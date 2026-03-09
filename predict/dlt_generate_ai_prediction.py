@@ -7,6 +7,7 @@
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
@@ -23,17 +24,18 @@ BASE_URL = os.environ.get("AI_BASE_URL") or "https://aihubmix.com/v1"
 API_KEY = os.environ.get("AI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
 MODELS = [
-    {"id": "gpt-4o", "name": "GPT-5", "model_id": "dlt_gpt"},
-    {"id": "claude-sonnet-4-6", "name": "Claude 4.6", "model_id": "dlt_claude"},
-    {"id": "gemini-3-flash-preview", "name": "Gemini 3", "model_id": "dlt_gemini"},
-    {"id": "deepseek-v3.2", "name": "DeepSeek v3.2", "model_id": "dlt_deepseek"},
+    {"id": "gpt-4o", "name": "GPT-4o", "model_id": "dlt_gpt"},
+    {"id": "claude-sonnet-4-6", "name": "Claude-4.6", "model_id": "dlt_claude"},
+    {"id": "gemini-3-flash-preview", "name": "Gemini-3", "model_id": "dlt_gemini"},
+    {"id": "deepseek-v3.2", "name": "DeepSeek-v3.2", "model_id": "dlt_deepseek"},
 ]
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOTTERY_HISTORY_FILE = os.path.join(SCRIPT_DIR, "data", "sports_lottery_data.json")
-AI_PREDICTIONS_FILE = os.path.join(SCRIPT_DIR, "data", "sport_lottery_ai_predictions.json")
-PREDICTIONS_HISTORY_FILE = os.path.join(SCRIPT_DIR, "data", "sport_lottery_predictions_history.json")
-PROMPT_FILE = os.path.join(SCRIPT_DIR, "doc", "sport_lottery_prompt2.0.md")
+LOTTERY_HISTORY_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_data.json")
+AI_PREDICTIONS_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_ai_predictions.json")
+PREDICTIONS_HISTORY_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_predictions_history.json")
+PROMPT_FILE = os.path.join(PROJECT_ROOT, "doc", "dlt_prompt2.0.md")
 
 
 def load_prompt_template() -> str:
