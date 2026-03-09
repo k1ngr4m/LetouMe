@@ -394,10 +394,10 @@ function prepareSportsLotteryChartData() {
     });
 
     const colors = {
-        'GPT-5': '#10b981',
-        'Claude 4.5': '#8b5cf6',
-        'Gemini 2.5': '#3b82f6',
-        'DeepSeek R1': '#f59e0b'
+        'GPT-4o': '#10b981',
+        'Claude-4.6': '#8b5cf6',
+        'Gemini-3': '#3b82f6',
+        'DeepSeek-v3.2': '#f59e0b'
     };
 
     const datasets = Object.keys(modelsData).map(modelName => ({
