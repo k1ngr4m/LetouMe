@@ -196,8 +196,8 @@ function _expandToFullBallRange(rankedList, start, end, totalPredictions) {
 function generateModelPredictionSummary(models) {
     const stats = _buildConsensusStats(models);
     return {
-        red: _expandToFullBallRange(stats.redRanked, 1, 35, stats.totalPredictions),
-        blue: _expandToFullBallRange(stats.blueRanked, 1, 12, stats.totalPredictions),
+        red: _expandToFullBallRange(stats.redRanked, 1, 35, stats.totalPredictions).filter(item => item.count > 0),
+        blue: _expandToFullBallRange(stats.blueRanked, 1, 12, stats.totalPredictions).filter(item => item.count > 0),
         totalPredictions: stats.totalPredictions,
         modelCount: stats.modelCount
     };
