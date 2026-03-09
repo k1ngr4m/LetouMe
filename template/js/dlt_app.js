@@ -119,172 +119,115 @@ function createSportsLotteryDrawnStatusBanner(actualResult) {
     return banner;
 }
 
-function generateCompound5x2(models) {
+function _buildConsensusStats(models) {
     const redFreq = {};
     const blueFreq = {};
 
     models.forEach(model => {
         model.predictions.forEach(pred => {
-            pred.red_balls.forEach(ball => { redFreq[ball] = (redFreq[ball] || 0) + 1; });
-            pred.blue_balls.forEach(ball => { blueFreq[ball] = (blueFreq[ball] || 0) + 1; });
+            pred.red_balls.forEach(ball => {
+                redFreq[ball] = (redFreq[ball] || 0) + 1;
+            });
+            pred.blue_balls.forEach(ball => {
+                blueFreq[ball] = (blueFreq[ball] || 0) + 1;
+            });
         });
     });
 
     const totalPredictions = models.reduce((sum, m) => sum + m.predictions.length, 0);
-
-    const sortedRed = Object.entries(redFreq)
+    const toRankedList = (freqMap) => Object.entries(freqMap)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([ball, count]) => ({ ball, count, rate: Math.round(count / totalPredictions * 100) }));
-
-    const sortedBlue = Object.entries(blueFreq)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([ball, count]) => ({ ball, count, rate: Math.round(count / totalPredictions * 100) }));
-
-    const redThreshold = Math.max(3, Math.floor(totalPredictions * 0.25));
-    let compoundRed = sortedRed.filter(item => item.count >= redThreshold);
-    if (compoundRed.length < 5) compoundRed = sortedRed.slice(0, 5);
-    if (compoundRed.length > 8) compoundRed = compoundRed.slice(0, 8);
-
-    const blueThreshold = Math.max(2, Math.floor(totalPredictions * 0.2));
-    let compoundBlue = sortedBlue.filter(item => item.count >= blueThreshold);
-    if (compoundBlue.length < 2) compoundBlue = sortedBlue.slice(0, 2);
-    if (compoundBlue.length > 4) compoundBlue = compoundBlue.slice(0, 4);
-
-    compoundRed.sort((a, b) => a.ball.localeCompare(b.ball));
-    compoundBlue.sort((a, b) => a.ball.localeCompare(b.ball));
+        .map(([ball, count]) => ({
+            ball,
+            count,
+            rate: totalPredictions ? Math.round((count / totalPredictions) * 100) : 0
+        }));
 
     return {
-        red: compoundRed,
-        blue: compoundBlue,
+        redRanked: toRankedList(redFreq),
+        blueRanked: toRankedList(blueFreq),
         totalPredictions,
         modelCount: models.length
     };
 }
 
-function _calcHistoryStats(draws) {
-    const pad = n => String(n).padStart(2, '0');
-    const recent5 = draws.slice(0, 5);
-    const recent10 = draws.slice(0, 10);
-    const recent20 = draws.slice(0, 20);
-    const recent30 = draws.slice(0, 30);
-
-    const redStats = {};
-    for (let i = 1; i <= 35; i++) {
-        const ball = pad(i);
-        const freq5 = recent5.filter(d => d.red_balls.includes(ball)).length;
-        const freq10 = recent10.filter(d => d.red_balls.includes(ball)).length;
-        const freq30 = recent30.filter(d => d.red_balls.includes(ball)).length;
-        const missIdx = draws.findIndex(d => d.red_balls.includes(ball));
-        const miss = missIdx === -1 ? draws.length : missIdx;
-
-        const hotScore = freq5 * 5 + freq10 * 3 + freq30 * 2;
-        const lastDraw = draws[0]?.red_balls || [];
-        const hotAdj = lastDraw.includes(ball) ? hotScore * 0.6 : (miss >= 4 ? hotScore * 0.8 : hotScore);
-
-        const coldRaw = miss >= 4 && miss <= 8 ? miss * 1.0 : (miss >= 9 && miss <= 16 ? miss * 1.4 : miss * 0.8);
-        const reappear = miss === 0 && draws.slice(1, 5).every(d => !d.red_balls.includes(ball));
-        const coldScore = reappear ? coldRaw * 1.3 : coldRaw;
-
-        const trend = (freq5 / 5 - freq30 / 30) * 100 + (freq10 / 10 - freq30 / 30) * 50;
-        const turnSignal = miss === 0 && draws.slice(1, 4).every(d => !d.red_balls.includes(ball));
-        const cycleScore = turnSignal ? trend + 15 : trend;
-
-        const balanceScore = freq30 >= 1 && freq30 <= 5 ? 10 : (freq30 > 5 ? 5 : 2);
-
-        const composite = hotAdj * 0.30 + coldScore * 0.25 + balanceScore * 0.20 + cycleScore * 0.25;
-
-        redStats[ball] = { ball, hotScore: hotAdj, coldScore, cycleScore, balanceScore, composite, miss, freq30, num: i };
+function _pickByConsensus(rankedList, pickCount, minRate) {
+    let picked = rankedList.filter(item => item.rate >= minRate);
+    if (picked.length < pickCount) {
+        picked = rankedList.slice(0, pickCount);
+    } else if (picked.length > pickCount) {
+        picked = picked
+            .sort((a, b) => b.count - a.count || a.ball.localeCompare(b.ball))
+            .slice(0, pickCount);
     }
-
-    const blueStats = {};
-    for (let i = 1; i <= 12; i++) {
-        const ball = pad(i);
-        const freq20 = recent20.filter(d => (d.blue_balls || []).includes(ball)).length;
-        const freq30 = recent30.filter(d => (d.blue_balls || []).includes(ball)).length;
-        const missIdx = draws.findIndex(d => (d.blue_balls || []).includes(ball));
-        const miss = missIdx === -1 ? draws.length : missIdx;
-        const avgMiss = freq30 > 0 ? Math.round(30 / freq30) : 30;
-
-        const hotScore = freq20 * 3 + freq30 * 1;
-        const coldScore = miss >= 4 && miss <= 10 ? miss * 1.2 : miss * 0.7;
-        const cycleScore = Math.max(0, 10 - Math.abs(miss - avgMiss));
-        const midScore = freq30 >= 2 && freq30 <= 5 ? 8 : 3;
-        const composite = hotScore * 0.35 + coldScore * 0.30 + cycleScore * 0.20 + midScore * 0.15;
-
-        blueStats[ball] = { ball, hotScore, coldScore, cycleScore, composite, miss, freq20, freq30, avgMiss };
-    }
-
-    return { redStats, blueStats, totalDraws: draws.length };
+    return picked.sort((a, b) => a.ball.localeCompare(b.ball));
 }
 
-function _ensureZoneBalance(candidates, count) {
-    const zones = [
-        candidates.filter(c => c.num >= 1 && c.num <= 12),
-        candidates.filter(c => c.num >= 13 && c.num <= 24),
-        candidates.filter(c => c.num >= 25 && c.num <= 35)
-    ];
-    const picked = [];
-    zones.forEach(zone => {
-        if (zone.length > 0) picked.push(zone[0]);
-    });
-    const remaining = candidates.filter(c => !picked.includes(c));
-    remaining.forEach(c => { if (picked.length < count) picked.push(c); });
-    return picked.slice(0, count).sort((a, b) => a.ball.localeCompare(b.ball));
-}
-
-function generateCompound6x3(draws) {
-    const { redStats, blueStats, totalDraws } = _calcHistoryStats(draws);
-    const allRed = Object.values(redStats);
-    const allBlue = Object.values(blueStats);
-
-    const hotPool = [...allRed].sort((a, b) => b.hotScore - a.hotScore).slice(0, 10);
-    const coldPool = [...allRed].sort((a, b) => b.coldScore - a.coldScore).slice(0, 10);
-
-    const merged = {};
-    hotPool.forEach(c => { merged[c.ball] = { ...c, source: 'hot', score: c.hotScore * 0.6 + c.coldScore * 0.4 }; });
-    coldPool.forEach(c => {
-        if (merged[c.ball]) {
-            merged[c.ball].score += c.coldScore * 0.3;
-            merged[c.ball].source = 'both';
-        } else {
-            merged[c.ball] = { ...c, source: 'cold', score: c.hotScore * 0.4 + c.coldScore * 0.6 };
-        }
-    });
-
-    const sortedCandidates = Object.values(merged).sort((a, b) => b.score - a.score);
-    const redPicked = _ensureZoneBalance(sortedCandidates, 6);
-
-    const blueByHot = [...allBlue].sort((a, b) => b.hotScore - a.hotScore);
-    const blueByCold = [...allBlue].sort((a, b) => b.coldScore - a.coldScore);
-    const blueScored = allBlue.map(b => ({
-        ...b,
-        finalScore: b.hotScore * 0.5 + b.coldScore * 0.3 + b.cycleScore * 0.2
-    })).sort((a, b) => b.finalScore - a.finalScore);
-    const bluePicked = blueScored.slice(0, 3).sort((a, b) => a.ball.localeCompare(b.ball));
-
+function generateConsensusCompound(models, config) {
+    const stats = _buildConsensusStats(models);
     return {
-        red: redPicked.map(c => ({ ball: c.ball, count: c.freq30, rate: Math.round(c.score * 10), source: c.source })),
-        blue: bluePicked.map(c => ({ ball: c.ball, count: c.freq30, rate: Math.round(c.finalScore * 10) })),
-        totalDraws
+        red: _pickByConsensus(stats.redRanked, config.redCount, config.redMinRate),
+        blue: _pickByConsensus(stats.blueRanked, config.blueCount, config.blueMinRate),
+        totalPredictions: stats.totalPredictions,
+        modelCount: stats.modelCount
     };
 }
 
-function generateCompound7x4(draws) {
-    const { redStats, blueStats, totalDraws } = _calcHistoryStats(draws);
-    const allRed = Object.values(redStats);
-    const allBlue = Object.values(blueStats);
+function _expandToFullBallRange(rankedList, start, end, totalPredictions) {
+    const rankedMap = {};
+    rankedList.forEach(item => {
+        rankedMap[item.ball] = item;
+    });
 
-    const compositeRanked = [...allRed].sort((a, b) => b.composite - a.composite).slice(0, 12);
-    const redPicked = _ensureZoneBalance(compositeRanked, 7);
+    const full = [];
+    for (let n = start; n <= end; n++) {
+        const ball = String(n).padStart(2, '0');
+        const hit = rankedMap[ball];
+        const count = hit ? hit.count : 0;
+        full.push({
+            ball,
+            count,
+            rate: totalPredictions ? Math.round((count / totalPredictions) * 100) : 0
+        });
+    }
+    return full;
+}
 
-    const blueComposite = [...allBlue].sort((a, b) => b.composite - a.composite);
-    const bluePicked = blueComposite.slice(0, 4).sort((a, b) => a.ball.localeCompare(b.ball));
-
+function generateModelPredictionSummary(models) {
+    const stats = _buildConsensusStats(models);
     return {
-        red: redPicked.map(c => ({ ball: c.ball, count: c.freq30, rate: Math.round(c.composite * 10) })),
-        blue: bluePicked.map(c => ({ ball: c.ball, count: c.freq30, rate: Math.round(c.composite * 10) })),
-        totalDraws
+        red: _expandToFullBallRange(stats.redRanked, 1, 35, stats.totalPredictions),
+        blue: _expandToFullBallRange(stats.blueRanked, 1, 12, stats.totalPredictions),
+        totalPredictions: stats.totalPredictions,
+        modelCount: stats.modelCount
     };
+}
+
+function generateCompound6x3(models) {
+    return generateConsensusCompound(models, {
+        redCount: 6,
+        blueCount: 3,
+        redMinRate: 30,
+        blueMinRate: 25
+    });
+}
+
+function generateCompound7x3(models) {
+    return generateConsensusCompound(models, {
+        redCount: 7,
+        blueCount: 3,
+        redMinRate: 25,
+        blueMinRate: 20
+    });
+}
+
+function generateCompound7x4(models) {
+    return generateConsensusCompound(models, {
+        redCount: 7,
+        blueCount: 4,
+        redMinRate: 20,
+        blueMinRate: 15
+    });
 }
 
 function renderSportsLotteryCompoundSelection() {
@@ -292,35 +235,41 @@ function renderSportsLotteryCompoundSelection() {
     if (!container || !sportLotteryAppData.aiPredictions) return;
 
     const models = sportLotteryAppData.aiPredictions.models;
-    const draws = sportLotteryAppData.lotteryHistory?.data || [];
-
-    const compound5x2 = generateCompound5x2(models);
-    const compound6x3 = generateCompound6x3(draws);
-    const compound7x4 = generateCompound7x4(draws);
+    const summary = generateModelPredictionSummary(models);
+    const compound6x3 = generateCompound6x3(models);
+    const compound7x3 = generateCompound7x3(models);
+    const compound7x4 = generateCompound7x4(models);
 
     container.innerHTML = '';
     container.appendChild(SportsLotteryComponents.createCompoundCard({
         types: [
             {
-                label: '5+2 基础复式',
-                tag: '5+2',
-                data: compound5x2,
-                rule: '从 ' + compound5x2.modelCount + ' 个 AI 模型共 ' + compound5x2.totalPredictions + ' 组预测中，按号码出现频率筛选高共识度号码',
+                label: '模型预测汇总',
+                tag: '汇总',
+                data: summary,
+                rule: '汇总 ' + summary.modelCount + ' 个 AI 模型共 ' + summary.totalPredictions + ' 组预测，展示前区 01-35 与后区 01-12 各号码被模型选中的频率统计',
                 basis: 'prediction'
             },
             {
                 label: '6+3 进阶复式',
                 tag: '6+3',
                 data: compound6x3,
-                rule: '基于近 30 期历史数据，融合热号加权频率与冷号遗漏回补得分，前区保证三区间覆盖，后区综合热度+遗漏+周期评分',
-                basis: 'history'
+                rule: '基于 AI 模型预测共识度，采用中阈值筛选并扩展到 6+3，兼顾主共识号码与次共识号码',
+                basis: 'prediction'
+            },
+            {
+                label: '7+3 扩展复式',
+                tag: '7+3',
+                data: compound7x3,
+                rule: '基于 AI 模型预测共识度，优先扩展前区覆盖范围，同时保持后区核心共识号码稳定性',
+                basis: 'prediction'
             },
             {
                 label: '7+4 豪华复式',
                 tag: '7+4',
                 data: compound7x4,
-                rule: '基于近 30 期历史数据，采用四维综合评分（热度×0.30 + 遗漏×0.25 + 平衡×0.20 + 周期×0.25），前区保证三区间覆盖，后区同权综合排名',
-                basis: 'history'
+                rule: '基于 AI 模型预测共识度，采用低阈值扩容到 7+4，覆盖高共识到潜在共识区间',
+                basis: 'prediction'
             }
         ]
     }));

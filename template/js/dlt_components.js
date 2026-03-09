@@ -1,6 +1,6 @@
 /**
  * 大乐透 UI 组件模块
- * 负责 5+2 玩法的号码展示、命中对比与历史记录卡片渲染
+ * 负责大乐透号码展示、命中对比与历史记录卡片渲染
  */
 
 const SportsLotteryComponents = {
@@ -364,7 +364,7 @@ const SportsLotteryComponents = {
                 </div>
                 <div>
                     <h3>AI 复式推荐</h3>
-                    <span class="compound-subtitle">多维度统计分析生成三档复式方案</span>
+                    <span class="compound-subtitle">模型预测汇总 + 共识度复式方案</span>
                 </div>
             </div>
         `;
@@ -426,7 +426,7 @@ const SportsLotteryComponents = {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
             </svg>
-            <span>5+2 基于 AI 模型预测共识度；6+3 融合热号与冷号双维分析；7+4 采用四维综合评分体系。复式号码仅供参考。</span>
+            <span>含模型预测汇总与 6+3、7+3、7+4 共识复式，均基于 AI 模型预测频次统计。复式号码仅供参考。</span>
         `;
         card.appendChild(footer);
 
