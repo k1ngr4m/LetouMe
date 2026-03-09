@@ -1,0 +1,12 @@
+[project]
+name = "letoume"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.10"
+dependencies = [
+    "bs4>=0.0.2",
+    "openai>=2.26.0",
+    "psycopg2-binary>=2.9.11",
+    "python-dotenv>=1.2.2",
+    "requests>=2.32.5",
+]

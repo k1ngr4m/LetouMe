@@ -1,0 +1,300 @@
+{
+  "历史预测记录": "本文件保存已开奖期号的大乐透 AI 预测数据，用于对比和统计",
+  "predictions_history": [
+    {
+      "prediction_date": "2026-03-06",
+      "target_period": "26023",
+      "actual_result": {
+        "period": "26023",
+        "red_balls": [
+          "09",
+          "25",
+          "26",
+          "27",
+          "28"
+        ],
+        "blue_balls": [
+          "01",
+          "08"
+        ],
+        "blue_ball": "01",
+        "date": "2026-03-07"
+      },
+      "models": [
+        {
+          "model_id": "dlt_gpt_4.1",
+          "model_name": "GPT-4.1",
+          "predictions": [
+            {
+              "group_id": 1,
+              "strategy": "增强型热号追随者",
+              "red_balls": [
+                "05",
+                "09",
+                "13",
+                "23",
+                "26"
+              ],
+              "blue_balls": [
+                "05",
+                "06"
+              ],
+              "description": "前区高频热号分布覆盖三区，区间1、2、3均有；后区为近20期活跃号码。",
+              "blue_ball": "05",
+              "hit_result": {
+                "red_hits": [
+                  "09",
+                  "26"
+                ],
+                "red_hit_count": 2,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 2
+              }
+            },
+            {
+              "group_id": 2,
+              "strategy": "增强型冷号逆向者",
+              "red_balls": [
+                "02",
+                "16",
+                "17",
+                "25",
+                "29"
+              ],
+              "blue_balls": [
+                "08",
+                "10"
+              ],
+              "description": "前区遗漏期数长且分散，奇偶3:2，大号3个；后区为近遗漏回补强信号。",
+              "blue_ball": "08",
+              "hit_result": {
+                "red_hits": [
+                  "25"
+                ],
+                "red_hit_count": 1,
+                "blue_hits": [
+                  "08"
+                ],
+                "blue_hit_count": 1,
+                "total_hits": 2
+              }
+            },
+            {
+              "group_id": 3,
+              "strategy": "增强型平衡策略师",
+              "red_balls": [
+                "04",
+                "10",
+                "14",
+                "23",
+                "31"
+              ],
+              "blue_balls": [
+                "01",
+                "09"
+              ],
+              "description": "前区中频号主导，奇偶2:3，和值90，1对连号；后区跨度适中。",
+              "blue_ball": "01",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [
+                  "01"
+                ],
+                "blue_hit_count": 1,
+                "total_hits": 1
+              }
+            },
+            {
+              "group_id": 4,
+              "strategy": "增强型周期理论家",
+              "red_balls": [
+                "09",
+                "12",
+                "18",
+                "23",
+                "35"
+              ],
+              "blue_balls": [
+                "06",
+                "12"
+              ],
+              "description": "选趋势分大于0号码，含周期转折点，后区遗漏接近均值。",
+              "blue_ball": "06",
+              "hit_result": {
+                "red_hits": [
+                  "09"
+                ],
+                "red_hit_count": 1,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 1
+              }
+            },
+            {
+              "group_id": 5,
+              "strategy": "增强型综合决策者",
+              "red_balls": [
+                "05",
+                "10",
+                "13",
+                "22",
+                "33"
+              ],
+              "blue_balls": [
+                "05",
+                "12"
+              ],
+              "description": "综合热度遗漏与趋势，前区三区覆盖，奇偶3:2，后区双活跃中频号。",
+              "blue_ball": "05",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0
+              }
+            }
+          ],
+          "best_group": 1,
+          "best_hit_count": 2
+        },
+        {
+          "model_id": "dlt_gemini_3_flash",
+          "model_name": "Gemini-3-flash-preview",
+          "predictions": [
+            {
+              "group_id": 1,
+              "strategy": "增强型热号追随者",
+              "red_balls": [
+                "01",
+                "12",
+                "13",
+                "23",
+                "35"
+              ],
+              "blue_balls": [
+                "04",
+                "12"
+              ],
+              "description": "基于加权频率，锁定23(30期8次)与01、12、35等高分号，各区间均衡分布；后区追踪近期热号04、12。",
+              "blue_ball": "04",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0
+              }
+            },
+            {
+              "group_id": 2,
+              "strategy": "增强型冷号逆向者",
+              "red_balls": [
+                "02",
+                "07",
+                "15",
+                "20",
+                "22"
+              ],
+              "blue_balls": [
+                "03",
+                "09"
+              ],
+              "description": "聚焦遗漏期数超过20期的07、15、20号，配合二区冷号22回补；奇偶比3:2，覆盖多尾数。",
+              "blue_ball": "03",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0
+              }
+            },
+            {
+              "group_id": 3,
+              "strategy": "增强型平衡策略师",
+              "red_balls": [
+                "04",
+                "08",
+                "16",
+                "21",
+                "31"
+              ],
+              "blue_balls": [
+                "02",
+                "08"
+              ],
+              "description": "严格控制和值在80左右，奇偶比2:3，大小比2:3；中频号为主，后区采用大跨度偶数组合。",
+              "blue_ball": "02",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [
+                  "08"
+                ],
+                "blue_hit_count": 1,
+                "total_hits": 1
+              }
+            },
+            {
+              "group_id": 4,
+              "strategy": "增强型周期理论家",
+              "red_balls": [
+                "09",
+                "10",
+                "12",
+                "14",
+                "18"
+              ],
+              "blue_balls": [
+                "07",
+                "11"
+              ],
+              "description": "选入趋势分最高的09、10号，结合超短期回补号14、18；后区选择接近历史平均遗漏期的07、11。",
+              "blue_ball": "07",
+              "hit_result": {
+                "red_hits": [
+                  "09"
+                ],
+                "red_hit_count": 1,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 1
+              }
+            },
+            {
+              "group_id": 5,
+              "strategy": "增强型综合决策者",
+              "red_balls": [
+                "01",
+                "11",
+                "13",
+                "23",
+                "32"
+              ],
+              "blue_balls": [
+                "01",
+                "04"
+              ],
+              "description": "综合热度与周期得分，保留高分号23并补充潜力号11、32，避免与上期重合过多；后区选高综分组合。",
+              "blue_ball": "01",
+              "hit_result": {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [
+                  "01"
+                ],
+                "blue_hit_count": 1,
+                "total_hits": 1
+              }
+            }
+          ],
+          "best_group": 3,
+          "best_hit_count": 1
+        }
+      ]
+    }
+  ]
+}

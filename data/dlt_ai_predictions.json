@@ -1,0 +1,192 @@
+{
+  "prediction_date": "2026-03-08",
+  "target_period": "26024",
+  "models": [
+    {
+      "prediction_date": "2026-03-08",
+      "target_period": "26024",
+      "model_id": "dlt_gpt_4.1",
+      "model_name": "GPT-4.1",
+      "predictions": [
+        {
+          "group_id": 1,
+          "strategy": "增强型热号追随者",
+          "red_balls": [
+            "05",
+            "09",
+            "13",
+            "23",
+            "26"
+          ],
+          "blue_balls": [
+            "01",
+            "05"
+          ],
+          "description": "选取近30期高频号，区间为2-2-1分布，后区为20期最热且近期开出号码。",
+          "blue_ball": "01"
+        },
+        {
+          "group_id": 2,
+          "strategy": "增强型冷号逆向者",
+          "red_balls": [
+            "06",
+            "17",
+            "18",
+            "22",
+            "28"
+          ],
+          "blue_balls": [
+            "04",
+            "06"
+          ],
+          "description": "前区优先遗漏8期以上回补潜力号码，保证4尾数，奇偶3:2，后区遗漏4-10期未连开。",
+          "blue_ball": "04"
+        },
+        {
+          "group_id": 3,
+          "strategy": "增强型平衡策略师",
+          "red_balls": [
+            "03",
+            "12",
+            "16",
+            "24",
+            "33"
+          ],
+          "blue_balls": [
+            "08",
+            "10"
+          ],
+          "description": "中频号组合，奇偶2:3，大小2:3，和值99，1对连号，后区跨度2。",
+          "blue_ball": "08"
+        },
+        {
+          "group_id": 4,
+          "strategy": "增强型周期理论家",
+          "red_balls": [
+            "02",
+            "10",
+            "13",
+            "25",
+            "31"
+          ],
+          "blue_balls": [
+            "02",
+            "08"
+          ],
+          "description": "优选趋势分大于0号码含周期转折，后区遗漏期接近均值，节奏稳定。",
+          "blue_ball": "02"
+        },
+        {
+          "group_id": 5,
+          "strategy": "增强型综合决策者",
+          "red_balls": [
+            "04",
+            "14",
+            "18",
+            "27",
+            "32"
+          ],
+          "blue_balls": [
+            "01",
+            "09"
+          ],
+          "description": "综合热冷趋势得分，候选池区间2-2-1覆盖，后区高分稳健搭配。",
+          "blue_ball": "01"
+        }
+      ]
+    },
+    {
+      "prediction_date": "2026-03-08",
+      "target_period": "26024",
+      "model_id": "dlt_gemini_3_flash",
+      "model_name": "Gemini-3-flash-preview",
+      "predictions": [
+        {
+          "group_id": 1,
+          "strategy": "增强型热号追随者",
+          "red_balls": [
+            "05",
+            "12",
+            "13",
+            "23",
+            "26"
+          ],
+          "blue_balls": [
+            "01",
+            "06"
+          ],
+          "description": "聚焦30期内高频号05与23，区间分布2:2:1均衡；后区锁定近20期最热号码01与06。",
+          "blue_ball": "01"
+        },
+        {
+          "group_id": 2,
+          "strategy": "增强型冷号逆向者",
+          "red_balls": [
+            "07",
+            "15",
+            "20",
+            "32",
+            "33"
+          ],
+          "blue_balls": [
+            "02",
+            "09"
+          ],
+          "description": "锁定遗漏20期以上的07、15、20，奇偶比3:2，尾数全覆盖；后区博取长期遗漏号回补。",
+          "blue_ball": "02"
+        },
+        {
+          "group_id": 3,
+          "strategy": "增强型平衡策略师",
+          "red_balls": [
+            "08",
+            "11",
+            "17",
+            "22",
+            "31"
+          ],
+          "blue_balls": [
+            "04",
+            "10"
+          ],
+          "description": "以中频号为核心，和值回归89点位，大小比2:3；后区采用中频跨度组合。",
+          "blue_ball": "04"
+        },
+        {
+          "group_id": 4,
+          "strategy": "增强型周期理论家",
+          "red_balls": [
+            "09",
+            "12",
+            "18",
+            "25",
+            "26"
+          ],
+          "blue_balls": [
+            "05",
+            "12"
+          ],
+          "description": "09与26趋势分显著占优，捕捉上升通道号码；后区选择遗漏期数接近均值的05、12。",
+          "blue_ball": "05"
+        },
+        {
+          "group_id": 5,
+          "strategy": "增强型综合决策者",
+          "red_balls": [
+            "02",
+            "05",
+            "13",
+            "14",
+            "23"
+          ],
+          "blue_balls": [
+            "06",
+            "12"
+          ],
+          "description": "综合热度与周期评分，避开上期重号，区间重点落在01-24；后区结合热度与中频得分。",
+          "blue_ball": "06"
+        }
+      ]
+    }
+  ]
+}
