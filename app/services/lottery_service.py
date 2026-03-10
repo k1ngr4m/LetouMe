@@ -21,7 +21,6 @@ class LotteryService:
     def normalize_draw(self, draw: dict[str, Any]) -> dict[str, Any]:
         blue_balls = self.normalize_blue_balls(draw.get("blue_balls", draw.get("blue_ball")))
         return {
-            **draw,
             "period": str(draw.get("period", "")),
             "red_balls": sorted(str(item).zfill(2) for item in draw.get("red_balls", [])),
             "blue_balls": blue_balls,

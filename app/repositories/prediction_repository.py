@@ -23,6 +23,21 @@ class PredictionRepository:
                 row = cursor.fetchone()
         return self._current_row_to_dict(row) if row else None
 
+    def get_current_prediction_by_period(self, target_period: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT target_period, prediction_date, payload_json, updated_at
+                    FROM current_predictions
+                    WHERE target_period = %s
+                    LIMIT 1
+                    """,
+                    (target_period,),
+                )
+                row = cursor.fetchone()
+        return self._current_row_to_dict(row) if row else None
+
     def upsert_current_prediction(self, payload: dict[str, Any]) -> None:
         with get_connection() as connection:
             with connection.cursor() as cursor:

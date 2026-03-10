@@ -218,7 +218,26 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
 
     registry = load_model_registry(MODEL_CONFIG_FILE)
     model_definitions = registry.select()
-    models = prepare_models(model_definitions, enable_health_check=True)
+    current_prediction = prediction_service.get_current_payload_by_period(target_period)
+    existing_model_ids = {
+        model.get("model_id")
+        for model in current_prediction.get("models", [])
+        if model.get("model_id")
+    }
+    pending_definitions = [
+        model_def
+        for model_def in model_definitions
+        if model_def.model_id not in existing_model_ids
+    ]
+
+    if existing_model_ids:
+        print(f"Existing models for period {target_period}: {len(existing_model_ids)}")
+
+    if not pending_definitions:
+        print(f"No missing models for target period {target_period}.")
+        return current_prediction
+
+    models = prepare_models(pending_definitions, enable_health_check=True)
 
     all_predictions = []
     for model in models:

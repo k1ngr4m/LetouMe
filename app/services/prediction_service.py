@@ -48,12 +48,20 @@ class PredictionService:
             "models": [],
         }
 
+    def get_current_payload_by_period(self, target_period: str) -> dict[str, Any]:
+        return self.prediction_repository.get_current_prediction_by_period(target_period) or {
+            "prediction_date": "",
+            "target_period": target_period,
+            "models": [],
+        }
+
     def get_history_payload(self) -> dict[str, Any]:
         return {"predictions_history": self.prediction_repository.list_history_records()}
 
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
-        current = self.get_current_payload()
-        if current.get("target_period") == payload.get("target_period"):
+        target_period = str(payload.get("target_period") or "")
+        current = self.get_current_payload_by_period(target_period) if target_period else self.get_current_payload()
+        if current.get("target_period") == target_period:
             existing_model_map = {
                 model.get("model_id"): model
                 for model in current.get("models", [])
@@ -65,11 +73,11 @@ class PredictionService:
             payload = {
                 **current,
                 "prediction_date": payload.get("prediction_date", current.get("prediction_date")),
-                "target_period": payload.get("target_period", current.get("target_period")),
+                "target_period": target_period or current.get("target_period"),
                 "models": list(existing_model_map.values()),
             }
 
-        self.prediction_repository.replace_current_prediction(payload)
+        self.prediction_repository.upsert_current_prediction(payload)
         return payload
 
     def archive_current_prediction_if_needed(self, lottery_data: dict[str, Any]) -> None:

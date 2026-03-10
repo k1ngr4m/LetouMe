@@ -1052,6 +1052,11 @@ body::after {
     color: white;
 }
 
+.model-header-doubao {
+    background: linear-gradient(to right, #0f766e, #1d4ed8);
+    color: white;
+}
+
 .model-card-header-left {
     display: flex;
     align-items: center;

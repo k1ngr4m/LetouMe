@@ -22,6 +22,7 @@ const SportsLotteryComponents = {
         if (modelName.includes('Claude')) return 'model-header-claude';
         if (modelName.includes('DeepSeek')) return 'model-header-deepseek';
         if (modelName.includes('Gemini')) return 'model-header-gemini';
+        if (modelName.includes('Doubao') || modelName.includes('豆包')) return 'model-header-doubao';
         return 'model-header-gpt';
     },
 
