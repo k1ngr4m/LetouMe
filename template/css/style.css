@@ -881,6 +881,7 @@ body::after {
     margin-top: 0.25rem;
     font-size: 0.76rem;
     color: var(--slate-500);
+    line-height: 1.5;
 }
 
 .prediction-overview-actions {
@@ -2231,6 +2232,16 @@ body::after {
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--slate-700);
+}
+
+.summary-filter-option-score {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--indigo-600);
+    background: rgba(79, 70, 229, 0.08);
+    border-radius: 9999px;
+    padding: 0.18rem 0.45rem;
 }
 
 .summary-filter-empty {

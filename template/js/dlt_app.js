@@ -5,7 +5,8 @@
 let sportLotteryAppData = {
     lotteryHistory: null,
     aiPredictions: null,
-    predictionsHistory: null
+    predictionsHistory: null,
+    modelScores: {}
 };
 
 let sportLotteryUiState = {
@@ -20,6 +21,7 @@ let sportLotteryUiState = {
         sortOrder: 'desc',
         selectedModelIds: [],
         commonOnly: false,
+        scoreWeightingEnabled: false,
         modelSearchQuery: '',
         isModelDropdownOpen: false
     }
@@ -27,6 +29,9 @@ let sportLotteryUiState = {
 
 let sportLotteryCharts = [];
 const SPORT_LOTTERY_PINNED_MODELS_KEY = 'dltPinnedModelIds';
+const SPORT_LOTTERY_SCORE_WINDOW = 20;
+const SPORT_LOTTERY_BEST_SCORE_WEIGHT = 0.6;
+const SPORT_LOTTERY_AVG_SCORE_WEIGHT = 0.4;
 
 async function initSportsLotteryApp() {
     try {
@@ -52,6 +57,7 @@ async function loadSportsLotteryAllData() {
     sportLotteryAppData.lotteryHistory = lotteryHistory;
     sportLotteryAppData.aiPredictions = aiPredictions;
     sportLotteryAppData.predictionsHistory = predictionsHistory;
+    sportLotteryAppData.modelScores = buildSportsLotteryModelScores(predictionsHistory, aiPredictions.models);
     initializeSportsLotteryPredictionState(aiPredictions.models);
     sportLotteryUiState.compound.selectedModelIds = aiPredictions.models.map(model => model.model_id);
 }
@@ -61,9 +67,7 @@ function initializeSportsLotteryPredictionState(models) {
     const pinnedModelIds = loadSportsLotteryPinnedModelIds().filter(modelId => allModelIds.includes(modelId));
 
     sportLotteryUiState.prediction.pinnedModelIds = pinnedModelIds;
-    sportLotteryUiState.prediction.highlightedModelIds = pinnedModelIds.length
-        ? pinnedModelIds.slice(0, 3)
-        : allModelIds.slice(0, 3);
+    sportLotteryUiState.prediction.highlightedModelIds = getDefaultHighlightedPredictionModelIds(models);
 }
 
 function loadSportsLotteryPinnedModelIds() {
@@ -88,6 +92,65 @@ function saveSportsLotteryPinnedModelIds() {
     }
 }
 
+function buildSportsLotteryModelScores(predictionsHistory, models) {
+    const history = (predictionsHistory?.predictions_history || []).slice(0, SPORT_LOTTERY_SCORE_WINDOW);
+    const scoreMap = {};
+
+    models.forEach(model => {
+        const periods = [];
+
+        history.forEach(record => {
+            const historyModel = record.models.find(item => item.model_id === model.model_id);
+            if (!historyModel || !historyModel.predictions?.length) return;
+
+            const groupScores = historyModel.predictions.map(prediction => {
+                const redScore = (prediction.hit_result?.red_hit_count || 0) / 5;
+                const blueScore = (prediction.hit_result?.blue_hit_count || 0) / 2;
+                return (redScore + blueScore) / 2;
+            });
+
+            if (!groupScores.length) return;
+
+            const bestScore = Math.max(...groupScores);
+            const avgScore = groupScores.reduce((sum, value) => sum + value, 0) / groupScores.length;
+            periods.push({
+                bestScore,
+                avgScore,
+                periodScore: bestScore * SPORT_LOTTERY_BEST_SCORE_WEIGHT + avgScore * SPORT_LOTTERY_AVG_SCORE_WEIGHT
+            });
+        });
+
+        const sampleSize = periods.length;
+        const bestComponent = sampleSize
+            ? Math.round((periods.reduce((sum, item) => sum + item.bestScore, 0) / sampleSize) * 100)
+            : 0;
+        const avgComponent = sampleSize
+            ? Math.round((periods.reduce((sum, item) => sum + item.avgScore, 0) / sampleSize) * 100)
+            : 0;
+        const score100 = sampleSize
+            ? Math.round((periods.reduce((sum, item) => sum + item.periodScore, 0) / sampleSize) * 100)
+            : 0;
+
+        scoreMap[model.model_id] = {
+            score100,
+            bestComponent,
+            avgComponent,
+            sampleSize,
+            windowSize: SPORT_LOTTERY_SCORE_WINDOW
+        };
+    });
+
+    return scoreMap;
+}
+
+function getDefaultHighlightedPredictionModelIds(models) {
+    if (sportLotteryUiState.prediction.pinnedModelIds.length) {
+        return sportLotteryUiState.prediction.pinnedModelIds.slice(0, 3);
+    }
+
+    return _getOrderedPredictionModels(models).slice(0, 3).map(model => model.model_id);
+}
+
 function _getSportsLotteryActualResult() {
     if (!sportLotteryAppData.aiPredictions || !sportLotteryAppData.lotteryHistory?.data?.length) {
         return null;
@@ -106,17 +169,21 @@ function _getOrderedPredictionModels(models) {
     const pinnedIndexMap = new Map(
         sportLotteryUiState.prediction.pinnedModelIds.map((modelId, index) => [modelId, index])
     );
+    const originalIndexMap = new Map(models.map((model, index) => [model.model_id, index]));
 
     return [...models].sort((left, right) => {
         const leftPinned = pinnedIndexMap.has(left.model_id);
         const rightPinned = pinnedIndexMap.has(right.model_id);
+        const leftScore = sportLotteryAppData.modelScores[left.model_id]?.score100 || 0;
+        const rightScore = sportLotteryAppData.modelScores[right.model_id]?.score100 || 0;
 
         if (leftPinned && rightPinned) {
             return pinnedIndexMap.get(left.model_id) - pinnedIndexMap.get(right.model_id);
         }
         if (leftPinned) return -1;
         if (rightPinned) return 1;
-        return 0;
+        if (rightScore !== leftScore) return rightScore - leftScore;
+        return originalIndexMap.get(left.model_id) - originalIndexMap.get(right.model_id);
     });
 }
 
@@ -150,6 +217,13 @@ function _buildPredictionOverviewModel(model, actualResult) {
         predictionCount: model.predictions.length,
         bestPrediction,
         primaryPrediction,
+        historyScore: sportLotteryAppData.modelScores[model.model_id] || {
+            score100: 0,
+            bestComponent: 0,
+            avgComponent: 0,
+            sampleSize: 0,
+            windowSize: SPORT_LOTTERY_SCORE_WINDOW
+        },
         isPinned: sportLotteryUiState.prediction.pinnedModelIds.includes(model.model_id)
     };
 }
@@ -341,6 +415,7 @@ function _createBallMetaMap(start, end) {
         metaMap[ball] = {
             ball,
             count: 0,
+            rawCount: 0,
             models: new Set()
         };
     }
@@ -360,20 +435,29 @@ function generateFilteredModelPredictionSummary(models, selectedModelIds, sortOr
     const selectedModels = models.filter(model => selectedModelIds.includes(model.model_id));
     const selectedModelCount = selectedModels.length;
     const totalPredictions = selectedModels.reduce((sum, model) => sum + model.predictions.length, 0);
+    const scoreWeightingEnabled = sportLotteryUiState.compound.scoreWeightingEnabled;
     const redMetaMap = _createBallMetaMap(1, 35);
     const blueMetaMap = _createBallMetaMap(1, 12);
+    let weightedTotalPredictions = 0;
 
     selectedModels.forEach(model => {
         const modelRedHits = new Set();
         const modelBlueHits = new Set();
+        const scoreWeight = scoreWeightingEnabled
+            ? (sportLotteryAppData.modelScores[model.model_id]?.score100 || 0) / 100
+            : 1;
+
+        weightedTotalPredictions += model.predictions.length * scoreWeight;
 
         model.predictions.forEach(prediction => {
             prediction.red_balls.forEach(ball => {
-                redMetaMap[ball].count += 1;
+                redMetaMap[ball].count += scoreWeight;
+                redMetaMap[ball].rawCount += 1;
                 modelRedHits.add(ball);
             });
             prediction.blue_balls.forEach(ball => {
-                blueMetaMap[ball].count += 1;
+                blueMetaMap[ball].count += scoreWeight;
+                blueMetaMap[ball].rawCount += 1;
                 modelBlueHits.add(ball);
             });
         });
@@ -390,9 +474,13 @@ function generateFilteredModelPredictionSummary(models, selectedModelIds, sortOr
                 .filter(item => item.count > 0)
                 .map(item => ({
                     ball: item.ball,
-                    count: item.count,
-                    predictionCount: item.count,
-                    rate: totalPredictions ? Math.round((item.count / totalPredictions) * 100) : 0,
+                    count: scoreWeightingEnabled ? Number(item.count.toFixed(1)) : item.rawCount,
+                    predictionCount: scoreWeightingEnabled ? Number(item.count.toFixed(1)) : item.rawCount,
+                    rawPredictionCount: item.rawCount,
+                    weightedCount: Number(item.count.toFixed(1)),
+                    rate: (scoreWeightingEnabled ? weightedTotalPredictions : totalPredictions)
+                        ? Math.round((item.count / (scoreWeightingEnabled ? weightedTotalPredictions : totalPredictions)) * 100)
+                        : 0,
                     matchedModels: Array.from(item.models),
                     matchedModelCount: item.models.size
                 }))
@@ -409,6 +497,7 @@ function generateFilteredModelPredictionSummary(models, selectedModelIds, sortOr
         red: redZone,
         blue: blueZone,
         totalPredictions,
+        weightedTotalPredictions: Number(weightedTotalPredictions.toFixed(1)),
         selectedModelCount,
         selectedModels: selectedModels.map(model => ({
             model_id: model.model_id,
@@ -417,12 +506,15 @@ function generateFilteredModelPredictionSummary(models, selectedModelIds, sortOr
         totalDisplayedNumbers: redZone.length + blueZone.length,
         sortOrder,
         commonOnly,
+        scoreWeightingEnabled,
         zoneMeta: {
             red: {
-                isCommonOnly: commonOnly
+                isCommonOnly: commonOnly,
+                isWeighted: scoreWeightingEnabled
             },
             blue: {
-                isCommonOnly: commonOnly
+                isCommonOnly: commonOnly,
+                isWeighted: scoreWeightingEnabled
             }
         }
     };
@@ -478,19 +570,21 @@ function renderSportsLotteryCompoundSelection() {
                 data: summary,
                 rule: summary.selectedModelCount
                     ? (summary.commonOnly
-                        ? '当前仅展示所有已选模型共同预测过的号码，并按号码在预测组中的累计出现次数排序。'
-                        : '当前展示所有已选模型预测过的号码，并同时显示累计出现次数与命中模型数。')
+                        ? `当前仅展示所有已选模型共同预测过的号码，并按${summary.scoreWeightingEnabled ? '历史评分加权后的' : ''}累计出现次数排序。`
+                        : `当前展示所有已选模型预测过的号码，并同时显示${summary.scoreWeightingEnabled ? '加权出现次数、原始出现次数' : '累计出现次数'}与命中模型数。`)
                     : '请先在筛选框中选择至少一个模型，再查看共同预测号码汇总。',
                 basis: 'prediction',
                 summaryControls: {
                     selectedModelIds: sportLotteryUiState.compound.selectedModelIds,
                     sortOrder: sportLotteryUiState.compound.sortOrder,
                     commonOnly: sportLotteryUiState.compound.commonOnly,
+                    scoreWeightingEnabled: sportLotteryUiState.compound.scoreWeightingEnabled,
                     modelSearchQuery: sportLotteryUiState.compound.modelSearchQuery,
                     isModelDropdownOpen: sportLotteryUiState.compound.isModelDropdownOpen,
                     models: models.map(model => ({
                         model_id: model.model_id,
-                        model_name: model.model_name
+                        model_name: model.model_name,
+                        score100: sportLotteryAppData.modelScores[model.model_id]?.score100 || 0
                     }))
                 }
             },
@@ -573,9 +667,9 @@ function handleSportsLotteryPredictionInteractions(event) {
         }
 
         sportLotteryUiState.prediction.pinnedModelIds = pinnedModelIds;
-        sportLotteryUiState.prediction.highlightedModelIds = pinnedModelIds.length
-            ? pinnedModelIds.slice(0, 3)
-            : sportLotteryAppData.aiPredictions.models.map(model => model.model_id).slice(0, 3);
+        sportLotteryUiState.prediction.highlightedModelIds = getDefaultHighlightedPredictionModelIds(
+            sportLotteryAppData.aiPredictions.models
+        );
         saveSportsLotteryPinnedModelIds();
         renderSportsLotteryModelsGrid();
         return;
@@ -607,6 +701,12 @@ function handleSportsLotteryPredictionInteractions(event) {
 function handleSportsLotteryCompoundChange(event) {
     if (event.target.matches('[data-role="common-only-toggle"]')) {
         sportLotteryUiState.compound.commonOnly = event.target.checked;
+        renderSportsLotteryCompoundSelection();
+        return;
+    }
+
+    if (event.target.matches('[data-role="score-weighting-toggle"]')) {
+        sportLotteryUiState.compound.scoreWeightingEnabled = event.target.checked;
         renderSportsLotteryCompoundSelection();
         return;
     }

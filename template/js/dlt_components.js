@@ -403,7 +403,7 @@ const SportsLotteryComponents = {
             <div class="prediction-spotlight-top">
                 <div>
                     <div class="prediction-spotlight-name">${model.model_name}</div>
-                    <div class="prediction-spotlight-meta">${hitLabel}</div>
+                    <div class="prediction-spotlight-meta">${hitLabel} · 历史评分 ${model.historyScore.score100}</div>
                 </div>
                 <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
                     ${model.isPinned ? '已置顶' : '置顶'}
@@ -471,7 +471,7 @@ const SportsLotteryComponents = {
             <div class="prediction-overview-balls"></div>
             <div class="prediction-overview-summary">
                 <div class="prediction-overview-summary-main">${summary}</div>
-                <div class="prediction-overview-summary-sub">${hitResult ? `前区 ${hitResult.redHitCount} / 后区 ${hitResult.blueHitCount}` : '点击查看完整 5 组策略与说明'}</div>
+                <div class="prediction-overview-summary-sub">历史评分 ${model.historyScore.score100} · 最佳项 ${model.historyScore.bestComponent} · 平均项 ${model.historyScore.avgComponent}</div>
             </div>
             <div class="prediction-overview-actions">
                 <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
@@ -507,7 +507,7 @@ const SportsLotteryComponents = {
             <div class="prediction-mobile-card-top">
                 <div>
                     <strong>${model.model_name}</strong>
-                    <div class="prediction-mobile-card-sub">${summary}</div>
+                    <div class="prediction-mobile-card-sub">${summary} · 历史评分 ${model.historyScore.score100}</div>
                 </div>
                 <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
                     ${model.isPinned ? '已置顶' : '置顶'}
@@ -637,7 +637,9 @@ const SportsLotteryComponents = {
             const content = document.createElement('div');
             content.className = 'compound-card-content';
 
-            const totalRef = type.basis === 'prediction' ? type.data.totalPredictions : type.data.totalDraws;
+            const totalRef = type.basis === 'prediction'
+                ? (type.data.scoreWeightingEnabled ? type.data.weightedTotalPredictions : type.data.totalPredictions)
+                : type.data.totalDraws;
             const redSection = this._createCompoundZone('前区精选', 'red', type.data.red, totalRef, type.basis, {
                 isSummary: Boolean(type.summaryControls),
                 zoneMeta: type.data.zoneMeta?.red
@@ -700,6 +702,11 @@ const SportsLotteryComponents = {
                         <span class="summary-check-indicator"></span>
                         <span class="summary-check-text">共同预测</span>
                     </label>
+                    <label class="summary-check-toggle">
+                        <input type="checkbox" data-role="score-weighting-toggle" ${summaryControls.scoreWeightingEnabled ? 'checked' : ''}>
+                        <span class="summary-check-indicator"></span>
+                        <span class="summary-check-text">按历史评分加权</span>
+                    </label>
                 </div>
                 <div class="summary-toolbar-group summary-filter-group">
                     <span class="summary-toolbar-label">模型筛选</span>
@@ -728,6 +735,7 @@ const SportsLotteryComponents = {
                                         <label class="summary-filter-option selected">
                                             <input type="checkbox" value="${model.model_id}" checked>
                                             <span class="summary-filter-option-name">${model.model_name}</span>
+                                            <span class="summary-filter-option-score">${model.score100}</span>
                                         </label>
                                     `).join('') : '<div class="summary-filter-empty">暂无已选模型</div>'}
                                 </div>
@@ -739,6 +747,7 @@ const SportsLotteryComponents = {
                                         <label class="summary-filter-option">
                                             <input type="checkbox" value="${model.model_id}">
                                             <span class="summary-filter-option-name">${model.model_name}</span>
+                                            <span class="summary-filter-option-score">${model.score100}</span>
                                         </label>
                                     `).join('') : '<div class="summary-filter-empty">未找到匹配的模型</div>'}
                                 </div>
@@ -813,7 +822,9 @@ const SportsLotteryComponents = {
             const freq = document.createElement('div');
             freq.className = 'compound-ball-freq';
             freq.textContent = basis === 'prediction'
-                ? `出现 ${item.predictionCount || item.count}/${totalRef}`
+                ? (zoneMeta?.isWeighted
+                    ? `加权 ${item.weightedCount}/${totalRef} · 原始 ${item.rawPredictionCount}`
+                    : `出现 ${item.predictionCount || item.count}/${totalRef}`)
                 : `${item.count}期`;
             ballWrap.appendChild(freq);
 
