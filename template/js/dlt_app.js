@@ -630,8 +630,19 @@ function handleSportsLotteryCompoundChange(event) {
 function handleSportsLotteryCompoundInput(event) {
     if (!event.target.matches('[data-role="model-search-input"]')) return;
 
-    sportLotteryUiState.compound.modelSearchQuery = event.target.value;
+    const { value, selectionStart, selectionEnd } = event.target;
+    sportLotteryUiState.compound.modelSearchQuery = value;
     renderSportsLotteryCompoundSelection();
+
+    window.requestAnimationFrame(() => {
+        const nextInput = document.querySelector('[data-role="model-search-input"]');
+        if (!nextInput) return;
+
+        nextInput.focus();
+        const cursorStart = typeof selectionStart === 'number' ? selectionStart : value.length;
+        const cursorEnd = typeof selectionEnd === 'number' ? selectionEnd : value.length;
+        nextInput.setSelectionRange(cursorStart, cursorEnd);
+    });
 }
 
 function renderSportsLotteryHistoryTab() {
