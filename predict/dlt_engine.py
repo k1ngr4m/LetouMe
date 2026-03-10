@@ -4,13 +4,14 @@
 自动调用 AI 模型生成下期预测数据
 """
 
+from __future__ import annotations
+
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-from openai import OpenAI
 
 # 尝试导入并加载 .env 文件
 try:
@@ -20,26 +21,22 @@ except ImportError:
     pass
 
 
-BASE_URL = os.environ.get("AI_BASE_URL") or "https://aihubmix.com/v1"
-API_KEY = os.environ.get("AI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-
-MODELS = [
-    {"id": "gpt-4o", "name": "GPT-4o", "model_id": "dlt_gpt"},
-    {"id": "claude-sonnet-4-6", "name": "Claude-4.6", "model_id": "dlt_claude"},
-    {"id": "gemini-3-flash-preview", "name": "Gemini-3", "model_id": "dlt_gemini"},
-    {"id": "deepseek-v3.2", "name": "DeepSeek-v3.2", "model_id": "dlt_deepseek"},
-]
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from core.model_config import ModelDefinition, load_model_registry
+from core.model_factory import ModelFactory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOTTERY_HISTORY_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_data.json")
 AI_PREDICTIONS_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_ai_predictions.json")
 PREDICTIONS_HISTORY_FILE = os.path.join(PROJECT_ROOT, "data", "dlt_predictions_history.json")
 PROMPT_FILE = os.path.join(PROJECT_ROOT, "doc", "dlt_prompt2.0.md")
+MODEL_CONFIG_FILE = os.path.join(PROJECT_ROOT, "config", "models.json")
 
 
 def load_prompt_template() -> str:
-    with open(PROMPT_FILE, 'r', encoding='utf-8') as f:
+    with open(PROMPT_FILE, "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -63,65 +60,13 @@ def normalize_draw(draw: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_lottery_history() -> Dict[str, Any]:
-    with open(LOTTERY_HISTORY_FILE, 'r', encoding='utf-8') as f:
+    with open(LOTTERY_HISTORY_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     return {
         **data,
-        "data": [normalize_draw(draw) for draw in data.get("data", [])]
+        "data": [normalize_draw(draw) for draw in data.get("data", [])],
     }
-
-
-def get_openai_client() -> OpenAI:
-    if not API_KEY:
-        raise EnvironmentError("请设置环境变量 AI_API_KEY 或 OPENAI_API_KEY")
-    return OpenAI(api_key=API_KEY, base_url=BASE_URL)
-
-
-def extract_json_from_response(response_text: str) -> str:
-    text = response_text.strip()
-    if "```json" in text:
-        start = text.find("```json") + 7
-        end = text.find("```", start)
-        return text[start:end].strip()
-    if "```" in text:
-        start = text.find("```") + 3
-        end = text.find("```", start)
-        return text[start:end].strip()
-    return text
-
-
-def call_ai_model(client: OpenAI, model_config: Dict[str, str], prompt: str) -> Dict[str, Any]:
-    response_text = ""
-    try:
-        print(f"  ⏳ 正在调用 {model_config['name']} 模型...")
-        response = client.chat.completions.create(
-            model=model_config['id'],
-            messages=[
-                {
-                    "role": "system",
-                    "content": "你是一个专业的彩票数据分析师，擅长基于历史数据进行模式分析和预测。请严格按照要求返回 JSON 格式数据，不要有任何额外的解释或说明。"
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.8
-        )
-        response_text = (response.choices[0].message.content or "").strip()
-        prediction_data = json.loads(extract_json_from_response(response_text))
-        print(f"  ✅ {model_config['name']} 预测成功")
-        return prediction_data
-    except json.JSONDecodeError as e:
-        print(f"  ❌ {model_config['name']} JSON 解析失败: {str(e)}")
-        print(f"  原始响应前500字符:\n{response_text[:500]}")
-        raise
-    except Exception as e:
-        print(f"  ❌ {model_config['name']} 调用失败")
-        print(f"  错误类型: {type(e).__name__}")
-        print(f"  错误信息: {str(e)}")
-        raise
 
 
 def validate_prediction(prediction: Dict[str, Any]) -> bool:
@@ -172,7 +117,7 @@ def normalize_prediction(prediction: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         **prediction,
-        "predictions": normalized_predictions
+        "predictions": normalized_predictions,
     }
 
 
@@ -184,7 +129,7 @@ def calculate_hit_result(prediction_group: Dict[str, Any], actual_result: Dict[s
         "red_hit_count": len(red_hits),
         "blue_hits": blue_hits,
         "blue_hit_count": len(blue_hits),
-        "total_hits": len(red_hits) + len(blue_hits)
+        "total_hits": len(red_hits) + len(blue_hits),
     }
 
 
@@ -194,7 +139,7 @@ def archive_old_prediction(lottery_data: Dict[str, Any]) -> None:
             print("  ℹ️  没有旧预测需要归档\n")
             return
 
-        with open(AI_PREDICTIONS_FILE, 'r', encoding='utf-8') as f:
+        with open(AI_PREDICTIONS_FILE, "r", encoding="utf-8") as f:
             old_predictions = json.load(f)
 
         old_target_period = old_predictions.get("target_period")
@@ -219,7 +164,7 @@ def archive_old_prediction(lottery_data: Dict[str, Any]) -> None:
 
         history_data = {"历史预测记录": "本文件保存已开奖期号的大乐透 AI 预测数据，用于对比和统计", "predictions_history": []}
         if os.path.exists(PREDICTIONS_HISTORY_FILE):
-            with open(PREDICTIONS_HISTORY_FILE, 'r', encoding='utf-8') as f:
+            with open(PREDICTIONS_HISTORY_FILE, "r", encoding="utf-8") as f:
                 history_data = json.load(f)
 
         existing_record = next((r for r in history_data["predictions_history"] if r["target_period"] == old_target_period), None)
@@ -240,20 +185,24 @@ def archive_old_prediction(lottery_data: Dict[str, Any]) -> None:
             models_with_hits.append({
                 "model_id": model_data.get("model_id"),
                 "model_name": model_data.get("model_name"),
+                "model_provider": model_data.get("model_provider"),
+                "model_version": model_data.get("model_version"),
+                "model_tags": model_data.get("model_tags"),
+                "model_api_model": model_data.get("model_api_model"),
                 "predictions": predictions_with_hits,
                 "best_group": best_pred["group_id"],
-                "best_hit_count": best_pred["hit_result"]["total_hits"]
+                "best_hit_count": best_pred["hit_result"]["total_hits"],
             })
 
         new_record = {
             "prediction_date": old_predictions.get("prediction_date"),
             "target_period": old_target_period,
             "actual_result": actual_result,
-            "models": models_with_hits
+            "models": models_with_hits,
         }
         history_data["predictions_history"].insert(0, new_record)
 
-        with open(PREDICTIONS_HISTORY_FILE, 'w', encoding='utf-8') as f:
+        with open(PREDICTIONS_HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(history_data, f, ensure_ascii=False, indent=2)
 
         print(f"  ✅ 已将期号 {old_target_period} 的预测归档到历史记录")
@@ -261,6 +210,66 @@ def archive_old_prediction(lottery_data: Dict[str, Any]) -> None:
     except Exception as e:
         print(f"  ⚠️  归档旧预测时出错: {str(e)}")
         print("  继续生成新预测...\n")
+
+
+def build_prediction_prompt(
+    prompt_template: str,
+    target_period: str,
+    target_date: str,
+    prediction_date: str,
+    model_def: ModelDefinition,
+    history_json: str,
+) -> str:
+    return prompt_template.format(
+        target_period=target_period,
+        target_date=target_date,
+        lottery_history=history_json,
+        prediction_date=prediction_date,
+        model_id=model_def.model_id,
+        model_name=model_def.name,
+    )
+
+
+def prepare_models(
+    model_definitions: List[ModelDefinition],
+    enable_health_check: bool = True,
+) -> List[Any]:
+    factory = ModelFactory()
+    models = []
+    for model_def in model_definitions:
+        try:
+            model = factory.create(model_def)
+        except Exception as exc:
+            print(f"  ✗ 跳过 {model_def.name}: {exc}")
+            continue
+
+        if enable_health_check:
+            ok, message = model.health_check()
+            if not ok:
+                print(f"  ✗ 健康检查失败: {model_def.name} ({message})")
+                continue
+            print(f"  ✓ 健康检查通过: {model_def.name}")
+
+        models.append(model)
+    return models
+
+
+def finalize_prediction(
+    prediction: Dict[str, Any],
+    model_def: ModelDefinition,
+    prediction_date: str,
+    target_period: str,
+) -> Dict[str, Any]:
+    normalized = normalize_prediction(prediction)
+    normalized["prediction_date"] = prediction_date
+    normalized["target_period"] = target_period
+    normalized["model_id"] = model_def.model_id
+    normalized["model_name"] = model_def.name
+    normalized["model_provider"] = model_def.provider
+    normalized["model_version"] = model_def.version
+    normalized["model_tags"] = model_def.tags
+    normalized["model_api_model"] = model_def.api_model
+    return normalized
 
 
 def generate_predictions() -> Optional[Dict[str, Any]]:
@@ -288,27 +297,31 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
     print(f"📝 历史数据: 最近 {len(history_data)} 期")
     print(f"📅 预测日期: {prediction_date}\n")
 
-    client = get_openai_client()
-    all_predictions = []
+    registry = load_model_registry(MODEL_CONFIG_FILE)
+    model_definitions = registry.select()
+    models = prepare_models(model_definitions, enable_health_check=True)
 
-    for model_config in MODELS:
+    all_predictions = []
+    for model in models:
+        model_def = model.definition
         try:
-            prompt = prompt_template.format(
+            prompt = build_prediction_prompt(
+                prompt_template=prompt_template,
                 target_period=target_period,
                 target_date=target_date,
-                lottery_history=history_json,
                 prediction_date=prediction_date,
-                model_id=model_config['model_id'],
-                model_name=model_config['name']
+                model_def=model_def,
+                history_json=history_json,
             )
-            prediction = normalize_prediction(call_ai_model(client, model_config, prompt))
+            raw_prediction = model.predict(prompt)
+            prediction = finalize_prediction(raw_prediction, model_def, prediction_date, target_period)
             if validate_prediction(prediction):
                 all_predictions.append(prediction)
                 print("  ✓ 验证通过\n")
             else:
                 print("  ✗ 验证失败，跳过该模型\n")
         except Exception as e:
-            print(f"  ✗ 处理 {model_config['name']} 时失败: {str(e)}\n")
+            print(f"  ✗ 处理 {model_def.name} 时失败: {str(e)}\n")
             continue
 
     if not all_predictions:
@@ -318,21 +331,61 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
     return {
         "prediction_date": prediction_date,
         "target_period": target_period,
-        "models": all_predictions
+        "models": all_predictions,
     }
 
 
 def save_predictions(predictions: Dict[str, Any]) -> None:
     print("💾 保存预测数据...")
     if os.path.exists(AI_PREDICTIONS_FILE):
-        backup_file = AI_PREDICTIONS_FILE.replace(".json", f"_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-        with open(AI_PREDICTIONS_FILE, 'r', encoding='utf-8') as f:
-            backup_data = json.load(f)
-        with open(backup_file, 'w', encoding='utf-8') as f:
-            json.dump(backup_data, f, ensure_ascii=False, indent=2)
-        print(f"  ✓ 已创建备份: {os.path.basename(backup_file)}")
+        with open(AI_PREDICTIONS_FILE, "r", encoding="utf-8") as f:
+            existing_predictions = json.load(f)
 
-    with open(AI_PREDICTIONS_FILE, 'w', encoding='utf-8') as f:
+        if existing_predictions.get("target_period") == predictions.get("target_period"):
+            existing_models = existing_predictions.get("models", [])
+            existing_model_map = {
+                model.get("model_id"): model
+                for model in existing_models
+                if model.get("model_id")
+            }
+
+            for model in predictions.get("models", []):
+                model_id = model.get("model_id")
+                if model_id:
+                    existing_model_map[model_id] = model
+                else:
+                    existing_models.append(model)
+
+            merged_models = []
+            seen_model_ids = set()
+            for model in existing_models:
+                model_id = model.get("model_id")
+                if model_id and model_id in existing_model_map and model_id not in seen_model_ids:
+                    merged_models.append(existing_model_map[model_id])
+                    seen_model_ids.add(model_id)
+                elif not model_id:
+                    merged_models.append(model)
+
+            for model in predictions.get("models", []):
+                model_id = model.get("model_id")
+                if model_id and model_id not in seen_model_ids:
+                    merged_models.append(model)
+                    seen_model_ids.add(model_id)
+
+            predictions = {
+                **existing_predictions,
+                "prediction_date": predictions.get("prediction_date", existing_predictions.get("prediction_date")),
+                "target_period": predictions.get("target_period", existing_predictions.get("target_period")),
+                "models": merged_models,
+            }
+            print(f"  ✓ 同一期号 {predictions['target_period']}，已合并模型预测")
+        else:
+            backup_file = AI_PREDICTIONS_FILE.replace(".json", f"_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            with open(backup_file, "w", encoding="utf-8") as f:
+                json.dump(existing_predictions, f, ensure_ascii=False, indent=2)
+            print(f"  ✓ 已创建备份: {os.path.basename(backup_file)}")
+
+    with open(AI_PREDICTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(predictions, f, ensure_ascii=False, indent=2)
     print(f"  ✓ 已保存到: {AI_PREDICTIONS_FILE}\n")
 
@@ -348,7 +401,7 @@ def main() -> None:
         print(f"  期号: {predictions['target_period']}")
         print(f"  日期: {predictions['prediction_date']}")
         print(f"  模型数量: {len(predictions['models'])}")
-        for model in predictions['models']:
+        for model in predictions["models"]:
             print(f"    - {model['model_name']}")
     else:
         print("❌ 大乐透预测生成失败")

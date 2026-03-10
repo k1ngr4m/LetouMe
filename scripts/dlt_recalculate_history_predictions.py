@@ -5,8 +5,8 @@
 python scripts/dlt_recalculate_history_predictions.py \
   --start-period 26022 \
   --end-period 26024 \
-  --model dlt_gpt_4.1:GPT-4.1:gpt-4.1 \
-  --model dlt_gemini_3_flash:Gemini-3-flash-preview:gpt-4.1-mini \
+  --model dlt_gpt-4o_4.1:GPT-4.1:gpt-4.1 \
+  --model dlt_gemini-3-flash-preview_3_flash:Gemini-3-flash-preview:gpt-4.1-mini \
   --force
 """
 
@@ -16,7 +16,6 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,20 +24,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from predict import dlt_generate_ai_prediction as dlt_ai
+from core.model_config import load_model_registry
+from core.model_factory import ModelFactory
+from predict import dlt_engine as dlt_ai
 
 
 DEFAULT_HISTORY_PATH = Path("data/dlt_data.json")
 DEFAULT_OUTPUT_PATH = Path("data/dlt_predictions_history.json")
 DEFAULT_PROMPT_PATH = Path("doc/dlt_prompt2.0.md")
 DEFAULT_CONTEXT_SIZE = 30
-
-
-@dataclass
-class ModelConfig:
-    model_id: str
-    model_name: str
-    model_api_name: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,22 +45,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--context-size", type=int, default=DEFAULT_CONTEXT_SIZE, help="每期使用的历史开奖条数")
     parser.add_argument("--force", action="store_true", help="强制覆盖已存在的目标期+模型预测")
     parser.add_argument(
-        "--model",
-        action="append",
-        required=True,
-        help="模型配置，格式 model_id:model_name:model_api_name；可重复传入多个",
+        "--config",
+        default="config/models.json",
+        help="模型配置文件路径（默认 config/models.json）",
+    )
+    parser.add_argument(
+        "--models",
+        default="",
+        help="要使用的模型 ID，逗号分隔；为空则使用配置中的 active_models",
+    )
+    parser.add_argument(
+        "--include-tags",
+        default="",
+        help="按标签筛选模型，逗号分隔，例如 reasoning,fast",
+    )
+    parser.add_argument(
+        "--no-health-check",
+        action="store_true",
+        help="禁用模型健康检查（默认开启）",
     )
     return parser.parse_args()
 
 
-def parse_model_configs(items: list[str]) -> list[ModelConfig]:
-    configs: list[ModelConfig] = []
-    for item in items:
-        parts = item.split(":", 2)
-        if len(parts) != 3 or not all(parts):
-            raise ValueError(f"模型参数格式错误: {item}，应为 model_id:model_name:model_api_name")
-        configs.append(ModelConfig(parts[0], parts[1], parts[2]))
-    return configs
+def parse_csv(value: str) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def load_json(path: Path) -> Any:
@@ -111,7 +115,7 @@ def build_prediction_prompt(
     prompt_template: str,
     target_period: str,
     prediction_date: str,
-    model_cfg: ModelConfig,
+    model_def: Any,
     history_context: list[dict[str, Any]],
 ) -> str:
     context_json = json.dumps(history_context, ensure_ascii=False, indent=2)
@@ -120,36 +124,27 @@ def build_prediction_prompt(
         target_date="",
         lottery_history=context_json,
         prediction_date=prediction_date,
-        model_id=model_cfg.model_id,
-        model_name=model_cfg.model_name,
+        model_id=model_def.model_id,
+        model_name=model_def.name,
     )
 
 
 def dlt_generate_ai_prediction(
-    client: Any,
+    model: Any,
     prompt_template: str,
     target_period: str,
     prediction_date: str,
-    model_cfg: ModelConfig,
+    model_def: Any,
     history_context: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    prompt = build_prediction_prompt(prompt_template, target_period, prediction_date, model_cfg, history_context)
-    model_config = {
-        "id": model_cfg.model_api_name,
-        "name": model_cfg.model_name,
-        "model_id": model_cfg.model_id,
-    }
-    raw_prediction = dlt_ai.call_ai_model(client, model_config, prompt)
-    normalized = dlt_ai.normalize_prediction(raw_prediction)
-    normalized["prediction_date"] = prediction_date
-    normalized["target_period"] = target_period
-    normalized["model_id"] = model_cfg.model_id
-    normalized["model_name"] = model_cfg.model_name
+    prompt = build_prediction_prompt(prompt_template, target_period, prediction_date, model_def, history_context)
+    raw_prediction = model.predict(prompt)
+    finalized = dlt_ai.finalize_prediction(raw_prediction, model_def, prediction_date, target_period)
 
-    if not dlt_ai.validate_prediction(normalized):
-        raise ValueError(f"模型 {model_cfg.model_id} 输出结构校验失败")
+    if not dlt_ai.validate_prediction(finalized):
+        raise ValueError(f"模型 {model_def.model_id} 输出结构校验失败")
 
-    return normalized
+    return finalized
 
 
 def make_prediction_date(target_draw_date: str | None) -> str:
@@ -161,7 +156,10 @@ def make_prediction_date(target_draw_date: str | None) -> str:
 
 def main() -> None:
     args = parse_args()
-    models = parse_model_configs(args.model)
+    registry = load_model_registry(args.config)
+    model_ids = parse_csv(args.models)
+    include_tags = parse_csv(args.include_tags)
+    model_definitions = registry.select(model_ids=model_ids or None, include_tags=include_tags)
 
     history_path = Path(args.history_file)
     output_path = Path(args.output_file)
@@ -200,7 +198,22 @@ def main() -> None:
     sorted_periods_desc = sorted((int(p), p) for p in period_map.keys())
     all_period_ints = {x[0] for x in sorted_periods_desc}
 
-    client = dlt_ai.get_openai_client()
+    factory = ModelFactory()
+    model_instances = {}
+    for model_def in model_definitions:
+        try:
+            model = factory.create(model_def)
+        except Exception as exc:
+            print(f"[跳过] 模型 {model_def.model_id} 初始化失败: {exc}")
+            continue
+
+        if not args.no_health_check:
+            ok, message = model.health_check()
+            if not ok:
+                print(f"[跳过] 模型 {model_def.model_id} 健康检查失败: {message}")
+                continue
+            print(f"[通过] 模型 {model_def.model_id} 健康检查")
+        model_instances[model_def.model_id] = model
 
     for period_int in range(start_period, end_period + 1):
         target_period = str(period_int)
@@ -240,18 +253,22 @@ def main() -> None:
             if isinstance(m, dict) and m.get("model_id")
         }
 
-        for model_cfg in models:
-            if model_cfg.model_id in model_map and not args.force:
-                print(f"[跳过] {target_period} / {model_cfg.model_id} 已存在（未启用 --force）")
+        for model_def in model_definitions:
+            if model_def.model_id not in model_instances:
+                print(f"[跳过] {target_period} / {model_def.model_id} 模型不可用")
+                continue
+            if model_def.model_id in model_map and not args.force:
+                print(f"[跳过] {target_period} / {model_def.model_id} 已存在（未启用 --force）")
                 continue
 
-            print(f"[执行] 目标期 {target_period} / 模型 {model_cfg.model_id}")
+            model = model_instances[model_def.model_id]
+            print(f"[执行] 目标期 {target_period} / 模型 {model_def.model_id}")
             prediction = dlt_generate_ai_prediction(
-                client=client,
+                model=model,
                 prompt_template=prompt_template,
                 target_period=target_period,
                 prediction_date=prediction_date,
-                model_cfg=model_cfg,
+                model_def=model_def,
                 history_context=history_context,
             )
 
@@ -265,13 +282,17 @@ def main() -> None:
                     best_group = item["group_id"]
 
             model_entry = {
-                "model_id": model_cfg.model_id,
-                "model_name": model_cfg.model_name,
+                "model_id": model_def.model_id,
+                "model_name": model_def.name,
+                "model_provider": model_def.provider,
+                "model_version": model_def.version,
+                "model_tags": model_def.tags,
+                "model_api_model": model_def.api_model,
                 "predictions": prediction["predictions"],
                 "best_group": best_group,
                 "best_hit_count": best_hit_count,
             }
-            model_map[model_cfg.model_id] = model_entry
+            model_map[model_def.model_id] = model_entry
             time.sleep(5)
 
         record["models"] = sorted(

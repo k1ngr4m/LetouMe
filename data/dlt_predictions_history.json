@@ -22,7 +22,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -157,7 +157,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -289,7 +289,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -429,7 +429,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -588,7 +588,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -724,7 +724,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -865,7 +865,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -1003,7 +1003,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -1163,7 +1163,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -1311,7 +1311,7 @@
           "best_hit_count": 5
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -1449,7 +1449,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -1590,7 +1590,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -1754,7 +1754,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -1894,7 +1894,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -2029,7 +2029,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -2169,7 +2169,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -2329,7 +2329,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -2463,7 +2463,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -2601,7 +2601,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -2739,7 +2739,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -2895,7 +2895,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -3031,7 +3031,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -3166,7 +3166,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -3308,7 +3308,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -3464,7 +3464,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -3595,7 +3595,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -3735,7 +3735,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -3870,7 +3870,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -4028,7 +4028,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -4169,7 +4169,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -4303,7 +4303,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -4440,7 +4440,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -4598,7 +4598,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -4732,7 +4732,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -4870,7 +4870,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -5007,7 +5007,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -5164,7 +5164,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -5301,7 +5301,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -5437,7 +5437,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -5572,7 +5572,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -5726,7 +5726,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -5867,7 +5867,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -6010,7 +6010,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -6146,7 +6146,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -6307,7 +6307,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -6444,7 +6444,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -6576,7 +6576,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -6714,7 +6714,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -6874,7 +6874,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -7006,7 +7006,7 @@
           "best_hit_count": 1
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -7140,7 +7140,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -7272,7 +7272,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -7428,7 +7428,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -7568,7 +7568,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -7713,7 +7713,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -7854,7 +7854,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
@@ -8014,7 +8014,7 @@
       },
       "models": [
         {
-          "model_id": "dlt_claude",
+          "model_id": "dlt_claude-sonnet-4-6",
           "model_name": "Claude-4.6",
           "predictions": [
             {
@@ -8148,7 +8148,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_deepseek",
+          "model_id": "dlt_deepseek-v3.2",
           "model_name": "DeepSeek-v3.2",
           "predictions": [
             {
@@ -8288,7 +8288,7 @@
           "best_hit_count": 2
         },
         {
-          "model_id": "dlt_gemini",
+          "model_id": "dlt_gemini-3-flash-preview",
           "model_name": "Gemini-3",
           "predictions": [
             {
@@ -8431,7 +8431,7 @@
           "best_hit_count": 3
         },
         {
-          "model_id": "dlt_gpt",
+          "model_id": "dlt_gpt-4o",
           "model_name": "GPT-4o",
           "predictions": [
             {
