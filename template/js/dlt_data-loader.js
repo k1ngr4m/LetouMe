@@ -4,9 +4,9 @@
  */
 
 const SportsLotteryDataLoader = {
-    historyPath: './data/dlt_data.json',
-    predictionsPath: './data/dlt_ai_predictions.json',
-    predictionsHistoryPath: './data/dlt_predictions_history.json',
+    historyPath: '/api/lottery/history',
+    predictionsPath: '/api/predictions/current',
+    predictionsHistoryPath: '/api/predictions/history',
 
     padNumber(value) {
         return String(value).padStart(2, '0');
