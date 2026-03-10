@@ -349,6 +349,210 @@ const SportsLotteryComponents = {
         return wrapper;
     },
 
+    createPredictionOverview(overview, actualResult = null) {
+        const wrapper = document.createElement('section');
+        wrapper.className = 'prediction-overview';
+
+        const header = document.createElement('div');
+        header.className = 'prediction-overview-header';
+        header.innerHTML = `
+            <div>
+                <div class="prediction-overview-eyebrow">Latest Prediction</div>
+                <h3 class="prediction-overview-title">模型对比总览</h3>
+                <p class="prediction-overview-desc">桌面端按表格对比核心号码与摘要，移动端收敛为精简卡片，详细策略进入抽屉查看。</p>
+            </div>
+            <div class="prediction-overview-badges">
+                <span class="prediction-overview-badge">置顶优先</span>
+                <span class="prediction-overview-badge">${overview.models.length} 个模型</span>
+            </div>
+        `;
+        wrapper.appendChild(header);
+
+        if (overview.highlighted.length) {
+            const spotlight = document.createElement('div');
+            spotlight.className = 'prediction-spotlight-grid';
+            overview.highlighted.forEach(model => {
+                spotlight.appendChild(this.createPredictionSpotlightCard(model, actualResult));
+            });
+            wrapper.appendChild(spotlight);
+        }
+
+        wrapper.appendChild(this.createPredictionOverviewTable(overview.models, actualResult));
+
+        const mobileList = document.createElement('div');
+        mobileList.className = 'prediction-mobile-list';
+        overview.models.forEach(model => {
+            mobileList.appendChild(this.createPredictionMobileCard(model, actualResult));
+        });
+        wrapper.appendChild(mobileList);
+
+        return wrapper;
+    },
+
+    createPredictionSpotlightCard(model, actualResult = null) {
+        const card = document.createElement('article');
+        card.className = 'prediction-spotlight-card';
+        const totalHits = model.bestPrediction?.totalHits || 0;
+        const hitLabel = actualResult
+            ? `最佳 ${totalHits} 中`
+            : `${model.predictionCount} 组方案`;
+        card.innerHTML = `
+            <div class="prediction-spotlight-top">
+                <div>
+                    <div class="prediction-spotlight-name">${model.model_name}</div>
+                    <div class="prediction-spotlight-meta">${hitLabel}</div>
+                </div>
+                <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
+                    ${model.isPinned ? '已置顶' : '置顶'}
+                </button>
+            </div>
+            <div class="prediction-spotlight-balls"></div>
+            <div class="prediction-spotlight-actions">
+                <span class="prediction-spotlight-strategy">${model.primaryPrediction?.strategy || '暂无策略'}</span>
+                <button type="button" class="prediction-detail-btn" data-role="prediction-open-detail" data-model-id="${model.model_id}">查看详情</button>
+            </div>
+        `;
+
+        const balls = card.querySelector('.prediction-spotlight-balls');
+        if (model.primaryPrediction) {
+            balls.appendChild(this.createBallsFragment(model.primaryPrediction.red_balls, model.primaryPrediction.blue_balls, {
+                redSize: 'sm',
+                blueSize: 'sm',
+                redHits: model.bestPrediction?.hitResult?.redHits || [],
+                blueHits: model.bestPrediction?.hitResult?.blueHits || []
+            }));
+        }
+
+        return card;
+    },
+
+    createPredictionOverviewTable(models, actualResult = null) {
+        const wrap = document.createElement('div');
+        wrap.className = 'prediction-overview-table-wrap';
+
+        const table = document.createElement('div');
+        table.className = 'prediction-overview-table';
+        table.innerHTML = `
+            <div class="prediction-overview-table-head">
+                <div>模型</div>
+                <div>核心号码</div>
+                <div>摘要</div>
+                <div>操作</div>
+            </div>
+        `;
+
+        models.forEach(model => {
+            table.appendChild(this.createPredictionOverviewRow(model, actualResult));
+        });
+
+        wrap.appendChild(table);
+        return wrap;
+    },
+
+    createPredictionOverviewRow(model, actualResult = null) {
+        const row = document.createElement('div');
+        row.className = 'prediction-overview-row';
+
+        const hitResult = model.bestPrediction?.hitResult;
+        const summary = actualResult
+            ? `最佳组 ${model.bestPrediction?.prediction?.group_id || '-'}，命中 ${model.bestPrediction?.totalHits || 0} 球`
+            : `${model.primaryPrediction?.strategy || '暂无策略'} · ${model.predictionCount} 组`;
+
+        row.innerHTML = `
+            <div class="prediction-overview-model">
+                <div class="prediction-overview-model-top">
+                    <strong>${model.model_name}</strong>
+                    ${model.isPinned ? '<span class="prediction-inline-pin">置顶</span>' : ''}
+                </div>
+                <div class="prediction-overview-model-id">${model.model_id}</div>
+            </div>
+            <div class="prediction-overview-balls"></div>
+            <div class="prediction-overview-summary">
+                <div class="prediction-overview-summary-main">${summary}</div>
+                <div class="prediction-overview-summary-sub">${hitResult ? `前区 ${hitResult.redHitCount} / 后区 ${hitResult.blueHitCount}` : '点击查看完整 5 组策略与说明'}</div>
+            </div>
+            <div class="prediction-overview-actions">
+                <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
+                    ${model.isPinned ? '取消置顶' : '置顶'}
+                </button>
+                <button type="button" class="prediction-detail-btn" data-role="prediction-open-detail" data-model-id="${model.model_id}">详情</button>
+            </div>
+        `;
+
+        const ballsContainer = row.querySelector('.prediction-overview-balls');
+        if (model.primaryPrediction) {
+            ballsContainer.appendChild(this.createBallsFragment(model.primaryPrediction.red_balls, model.primaryPrediction.blue_balls, {
+                redSize: 'sm',
+                blueSize: 'sm',
+                redHits: hitResult?.redHits || [],
+                blueHits: hitResult?.blueHits || []
+            }));
+        }
+
+        return row;
+    },
+
+    createPredictionMobileCard(model, actualResult = null) {
+        const card = document.createElement('article');
+        card.className = 'prediction-mobile-card';
+        const summary = actualResult
+            ? `最佳 ${model.bestPrediction?.totalHits || 0} 中`
+            : `${model.predictionCount} 组方案`;
+        card.innerHTML = `
+            <div class="prediction-mobile-card-top">
+                <div>
+                    <strong>${model.model_name}</strong>
+                    <div class="prediction-mobile-card-sub">${summary}</div>
+                </div>
+                <button type="button" class="prediction-pin-btn${model.isPinned ? ' pinned' : ''}" data-role="prediction-pin-toggle" data-model-id="${model.model_id}">
+                    ${model.isPinned ? '已置顶' : '置顶'}
+                </button>
+            </div>
+            <div class="prediction-mobile-card-balls"></div>
+            <div class="prediction-mobile-card-actions">
+                <span>${model.primaryPrediction?.strategy || '暂无策略'}</span>
+                <button type="button" class="prediction-detail-btn" data-role="prediction-open-detail" data-model-id="${model.model_id}">查看详情</button>
+            </div>
+        `;
+
+        const balls = card.querySelector('.prediction-mobile-card-balls');
+        if (model.primaryPrediction) {
+            balls.appendChild(this.createBallsFragment(model.primaryPrediction.red_balls, model.primaryPrediction.blue_balls, {
+                redSize: 'sm',
+                blueSize: 'sm',
+                redHits: model.bestPrediction?.hitResult?.redHits || [],
+                blueHits: model.bestPrediction?.hitResult?.blueHits || []
+            }));
+        }
+
+        return card;
+    },
+
+    createModelDetailDrawer(model, actualResult = null) {
+        const drawer = document.createElement('div');
+        drawer.className = 'prediction-drawer-backdrop';
+
+        const panel = document.createElement('div');
+        panel.className = 'prediction-drawer-panel';
+        panel.innerHTML = `
+            <div class="prediction-drawer-header">
+                <div>
+                    <div class="prediction-drawer-eyebrow">Model Detail</div>
+                    <h3>${model.model_name}</h3>
+                    <p>${model.model_id}</p>
+                </div>
+                <button type="button" class="prediction-drawer-close" data-role="prediction-close-detail">关闭</button>
+            </div>
+            <div class="prediction-drawer-content"></div>
+        `;
+
+        const content = panel.querySelector('.prediction-drawer-content');
+        content.appendChild(this.createModelCard(model, actualResult));
+
+        drawer.appendChild(panel);
+        return drawer;
+    },
+
     createCompoundCard(compound) {
         const card = document.createElement('div');
         card.className = 'compound-selection-card';

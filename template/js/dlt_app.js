@@ -9,6 +9,12 @@ let sportLotteryAppData = {
 };
 
 let sportLotteryUiState = {
+    prediction: {
+        pinnedModelIds: [],
+        highlightedModelIds: [],
+        selectedModelId: null,
+        isModelDetailOpen: false
+    },
     compound: {
         activeTabIndex: 0,
         sortOrder: 'desc',
@@ -19,6 +25,7 @@ let sportLotteryUiState = {
 };
 
 let sportLotteryCharts = [];
+const SPORT_LOTTERY_PINNED_MODELS_KEY = 'dltPinnedModelIds';
 
 async function initSportsLotteryApp() {
     try {
@@ -44,7 +51,116 @@ async function loadSportsLotteryAllData() {
     sportLotteryAppData.lotteryHistory = lotteryHistory;
     sportLotteryAppData.aiPredictions = aiPredictions;
     sportLotteryAppData.predictionsHistory = predictionsHistory;
+    initializeSportsLotteryPredictionState(aiPredictions.models);
     sportLotteryUiState.compound.selectedModelIds = aiPredictions.models.map(model => model.model_id);
+}
+
+function initializeSportsLotteryPredictionState(models) {
+    const allModelIds = models.map(model => model.model_id);
+    const pinnedModelIds = loadSportsLotteryPinnedModelIds().filter(modelId => allModelIds.includes(modelId));
+
+    sportLotteryUiState.prediction.pinnedModelIds = pinnedModelIds;
+    sportLotteryUiState.prediction.highlightedModelIds = pinnedModelIds.length
+        ? pinnedModelIds.slice(0, 3)
+        : allModelIds.slice(0, 3);
+}
+
+function loadSportsLotteryPinnedModelIds() {
+    try {
+        const raw = window.localStorage.getItem(SPORT_LOTTERY_PINNED_MODELS_KEY);
+        const parsed = JSON.parse(raw || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('读取置顶模型失败:', error);
+        return [];
+    }
+}
+
+function saveSportsLotteryPinnedModelIds() {
+    try {
+        window.localStorage.setItem(
+            SPORT_LOTTERY_PINNED_MODELS_KEY,
+            JSON.stringify(sportLotteryUiState.prediction.pinnedModelIds)
+        );
+    } catch (error) {
+        console.warn('保存置顶模型失败:', error);
+    }
+}
+
+function _getSportsLotteryActualResult() {
+    if (!sportLotteryAppData.aiPredictions || !sportLotteryAppData.lotteryHistory?.data?.length) {
+        return null;
+    }
+
+    const targetPeriod = sportLotteryAppData.aiPredictions.target_period;
+    const latestDraw = sportLotteryAppData.lotteryHistory.data[0];
+    if (!latestDraw || parseInt(targetPeriod, 10) > parseInt(latestDraw.period, 10)) {
+        return null;
+    }
+
+    return sportLotteryAppData.lotteryHistory.data.find(draw => draw.period === targetPeriod) || null;
+}
+
+function _getOrderedPredictionModels(models) {
+    const pinnedIndexMap = new Map(
+        sportLotteryUiState.prediction.pinnedModelIds.map((modelId, index) => [modelId, index])
+    );
+
+    return [...models].sort((left, right) => {
+        const leftPinned = pinnedIndexMap.has(left.model_id);
+        const rightPinned = pinnedIndexMap.has(right.model_id);
+
+        if (leftPinned && rightPinned) {
+            return pinnedIndexMap.get(left.model_id) - pinnedIndexMap.get(right.model_id);
+        }
+        if (leftPinned) return -1;
+        if (rightPinned) return 1;
+        return 0;
+    });
+}
+
+function _buildPredictionOverviewModel(model, actualResult) {
+    const bestPrediction = model.predictions.reduce((best, prediction) => {
+        const hitResult = actualResult
+            ? SportsLotteryComponents.compareNumbers(prediction, actualResult)
+            : null;
+        const totalHits = hitResult?.totalHits || 0;
+
+        if (!best || totalHits > best.totalHits) {
+            return {
+                prediction,
+                totalHits,
+                hitResult
+            };
+        }
+        return best;
+    }, null) || {
+        prediction: model.predictions[0] || null,
+        totalHits: 0,
+        hitResult: null
+    };
+
+    const primaryPrediction = bestPrediction.prediction || model.predictions[0] || null;
+    return {
+        model_id: model.model_id,
+        model_name: model.model_name,
+        model_provider: model.model_provider,
+        predictionCount: model.predictions.length,
+        bestPrediction,
+        primaryPrediction,
+        isPinned: sportLotteryUiState.prediction.pinnedModelIds.includes(model.model_id)
+    };
+}
+
+function _buildSportsLotteryPredictionOverview(models, actualResult) {
+    const orderedModels = _getOrderedPredictionModels(models);
+    const overviewModels = orderedModels.map(model => _buildPredictionOverviewModel(model, actualResult));
+    const highlightedSet = new Set(sportLotteryUiState.prediction.highlightedModelIds);
+
+    return {
+        highlighted: overviewModels.filter(model => highlightedSet.has(model.model_id)).slice(0, 3),
+        models: overviewModels
+    };
 }
 
 function renderSportsLotteryHeroBanner() {
@@ -77,20 +193,22 @@ function renderSportsLotteryModelsGrid() {
 
     modelsGridEl.innerHTML = '';
 
-    const targetPeriod = sportLotteryAppData.aiPredictions.target_period;
-    const latestDraw = sportLotteryAppData.lotteryHistory?.data?.[0];
-    let actualResult = null;
-
-    if (latestDraw && parseInt(targetPeriod, 10) <= parseInt(latestDraw.period, 10)) {
-        actualResult = sportLotteryAppData.lotteryHistory.data.find(draw => draw.period === targetPeriod) || null;
-        if (actualResult) {
-            modelsGridEl.appendChild(createSportsLotteryDrawnStatusBanner(actualResult));
-        }
+    const actualResult = _getSportsLotteryActualResult();
+    if (actualResult) {
+        modelsGridEl.appendChild(createSportsLotteryDrawnStatusBanner(actualResult));
     }
 
-    sportLotteryAppData.aiPredictions.models.forEach(model => {
-        modelsGridEl.appendChild(SportsLotteryComponents.createModelCard(model, actualResult));
-    });
+    const overview = _buildSportsLotteryPredictionOverview(sportLotteryAppData.aiPredictions.models, actualResult);
+    modelsGridEl.appendChild(SportsLotteryComponents.createPredictionOverview(overview, actualResult));
+
+    if (sportLotteryUiState.prediction.isModelDetailOpen && sportLotteryUiState.prediction.selectedModelId) {
+        const selectedModel = sportLotteryAppData.aiPredictions.models.find(
+            model => model.model_id === sportLotteryUiState.prediction.selectedModelId
+        );
+        if (selectedModel) {
+            modelsGridEl.appendChild(SportsLotteryComponents.createModelDetailDrawer(selectedModel, actualResult));
+        }
+    }
 
     // 渲染复式号码推荐（汇总所有模型预测）
     renderSportsLotteryCompoundSelection();
@@ -435,6 +553,51 @@ function handleSportsLotteryCompoundInteractions(event) {
             sportLotteryUiState.compound.isModelDropdownOpen = false;
             renderSportsLotteryCompoundSelection();
         }
+    }
+}
+
+function handleSportsLotteryPredictionInteractions(event) {
+    const pinButton = event.target.closest('[data-role="prediction-pin-toggle"]');
+    if (pinButton) {
+        const modelId = pinButton.dataset.modelId;
+        const pinnedModelIds = [...sportLotteryUiState.prediction.pinnedModelIds];
+        const existingIndex = pinnedModelIds.indexOf(modelId);
+
+        if (existingIndex >= 0) {
+            pinnedModelIds.splice(existingIndex, 1);
+        } else {
+            pinnedModelIds.unshift(modelId);
+        }
+
+        sportLotteryUiState.prediction.pinnedModelIds = pinnedModelIds;
+        sportLotteryUiState.prediction.highlightedModelIds = pinnedModelIds.length
+            ? pinnedModelIds.slice(0, 3)
+            : sportLotteryAppData.aiPredictions.models.map(model => model.model_id).slice(0, 3);
+        saveSportsLotteryPinnedModelIds();
+        renderSportsLotteryModelsGrid();
+        return;
+    }
+
+    const detailOpenButton = event.target.closest('[data-role="prediction-open-detail"]');
+    if (detailOpenButton) {
+        sportLotteryUiState.prediction.selectedModelId = detailOpenButton.dataset.modelId;
+        sportLotteryUiState.prediction.isModelDetailOpen = true;
+        renderSportsLotteryModelsGrid();
+        return;
+    }
+
+    const detailCloseButton = event.target.closest('[data-role="prediction-close-detail"]');
+    if (detailCloseButton) {
+        sportLotteryUiState.prediction.isModelDetailOpen = false;
+        sportLotteryUiState.prediction.selectedModelId = null;
+        renderSportsLotteryModelsGrid();
+        return;
+    }
+
+    if (event.target.classList.contains('prediction-drawer-backdrop')) {
+        sportLotteryUiState.prediction.isModelDetailOpen = false;
+        sportLotteryUiState.prediction.selectedModelId = null;
+        renderSportsLotteryModelsGrid();
     }
 }
 
@@ -904,6 +1067,7 @@ function setupSportsLotteryEventListeners() {
         item.addEventListener('click', () => handleSportsLotteryTabSwitch(item.dataset.tab));
     });
 
+    document.addEventListener('click', handleSportsLotteryPredictionInteractions);
     document.addEventListener('click', handleSportsLotteryCompoundInteractions);
     document.addEventListener('change', handleSportsLotteryCompoundChange);
 }
