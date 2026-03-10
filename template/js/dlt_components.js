@@ -677,6 +677,12 @@ const SportsLotteryComponents = {
         const selectedNames = summaryControls.models
             .filter(model => summaryControls.selectedModelIds.includes(model.model_id))
             .map(model => model.model_name);
+        const searchQuery = (summaryControls.modelSearchQuery || '').trim().toLowerCase();
+        const selectedModels = summaryControls.models.filter(model => summaryControls.selectedModelIds.includes(model.model_id));
+        const unselectedModels = summaryControls.models.filter(model => !summaryControls.selectedModelIds.includes(model.model_id));
+        const filteredUnselectedModels = unselectedModels.filter(model => (
+            !searchQuery || model.model_name.toLowerCase().includes(searchQuery)
+        ));
 
         wrapper.innerHTML = `
             <div class="summary-toolbar-main">
@@ -706,12 +712,37 @@ const SportsLotteryComponents = {
                             </svg>
                         </button>
                         <div class="summary-filter-menu">
-                            ${summaryControls.models.map(model => `
-                                <label class="summary-filter-option">
-                                    <input type="checkbox" value="${model.model_id}" ${summaryControls.selectedModelIds.includes(model.model_id) ? 'checked' : ''}>
-                                    <span class="summary-filter-option-name">${model.model_name}</span>
-                                </label>
-                            `).join('')}
+                            <div class="summary-filter-search">
+                                <input
+                                    type="text"
+                                    class="summary-filter-search-input"
+                                    data-role="model-search-input"
+                                    placeholder="搜索模型名称"
+                                    value="${summaryControls.modelSearchQuery || ''}"
+                                >
+                            </div>
+                            <div class="summary-filter-section">
+                                <div class="summary-filter-section-title">已选模型</div>
+                                <div class="summary-filter-section-list">
+                                    ${selectedModels.length ? selectedModels.map(model => `
+                                        <label class="summary-filter-option selected">
+                                            <input type="checkbox" value="${model.model_id}" checked>
+                                            <span class="summary-filter-option-name">${model.model_name}</span>
+                                        </label>
+                                    `).join('') : '<div class="summary-filter-empty">暂无已选模型</div>'}
+                                </div>
+                            </div>
+                            <div class="summary-filter-section">
+                                <div class="summary-filter-section-title">搜索结果</div>
+                                <div class="summary-filter-section-list">
+                                    ${filteredUnselectedModels.length ? filteredUnselectedModels.map(model => `
+                                        <label class="summary-filter-option">
+                                            <input type="checkbox" value="${model.model_id}">
+                                            <span class="summary-filter-option-name">${model.model_name}</span>
+                                        </label>
+                                    `).join('') : '<div class="summary-filter-empty">未找到匹配的模型</div>'}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -2155,11 +2155,54 @@ body::after {
     border-radius: 0.9rem;
     box-shadow: var(--shadow-xl);
     padding: 0.6rem;
+    max-height: 320px;
+    overflow: auto;
 }
 
 .summary-filter-dropdown.open .summary-filter-menu {
     display: grid;
     gap: 0.4rem;
+}
+
+.summary-filter-search {
+    position: sticky;
+    top: 0;
+    background: white;
+    padding-bottom: 0.35rem;
+}
+
+.summary-filter-search-input {
+    width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 0.7rem;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.82rem;
+    color: var(--slate-700);
+    outline: none;
+}
+
+.summary-filter-search-input:focus {
+    border-color: rgba(99, 102, 241, 0.45);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.summary-filter-section {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.summary-filter-section-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--slate-500);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0 0.2rem;
+}
+
+.summary-filter-section-list {
+    display: grid;
+    gap: 0.35rem;
 }
 
 .summary-filter-option {
@@ -2176,6 +2219,10 @@ body::after {
     background: var(--slate-50);
 }
 
+.summary-filter-option.selected {
+    background: rgba(79, 70, 229, 0.06);
+}
+
 .summary-filter-option input {
     accent-color: var(--indigo-600);
 }
@@ -2184,6 +2231,15 @@ body::after {
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--slate-700);
+}
+
+.summary-filter-empty {
+    font-size: 0.8rem;
+    color: var(--slate-400);
+    padding: 0.7rem 0.8rem;
+    border-radius: 0.7rem;
+    background: var(--slate-50);
+    border: 1px dashed var(--slate-200);
 }
 
 .summary-toolbar-stats {

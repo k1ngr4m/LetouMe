@@ -20,6 +20,7 @@ let sportLotteryUiState = {
         sortOrder: 'desc',
         selectedModelIds: [],
         commonOnly: false,
+        modelSearchQuery: '',
         isModelDropdownOpen: false
     }
 };
@@ -485,6 +486,7 @@ function renderSportsLotteryCompoundSelection() {
                     selectedModelIds: sportLotteryUiState.compound.selectedModelIds,
                     sortOrder: sportLotteryUiState.compound.sortOrder,
                     commonOnly: sportLotteryUiState.compound.commonOnly,
+                    modelSearchQuery: sportLotteryUiState.compound.modelSearchQuery,
                     isModelDropdownOpen: sportLotteryUiState.compound.isModelDropdownOpen,
                     models: models.map(model => ({
                         model_id: model.model_id,
@@ -622,6 +624,13 @@ function handleSportsLotteryCompoundChange(event) {
     sportLotteryUiState.compound.selectedModelIds = sportLotteryAppData.aiPredictions.models
         .map(model => model.model_id)
         .filter(id => nextSelectedModelIds.has(id));
+    renderSportsLotteryCompoundSelection();
+}
+
+function handleSportsLotteryCompoundInput(event) {
+    if (!event.target.matches('[data-role="model-search-input"]')) return;
+
+    sportLotteryUiState.compound.modelSearchQuery = event.target.value;
     renderSportsLotteryCompoundSelection();
 }
 
@@ -1071,6 +1080,7 @@ function setupSportsLotteryEventListeners() {
     document.addEventListener('click', handleSportsLotteryPredictionInteractions);
     document.addEventListener('click', handleSportsLotteryCompoundInteractions);
     document.addEventListener('change', handleSportsLotteryCompoundChange);
+    document.addEventListener('input', handleSportsLotteryCompoundInput);
 }
 
 function handleSportsLotteryTabSwitch(tabName) {
