@@ -8,6 +8,16 @@ let sportLotteryAppData = {
     predictionsHistory: null
 };
 
+let sportLotteryUiState = {
+    compound: {
+        activeTabIndex: 0,
+        sortOrder: 'desc',
+        selectedModelIds: [],
+        commonOnly: false,
+        isModelDropdownOpen: false
+    }
+};
+
 let sportLotteryCharts = [];
 
 async function initSportsLotteryApp() {
@@ -34,6 +44,7 @@ async function loadSportsLotteryAllData() {
     sportLotteryAppData.lotteryHistory = lotteryHistory;
     sportLotteryAppData.aiPredictions = aiPredictions;
     sportLotteryAppData.predictionsHistory = predictionsHistory;
+    sportLotteryUiState.compound.selectedModelIds = aiPredictions.models.map(model => model.model_id);
 }
 
 function renderSportsLotteryHeroBanner() {
@@ -203,6 +214,100 @@ function generateModelPredictionSummary(models) {
     };
 }
 
+function _createBallMetaMap(start, end) {
+    const metaMap = {};
+    for (let n = start; n <= end; n++) {
+        const ball = String(n).padStart(2, '0');
+        metaMap[ball] = {
+            ball,
+            count: 0,
+            models: new Set()
+        };
+    }
+    return metaMap;
+}
+
+function _sortSummaryBalls(items, sortOrder) {
+    return items.sort((a, b) => {
+        if (sortOrder === 'asc') {
+            return a.count - b.count || a.ball.localeCompare(b.ball);
+        }
+        return b.count - a.count || a.ball.localeCompare(b.ball);
+    });
+}
+
+function generateFilteredModelPredictionSummary(models, selectedModelIds, sortOrder = 'desc') {
+    const selectedModels = models.filter(model => selectedModelIds.includes(model.model_id));
+    const selectedModelCount = selectedModels.length;
+    const totalPredictions = selectedModels.reduce((sum, model) => sum + model.predictions.length, 0);
+    const redMetaMap = _createBallMetaMap(1, 35);
+    const blueMetaMap = _createBallMetaMap(1, 12);
+
+    selectedModels.forEach(model => {
+        const modelRedHits = new Set();
+        const modelBlueHits = new Set();
+
+        model.predictions.forEach(prediction => {
+            prediction.red_balls.forEach(ball => {
+                redMetaMap[ball].count += 1;
+                modelRedHits.add(ball);
+            });
+            prediction.blue_balls.forEach(ball => {
+                blueMetaMap[ball].count += 1;
+                modelBlueHits.add(ball);
+            });
+        });
+
+        modelRedHits.forEach(ball => redMetaMap[ball].models.add(model.model_id));
+        modelBlueHits.forEach(ball => blueMetaMap[ball].models.add(model.model_id));
+    });
+
+    const toSummaryZone = (metaMap, commonOnly) => {
+        if (!selectedModelCount) return [];
+
+        return _sortSummaryBalls(
+            Object.values(metaMap)
+                .filter(item => item.count > 0)
+                .map(item => ({
+                    ball: item.ball,
+                    count: item.count,
+                    predictionCount: item.count,
+                    rate: totalPredictions ? Math.round((item.count / totalPredictions) * 100) : 0,
+                    matchedModels: Array.from(item.models),
+                    matchedModelCount: item.models.size
+                }))
+                .filter(item => !commonOnly || item.matchedModelCount === selectedModelCount),
+            sortOrder
+        );
+    };
+
+    const commonOnly = sportLotteryUiState.compound.commonOnly;
+    const redZone = toSummaryZone(redMetaMap, commonOnly);
+    const blueZone = toSummaryZone(blueMetaMap, commonOnly);
+
+    return {
+        red: redZone,
+        blue: blueZone,
+        totalPredictions,
+        selectedModelCount,
+        selectedModels: selectedModels.map(model => ({
+            model_id: model.model_id,
+            model_name: model.model_name
+        })),
+        totalDisplayedNumbers: redZone.length + blueZone.length,
+        sortOrder,
+        commonOnly,
+        zoneMeta: {
+            red: {
+                isCommonOnly: commonOnly
+            },
+            blue: {
+                isCommonOnly: commonOnly
+            }
+        }
+    };
+}
+
 function generateCompound6x3(models) {
     return generateConsensusCompound(models, {
         redCount: 6,
@@ -235,7 +340,11 @@ function renderSportsLotteryCompoundSelection() {
     if (!container || !sportLotteryAppData.aiPredictions) return;
 
     const models = sportLotteryAppData.aiPredictions.models;
-    const summary = generateModelPredictionSummary(models);
+    const summary = generateFilteredModelPredictionSummary(
+        models,
+        sportLotteryUiState.compound.selectedModelIds,
+        sportLotteryUiState.compound.sortOrder
+    );
     const compound6x3 = generateCompound6x3(models);
     const compound7x3 = generateCompound7x3(models);
     const compound7x4 = generateCompound7x4(models);
@@ -247,8 +356,22 @@ function renderSportsLotteryCompoundSelection() {
                 label: '模型预测汇总',
                 tag: '汇总',
                 data: summary,
-                rule: '汇总 ' + summary.modelCount + ' 个 AI 模型共 ' + summary.totalPredictions + ' 组预测，展示前区 01-35 与后区 01-12 各号码被模型选中的频率统计',
-                basis: 'prediction'
+                rule: summary.selectedModelCount
+                    ? (summary.commonOnly
+                        ? '当前仅展示所有已选模型共同预测过的号码，并按号码在预测组中的累计出现次数排序。'
+                        : '当前展示所有已选模型预测过的号码，并同时显示累计出现次数与命中模型数。')
+                    : '请先在筛选框中选择至少一个模型，再查看共同预测号码汇总。',
+                basis: 'prediction',
+                summaryControls: {
+                    selectedModelIds: sportLotteryUiState.compound.selectedModelIds,
+                    sortOrder: sportLotteryUiState.compound.sortOrder,
+                    commonOnly: sportLotteryUiState.compound.commonOnly,
+                    isModelDropdownOpen: sportLotteryUiState.compound.isModelDropdownOpen,
+                    models: models.map(model => ({
+                        model_id: model.model_id,
+                        model_name: model.model_name
+                    }))
+                }
             },
             {
                 label: '6+3 进阶复式',
@@ -271,8 +394,71 @@ function renderSportsLotteryCompoundSelection() {
                 rule: '基于 AI 模型预测共识度，采用低阈值扩容到 7+4，覆盖高共识到潜在共识区间',
                 basis: 'prediction'
             }
-        ]
+        ],
+        activeTabIndex: sportLotteryUiState.compound.activeTabIndex
     }));
+}
+
+function handleSportsLotteryCompoundInteractions(event) {
+    const compoundCard = event.target.closest('.compound-selection-card');
+    if (!compoundCard) {
+        if (sportLotteryUiState.compound.isModelDropdownOpen) {
+            sportLotteryUiState.compound.isModelDropdownOpen = false;
+            renderSportsLotteryCompoundSelection();
+        }
+        return;
+    }
+
+    const tabButton = event.target.closest('.compound-tab');
+    if (tabButton) {
+        sportLotteryUiState.compound.activeTabIndex = Number(tabButton.dataset.idx) || 0;
+        renderSportsLotteryCompoundSelection();
+        return;
+    }
+
+    const sortButton = event.target.closest('[data-sort-order]');
+    if (sortButton) {
+        sportLotteryUiState.compound.sortOrder = sortButton.dataset.sortOrder;
+        renderSportsLotteryCompoundSelection();
+        return;
+    }
+
+    const dropdownToggle = event.target.closest('[data-role="model-filter-toggle"]');
+    if (dropdownToggle) {
+        sportLotteryUiState.compound.isModelDropdownOpen = !sportLotteryUiState.compound.isModelDropdownOpen;
+        renderSportsLotteryCompoundSelection();
+        return;
+    }
+
+    if (!event.target.closest('.summary-filter-dropdown')) {
+        if (sportLotteryUiState.compound.isModelDropdownOpen) {
+            sportLotteryUiState.compound.isModelDropdownOpen = false;
+            renderSportsLotteryCompoundSelection();
+        }
+    }
+}
+
+function handleSportsLotteryCompoundChange(event) {
+    if (event.target.matches('[data-role="common-only-toggle"]')) {
+        sportLotteryUiState.compound.commonOnly = event.target.checked;
+        renderSportsLotteryCompoundSelection();
+        return;
+    }
+
+    if (!event.target.matches('.summary-filter-option input[type="checkbox"]')) return;
+
+    const modelId = event.target.value;
+    const nextSelectedModelIds = new Set(sportLotteryUiState.compound.selectedModelIds);
+    if (event.target.checked) {
+        nextSelectedModelIds.add(modelId);
+    } else {
+        nextSelectedModelIds.delete(modelId);
+    }
+
+    sportLotteryUiState.compound.selectedModelIds = sportLotteryAppData.aiPredictions.models
+        .map(model => model.model_id)
+        .filter(id => nextSelectedModelIds.has(id));
+    renderSportsLotteryCompoundSelection();
 }
 
 function renderSportsLotteryHistoryTab() {
@@ -717,6 +903,9 @@ function setupSportsLotteryEventListeners() {
     mobileNavItems.forEach(item => {
         item.addEventListener('click', () => handleSportsLotteryTabSwitch(item.dataset.tab));
     });
+
+    document.addEventListener('click', handleSportsLotteryCompoundInteractions);
+    document.addEventListener('change', handleSportsLotteryCompoundChange);
 }
 
 function handleSportsLotteryTabSwitch(tabName) {

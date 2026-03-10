@@ -352,6 +352,7 @@ const SportsLotteryComponents = {
     createCompoundCard(compound) {
         const card = document.createElement('div');
         card.className = 'compound-selection-card';
+        const activeTabIndex = typeof compound.activeTabIndex === 'number' ? compound.activeTabIndex : 0;
 
         const header = document.createElement('div');
         header.className = 'compound-card-header';
@@ -374,15 +375,9 @@ const SportsLotteryComponents = {
         tabs.className = 'compound-tabs';
         compound.types.forEach((type, idx) => {
             const tab = document.createElement('button');
-            tab.className = 'compound-tab' + (idx === 0 ? ' active' : '');
+            tab.className = 'compound-tab' + (idx === activeTabIndex ? ' active' : '');
             tab.dataset.idx = idx;
             tab.innerHTML = `<span class="compound-tab-tag">${type.tag}</span>${type.label}`;
-            tab.addEventListener('click', () => {
-                tabs.querySelectorAll('.compound-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                card.querySelectorAll('.compound-type-panel').forEach(p => p.classList.remove('active'));
-                card.querySelector(`.compound-type-panel[data-idx="${idx}"]`).classList.add('active');
-            });
             tabs.appendChild(tab);
         });
         card.appendChild(tabs);
@@ -391,7 +386,7 @@ const SportsLotteryComponents = {
         panelsWrap.className = 'compound-panels';
         compound.types.forEach((type, idx) => {
             const panel = document.createElement('div');
-            panel.className = 'compound-type-panel' + (idx === 0 ? ' active' : '');
+            panel.className = 'compound-type-panel' + (idx === activeTabIndex ? ' active' : '');
             panel.dataset.idx = idx;
 
             const ruleBox = document.createElement('div');
@@ -406,13 +401,23 @@ const SportsLotteryComponents = {
             `;
             panel.appendChild(ruleBox);
 
+            if (type.summaryControls) {
+                panel.appendChild(this._createSummaryControls(type.summaryControls, type.data));
+            }
+
             const content = document.createElement('div');
             content.className = 'compound-card-content';
 
             const totalRef = type.basis === 'prediction' ? type.data.totalPredictions : type.data.totalDraws;
-            const redSection = this._createCompoundZone('前区精选', 'red', type.data.red, totalRef, type.basis);
+            const redSection = this._createCompoundZone('前区精选', 'red', type.data.red, totalRef, type.basis, {
+                isSummary: Boolean(type.summaryControls),
+                zoneMeta: type.data.zoneMeta?.red
+            });
             content.appendChild(redSection);
-            const blueSection = this._createCompoundZone('后区精选', 'blue', type.data.blue, totalRef, type.basis);
+            const blueSection = this._createCompoundZone('后区精选', 'blue', type.data.blue, totalRef, type.basis, {
+                isSummary: Boolean(type.summaryControls),
+                zoneMeta: type.data.zoneMeta?.blue
+            });
             content.appendChild(blueSection);
 
             panel.appendChild(content);
@@ -433,21 +438,112 @@ const SportsLotteryComponents = {
         return card;
     },
 
-    _createCompoundZone(title, color, balls, totalRef, basis) {
+    _createSummaryControls(summaryControls, summaryData) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'compound-summary-toolbar';
+
+        const selectedModelsLabel = summaryControls.selectedModelIds.length === summaryControls.models.length
+            ? '全部模型'
+            : `${summaryControls.selectedModelIds.length} 个模型`;
+        const selectedNames = summaryControls.models
+            .filter(model => summaryControls.selectedModelIds.includes(model.model_id))
+            .map(model => model.model_name);
+
+        wrapper.innerHTML = `
+            <div class="summary-toolbar-main">
+                <div class="summary-toolbar-group">
+                    <span class="summary-toolbar-label">排序方式</span>
+                    <div class="summary-sort-switch">
+                        <button type="button" class="summary-sort-btn${summaryControls.sortOrder === 'desc' ? ' active' : ''}" data-sort-order="desc">次数降序</button>
+                        <button type="button" class="summary-sort-btn${summaryControls.sortOrder === 'asc' ? ' active' : ''}" data-sort-order="asc">次数升序</button>
+                    </div>
+                </div>
+                <div class="summary-toolbar-group summary-toggle-group">
+                    <span class="summary-toolbar-label">结果模式</span>
+                    <label class="summary-check-toggle">
+                        <input type="checkbox" data-role="common-only-toggle" ${summaryControls.commonOnly ? 'checked' : ''}>
+                        <span class="summary-check-indicator"></span>
+                        <span class="summary-check-text">共同预测</span>
+                    </label>
+                </div>
+                <div class="summary-toolbar-group summary-filter-group">
+                    <span class="summary-toolbar-label">模型筛选</span>
+                    <div class="summary-filter-dropdown${summaryControls.isModelDropdownOpen ? ' open' : ''}">
+                        <button type="button" class="summary-filter-trigger" data-role="model-filter-toggle">
+                            <span class="summary-filter-trigger-text">${selectedModelsLabel}</span>
+                            <span class="summary-filter-trigger-hint">${selectedNames.slice(0, 2).join(' / ') || '未选择模型'}</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="summary-filter-menu">
+                            ${summaryControls.models.map(model => `
+                                <label class="summary-filter-option">
+                                    <input type="checkbox" value="${model.model_id}" ${summaryControls.selectedModelIds.includes(model.model_id) ? 'checked' : ''}>
+                                    <span class="summary-filter-option-name">${model.model_name}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="summary-toolbar-stats">
+                <div class="summary-stat-pill">
+                    <span class="summary-stat-value">${summaryData.selectedModelCount}</span>
+                    <span class="summary-stat-label">已选模型</span>
+                </div>
+                <div class="summary-stat-pill">
+                    <span class="summary-stat-value">${summaryData.totalDisplayedNumbers}</span>
+                    <span class="summary-stat-label">${summaryData.commonOnly ? '共同号码' : '展示号码'}</span>
+                </div>
+                <div class="summary-stat-pill summary-stat-pill-wide">
+                    <span class="summary-stat-value">${summaryData.totalPredictions}</span>
+                    <span class="summary-stat-label">纳入统计的预测组</span>
+                </div>
+            </div>
+        `;
+
+        return wrapper;
+    },
+
+    _createCompoundZone(title, color, balls, totalRef, basis, options = {}) {
+        const { isSummary = false, zoneMeta = null } = options;
         const section = document.createElement('div');
         section.className = 'compound-zone';
+
+        const heading = document.createElement('div');
+        heading.className = 'compound-zone-heading';
 
         const label = document.createElement('div');
         label.className = `compound-zone-label ${color}`;
         label.textContent = title;
-        section.appendChild(label);
+        heading.appendChild(label);
+
+        if (isSummary && zoneMeta?.isCommonOnly) {
+            const fallbackBadge = document.createElement('div');
+            fallbackBadge.className = `compound-zone-status ${color}`;
+            fallbackBadge.textContent = '共同预测';
+            heading.appendChild(fallbackBadge);
+        }
+
+        section.appendChild(heading);
 
         const ballsRow = document.createElement('div');
-        ballsRow.className = 'compound-balls-row';
+        ballsRow.className = `compound-balls-row${isSummary ? ' summary-grid' : ''}`;
+
+        if (!balls.length) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'compound-zone-empty';
+            emptyState.textContent = isSummary && zoneMeta?.isCommonOnly
+                ? '当前筛选下暂无共同预测号码。'
+                : '当前筛选下暂无号码。';
+            section.appendChild(emptyState);
+            return section;
+        }
 
         balls.forEach(item => {
             const ballWrap = document.createElement('div');
-            ballWrap.className = 'compound-ball-wrap';
+            ballWrap.className = `compound-ball-wrap${isSummary ? ' summary-card' : ''}`;
 
             const ball = document.createElement('div');
             ball.className = `compound-ball ${color}`;
@@ -456,14 +552,32 @@ const SportsLotteryComponents = {
 
             const freq = document.createElement('div');
             freq.className = 'compound-ball-freq';
-            freq.textContent = basis === 'prediction' ? `${item.count}/${totalRef}` : `${item.count}期`;
+            freq.textContent = basis === 'prediction'
+                ? `出现 ${item.predictionCount || item.count}/${totalRef}`
+                : `${item.count}期`;
             ballWrap.appendChild(freq);
+
+            if (isSummary) {
+                const tag = document.createElement('div');
+                tag.className = `compound-ball-meta-tag ${color}`;
+                tag.textContent = zoneMeta?.isCommonOnly
+                    ? '共同预测'
+                    : `命中 ${item.matchedModelCount} 个模型`;
+                ballWrap.appendChild(tag);
+            }
 
             const barRate = basis === 'prediction' ? item.rate : Math.min(100, Math.round(item.count / totalRef * 100 * 3));
             const bar = document.createElement('div');
             bar.className = `compound-freq-bar ${color}`;
             bar.innerHTML = `<div class="compound-freq-bar-fill" style="width: ${barRate}%"></div>`;
             ballWrap.appendChild(bar);
+
+            if (isSummary) {
+                const rate = document.createElement('div');
+                rate.className = 'compound-ball-rate';
+                rate.textContent = `命中占比 ${barRate}%`;
+                ballWrap.appendChild(rate);
+            }
 
             ballsRow.appendChild(ballWrap);
         });
