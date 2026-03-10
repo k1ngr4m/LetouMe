@@ -396,6 +396,9 @@ const SportsLotteryComponents = {
         const hitLabel = actualResult
             ? `最佳 ${totalHits} 中`
             : `${model.predictionCount} 组方案`;
+        const previewPredictions = model.isPinned
+            ? model.predictions
+            : (model.primaryPrediction ? [model.primaryPrediction] : []);
         card.innerHTML = `
             <div class="prediction-spotlight-top">
                 <div>
@@ -406,22 +409,21 @@ const SportsLotteryComponents = {
                     ${model.isPinned ? '已置顶' : '置顶'}
                 </button>
             </div>
-            <div class="prediction-spotlight-balls"></div>
+            <div class="prediction-spotlight-balls-list"></div>
             <div class="prediction-spotlight-actions">
                 <span class="prediction-spotlight-strategy">${model.primaryPrediction?.strategy || '暂无策略'}</span>
                 <button type="button" class="prediction-detail-btn" data-role="prediction-open-detail" data-model-id="${model.model_id}">查看详情</button>
             </div>
         `;
 
-        const balls = card.querySelector('.prediction-spotlight-balls');
-        if (model.primaryPrediction) {
-            balls.appendChild(this.createBallsFragment(model.primaryPrediction.red_balls, model.primaryPrediction.blue_balls, {
-                redSize: 'sm',
-                blueSize: 'sm',
-                redHits: model.bestPrediction?.hitResult?.redHits || [],
-                blueHits: model.bestPrediction?.hitResult?.blueHits || []
-            }));
-        }
+        const ballsList = card.querySelector('.prediction-spotlight-balls-list');
+        previewPredictions.forEach((prediction, index) => {
+            ballsList.appendChild(this.createPredictionPreviewRow(
+                prediction,
+                actualResult,
+                model.isPinned ? `方案 ${index + 1}` : '核心方案'
+            ));
+        });
 
         return card;
     },
@@ -498,6 +500,9 @@ const SportsLotteryComponents = {
         const summary = actualResult
             ? `最佳 ${model.bestPrediction?.totalHits || 0} 中`
             : `${model.predictionCount} 组方案`;
+        const previewPredictions = model.isPinned
+            ? model.predictions
+            : (model.primaryPrediction ? [model.primaryPrediction] : []);
         card.innerHTML = `
             <div class="prediction-mobile-card-top">
                 <div>
@@ -508,24 +513,44 @@ const SportsLotteryComponents = {
                     ${model.isPinned ? '已置顶' : '置顶'}
                 </button>
             </div>
-            <div class="prediction-mobile-card-balls"></div>
+            <div class="prediction-mobile-card-balls-list"></div>
             <div class="prediction-mobile-card-actions">
                 <span>${model.primaryPrediction?.strategy || '暂无策略'}</span>
                 <button type="button" class="prediction-detail-btn" data-role="prediction-open-detail" data-model-id="${model.model_id}">查看详情</button>
             </div>
         `;
 
-        const balls = card.querySelector('.prediction-mobile-card-balls');
-        if (model.primaryPrediction) {
-            balls.appendChild(this.createBallsFragment(model.primaryPrediction.red_balls, model.primaryPrediction.blue_balls, {
-                redSize: 'sm',
-                blueSize: 'sm',
-                redHits: model.bestPrediction?.hitResult?.redHits || [],
-                blueHits: model.bestPrediction?.hitResult?.blueHits || []
-            }));
-        }
+        const ballsList = card.querySelector('.prediction-mobile-card-balls-list');
+        previewPredictions.forEach((prediction, index) => {
+            ballsList.appendChild(this.createPredictionPreviewRow(
+                prediction,
+                actualResult,
+                model.isPinned ? `方案 ${index + 1}` : '核心方案'
+            ));
+        });
 
         return card;
+    },
+
+    createPredictionPreviewRow(prediction, actualResult = null, label = '核心方案') {
+        const row = document.createElement('div');
+        row.className = 'prediction-preview-row';
+
+        const hitResult = actualResult ? this.compareNumbers(prediction, actualResult) : null;
+        row.innerHTML = `
+            <div class="prediction-preview-label">${label}</div>
+            <div class="prediction-preview-balls"></div>
+        `;
+
+        const balls = row.querySelector('.prediction-preview-balls');
+        balls.appendChild(this.createBallsFragment(prediction.red_balls, prediction.blue_balls, {
+            redSize: 'sm',
+            blueSize: 'sm',
+            redHits: hitResult?.redHits || [],
+            blueHits: hitResult?.blueHits || []
+        }));
+
+        return row;
     },
 
     createModelDetailDrawer(model, actualResult = null) {

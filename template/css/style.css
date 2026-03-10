@@ -755,13 +755,40 @@ body::after {
 
 .prediction-spotlight-balls,
 .prediction-mobile-card-balls,
-.prediction-overview-balls {
+.prediction-overview-balls,
+.prediction-preview-balls {
     margin-top: 0.85rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: nowrap;
     overflow-x: auto;
+}
+
+.prediction-spotlight-balls-list,
+.prediction-mobile-card-balls-list {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.prediction-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.prediction-preview-label {
+    flex: 0 0 56px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--slate-500);
+    letter-spacing: 0.04em;
+}
+
+.prediction-preview-balls .ball-divider {
+    height: 24px;
 }
 
 .prediction-spotlight-actions,

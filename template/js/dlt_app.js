@@ -145,6 +145,7 @@ function _buildPredictionOverviewModel(model, actualResult) {
         model_id: model.model_id,
         model_name: model.model_name,
         model_provider: model.model_provider,
+        predictions: model.predictions,
         predictionCount: model.predictions.length,
         bestPrediction,
         primaryPrediction,
