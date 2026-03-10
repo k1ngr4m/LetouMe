@@ -217,41 +217,41 @@ const SportsLotteryComponents = {
         const hitsList = document.createElement('div');
         hitsList.className = 'model-hits-list';
         record.models.forEach((model, index) => {
-            hitsList.appendChild(this.createModelHitItem(model, index + 1, index === record.models.length - 1));
+            hitsList.appendChild(this.createModelHitItem(model, index + 1));
         });
         card.appendChild(hitsList);
 
         return card;
     },
 
-    createModelHitItem(model, index, isLast = false) {
+    createModelHitItem(model, index) {
         const item = document.createElement('div');
         item.className = 'model-hit-item';
-        const bestHit = Math.max(...model.predictions.map(p => p.hit_result?.total_hits || 0), 0);
-        const safeModelId = model.model_id.replace(/[^a-zA-Z0-9-_]/g, '-');
+        const predictions = Array.isArray(model.predictions) ? model.predictions : [];
+        const bestHit = Math.max(...predictions.map(p => p.hit_result?.total_hits || 0), 0);
+        const safeModelId = (model.model_id || model.model_name || `model-${index}`).replace(/[^a-zA-Z0-9-_]/g, '-');
 
         item.innerHTML = `
-            ${!isLast ? '<div class="model-hit-connector"></div>' : ''}
-            <div class="model-hit-row">
-                <div class="model-hit-number">${index}</div>
-                <div class="model-hit-content">
-                    <div class="model-hit-header">
-                        <h4 class="model-hit-name">${model.model_name}</h4>
-                        ${bestHit >= 4 ? `
-                        <span class="high-hit-badge">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                            </svg>
-                            高命中: ${bestHit}
-                        </span>` : ''}
-                    </div>
-                    <div class="prediction-groups" id="groups-${safeModelId}"></div>
+            <div class="model-hit-header">
+                <div class="model-hit-header-main">
+                    <div class="model-hit-number">${index}</div>
+                    <h4 class="model-hit-name">${model.model_name}</h4>
                 </div>
+                ${bestHit >= 4 ? `
+                    <span class="high-hit-badge">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        高命中: ${bestHit}
+                    </span>` : ''}
+            </div>
+            <div class="model-hit-content">
+                <div class="prediction-groups" id="groups-${safeModelId}"></div>
             </div>
         `;
 
         const groupsContainer = item.querySelector(`#groups-${safeModelId}`);
-        model.predictions.forEach(prediction => {
+        predictions.forEach(prediction => {
             groupsContainer.appendChild(this.createPredictionGroupRow(prediction));
         });
 

@@ -795,40 +795,78 @@ function renderSportsLotteryAccuracyChart() {
     sportLotteryCharts.push(chart);
 }
 
+function _hashSportsLotteryModelKey(modelKey) {
+    let hash = 0;
+    for (let index = 0; index < modelKey.length; index++) {
+        hash = ((hash << 5) - hash) + modelKey.charCodeAt(index);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+
+function getSportsLotteryModelChartColor(modelKey, index = 0) {
+    const hash = _hashSportsLotteryModelKey(modelKey);
+    const hue = (hash + index * 47) % 360;
+    const saturation = 62 + (hash % 12);
+    const lightness = 46 + (hash % 10);
+
+    return {
+        borderColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        backgroundColor: `hsla(${hue}, ${saturation}%, ${lightness}%, 0.18)`
+    };
+}
+
 function prepareSportsLotteryChartData() {
     const history = sportLotteryAppData.predictionsHistory.predictions_history || [];
     const reversedHistory = [...history].reverse();
     const labels = [];
-    const modelsData = {};
+    const modelMetaMap = new Map();
 
     reversedHistory.forEach(record => {
         labels.push(record.target_period);
-        record.models.forEach(model => {
-            if (!modelsData[model.model_name]) {
-                modelsData[model.model_name] = [];
+        (record.models || []).forEach(model => {
+            const modelKey = model.model_id || model.model_name;
+            if (!modelKey) return;
+
+            if (!modelMetaMap.has(modelKey)) {
+                modelMetaMap.set(modelKey, {
+                    key: modelKey,
+                    label: model.model_name || modelKey
+                });
             }
-            const bestHit = Math.max(...model.predictions.map(p => p.hit_result?.total_hits || 0), 0);
-            modelsData[model.model_name].push(bestHit);
         });
     });
 
-    const colors = {
-        'GPT-4o': '#10b981',
-        'Claude-4.6': '#8b5cf6',
-        'Gemini-3': '#3b82f6',
-        'DeepSeek-v3.2': '#f59e0b'
-    };
+    const modelsData = {};
+    modelMetaMap.forEach((meta) => {
+        modelsData[meta.key] = Array(reversedHistory.length).fill(null);
+    });
 
-    const datasets = Object.keys(modelsData).map(modelName => ({
-        label: modelName,
-        data: modelsData[modelName],
-        borderColor: colors[modelName] || '#6b7280',
-        backgroundColor: colors[modelName] || '#6b7280',
-        borderWidth: 3,
-        pointRadius: 4,
-        pointHoverRadius: 7,
-        tension: 0.15
-    }));
+    reversedHistory.forEach((record, recordIndex) => {
+        (record.models || []).forEach(model => {
+            const modelKey = model.model_id || model.model_name;
+            if (!modelsData[modelKey]) return;
+
+            const predictions = Array.isArray(model.predictions) ? model.predictions : [];
+            const bestHit = Math.max(...predictions.map(p => p.hit_result?.total_hits || 0), 0);
+            modelsData[modelKey][recordIndex] = bestHit;
+        });
+    });
+
+    const datasets = Array.from(modelMetaMap.values()).map((meta, index) => {
+        const colors = getSportsLotteryModelChartColor(meta.key, index);
+        return {
+            label: meta.label,
+            data: modelsData[meta.key],
+            borderColor: colors.borderColor,
+            backgroundColor: colors.backgroundColor,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            tension: 0.15,
+            spanGaps: false
+        };
+    });
 
     return { labels, datasets };
 }

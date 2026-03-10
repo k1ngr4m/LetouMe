@@ -1462,69 +1462,59 @@ body::after {
 /* Model Hits List */
 .model-hits-list {
     padding: 1rem 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
 }
 
 .model-hit-item {
-    position: relative;
-    margin-bottom: 1.5rem;
-}
-
-.model-hit-item:last-child {
-    margin-bottom: 0;
-}
-
-.model-hit-connector {
-    position: absolute;
-    left: 11px;
-    top: 32px;
-    bottom: -24px;
-    width: 1px;
-    background: var(--slate-100);
-    z-index: 0;
-}
-
-.model-hit-item:last-child .model-hit-connector {
-    display: none;
-}
-
-.model-hit-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    position: relative;
-    z-index: 10;
+    min-width: 0;
+    border: 1px solid var(--slate-200);
+    border-radius: 1rem;
+    background: linear-gradient(to bottom, white, var(--slate-50));
+    box-shadow: var(--shadow-sm);
+    padding: 1rem;
 }
 
 .model-hit-number {
-    margin-top: 0.25rem;
-    min-width: 24px;
-    height: 24px;
+    min-width: 26px;
+    height: 26px;
     border-radius: 9999px;
-    background: white;
+    background: var(--indigo-50);
     border: 2px solid var(--indigo-100);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: #818cf8;
 }
 
 .model-hit-content {
-    flex: 1;
+    min-width: 0;
+}
+
+.model-hit-header-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
 }
 
 .model-hit-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     margin-bottom: 0.75rem;
+    gap: 0.75rem;
 }
 
 .model-hit-name {
     font-size: 0.875rem;
     font-weight: 700;
     color: var(--slate-800);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
 .high-hit-badge {
@@ -1551,6 +1541,13 @@ body::after {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .model-hits-list {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+    }
 }
 
 .prediction-group-row {
