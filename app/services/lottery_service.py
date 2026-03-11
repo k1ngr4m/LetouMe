@@ -33,8 +33,10 @@ class LotteryService:
         self.repository.upsert_draws(normalized)
         return normalized
 
-    def get_history_payload(self, limit: int | None = None) -> dict[str, Any]:
-        draws = self.repository.list_draws(limit=limit)
+    def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+        draws = self.repository.list_draws(limit=limit, offset=offset)
+        total_count = self.repository.count_draws()
+        latest_draw = self.repository.get_latest_draw()
         last_updated = max(
             (draw.get("updated_at") for draw in draws if draw.get("updated_at")),
             default=datetime.utcnow(),
@@ -42,11 +44,12 @@ class LotteryService:
         payload = {
             "last_updated": last_updated.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "data": [self.normalize_draw(draw) for draw in draws],
+            "total_count": total_count,
         }
-        if payload["data"]:
+        if latest_draw:
             payload["next_draw"] = self.predict_next_draw(
-                payload["data"][0]["period"],
-                payload["data"][0]["date"],
+                latest_draw["period"],
+                latest_draw["date"],
             )
         return payload
 

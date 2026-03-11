@@ -163,18 +163,36 @@ class PredictionRepository:
             )
             raise
 
-    def list_history_records(self) -> list[dict[str, Any]]:
+    def list_history_records(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        sql = """
+            SELECT target_period, prediction_date, actual_period, payload_json, created_at
+            FROM prediction_history
+            ORDER BY target_period DESC
+        """
+        params: list[Any] = []
+        if limit is not None:
+            sql += " LIMIT %s"
+            params.append(limit)
+        if offset:
+            sql += " OFFSET %s"
+            params.append(offset)
+
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT target_period, prediction_date, actual_period, payload_json, created_at
-                    FROM prediction_history
-                    ORDER BY target_period DESC
-                    """
-                )
+                cursor.execute(sql, tuple(params))
                 rows = cursor.fetchall()
         return [self._history_row_to_dict(row) for row in rows]
+
+    def count_history_records(self) -> int:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) AS total FROM prediction_history")
+                row = cursor.fetchone() or {}
+        return int(row.get("total") or 0)
 
     @staticmethod
     def _current_row_to_dict(row: dict[str, Any]) -> dict[str, Any]:

@@ -47,23 +47,33 @@ class LotteryRepository:
             )
             raise
 
-    def list_draws(self, limit: int | None = None) -> list[dict[str, Any]]:
+    def list_draws(self, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
         sql = """
             SELECT period, draw_date, red_balls, blue_balls, updated_at
             FROM lottery_draws
             ORDER BY period DESC
         """
-        params: tuple[Any, ...] = ()
+        params: list[Any] = []
         if limit is not None:
             sql += " LIMIT %s"
-            params = (limit,)
+            params.append(limit)
+        if offset:
+            sql += " OFFSET %s"
+            params.append(offset)
 
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(sql, params)
+                cursor.execute(sql, tuple(params))
                 rows = cursor.fetchall()
 
         return [self._to_draw_dict(row) for row in rows]
+
+    def count_draws(self) -> int:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) AS total FROM lottery_draws")
+                row = cursor.fetchone() or {}
+        return int(row.get("total") or 0)
 
     def get_draw_by_period(self, period: str) -> dict[str, Any] | None:
         with get_connection() as connection:

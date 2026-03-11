@@ -6,7 +6,7 @@
     <title>大乐透 AI 预测</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="template/css/style.css?v=20260310c">
+    <link rel="stylesheet" href="template/css/style.css?v=20260311b">
 </head>
 <body>
     <div id="loadingScreen" class="loading-screen">
@@ -375,6 +375,15 @@
                         </span>
                     </div>
                     <div id="accuracyCardsContainer"></div>
+                    <div class="history-load-more-wrap">
+                        <span class="history-load-more-status" id="historyPredictionsLoadMoreStatus"></span>
+                        <button
+                            type="button"
+                            class="history-load-more-btn"
+                            id="historyPredictionsLoadMoreBtn"
+                            data-role="history-load-more-predictions"
+                        >加载更多命中记录</button>
+                    </div>
                 </div>
 
                 <div class="history-section">
@@ -393,6 +402,42 @@
                             </table>
                         </div>
                     </div>
+                    <div class="history-pagination-wrap">
+                        <div class="history-pagination-status" id="historyLotteryPaginationStatus"></div>
+                        <div class="history-pagination-controls">
+                            <button
+                                type="button"
+                                class="history-pagination-btn"
+                                id="historyLotteryPrevBtn"
+                                data-role="history-lottery-prev"
+                            >上一页</button>
+                            <div class="history-pagination-pages" id="historyLotteryPages"></div>
+                            <button
+                                type="button"
+                                class="history-pagination-btn"
+                                id="historyLotteryNextBtn"
+                                data-role="history-lottery-next"
+                            >下一页</button>
+                        </div>
+                        <div class="history-pagination-jump">
+                            <span class="history-pagination-jump-label">跳转到</span>
+                            <input
+                                type="text"
+                                inputmode="numeric"
+                                class="history-pagination-input"
+                                id="historyLotteryJumpInput"
+                                data-role="history-lottery-jump-input"
+                                value="1"
+                            >
+                            <span class="history-pagination-jump-label">页</span>
+                            <button
+                                type="button"
+                                class="history-pagination-btn primary"
+                                id="historyLotteryJumpBtn"
+                                data-role="history-lottery-jump"
+                            >跳转</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -406,8 +451,8 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-    <script src="template/js/dlt_data-loader.js?v=20260310c"></script>
+    <script src="template/js/dlt_data-loader.js?v=20260311a"></script>
     <script src="template/js/dlt_components.js?v=20260310c"></script>
-    <script src="template/js/dlt_app.js?v=20260310c"></script>
+    <script src="template/js/dlt_app.js?v=20260311b"></script>
 </body>
 </html>

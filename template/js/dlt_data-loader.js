@@ -8,6 +8,16 @@ const SportsLotteryDataLoader = {
     predictionsPath: '/api/predictions/current',
     predictionsHistoryPath: '/api/predictions/history',
 
+    buildPathWithQuery(path, query = {}) {
+        const params = new URLSearchParams();
+        Object.entries(query).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            params.set(key, String(value));
+        });
+        const queryString = params.toString();
+        return queryString ? `${path}?${queryString}` : path;
+    },
+
     padNumber(value) {
         return String(value).padStart(2, '0');
     },
@@ -87,6 +97,7 @@ const SportsLotteryDataLoader = {
     normalizePredictionsHistory(historyData) {
         return {
             ...historyData,
+            total_count: typeof historyData.total_count === 'number' ? historyData.total_count : 0,
             predictions_history: Array.isArray(historyData.predictions_history)
                 ? historyData.predictions_history.map(record => ({
                     ...record,
@@ -112,11 +123,12 @@ const SportsLotteryDataLoader = {
         return response.json();
     },
 
-    async loadLotteryHistory() {
+    async loadLotteryHistory(query = {}) {
         try {
-            const data = await this.fetchJson(this.historyPath);
+            const data = await this.fetchJson(this.buildPathWithQuery(this.historyPath, query));
             return {
                 ...data,
+                total_count: typeof data.total_count === 'number' ? data.total_count : 0,
                 data: Array.isArray(data.data) ? data.data.map(draw => this.normalizeDraw(draw)) : []
             };
         } catch (error) {
@@ -135,9 +147,9 @@ const SportsLotteryDataLoader = {
         }
     },
 
-    async loadPredictionsHistory() {
+    async loadPredictionsHistory(query = {}) {
         try {
-            const data = await this.fetchJson(this.predictionsHistoryPath);
+            const data = await this.fetchJson(this.buildPathWithQuery(this.predictionsHistoryPath, query));
             return this.normalizePredictionsHistory(data);
         } catch (error) {
             console.error('加载大乐透历史预测对比数据失败:', error);

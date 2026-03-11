@@ -55,8 +55,11 @@ class PredictionService:
             "models": [],
         }
 
-    def get_history_payload(self) -> dict[str, Any]:
-        return {"predictions_history": self.prediction_repository.list_history_records()}
+    def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+        return {
+            "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset),
+            "total_count": self.prediction_repository.count_history_records(),
+        }
 
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
         target_period = str(payload.get("target_period") or "")
