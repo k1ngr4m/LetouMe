@@ -6,9 +6,13 @@ from typing import Any
 from psycopg2.extras import Json
 
 from app.db.connection import get_connection
+from app.repositories.write_log_repository import WriteLogRepository
 
 
 class PredictionRepository:
+    def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
+        self.log_repository = log_repository or WriteLogRepository()
+
     def get_current_prediction(self) -> dict[str, Any] | None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -39,59 +43,125 @@ class PredictionRepository:
         return self._current_row_to_dict(row) if row else None
 
     def upsert_current_prediction(self, payload: dict[str, Any]) -> None:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO current_predictions (target_period, prediction_date, payload_json)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (target_period) DO UPDATE SET
-                        prediction_date = EXCLUDED.prediction_date,
-                        payload_json = EXCLUDED.payload_json,
-                        updated_at = NOW()
-                    """,
-                    (
-                        payload["target_period"],
-                        payload["prediction_date"],
-                        Json(payload),
-                    ),
+        target_period = str(payload["target_period"])
+        target_key = f"target_period={target_period}"
+        summary = f"upsert current_predictions {target_key}"
+        try:
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO current_predictions (target_period, prediction_date, payload_json)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (target_period) DO UPDATE SET
+                            prediction_date = EXCLUDED.prediction_date,
+                            payload_json = EXCLUDED.payload_json,
+                            updated_at = NOW()
+                        """,
+                        (
+                            target_period,
+                            payload["prediction_date"],
+                            Json(payload),
+                        ),
+                    )
+                self.log_repository.log_success(
+                    connection,
+                    table_name="current_predictions",
+                    action="upsert",
+                    target_key=target_key,
+                    summary=summary,
+                    payload=payload,
                 )
+        except Exception as exc:
+            self.log_repository.log_failure(
+                table_name="current_predictions",
+                action="upsert",
+                target_key=target_key,
+                summary=summary,
+                error_message=f"{type(exc).__name__}: {exc}",
+                payload=payload,
+            )
+            raise
 
     def replace_current_prediction(self, payload: dict[str, Any]) -> None:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("DELETE FROM current_predictions")
-                cursor.execute(
-                    """
-                    INSERT INTO current_predictions (target_period, prediction_date, payload_json)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (
-                        payload["target_period"],
-                        payload["prediction_date"],
-                        Json(payload),
-                    ),
+        target_period = str(payload["target_period"])
+        target_key = f"target_period={target_period}"
+        summary = f"replace current_predictions {target_key}"
+        try:
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM current_predictions")
+                    cursor.execute(
+                        """
+                        INSERT INTO current_predictions (target_period, prediction_date, payload_json)
+                        VALUES (%s, %s, %s)
+                        """,
+                        (
+                            target_period,
+                            payload["prediction_date"],
+                            Json(payload),
+                        ),
+                    )
+                self.log_repository.log_success(
+                    connection,
+                    table_name="current_predictions",
+                    action="replace",
+                    target_key=target_key,
+                    summary=summary,
+                    payload=payload,
                 )
+        except Exception as exc:
+            self.log_repository.log_failure(
+                table_name="current_predictions",
+                action="replace",
+                target_key=target_key,
+                summary=summary,
+                error_message=f"{type(exc).__name__}: {exc}",
+                payload=payload,
+            )
+            raise
 
     def upsert_history_record(self, payload: dict[str, Any]) -> None:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO prediction_history (target_period, prediction_date, actual_period, payload_json)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (target_period) DO UPDATE SET
-                        prediction_date = EXCLUDED.prediction_date,
-                        actual_period = EXCLUDED.actual_period,
-                        payload_json = EXCLUDED.payload_json
-                    """,
-                    (
-                        payload["target_period"],
-                        payload["prediction_date"],
-                        payload["target_period"],
-                        Json(payload),
-                    ),
+        target_period = str(payload["target_period"])
+        target_key = f"target_period={target_period}"
+        summary = f"upsert prediction_history {target_key}"
+        try:
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO prediction_history (target_period, prediction_date, actual_period, payload_json)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (target_period) DO UPDATE SET
+                            prediction_date = EXCLUDED.prediction_date,
+                            actual_period = EXCLUDED.actual_period,
+                            payload_json = EXCLUDED.payload_json
+                        """,
+                        (
+                            target_period,
+                            payload["prediction_date"],
+                            target_period,
+                            Json(payload),
+                        ),
+                    )
+                self.log_repository.log_success(
+                    connection,
+                    table_name="prediction_history",
+                    action="upsert",
+                    target_key=target_key,
+                    summary=summary,
+                    payload=payload,
                 )
+        except Exception as exc:
+            self.log_repository.log_failure(
+                table_name="prediction_history",
+                action="upsert",
+                target_key=target_key,
+                summary=summary,
+                error_message=f"{type(exc).__name__}: {exc}",
+                payload=payload,
+            )
+            raise
 
     def list_history_records(self) -> list[dict[str, Any]]:
         with get_connection() as connection:

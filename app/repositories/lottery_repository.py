@@ -6,51 +6,46 @@ from typing import Any
 from psycopg2.extras import Json
 
 from app.db.connection import get_connection
+from app.repositories.write_log_repository import WriteLogRepository
 
 
 class LotteryRepository:
+    def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
+        self.log_repository = log_repository or WriteLogRepository()
+
     def upsert_draw(self, draw: dict[str, Any]) -> None:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO lottery_draws (period, draw_date, red_balls, blue_balls)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (period) DO UPDATE SET
-                        draw_date = EXCLUDED.draw_date,
-                        red_balls = EXCLUDED.red_balls,
-                        blue_balls = EXCLUDED.blue_balls,
-                        updated_at = NOW()
-                    """,
-                    (
-                        draw["period"],
-                        draw.get("date"),
-                        Json(draw.get("red_balls", [])),
-                        Json(draw.get("blue_balls", [])),
-                    ),
-                )
+        self._upsert_draw(draw)
 
     def upsert_draws(self, draws: list[dict[str, Any]]) -> None:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
+        current_draw: dict[str, Any] | None = None
+        try:
+            with get_connection() as connection:
                 for draw in draws:
-                    cursor.execute(
-                        """
-                        INSERT INTO lottery_draws (period, draw_date, red_balls, blue_balls)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (period) DO UPDATE SET
-                            draw_date = EXCLUDED.draw_date,
-                            red_balls = EXCLUDED.red_balls,
-                            blue_balls = EXCLUDED.blue_balls,
-                            updated_at = NOW()
-                        """,
-                        (
-                            draw["period"],
-                            draw.get("date"),
-                            Json(draw.get("red_balls", [])),
-                            Json(draw.get("blue_balls", [])),
-                        ),
+                    current_draw = draw
+                    self._execute_upsert(connection, draw)
+                    period = str(draw["period"])
+                    self.log_repository.log_success(
+                        connection,
+                        table_name="lottery_draws",
+                        action="upsert",
+                        target_key=f"period={period}",
+                        summary=f"upsert lottery_draws period={period}",
                     )
+        except Exception as exc:
+            target_key = "period=unknown"
+            summary = "upsert lottery_draws period=unknown"
+            if current_draw is not None:
+                period = str(current_draw["period"])
+                target_key = f"period={period}"
+                summary = f"upsert lottery_draws {target_key}"
+            self.log_repository.log_failure(
+                table_name="lottery_draws",
+                action="upsert",
+                target_key=target_key,
+                summary=summary,
+                error_message=f"{type(exc).__name__}: {exc}",
+            )
+            raise
 
     def list_draws(self, limit: int | None = None) -> list[dict[str, Any]]:
         sql = """
@@ -87,6 +82,51 @@ class LotteryRepository:
     def get_latest_draw(self) -> dict[str, Any] | None:
         draws = self.list_draws(limit=1)
         return draws[0] if draws else None
+
+    def _upsert_draw(self, draw: dict[str, Any]) -> None:
+        period = str(draw["period"])
+        target_key = f"period={period}"
+        summary = f"upsert lottery_draws {target_key}"
+        try:
+            with get_connection() as connection:
+                self._execute_upsert(connection, draw)
+                self.log_repository.log_success(
+                    connection,
+                    table_name="lottery_draws",
+                    action="upsert",
+                    target_key=target_key,
+                    summary=summary,
+                )
+        except Exception as exc:
+            self.log_repository.log_failure(
+                table_name="lottery_draws",
+                action="upsert",
+                target_key=target_key,
+                summary=summary,
+                error_message=f"{type(exc).__name__}: {exc}",
+            )
+            raise
+
+    @staticmethod
+    def _execute_upsert(connection, draw: dict[str, Any]) -> None:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO lottery_draws (period, draw_date, red_balls, blue_balls)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (period) DO UPDATE SET
+                    draw_date = EXCLUDED.draw_date,
+                    red_balls = EXCLUDED.red_balls,
+                    blue_balls = EXCLUDED.blue_balls,
+                    updated_at = NOW()
+                """,
+                (
+                    str(draw["period"]),
+                    draw.get("date"),
+                    Json(draw.get("red_balls", [])),
+                    Json(draw.get("blue_balls", [])),
+                ),
+            )
 
     @staticmethod
     def _to_draw_dict(row: dict[str, Any]) -> dict[str, Any]:
