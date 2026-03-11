@@ -13,44 +13,20 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 @dataclass(frozen=True)
 class Settings:
-    db_host: str
-    db_port: int
-    db_name: str
-    db_user: str
-    db_password: str
-    db_sslmode: str = "require"
+    db_path: Path
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
     @property
-    def database_dsn(self) -> str:
-        return " ".join(
-            [
-                f"host={self.db_host}",
-                f"port={self.db_port}",
-                f"dbname={self.db_name}",
-                f"user={self.db_user}",
-                f"password={self.db_password}",
-                f"sslmode={self.db_sslmode}",
-            ]
-        )
-
-
-def _require_env(name: str) -> str:
-    value = os.getenv(name, "").strip()
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
+    def database_path(self) -> Path:
+        if self.db_path.is_absolute():
+            return self.db_path
+        return PROJECT_ROOT / self.db_path
 
 
 def load_settings() -> Settings:
     return Settings(
-        db_host=_require_env("DB_HOST"),
-        db_port=int(os.getenv("DB_PORT", "5432")),
-        db_name=os.getenv("DB_NAME", "postgres"),
-        db_user=_require_env("DB_USER"),
-        db_password=_require_env("DB_PASSWORD"),
-        db_sslmode=os.getenv("DB_SSLMODE", "require"),
+        db_path=Path(os.getenv("DB_PATH", "letoume.db")),
         api_host=os.getenv("API_HOST", "0.0.0.0"),
         api_port=int(os.getenv("API_PORT", "8000")),
     )

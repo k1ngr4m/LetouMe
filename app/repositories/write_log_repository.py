@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import json
 from typing import Any
-
-from psycopg2.extras import Json
 
 from app.db.connection import get_connection
 
@@ -75,14 +74,14 @@ class WriteLogRepository:
                     status,
                     error_message
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     table_name,
                     action,
                     target_key,
                     summary,
-                    Json(payload) if payload is not None else None,
+                    json.dumps(payload, ensure_ascii=False) if payload is not None else None,
                     status,
                     error_message,
                 ),

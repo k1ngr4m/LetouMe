@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
-
-from psycopg2.extras import Json
 
 from app.db.connection import get_connection
 from app.repositories.write_log_repository import WriteLogRepository
@@ -55,10 +54,10 @@ class LotteryRepository:
         """
         params: list[Any] = []
         if limit is not None:
-            sql += " LIMIT %s"
+            sql += " LIMIT ?"
             params.append(limit)
         if offset:
-            sql += " OFFSET %s"
+            sql += " OFFSET ?"
             params.append(offset)
 
         with get_connection() as connection:
@@ -82,7 +81,7 @@ class LotteryRepository:
                     """
                     SELECT period, draw_date, red_balls, blue_balls, updated_at
                     FROM lottery_draws
-                    WHERE period = %s
+                    WHERE period = ?
                     """,
                     (period,),
                 )
@@ -123,18 +122,18 @@ class LotteryRepository:
             cursor.execute(
                 """
                 INSERT INTO lottery_draws (period, draw_date, red_balls, blue_balls)
-                VALUES (%s, %s, %s, %s)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT (period) DO UPDATE SET
-                    draw_date = EXCLUDED.draw_date,
-                    red_balls = EXCLUDED.red_balls,
-                    blue_balls = EXCLUDED.blue_balls,
-                    updated_at = NOW()
+                    draw_date = excluded.draw_date,
+                    red_balls = excluded.red_balls,
+                    blue_balls = excluded.blue_balls,
+                    updated_at = CURRENT_TIMESTAMP
                 """,
                 (
                     str(draw["period"]),
                     draw.get("date"),
-                    Json(draw.get("red_balls", [])),
-                    Json(draw.get("blue_balls", [])),
+                    json.dumps(draw.get("red_balls", []), ensure_ascii=False),
+                    json.dumps(draw.get("blue_balls", []), ensure_ascii=False),
                 ),
             )
 
@@ -146,8 +145,14 @@ class LotteryRepository:
 
         return {
             "period": str(row["period"]),
-            "red_balls": list(row.get("red_balls") or []),
-            "blue_balls": list(row.get("blue_balls") or []),
+            "red_balls": list(_decode_json_value(row.get("red_balls")) or []),
+            "blue_balls": list(_decode_json_value(row.get("blue_balls")) or []),
             "date": draw_date or "",
             "updated_at": row.get("updated_at"),
         }
+
+
+def _decode_json_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value)
+    return value

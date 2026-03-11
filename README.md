@@ -4,7 +4,7 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 
 当前运行架构：
 - FastAPI 提供页面和 API
-- PostgreSQL 作为运行时唯一数据源
+- 项目根目录 SQLite 作为运行时唯一数据源
 - 旧 `data/*.json` 仅作为迁移输入和历史样本
 
 ## 核心能力
@@ -35,7 +35,7 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 系统主流程：
 
 1. 抓取脚本拉取历史开奖
-2. 开奖数据写入 PostgreSQL `lottery_draws`
+2. 开奖数据写入 SQLite `lottery_draws`
 3. 预测脚本读取历史开奖并调用模型生成预测
 4. 当期预测写入 `current_predictions`
 5. 当期开奖后，旧预测归档到 `prediction_history`
@@ -51,20 +51,15 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 AI_API_KEY=your-api-key-here
 AI_BASE_URL=https://aihubmix.com/v1
 
-DB_HOST=aws-1-ap-southeast-1.pooler.supabase.com
-DB_PORT=5432
-DB_NAME=postgres
-DB_USER=postgres.mzkkarjsurcekiuxauos
-DB_PASSWORD=your-database-password
-DB_SSLMODE=require
+DB_PATH=letoume.db
 
 API_HOST=0.0.0.0
 API_PORT=8000
 ```
 
 注意：
-- 不要把真实数据库密码提交到仓库
-- `DB_SSLMODE` 对 Supabase pooler 默认应为 `require`
+- 默认数据库文件位于项目根目录
+- 如需自定义位置，可将 `DB_PATH` 改为绝对路径
 
 ## 安装与启动
 
@@ -77,12 +72,12 @@ pip install -e .
 如果不使用 editable install，也可以直接：
 
 ```bash
-pip install fastapi uvicorn psycopg2-binary python-dotenv requests bs4 openai pydantic
+pip install fastapi uvicorn python-dotenv requests bs4 openai pydantic
 ```
 
 ### 2. 配置 `.env`
 
-参考 `.env.example` 创建 `.env`，填入真实数据库和 AI 配置。
+参考 `.env.example` 创建 `.env`，填入 AI 配置；数据库默认会写入项目根目录 `letoume.db`。
 
 ### 3. 首次迁移旧 JSON 到数据库
 
@@ -157,7 +152,7 @@ python scripts/migrate_json_to_db.py
 作用：
 - 读取旧 `data/*.json`
 - 转换为当前数据库结构
-- 将旧数据导入 PostgreSQL
+- 将旧数据导入 SQLite
 
 ### 重算历史预测
 

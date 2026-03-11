@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
-
-from psycopg2.extras import Json
 
 from app.db.connection import get_connection
 from app.repositories.write_log_repository import WriteLogRepository
@@ -34,7 +33,7 @@ class PredictionRepository:
                     """
                     SELECT target_period, prediction_date, payload_json, updated_at
                     FROM current_predictions
-                    WHERE target_period = %s
+                    WHERE target_period = ?
                     LIMIT 1
                     """,
                     (target_period,),
@@ -52,16 +51,16 @@ class PredictionRepository:
                     cursor.execute(
                         """
                         INSERT INTO current_predictions (target_period, prediction_date, payload_json)
-                        VALUES (%s, %s, %s)
+                        VALUES (?, ?, ?)
                         ON CONFLICT (target_period) DO UPDATE SET
-                            prediction_date = EXCLUDED.prediction_date,
-                            payload_json = EXCLUDED.payload_json,
-                            updated_at = NOW()
+                            prediction_date = excluded.prediction_date,
+                            payload_json = excluded.payload_json,
+                            updated_at = CURRENT_TIMESTAMP
                         """,
                         (
                             target_period,
                             payload["prediction_date"],
-                            Json(payload),
+                            json.dumps(payload, ensure_ascii=False),
                         ),
                     )
                 self.log_repository.log_success(
@@ -94,12 +93,12 @@ class PredictionRepository:
                     cursor.execute(
                         """
                         INSERT INTO current_predictions (target_period, prediction_date, payload_json)
-                        VALUES (%s, %s, %s)
+                        VALUES (?, ?, ?)
                         """,
                         (
                             target_period,
                             payload["prediction_date"],
-                            Json(payload),
+                            json.dumps(payload, ensure_ascii=False),
                         ),
                     )
                 self.log_repository.log_success(
@@ -131,17 +130,17 @@ class PredictionRepository:
                     cursor.execute(
                         """
                         INSERT INTO prediction_history (target_period, prediction_date, actual_period, payload_json)
-                        VALUES (%s, %s, %s, %s)
+                        VALUES (?, ?, ?, ?)
                         ON CONFLICT (target_period) DO UPDATE SET
-                            prediction_date = EXCLUDED.prediction_date,
-                            actual_period = EXCLUDED.actual_period,
-                            payload_json = EXCLUDED.payload_json
+                            prediction_date = excluded.prediction_date,
+                            actual_period = excluded.actual_period,
+                            payload_json = excluded.payload_json
                         """,
                         (
                             target_period,
                             payload["prediction_date"],
                             target_period,
-                            Json(payload),
+                            json.dumps(payload, ensure_ascii=False),
                         ),
                     )
                 self.log_repository.log_success(
@@ -175,10 +174,10 @@ class PredictionRepository:
         """
         params: list[Any] = []
         if limit is not None:
-            sql += " LIMIT %s"
+            sql += " LIMIT ?"
             params.append(limit)
         if offset:
-            sql += " OFFSET %s"
+            sql += " OFFSET ?"
             params.append(offset)
 
         with get_connection() as connection:
@@ -196,7 +195,7 @@ class PredictionRepository:
 
     @staticmethod
     def _current_row_to_dict(row: dict[str, Any]) -> dict[str, Any]:
-        payload = dict(row.get("payload_json") or {})
+        payload = dict(_decode_json_value(row.get("payload_json")) or {})
         prediction_date = row.get("prediction_date")
         if isinstance(prediction_date, date):
             payload["prediction_date"] = prediction_date.isoformat()
@@ -204,8 +203,14 @@ class PredictionRepository:
 
     @staticmethod
     def _history_row_to_dict(row: dict[str, Any]) -> dict[str, Any]:
-        payload = dict(row.get("payload_json") or {})
+        payload = dict(_decode_json_value(row.get("payload_json")) or {})
         prediction_date = row.get("prediction_date")
         if isinstance(prediction_date, date):
             payload["prediction_date"] = prediction_date.isoformat()
         return payload
+
+
+def _decode_json_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value)
+    return value
