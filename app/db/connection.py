@@ -47,6 +47,7 @@ class SQLiteConnectionAdapter:
 def _open_sqlite_connection(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(path)
     connection.row_factory = _dict_row_factory
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 

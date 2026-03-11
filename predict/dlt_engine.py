@@ -271,7 +271,7 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
 
 
 def save_predictions(predictions: Dict[str, Any]) -> None:
-    print("Saving predictions into PostgreSQL...")
+    print("Saving predictions into normalized SQLite tables...")
     saved = prediction_service.save_current_prediction(predictions)
     print(f"  Saved target period: {saved.get('target_period')}\n")
 

@@ -35,10 +35,10 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 系统主流程：
 
 1. 抓取脚本拉取历史开奖
-2. 开奖数据写入 SQLite `lottery_draws`
+2. 开奖数据写入规范化开奖表（`draw_issue`、`draw_result`、`draw_result_number`）
 3. 预测脚本读取历史开奖并调用模型生成预测
-4. 当期预测写入 `current_predictions`
-5. 当期开奖后，旧预测归档到 `prediction_history`
+4. 当期预测写入规范化预测表（`prediction_batch`、`prediction_model_run`、`prediction_group`）
+5. 当期开奖后，旧预测归档并写入命中结果表（`prediction_hit_summary` 等）
 6. 前端通过 FastAPI 的 `/api/*` 接口读取数据并渲染页面
 
 ## 环境配置
@@ -129,7 +129,7 @@ python fetch_history/fetch_dlt_history.py
 作用：
 - 抓取大乐透历史开奖
 - 标准化数据
-- 写入 `lottery_draws`
+- 写入开奖主表和号码明细表
 
 ### 生成当期预测
 
@@ -140,8 +140,8 @@ python predict/dlt_engine.py
 作用：
 - 读取最近开奖历史
 - 调用模型生成 5 组预测
-- 写入 `current_predictions`
-- 若旧预测已对应到已开奖期，则归档到 `prediction_history`
+- 写入预测批次、模型运行、预测组和号码明细表
+- 若旧预测已对应到已开奖期，则归档并写入命中摘要/命中号码表
 
 ### 迁移旧 JSON
 
@@ -152,7 +152,7 @@ python scripts/migrate_json_to_db.py
 作用：
 - 读取旧 `data/*.json`
 - 转换为当前数据库结构
-- 将旧数据导入 SQLite
+- 将旧数据导入规范化 SQLite 表结构
 
 ### 重算历史预测
 
@@ -162,7 +162,7 @@ python scripts/dlt_recalculate_history_predictions.py --start-period 26022 --end
 
 作用：
 - 对指定期号区间批量重算历史预测
-- 补充或覆盖 `prediction_history`
+- 补充或覆盖归档预测及命中结果
 
 ## 权重计算逻辑
 
@@ -177,8 +177,8 @@ python scripts/dlt_recalculate_history_predictions.py --start-period 26022 --end
 
 ## 数据与兼容说明
 
-- `lottery_draws` 已不再保存冗余字段 `blue_ball`
-- API 为兼容旧前端，仍会在响应中根据 `blue_balls` 动态补出 `blue_ball`
+- 开奖号码、预测号码、模型主数据、命中结果都已拆分为关系表，不再依赖 `payload_json`
+- API 为兼容现有前端，仍会在响应中聚合出 `models`、`predictions`、`actual_result` 等嵌套结构
 - 输入侧新数据统一使用 `blue_balls`
 - 旧 JSON 迁移时仍允许读取历史遗留的 `blue_ball`
 

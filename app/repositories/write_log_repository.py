@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from app.db.connection import get_connection
@@ -50,8 +49,8 @@ class WriteLogRepository:
                 error_message=error_message,
             )
 
-    @staticmethod
     def _insert_log(
+        self,
         connection,
         *,
         table_name: str,
@@ -62,27 +61,44 @@ class WriteLogRepository:
         status: str,
         error_message: str | None,
     ) -> None:
+        entity_type = table_name
+        entity_id = target_key.split("=", 1)[1] if "=" in target_key else None
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO data_write_logs (
+                INSERT INTO write_log (
+                    entity_type,
+                    entity_id,
                     table_name,
                     action,
                     target_key,
-                    summary,
-                    payload_json,
                     status,
+                    summary,
                     error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    entity_type,
+                    entity_id,
                     table_name,
                     action,
                     target_key,
-                    summary,
-                    json.dumps(payload, ensure_ascii=False) if payload is not None else None,
                     status,
+                    summary,
                     error_message,
                 ),
             )
+            log_id = cursor.lastrowid
+
+            if payload:
+                for field_name, value in payload.items():
+                    if isinstance(value, (dict, list, tuple, set)):
+                        continue
+                    cursor.execute(
+                        """
+                        INSERT INTO write_log_detail (log_id, field_name, new_value_text)
+                        VALUES (?, ?, ?)
+                        """,
+                        (log_id, str(field_name), None if value is None else str(value)),
+                    )
