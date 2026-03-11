@@ -18,8 +18,8 @@ app.mount("/template", StaticFiles(directory=PROJECT_ROOT / "template"), name="t
 
 @app.on_event("startup")
 def on_startup() -> None:
-    ensure_schema()
-
+    # ensure_schema()
+    pass
 
 @app.get("/")
 def read_index() -> FileResponse:

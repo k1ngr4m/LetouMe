@@ -28,6 +28,10 @@ let sportLotteryUiState = {
     },
     history: {
         predictionLimit: 20,
+        selectedModelIds: [],
+        periodQuery: '',
+        modelSearchQuery: '',
+        isModelDropdownOpen: false,
         lotteryPageSize: 20,
         lotteryCurrentPage: 1,
         lotteryJumpPageInput: '1',
@@ -72,6 +76,7 @@ async function loadSportsLotteryAllData() {
     sportLotteryAppData.modelScores = buildSportsLotteryModelScores(predictionsHistory, aiPredictions.models);
     initializeSportsLotteryPredictionState(aiPredictions.models);
     sportLotteryUiState.compound.selectedModelIds = aiPredictions.models.map(model => model.model_id);
+    sportLotteryUiState.history.selectedModelIds = aiPredictions.models.map(model => model.model_id);
 }
 
 function initializeSportsLotteryPredictionState(models) {
@@ -758,11 +763,92 @@ function handleSportsLotteryCompoundInput(event) {
 }
 
 function renderSportsLotteryHistoryTab() {
+    renderSportsLotteryHistoryFilters();
     renderSportsLotteryAccuracyChart();
     renderSportsLotteryAccuracyCards();
     renderSportsLotteryPredictionsLoadMore();
     renderSportsLotteryHistoryTable();
     renderSportsLotteryLotteryPagination();
+}
+
+function getFilteredSportsLotteryPredictionsHistory() {
+    const history = sportLotteryAppData.predictionsHistory?.predictions_history || [];
+    const selectedModelIds = sportLotteryUiState.history.selectedModelIds || [];
+    const periodQuery = (sportLotteryUiState.history.periodQuery || '').trim();
+    const shouldFilterModels = selectedModelIds.length > 0
+        && selectedModelIds.length < (sportLotteryAppData.aiPredictions?.models?.length || 0);
+
+    return history
+        .filter(record => !periodQuery || String(record.target_period || '').startsWith(periodQuery))
+        .map(record => {
+            const models = Array.isArray(record.models) ? record.models : [];
+            const filteredModels = shouldFilterModels
+                ? models.filter(model => selectedModelIds.includes(model.model_id))
+                : models;
+            return {
+                ...record,
+                models: filteredModels
+            };
+        })
+        .filter(record => (record.models || []).length > 0);
+}
+
+function renderSportsLotteryHistoryFilters() {
+    const selectedIds = new Set(sportLotteryUiState.history.selectedModelIds || []);
+    const models = (sportLotteryAppData.aiPredictions?.models || []).map(model => ({
+        model_id: model.model_id,
+        model_name: model.model_name,
+        score100: sportLotteryAppData.modelScores[model.model_id]?.score100 || 0
+    }));
+    const selectedModels = models.filter(model => selectedIds.has(model.model_id));
+    const unselectedModels = models.filter(model => !selectedIds.has(model.model_id));
+    const searchQuery = (sportLotteryUiState.history.modelSearchQuery || '').trim().toLowerCase();
+    const filteredUnselected = unselectedModels.filter(model => (
+        !searchQuery
+        || model.model_name.toLowerCase().includes(searchQuery)
+        || model.model_id.toLowerCase().includes(searchQuery)
+    ));
+
+    const triggerTextEl = document.getElementById('historyFilterTriggerText');
+    const triggerHintEl = document.getElementById('historyFilterTriggerHint');
+    const dropdownEl = document.getElementById('historyFilterDropdown');
+    const selectedListEl = document.getElementById('historyFilterSelectedList');
+    const searchResultsEl = document.getElementById('historyFilterSearchResults');
+    const periodInputEl = document.getElementById('historyPeriodFilterInput');
+    const clearButtonEl = document.getElementById('historyFilterClearBtn');
+    if (!triggerTextEl || !triggerHintEl || !dropdownEl || !selectedListEl || !searchResultsEl || !periodInputEl || !clearButtonEl) {
+        return;
+    }
+
+    triggerTextEl.textContent = selectedModels.length === models.length ? '全部模型' : `${selectedModels.length} 个模型`;
+    triggerHintEl.textContent = selectedModels.slice(0, 2).map(model => model.model_name).join(' / ') || '未选择模型';
+    dropdownEl.classList.toggle('open', sportLotteryUiState.history.isModelDropdownOpen);
+    periodInputEl.value = sportLotteryUiState.history.periodQuery;
+
+    selectedListEl.innerHTML = selectedModels.length
+        ? selectedModels.map(model => `
+            <label class="summary-filter-option selected">
+                <input type="checkbox" data-role="history-model-filter-option" value="${model.model_id}" checked>
+                <span class="summary-filter-option-name">${model.model_name}</span>
+                <span class="summary-filter-option-score">${model.score100}</span>
+            </label>
+        `).join('')
+        : '<div class="summary-filter-empty">暂无已选模型</div>';
+
+    searchResultsEl.innerHTML = filteredUnselected.length
+        ? filteredUnselected.map(model => `
+            <label class="summary-filter-option">
+                <input type="checkbox" data-role="history-model-filter-option" value="${model.model_id}">
+                <span class="summary-filter-option-name">${model.model_name}</span>
+                <span class="summary-filter-option-score">${model.score100}</span>
+            </label>
+        `).join('')
+        : '<div class="summary-filter-empty">未找到匹配的模型</div>';
+
+    clearButtonEl.disabled = (
+        sportLotteryUiState.history.periodQuery === ''
+        && selectedModels.length === models.length
+    );
 }
 
 function renderSportsLotteryAccuracyChart() {
@@ -831,7 +917,7 @@ function getSportsLotteryModelChartColor(modelKey, index = 0) {
 }
 
 function prepareSportsLotteryChartData() {
-    const history = sportLotteryAppData.predictionsHistory.predictions_history || [];
+    const history = getFilteredSportsLotteryPredictionsHistory();
     const reversedHistory = [...history].reverse();
     const labels = [];
     const modelMetaMap = new Map();
@@ -890,10 +976,10 @@ function renderSportsLotteryAccuracyCards() {
     if (!containerEl || !sportLotteryAppData.predictionsHistory) return;
 
     containerEl.innerHTML = '';
-    const records = sportLotteryAppData.predictionsHistory.predictions_history || [];
+    const records = getFilteredSportsLotteryPredictionsHistory();
 
     if (records.length === 0) {
-        containerEl.appendChild(SportsLotteryComponents.createEmptyState('暂无大乐透历史预测命中记录。'));
+        containerEl.appendChild(SportsLotteryComponents.createEmptyState('当前筛选条件下暂无大乐透历史预测命中记录。'));
         return;
     }
 
@@ -1381,11 +1467,35 @@ function setupSportsLotteryEventListeners() {
     document.addEventListener('click', handleSportsLotteryCompoundInteractions);
     document.addEventListener('click', handleSportsLotteryHistoryInteractions);
     document.addEventListener('change', handleSportsLotteryCompoundChange);
+    document.addEventListener('change', handleSportsLotteryHistoryChange);
     document.addEventListener('input', handleSportsLotteryCompoundInput);
     document.addEventListener('input', handleSportsLotteryHistoryInput);
 }
 
 function handleSportsLotteryHistoryInteractions(event) {
+    const dropdownToggle = event.target.closest('[data-role="history-model-filter-toggle"]');
+    if (dropdownToggle) {
+        sportLotteryUiState.history.isModelDropdownOpen = !sportLotteryUiState.history.isModelDropdownOpen;
+        renderSportsLotteryHistoryFilters();
+        return;
+    }
+
+    const clearButton = event.target.closest('[data-role="history-filter-clear"]');
+    if (clearButton) {
+        sportLotteryUiState.history.selectedModelIds = sportLotteryAppData.aiPredictions.models.map(model => model.model_id);
+        sportLotteryUiState.history.periodQuery = '';
+        sportLotteryUiState.history.modelSearchQuery = '';
+        sportLotteryUiState.history.isModelDropdownOpen = false;
+        renderSportsLotteryHistoryTab();
+        return;
+    }
+
+    const historyFilterWrap = event.target.closest('.history-filter-dropdown');
+    if (!historyFilterWrap && sportLotteryUiState.history.isModelDropdownOpen) {
+        sportLotteryUiState.history.isModelDropdownOpen = false;
+        renderSportsLotteryHistoryFilters();
+    }
+
     const predictionsButton = event.target.closest('[data-role="history-load-more-predictions"]');
     if (predictionsButton) {
         loadMoreSportsLotteryPredictionsHistory();
@@ -1420,8 +1530,40 @@ function handleSportsLotteryHistoryInteractions(event) {
 }
 
 function handleSportsLotteryHistoryInput(event) {
-    if (!event.target.matches('[data-role="history-lottery-jump-input"]')) return;
-    sportLotteryUiState.history.lotteryJumpPageInput = event.target.value.replace(/[^\d]/g, '');
+    if (event.target.matches('[data-role="history-lottery-jump-input"]')) {
+        sportLotteryUiState.history.lotteryJumpPageInput = event.target.value.replace(/[^\d]/g, '');
+        return;
+    }
+
+    if (event.target.matches('[data-role="history-period-filter-input"]')) {
+        sportLotteryUiState.history.periodQuery = event.target.value.replace(/[^\d]/g, '');
+        renderSportsLotteryAccuracyChart();
+        renderSportsLotteryAccuracyCards();
+        return;
+    }
+
+    if (event.target.matches('[data-role="history-model-search-input"]')) {
+        sportLotteryUiState.history.modelSearchQuery = event.target.value;
+        renderSportsLotteryHistoryFilters();
+    }
+}
+
+function handleSportsLotteryHistoryChange(event) {
+    if (!event.target.matches('[data-role="history-model-filter-option"]')) return;
+
+    const modelId = event.target.value;
+    const allModelIds = sportLotteryAppData.aiPredictions.models.map(model => model.model_id);
+    const nextSelectedModelIds = new Set(sportLotteryUiState.history.selectedModelIds);
+    if (event.target.checked) {
+        nextSelectedModelIds.add(modelId);
+    } else if (nextSelectedModelIds.size > 1) {
+        nextSelectedModelIds.delete(modelId);
+    }
+
+    sportLotteryUiState.history.selectedModelIds = allModelIds.filter(id => nextSelectedModelIds.has(id));
+    renderSportsLotteryHistoryFilters();
+    renderSportsLotteryAccuracyChart();
+    renderSportsLotteryAccuracyCards();
 }
 
 function handleSportsLotteryTabSwitch(tabName) {

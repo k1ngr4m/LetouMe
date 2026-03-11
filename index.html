@@ -6,7 +6,7 @@
     <title>大乐透 AI 预测</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="template/css/style.css?v=20260311b">
+    <link rel="stylesheet" href="template/css/style.css?v=20260311c">
 </head>
 <body>
     <div id="loadingScreen" class="loading-screen">
@@ -351,6 +351,55 @@
                 </div>
 
                 <div class="chart-container">
+                    <div class="history-filter-toolbar">
+                        <div class="history-filter-group">
+                            <span class="history-filter-label">模型筛选</span>
+                            <div class="summary-filter-dropdown history-filter-dropdown" id="historyFilterDropdown">
+                                <button type="button" class="summary-filter-trigger" data-role="history-model-filter-toggle">
+                                    <span class="summary-filter-trigger-text" id="historyFilterTriggerText">全部模型</span>
+                                    <span class="summary-filter-trigger-hint" id="historyFilterTriggerHint">未选择模型</span>
+                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <path d="M5 7.5 10 12.5 15 7.5"/>
+                                    </svg>
+                                </button>
+                                <div class="summary-filter-menu">
+                                    <div class="summary-filter-search">
+                                        <input
+                                            type="text"
+                                            class="summary-filter-search-input"
+                                            data-role="history-model-search-input"
+                                            placeholder="搜索模型名称"
+                                        >
+                                    </div>
+                                    <div class="summary-filter-section">
+                                        <div class="summary-filter-section-title">已选模型</div>
+                                        <div class="summary-filter-section-list" id="historyFilterSelectedList"></div>
+                                    </div>
+                                    <div class="summary-filter-section">
+                                        <div class="summary-filter-section-title">搜索结果</div>
+                                        <div class="summary-filter-section-list" id="historyFilterSearchResults"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="history-filter-group period">
+                            <label class="history-filter-label" for="historyPeriodFilterInput">历史期数</label>
+                            <input
+                                id="historyPeriodFilterInput"
+                                type="text"
+                                inputmode="numeric"
+                                class="history-filter-input"
+                                data-role="history-period-filter-input"
+                                placeholder="输入期数前缀，如 260"
+                            >
+                        </div>
+                        <button
+                            type="button"
+                            class="history-filter-clear-btn"
+                            id="historyFilterClearBtn"
+                            data-role="history-filter-clear"
+                        >清空筛选</button>
+                    </div>
                     <div class="chart-header">
                         <div class="chart-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -453,6 +502,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="template/js/dlt_data-loader.js?v=20260311a"></script>
     <script src="template/js/dlt_components.js?v=20260310c"></script>
-    <script src="template/js/dlt_app.js?v=20260311b"></script>
+    <script src="template/js/dlt_app.js?v=20260311c"></script>
 </body>
 </html>
