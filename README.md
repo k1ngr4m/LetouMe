@@ -1,9 +1,10 @@
 # LetouMe
 
-LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包含历史开奖抓取、AI 预测生成、预测归档、FastAPI 接口和前端可视化页面。
+LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包含历史开奖抓取、AI 预测生成、预测归档、FastAPI API 服务，以及一个独立的 React 前端控制台。
 
 当前运行架构：
-- FastAPI 提供页面和 API
+- FastAPI 提供 API
+- `frontend/` 提供 React + Vite + TypeScript 前端
 - 项目根目录 SQLite 作为运行时唯一数据源
 - 旧 `data/*.json` 仅作为迁移输入和历史样本
 
@@ -25,8 +26,10 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
   AI 预测生成脚本
 - `scripts/`
   数据迁移和历史预测重算脚本
+- `frontend/`
+  React 前端工程
 - `template/`
-  前端静态资源
+  旧静态前端资源，已退役
 - `doc/`
   预测 Prompt 和说明文档
 
@@ -39,7 +42,7 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 3. 预测脚本读取历史开奖并调用模型生成预测
 4. 当期预测写入规范化预测表（`prediction_batch`、`prediction_model_run`、`prediction_group`）
 5. 当期开奖后，旧预测归档并写入命中结果表（`prediction_hit_summary` 等）
-6. 前端通过 FastAPI 的 `/api/*` 接口读取数据并渲染页面
+6. React 前端通过 FastAPI 的 `/api/*` 接口读取数据并渲染页面
 
 ## 环境配置
 
@@ -52,6 +55,7 @@ DB_PATH=letoume.db
 
 API_HOST=0.0.0.0
 API_PORT=8000
+FRONTEND_ORIGIN=http://localhost:5173
 ```
 
 注意：
@@ -83,22 +87,25 @@ pip install fastapi uvicorn python-dotenv requests bs4 openai pydantic
 python scripts/migrate_json_to_db.py
 ```
 
-### 4. 启动服务
+### 4. 启动后端 API
 
 ```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+### 5. 启动 React 前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 启动后访问：
 
 ```text
-http://localhost:8000
-```
-
-模型设置页：
-
-```text
-http://localhost:8000/settings
+前端: http://localhost:5173
+后端 API: http://localhost:8000
 ```
 
 ## API
@@ -125,6 +132,10 @@ http://localhost:8000/settings
 ### `GET /api/settings/models`
 
 返回数据库中的模型配置列表。
+
+### `GET /`
+
+返回 API 服务信息与当前允许的前端来源，不再提供旧静态页面。
 
 ## 主要脚本
 
@@ -200,5 +211,5 @@ python scripts/dlt_recalculate_history_predictions.py --start-period 26022 --end
 ## 维护建议
 
 - 如果修改 `doc/dlt_prompt2.0.md` 中的评分公式，应同步更新 `doc/WEIGHT_LOGIC.md`
-- 如果修改 `template/js/dlt_app.js` 中的评分窗口或权重常量，应同步更新 `doc/WEIGHT_LOGIC.md`
+- 如果修改 React 前端中的评分窗口或权重常量，应同步更新 `doc/WEIGHT_LOGIC.md`
 - 如果未来把 Prompt 规则真正下沉为 Python 评分器，应在文档中明确“Prompt 规则”和“服务端实际计算规则”是否一致

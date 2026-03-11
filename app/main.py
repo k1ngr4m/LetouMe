@@ -1,40 +1,39 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.config import load_settings
 from app.db.connection import ensure_schema
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-app = FastAPI(title="LetouMe API")
-app.include_router(router)
-app.mount("/template", StaticFiles(directory=PROJECT_ROOT / "template"), name="template")
+def create_app() -> FastAPI:
+    settings = load_settings()
+    app = FastAPI(title="LetouMe API")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin.strip() for origin in settings.frontend_origin.split(",") if origin.strip()],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(router)
+
+    @app.on_event("startup")
+    def on_startup() -> None:
+        ensure_schema()
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    ensure_schema()
+    @app.get("/")
+    def read_root() -> dict[str, str]:
+        return {
+            "service": "LetouMe API",
+            "frontend_origin": settings.frontend_origin,
+            "docs": "/docs",
+        }
 
-@app.get("/")
-def read_index() -> FileResponse:
-    return FileResponse(PROJECT_ROOT / "index.html")
-
-
-@app.get("/index.html")
-def read_index_html() -> FileResponse:
-    return FileResponse(PROJECT_ROOT / "index.html")
+    return app
 
 
-@app.get("/settings")
-def read_settings() -> FileResponse:
-    return FileResponse(PROJECT_ROOT / "settings.html")
-
-
-@app.get("/settings.html")
-def read_settings_html() -> FileResponse:
-    return FileResponse(PROJECT_ROOT / "settings.html")
+app = create_app()

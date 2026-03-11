@@ -16,6 +16,7 @@ class Settings:
     db_path: Path
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    frontend_origin: str = "http://localhost:5173"
 
     @property
     def database_path(self) -> Path:
@@ -29,4 +30,5 @@ def load_settings() -> Settings:
         db_path=Path(os.getenv("DB_PATH", "letoume.db")),
         api_host=os.getenv("API_HOST", "0.0.0.0"),
         api_port=int(os.getenv("API_PORT", "8000")),
+        frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
     )
