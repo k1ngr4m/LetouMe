@@ -18,8 +18,7 @@ app.mount("/template", StaticFiles(directory=PROJECT_ROOT / "template"), name="t
 
 @app.on_event("startup")
 def on_startup() -> None:
-    # ensure_schema()
-    pass
+    ensure_schema()
 
 @app.get("/")
 def read_index() -> FileResponse:
@@ -29,3 +28,13 @@ def read_index() -> FileResponse:
 @app.get("/index.html")
 def read_index_html() -> FileResponse:
     return FileResponse(PROJECT_ROOT / "index.html")
+
+
+@app.get("/settings")
+def read_settings() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "settings.html")
+
+
+@app.get("/settings.html")
+def read_settings_html() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "settings.html")

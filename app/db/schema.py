@@ -63,6 +63,11 @@ SCHEMA_STATEMENTS = [
         api_model_name TEXT,
         version TEXT,
         is_active INTEGER NOT NULL DEFAULT 1,
+        base_url TEXT,
+        api_key TEXT,
+        app_code TEXT,
+        temperature REAL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (provider_id) REFERENCES model_provider(id)
@@ -71,6 +76,10 @@ SCHEMA_STATEMENTS = [
     """
     CREATE INDEX IF NOT EXISTS idx_ai_model_provider_active
     ON ai_model (provider_id, is_active)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_ai_model_deleted_active
+    ON ai_model (is_deleted, is_active)
     """,
     """
     CREATE TABLE IF NOT EXISTS model_tag (
@@ -257,3 +266,14 @@ SCHEMA_STATEMENTS = [
     ON write_log_detail (log_id)
     """,
 ]
+
+
+SCHEMA_MIGRATIONS = {
+    "ai_model": {
+        "base_url": "ALTER TABLE ai_model ADD COLUMN base_url TEXT",
+        "api_key": "ALTER TABLE ai_model ADD COLUMN api_key TEXT",
+        "app_code": "ALTER TABLE ai_model ADD COLUMN app_code TEXT",
+        "temperature": "ALTER TABLE ai_model ADD COLUMN temperature REAL",
+        "is_deleted": "ALTER TABLE ai_model ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
+    }
+}

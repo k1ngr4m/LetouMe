@@ -34,7 +34,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-file", default=str(DEFAULT_PROMPT_PATH), help="Prompt template path")
     parser.add_argument("--context-size", type=int, default=DEFAULT_CONTEXT_SIZE, help="History window size")
     parser.add_argument("--force", action="store_true", help="Overwrite existing model predictions")
-    parser.add_argument("--config", default="config/models.json", help="Model config path")
     parser.add_argument("--models", default="", help="Comma-separated model IDs")
     parser.add_argument("--include-tags", default="", help="Comma-separated tags")
     parser.add_argument("--no-health-check", action="store_true", help="Disable model health checks")
@@ -118,7 +117,7 @@ def main() -> None:
 
     lottery_service = LotteryService()
     prediction_repository = PredictionRepository()
-    registry = load_model_registry(args.config)
+    registry = load_model_registry()
     model_ids = parse_csv(args.models)
     include_tags = parse_csv(args.include_tags)
     model_definitions = registry.select(model_ids=model_ids or None, include_tags=include_tags)

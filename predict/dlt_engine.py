@@ -28,7 +28,6 @@ from core.model_config import ModelDefinition, load_model_registry
 from core.model_factory import ModelFactory
 
 PROMPT_FILE = os.path.join(PROJECT_ROOT, "doc", "dlt_prompt2.0.md")
-MODEL_CONFIG_FILE = os.path.join(PROJECT_ROOT, "config", "models.json")
 
 lottery_service = LotteryService()
 prediction_service = PredictionService()
@@ -216,7 +215,7 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
     history_json = json.dumps(history_data, ensure_ascii=False, indent=2)
     prediction_date = datetime.now().strftime("%Y-%m-%d")
 
-    registry = load_model_registry(MODEL_CONFIG_FILE)
+    registry = load_model_registry()
     model_definitions = registry.select()
     current_prediction = prediction_service.get_current_payload_by_period(target_period)
     existing_model_ids = {

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterator
 
 from app.config import load_settings
-from app.db.schema import SCHEMA_STATEMENTS
+from app.db.schema import SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS
 
 
 def _dict_row_factory(cursor: sqlite3.Cursor, row: tuple[object, ...]) -> dict[str, object]:
@@ -69,5 +69,24 @@ def get_connection() -> Iterator[SQLiteConnectionAdapter]:
 def ensure_schema() -> None:
     with get_connection() as connection:
         with connection.cursor() as cursor:
+            table_statements = []
+            other_statements = []
             for statement in SCHEMA_STATEMENTS:
+                normalized = statement.strip().upper()
+                if normalized.startswith("CREATE TABLE") or normalized.startswith("PRAGMA"):
+                    table_statements.append(statement)
+                else:
+                    other_statements.append(statement)
+
+            for statement in table_statements:
+                cursor.execute(statement)
+
+            for table_name, migrations in SCHEMA_MIGRATIONS.items():
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                existing_columns = {str(row["name"]) for row in cursor.fetchall()}
+                for column_name, statement in migrations.items():
+                    if column_name not in existing_columns:
+                        cursor.execute(statement)
+
+            for statement in other_statements:
                 cursor.execute(statement)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from app.db.connection import get_connection
@@ -9,17 +8,13 @@ from app.repositories.write_log_repository import WriteLogRepository
 from core.model_config import ModelDefinition, ModelRegistry, load_model_registry
 
 
-MODEL_CONFIG_PATH = Path("config/models.json")
-
-
 class PredictionRepository:
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
-        self._registry = _load_registry()
+        self._registry: ModelRegistry | None = None
 
     def sync_model_catalog(self) -> None:
-        with get_connection() as connection:
-            self._sync_registry(connection)
+        self._registry = _load_registry()
 
     def get_current_prediction(self) -> dict[str, Any] | None:
         with get_connection() as connection:
@@ -219,11 +214,9 @@ class PredictionRepository:
         return int(row.get("total") or 0)
 
     def _sync_registry(self, connection) -> None:
-        if not self._registry:
-            return
-        for model_key in self._registry.active_ids:
-            definition = self._registry.get(model_key)
-            self._upsert_model_definition(connection, definition)
+        if self._registry is None:
+            self._registry = _load_registry()
+        return None
 
     def _upsert_batch(
         self,
@@ -554,14 +547,15 @@ class PredictionRepository:
         )
 
     def _resolve_definition(self, model_payload: dict[str, Any]) -> ModelDefinition | None:
+        if self._registry is None:
+            self._registry = _load_registry()
         if not self._registry:
             return None
         model_code = str(model_payload.get("model_id") or "")
-        for model_key in self._registry.active_ids:
-            definition = self._registry.get(model_key)
-            if definition.model_id == model_code:
-                return definition
-        return None
+        try:
+            return self._registry.get(model_code)
+        except KeyError:
+            return None
 
     def _build_batch_payload(
         self,
@@ -810,6 +804,6 @@ class PredictionRepository:
 
 def _load_registry() -> ModelRegistry | None:
     try:
-        return load_model_registry(MODEL_CONFIG_PATH)
+        return load_model_registry()
     except Exception:
         return None

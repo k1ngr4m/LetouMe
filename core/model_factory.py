@@ -31,7 +31,7 @@ class ModelFactory:
 
         api_key = definition.api_key()
         if not api_key:
-            raise EnvironmentError(f"缺少环境变量: {definition.api_key_env}")
+            raise EnvironmentError(f"模型缺少 API Key 配置: {definition.model_id}")
 
         base_url = definition.base_url()
         client = OpenAI(api_key=api_key, base_url=base_url)

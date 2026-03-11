@@ -48,9 +48,6 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，包
 主要配置项：
 
 ```env
-AI_API_KEY=your-api-key-here
-AI_BASE_URL=https://aihubmix.com/v1
-
 DB_PATH=letoume.db
 
 API_HOST=0.0.0.0
@@ -60,6 +57,7 @@ API_PORT=8000
 注意：
 - 默认数据库文件位于项目根目录
 - 如需自定义位置，可将 `DB_PATH` 改为绝对路径
+- 模型 API Key、Base URL、APP Code 现在通过设置页写入数据库，不再依赖 `models.json`
 
 ## 安装与启动
 
@@ -97,6 +95,12 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 http://localhost:8000
 ```
 
+模型设置页：
+
+```text
+http://localhost:8000/settings
+```
+
 ## API
 
 ### `GET /api/lottery/history`
@@ -117,6 +121,10 @@ http://localhost:8000
 
 返回历史预测归档，包含：
 - `predictions_history`
+
+### `GET /api/settings/models`
+
+返回数据库中的模型配置列表。
 
 ## 主要脚本
 
