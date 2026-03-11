@@ -39,6 +39,9 @@ class BaseModel(ABC):
             kwargs["temperature"] = self.definition.temperature
         else:
             kwargs["temperature"] = 0.8
+        app_code = self.definition.app_code()
+        if app_code and self.definition.uses_aihubmix():
+            kwargs["extra_headers"] = {"APP-Code": app_code}
         return kwargs
 
     def _extract_json(self, response_text: str) -> str:

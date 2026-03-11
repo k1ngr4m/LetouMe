@@ -5,6 +5,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any, Iterable, Mapping
 
 
@@ -12,6 +13,7 @@ DEFAULT_CONFIG_PATH = Path("config/models.json")
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
 DEFAULT_BASE_URL_ENV = "AI_BASE_URL"
 DEFAULT_API_KEY_ENV = "AI_API_KEY"
+DEFAULT_APP_CODE_ENV = "APP_CODE"
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,15 @@ class ModelDefinition:
             return base
         base = os.environ.get(DEFAULT_BASE_URL_ENV)
         return base or DEFAULT_BASE_URL
+
+    def app_code(self) -> str | None:
+        value = os.environ.get(DEFAULT_APP_CODE_ENV, "").strip()
+        return value or None
+
+    def uses_aihubmix(self) -> bool:
+        hostname = urlparse(self.base_url()).hostname or ""
+        hostname = hostname.lower()
+        return hostname == "aihubmix.com" or hostname.endswith(".aihubmix.com")
 
     def has_tags(self, include_tags: Iterable[str]) -> bool:
         if not include_tags:
