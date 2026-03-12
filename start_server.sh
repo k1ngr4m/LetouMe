@@ -5,7 +5,11 @@ echo "LetouMe FastAPI Server"
 echo "=========================================="
 echo ""
 
-if ! command -v python3 &> /dev/null; then
+if [ -x "$(pwd)/.venv/bin/python" ]; then
+    PYTHON_CMD="$(pwd)/.venv/bin/python"
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+else
     echo "Error: Python 3 not found"
     echo "Please install Python 3: https://www.python.org/downloads/"
     exit 1
@@ -21,4 +25,4 @@ echo "Press Ctrl+C to stop the server"
 echo "=========================================="
 echo ""
 
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+"$PYTHON_CMD" -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
