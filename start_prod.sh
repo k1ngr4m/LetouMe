@@ -6,7 +6,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
 
 echo "=========================================="
-echo "LetouMe Full Dev Stack"
+echo "LetouMe Production Preview Stack"
 echo "=========================================="
 echo ""
 
@@ -25,15 +25,31 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+if [ ! -f "$SCRIPT_DIR/.env.prod" ]; then
+    echo "Error: .env.prod not found"
+    echo "Please create production environment config first."
+    exit 1
+fi
+
 if [ ! -d "$SCRIPT_DIR/frontend/node_modules" ]; then
     echo "Installing frontend dependencies..."
     (cd "$SCRIPT_DIR/frontend" && npm install)
     echo ""
 fi
 
+set -a
+. "$SCRIPT_DIR/.env.prod"
+set +a
+
+PROD_API_BASE_URL="${PROD_API_BASE_URL:-${FRONTEND_ORIGIN}:8000}"
+
+echo "Building frontend for production preview..."
+(cd "$SCRIPT_DIR/frontend" && VITE_API_BASE_URL="$PROD_API_BASE_URL" npm run build)
+echo ""
+
 cleanup() {
     echo ""
-    echo "Stopping LetouMe dev stack..."
+    echo "Stopping LetouMe production preview stack..."
     if [ -n "${BACKEND_PID:-}" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
         kill "$BACKEND_PID" 2>/dev/null || true
     fi
@@ -45,20 +61,20 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-echo "Starting FastAPI API..."
-APP_ENV=dev "$PYTHON_CMD" -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
+echo "Starting FastAPI API in prod mode..."
+APP_ENV=prod "$PYTHON_CMD" -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
-echo "Starting React frontend..."
+echo "Starting frontend preview..."
 (
     cd "$SCRIPT_DIR/frontend"
-    npm run dev -- --host 0.0.0.0
+    npm run preview -- --host 0.0.0.0 --port 4173
 ) &
 FRONTEND_PID=$!
 
 echo ""
-echo "Frontend: http://localhost:5173"
-echo "Backend API: http://localhost:8000"
+echo "Frontend Preview: ${FRONTEND_ORIGIN}:4173"
+echo "Backend API: ${PROD_API_BASE_URL}"
 echo "Press Ctrl+C to stop both services"
 echo "=========================================="
 echo ""

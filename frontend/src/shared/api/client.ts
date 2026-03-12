@@ -8,10 +8,13 @@ import type {
   SettingsProviderListResponse,
 } from '../types/api'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 function buildUrl(path: string, query?: Record<string, string | number | boolean | undefined | null>) {
-  const url = new URL(path, `${API_BASE_URL}/`)
+  const base = /^https?:\/\//.test(API_BASE_URL) ? `${API_BASE_URL}/` : window.location.origin
+  const url = /^https?:\/\//.test(API_BASE_URL)
+    ? new URL(path, base)
+    : new URL(`${API_BASE_URL}${path}`, base)
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined || value === null || value === '') continue
@@ -22,11 +25,13 @@ function buildUrl(path: string, query?: Record<string, string | number | boolean
 }
 
 async function requestJson<T>(path: string, init?: RequestInit, query?: Record<string, string | number | boolean | undefined | null>): Promise<T> {
+  const headers = new Headers(init?.headers || {})
+  if (init?.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   const response = await fetch(buildUrl(path, query), {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
     ...init,
   })
 

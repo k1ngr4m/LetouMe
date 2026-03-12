@@ -41,14 +41,11 @@ if not exist "frontend\node_modules" (
     echo.
 )
 
-if "%FRONTEND_ORIGIN%"=="" set "FRONTEND_ORIGIN=http://localhost:5173"
-if "%VITE_API_BASE_URL%"=="" set "VITE_API_BASE_URL=http://localhost:8000"
-
 echo Starting FastAPI API...
-start "LetouMe Backend" cmd /k "set FRONTEND_ORIGIN=%FRONTEND_ORIGIN% && %PYTHON_CMD% -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+start "LetouMe Backend" cmd /k "set APP_ENV=dev && %PYTHON_CMD% -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
 
 echo Starting React frontend...
-start "LetouMe Frontend" cmd /k "cd /d %~dp0frontend && set VITE_API_BASE_URL=%VITE_API_BASE_URL% && npm run dev -- --host 0.0.0.0"
+start "LetouMe Frontend" cmd /k "cd /d %~dp0frontend && npm run dev -- --host 0.0.0.0"
 
 echo.
 echo Frontend: http://localhost:5173

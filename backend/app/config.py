@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPO_ROOT = PROJECT_ROOT.parent
 load_dotenv(REPO_ROOT / ".env")
+APP_ENV = os.getenv("APP_ENV", "dev")
+load_dotenv(REPO_ROOT / f".env.{APP_ENV}", override=True)
 
 
 @dataclass(frozen=True)
