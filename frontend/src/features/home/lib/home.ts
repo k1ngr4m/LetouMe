@@ -16,6 +16,16 @@ export type ModelScore = {
   sampleSize: number
 }
 
+export type BallStatItem = {
+  ball: string
+  appearanceCount: number
+  totalGroupCount: number
+  matchedModelCount: number
+  selectedModelCount: number
+  appearanceRatio: number
+  weightedScore: number
+}
+
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
   return {
     ...draw,
@@ -117,32 +127,6 @@ export function getActualResult(draws: LotteryDraw[], targetPeriod: string) {
   return draws.find((draw) => draw.period === targetPeriod) || null
 }
 
-export function getStats(draws: LotteryDraw[]) {
-  const redCounter: Record<string, number> = {}
-  const blueCounter: Record<string, number> = {}
-  const sums: number[] = []
-
-  for (const draw of draws) {
-    for (const red of draw.red_balls) {
-      redCounter[red] = (redCounter[red] || 0) + 1
-    }
-    for (const blue of draw.blue_balls) {
-      blueCounter[blue] = (blueCounter[blue] || 0) + 1
-    }
-    sums.push(draw.red_balls.reduce((sum, value) => sum + Number(value), 0))
-  }
-
-  const hottestRed = byFrequencyDescending(Object.entries(redCounter).map(([ball, count]) => ({ ball, count })))[0]
-  const hottestBlue = byFrequencyDescending(Object.entries(blueCounter).map(([ball, count]) => ({ ball, count })))[0]
-
-  return {
-    totalDraws: draws.length,
-    hottestRed: hottestRed?.ball || '-',
-    hottestBlue: hottestBlue?.ball || '-',
-    avgSum: draws.length ? average(sums).toFixed(1) : '-',
-  }
-}
-
 export function sortModels(models: PredictionModel[], scores: Record<string, ModelScore>, pinnedModelIds: string[]) {
   const pinnedIndex = new Map(pinnedModelIds.map((id, index) => [id, index]))
   return [...models].sort((left, right) => {
@@ -157,8 +141,9 @@ export function sortModels(models: PredictionModel[], scores: Record<string, Mod
 
 export function buildSummary(models: PredictionModel[], scores: Record<string, ModelScore>, selectedIds: string[], weighted: boolean, commonOnly: boolean) {
   const selectedModels = models.filter((model) => selectedIds.includes(model.model_id))
-  const redMap = new Map<string, { count: number; models: Set<string> }>()
-  const blueMap = new Map<string, { count: number; models: Set<string> }>()
+  const redMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const blueMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const totalGroupCount = selectedModels.reduce((sum, model) => sum + model.predictions.length, 0)
 
   for (const model of selectedModels) {
     const weight = weighted ? (scores[model.model_id]?.score100 || 0) / 100 || 1 : 1
@@ -166,14 +151,16 @@ export function buildSummary(models: PredictionModel[], scores: Record<string, M
     const blueSeen = new Set<string>()
     for (const group of model.predictions) {
       for (const red of group.red_balls) {
-        const current = redMap.get(red) || { count: 0, models: new Set<string>() }
-        current.count += weight
+        const current = redMap.get(red) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+        current.appearanceCount += 1
+        current.weightedScore += weight
         redMap.set(red, current)
         redSeen.add(red)
       }
       for (const blue of group.blue_balls) {
-        const current = blueMap.get(blue) || { count: 0, models: new Set<string>() }
-        current.count += weight
+        const current = blueMap.get(blue) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+        current.appearanceCount += 1
+        current.weightedScore += weight
         blueMap.set(blue, current)
         blueSeen.add(blue)
       }
@@ -183,37 +170,29 @@ export function buildSummary(models: PredictionModel[], scores: Record<string, M
   }
 
   const modelCount = selectedModels.length
-  const normalize = (source: Map<string, { count: number; models: Set<string> }>) =>
-    byFrequencyDescending(
-      [...source.entries()]
-        .map(([ball, meta]) => ({
-          ball,
-          count: Number(meta.count.toFixed(1)),
-          matchedModelCount: meta.models.size,
-        }))
-        .filter((item) => !commonOnly || item.matchedModelCount === modelCount),
-    )
+  const normalize = (source: Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>) =>
+    [...source.entries()]
+      .map(([ball, meta]) => ({
+        ball,
+        appearanceCount: meta.appearanceCount,
+        totalGroupCount,
+        matchedModelCount: meta.models.size,
+        selectedModelCount: modelCount,
+        appearanceRatio: totalGroupCount ? meta.appearanceCount / totalGroupCount : 0,
+        weightedScore: Number(meta.weightedScore.toFixed(2)),
+      }))
+      .filter((item) => item.appearanceCount > 0)
+      .filter((item) => !commonOnly || item.matchedModelCount === modelCount)
+      .sort(
+        (left, right) =>
+          right.weightedScore - left.weightedScore ||
+          right.appearanceCount - left.appearanceCount ||
+          left.ball.localeCompare(right.ball),
+      )
 
   return {
     red: normalize(redMap),
     blue: normalize(blueMap),
-  }
-}
-
-export function buildCompoundSuggestions(summary: ReturnType<typeof buildSummary>) {
-  return {
-    '6+3': {
-      red: summary.red.slice(0, 6).map((item) => item.ball),
-      blue: summary.blue.slice(0, 3).map((item) => item.ball),
-    },
-    '7+3': {
-      red: summary.red.slice(0, 7).map((item) => item.ball),
-      blue: summary.blue.slice(0, 3).map((item) => item.ball),
-    },
-    '7+4': {
-      red: summary.red.slice(0, 7).map((item) => item.ball),
-      blue: summary.blue.slice(0, 4).map((item) => item.ball),
-    },
   }
 }
 

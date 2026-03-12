@@ -2,10 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../../shared/api/client'
 import { normalizeCurrentPredictions, normalizeDraw, normalizePredictionsHistory } from '../lib/home'
 
-export function useHomeData(predictionLimit: number, lotteryPage: number, lotteryPageSize: number) {
-  const currentPredictions = useQuery({
+export function currentPredictionsQueryOptions() {
+  return {
     queryKey: ['current-predictions'],
     queryFn: async () => normalizeCurrentPredictions(await apiClient.getCurrentPredictions()),
+  }
+}
+
+export function useHomeData(predictionLimit: number, lotteryPage: number, lotteryPageSize: number) {
+  const currentPredictions = useQuery({
+    ...currentPredictionsQueryOptions(),
   })
 
   const lotteryCharts = useQuery({

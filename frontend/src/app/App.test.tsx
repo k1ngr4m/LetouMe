@@ -8,6 +8,10 @@ vi.mock('../features/home/HomePage', () => ({
   HomePage: () => <div>Home Page Mock</div>,
 }))
 
+vi.mock('../features/landing/LandingPage', () => ({
+  LandingPage: () => <div>Landing Page Mock</div>,
+}))
+
 vi.mock('../features/settings/SettingsPage', () => ({
   SettingsPage: () => <div>Settings Page Mock</div>,
 }))
@@ -24,8 +28,13 @@ function renderApp(initialEntries: string[]) {
 }
 
 describe('App routing', () => {
-  it('renders home route', () => {
+  it('renders landing route', () => {
     renderApp(['/'])
+    expect(screen.getByText('Landing Page Mock')).toBeInTheDocument()
+  })
+
+  it('renders dashboard route', () => {
+    renderApp(['/dashboard'])
     expect(screen.getByText('Home Page Mock')).toBeInTheDocument()
   })
 

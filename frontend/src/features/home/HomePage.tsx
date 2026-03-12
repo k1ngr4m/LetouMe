@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Area,
   AreaChart,
@@ -19,8 +19,8 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
 import {
+  type BallStatItem,
   buildBlueFrequencyChart,
-  buildCompoundSuggestions,
   buildHistoryHitTrend,
   buildModelScores,
   buildOddEvenChart,
@@ -30,7 +30,6 @@ import {
   compareNumbers,
   filterHistoryRecords,
   getActualResult,
-  getStats,
   sortModels,
 } from './lib/home'
 import type { LotteryDraw, PredictionGroup, PredictionModel } from '../../shared/types/api'
@@ -42,15 +41,19 @@ const LOTTERY_PAGE_SIZE = 20
 
 export function HomePage() {
   const [activeTab, setActiveTab] = useState<HomeTab>('prediction')
+  const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
   const [predictionLimit, setPredictionLimit] = useState(HISTORY_BATCH_SIZE)
   const [lotteryPage, setLotteryPage] = useState(1)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [detailModelId, setDetailModelId] = useState<string | null>(null)
   const [summarySelectedModelIds, setSummarySelectedModelIds] = useState<string[] | null>(null)
   const [historySelectedModelIds, setHistorySelectedModelIds] = useState<string[] | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
-  const [weightedSummary, setWeightedSummary] = useState(true)
+  const [weightedSummary] = useState(true)
+  const modelSectionRef = useRef<HTMLElement | null>(null)
+  const weightsSectionRef = useRef<HTMLElement | null>(null)
 
   const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
     predictionLimit,
@@ -65,18 +68,45 @@ export function HomePage() {
   const modelScores = history ? buildModelScores(history, models) : {}
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
   const orderedModels = sortModels(models, modelScores, validPinnedModelIds)
-  const highlightedModels = orderedModels.slice(0, 3)
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
-  const stats = getStats(chartDraws)
 
   useEffect(() => {
     savePinnedModels(validPinnedModelIds)
   }, [validPinnedModelIds])
 
+  useEffect(() => {
+    if (activeTab !== 'prediction') return
+
+    function syncActiveSection() {
+      const sections = [
+        { id: 'models' as const, element: modelSectionRef.current },
+        { id: 'weights' as const, element: weightsSectionRef.current },
+      ]
+      const visibleSections = sections
+        .map((section) => {
+          const top = section.element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY
+          return { id: section.id, top }
+        })
+        .filter((section) => Number.isFinite(section.top))
+        .sort((left, right) => Math.abs(left.top - 120) - Math.abs(right.top - 120))
+
+      if (visibleSections[0]) {
+        setActiveSection(visibleSections[0].id)
+      }
+    }
+
+    syncActiveSection()
+    window.addEventListener('scroll', syncActiveSection, { passive: true })
+    window.addEventListener('resize', syncActiveSection)
+    return () => {
+      window.removeEventListener('scroll', syncActiveSection)
+      window.removeEventListener('resize', syncActiveSection)
+    }
+  }, [activeTab])
+
   const selectedSummaryIds = summarySelectedModelIds ?? models.map((model) => model.model_id)
   const selectedHistoryIds = historySelectedModelIds ?? models.map((model) => model.model_id)
   const summary = buildSummary(models, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
-  const compoundSuggestions = buildCompoundSuggestions(summary)
   const filteredHistory = history ? filterHistoryRecords(history, selectedHistoryIds, historyPeriodQuery) : []
   const historyHitTrend = buildHistoryHitTrend(filteredHistory, selectedHistoryIds)
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
@@ -103,6 +133,7 @@ export function HomePage() {
       }
       return [modelId, ...previous]
     })
+    setActiveActionMenuId(null)
   }
 
   function toggleSummaryModel(modelId: string) {
@@ -119,6 +150,12 @@ export function HomePage() {
       const current = previous ?? fallbackIds
       return current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
     })
+  }
+
+  function scrollToSection(section: 'models' | 'weights') {
+    const target = section === 'models' ? modelSectionRef.current : weightsSectionRef.current
+    setActiveSection(section)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   if (isLoading) {
@@ -145,14 +182,6 @@ export function HomePage() {
             <span>历史窗口 {history?.total_count || 0}</span>
           </div>
         </div>
-        <div className="hero-panel__orb" />
-      </section>
-
-      <section className="stats-grid">
-        <StatTile label="数据样本" value={String(stats.totalDraws)} />
-        <StatTile label="最热前区" value={stats.hottestRed} />
-        <StatTile label="最热后区" value={stats.hottestBlue} />
-        <StatTile label="平均前区和值" value={String(stats.avgSum)} />
       </section>
 
       <section className="tab-strip">
@@ -168,92 +197,75 @@ export function HomePage() {
       </section>
 
       {activeTab === 'prediction' ? (
-        <div className="page-section">
-          <StatusCard title="焦点模型" subtitle="历史评分与置顶状态会影响这里的曝光顺序。">
-            <div className="spotlight-grid">
-              {highlightedModels.map((model) => (
-                <SpotlightCard
-                  key={model.model_id}
-                  model={model}
-                  score={modelScores[model.model_id]?.score100 || 0}
-                  isPinned={validPinnedModelIds.includes(model.model_id)}
-                  actualResult={actualResult}
-                  onPin={() => togglePinned(model.model_id)}
-                  onDetail={() => setDetailModelId(model.model_id)}
-                />
-              ))}
-            </div>
-          </StatusCard>
-
-          <div className="split-grid">
-            <StatusCard
-              title="共识组合建议"
-              subtitle="支持按模型筛选、共同出现过滤和历史评分加权。"
-              actions={
-                <div className="toolbar-inline">
-                  <label className="toggle-chip">
-                    <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
-                    <span>仅共同号码</span>
-                  </label>
-                  <label className="toggle-chip">
-                    <input
-                      type="checkbox"
-                      checked={weightedSummary}
-                      onChange={(event) => setWeightedSummary(event.target.checked)}
-                    />
-                    <span>评分加权</span>
-                  </label>
-                </div>
-              }
+        <div className="dashboard-layout">
+          <aside className="dashboard-sidebar" aria-label="预测总览导航">
+            <button
+              className={clsx('dashboard-sidebar__link', activeSection === 'models' && 'is-active')}
+              onClick={() => scrollToSection('models')}
             >
-              <div className="filter-chip-group">
-                {orderedModels.map((model) => (
-                  <button
-                    key={model.model_id}
-                    className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) && 'is-active')}
-                    onClick={() => toggleSummaryModel(model.model_id)}
-                  >
-                    {model.model_name}
-                  </button>
-                ))}
-              </div>
-              <div className="compound-grid">
-                {Object.entries(compoundSuggestions).map(([label, value]) => (
-                  <article key={label} className="compound-card">
-                    <p className="compound-card__tag">{label}</p>
-                    <div className="number-row">
-                      {value.red.map((ball) => (
-                        <NumberBall key={`${label}-r-${ball}`} value={ball} color="red" />
-                      ))}
-                      <span className="number-row__divider" />
-                      {value.blue.map((ball) => (
-                        <NumberBall key={`${label}-b-${ball}`} value={ball} color="blue" />
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-              <div className="summary-columns">
-                <SummaryList title="前区权重" items={summary.red.slice(0, 12)} />
-                <SummaryList title="后区权重" items={summary.blue.slice(0, 12)} />
-              </div>
-            </StatusCard>
+              模型列表
+            </button>
+            <button
+              className={clsx('dashboard-sidebar__link', activeSection === 'weights' && 'is-active')}
+              onClick={() => scrollToSection('weights')}
+            >
+              号码预测统计
+            </button>
+          </aside>
 
-            <StatusCard title="模型矩阵" subtitle="保留全部模型详情，可查看最佳命中组和全量号码。">
-              <div className="model-grid">
-                {orderedModels.map((model) => (
-                  <ModelCard
-                    key={model.model_id}
-                    model={model}
-                    score={modelScores[model.model_id]?.score100 || 0}
-                    isPinned={validPinnedModelIds.includes(model.model_id)}
-                    actualResult={actualResult}
-                    onPin={() => togglePinned(model.model_id)}
-                    onDetail={() => setDetailModelId(model.model_id)}
-                  />
-                ))}
-              </div>
-            </StatusCard>
+          <div className="page-section dashboard-content">
+            <section ref={modelSectionRef} data-section="models">
+              <StatusCard title="模型列表" subtitle="统一查看所有模型的历史评分、本期 5 组预测号码和更多操作。">
+                <div className="model-list">
+                  {orderedModels.map((model) => (
+                    <ModelListCard
+                      key={model.model_id}
+                      model={model}
+                      score={modelScores[model.model_id]?.score100 || 0}
+                      isPinned={validPinnedModelIds.includes(model.model_id)}
+                      actualResult={actualResult}
+                      isActionMenuOpen={activeActionMenuId === model.model_id}
+                      onToggleActionMenu={() =>
+                        setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
+                      }
+                      onPin={() => togglePinned(model.model_id)}
+                      onDetail={() => setDetailModelId(model.model_id)}
+                    />
+                  ))}
+                </div>
+              </StatusCard>
+            </section>
+
+            <section ref={weightsSectionRef} data-section="weights">
+              <StatusCard
+                title="号码预测统计"
+                subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
+                actions={
+                  <div className="toolbar-inline">
+                    <label className="toggle-chip">
+                      <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
+                      <span>仅共同号码</span>
+                    </label>
+                  </div>
+                }
+              >
+                <div className="filter-chip-group">
+                  {orderedModels.map((model) => (
+                    <button
+                      key={model.model_id}
+                      className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) && 'is-active')}
+                      onClick={() => toggleSummaryModel(model.model_id)}
+                    >
+                      {model.model_name}
+                    </button>
+                  ))}
+                </div>
+                <div className="summary-columns">
+                  <SummaryList title="前区统计" items={summary.red} color="red" />
+                  <SummaryList title="后区统计" items={summary.blue} color="blue" />
+                </div>
+              </StatusCard>
+            </section>
           </div>
         </div>
       ) : null}
@@ -450,65 +462,13 @@ export function HomePage() {
   )
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="stat-tile">
-      <p className="stat-tile__label">{label}</p>
-      <strong className="stat-tile__value">{value}</strong>
-    </article>
-  )
-}
-
-function SpotlightCard({
-  model,
-  score,
-  actualResult,
-  isPinned,
-  onPin,
-  onDetail,
-}: {
-  model: PredictionModel
-  score: number
-  actualResult: LotteryDraw | null
-  isPinned: boolean
-  onPin: () => void
-  onDetail: () => void
-}) {
-  const bestPrediction = model.predictions.reduce<{ group: PredictionGroup | null; hits: number }>(
-    (best, current) => {
-      const hitCount = compareNumbers(current, actualResult)?.totalHits || 0
-      return hitCount > best.hits ? { group: current, hits: hitCount } : best
-    },
-    { group: model.predictions[0] || null, hits: 0 },
-  )
-
-  return (
-    <article className="spotlight-card">
-      <div className="spotlight-card__header">
-        <div>
-          <p className="spotlight-card__provider">{model.model_provider}</p>
-          <h3>{model.model_name}</h3>
-        </div>
-        <button className={clsx('pin-button', isPinned && 'is-active')} onClick={onPin}>
-          {isPinned ? '已置顶' : '置顶'}
-        </button>
-      </div>
-      <p className="spotlight-card__score">历史评分 {score}</p>
-      {bestPrediction.group ? <PredictionNumberRow group={bestPrediction.group} actualResult={actualResult} /> : null}
-      <div className="spotlight-card__actions">
-        <button className="ghost-button" onClick={onDetail}>
-          查看全部组
-        </button>
-      </div>
-    </article>
-  )
-}
-
-function ModelCard({
+function ModelListCard({
   model,
   score,
   isPinned,
   actualResult,
+  isActionMenuOpen,
+  onToggleActionMenu,
   onPin,
   onDetail,
 }: {
@@ -516,31 +476,63 @@ function ModelCard({
   score: number
   isPinned: boolean
   actualResult: LotteryDraw | null
+  isActionMenuOpen: boolean
+  onToggleActionMenu: () => void
   onPin: () => void
   onDetail: () => void
 }) {
   return (
-    <article className="model-card-react">
-      <div className="model-card-react__header">
+    <article className="model-list-card">
+      <div className="model-list-card__header">
         <div>
-          <p className="model-card-react__provider">{model.model_provider}</p>
+          <p className="model-list-card__provider">{model.model_provider}</p>
           <h3>{model.model_name}</h3>
         </div>
-        <button className={clsx('pin-button', isPinned && 'is-active')} onClick={onPin}>
-          {isPinned ? '★' : '☆'}
-        </button>
+        <div className="model-list-card__actions">
+          {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
+          <div className="action-menu">
+            <button className="ghost-button" onClick={onToggleActionMenu} aria-expanded={isActionMenuOpen}>
+              更多操作
+            </button>
+            {isActionMenuOpen ? (
+              <div className="action-menu__panel">
+                <button className="action-menu__item action-menu__item--disabled" type="button" disabled title="暂未开放">
+                  收藏
+                  <span>暂未开放</span>
+                </button>
+                <button className="action-menu__item" type="button" onClick={onPin}>
+                  {isPinned ? '取消置顶' : '置顶'}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
-      <p className="model-card-react__meta">
-        历史评分 {score} · {model.model_api_model || model.model_id}
-      </p>
-      <div className="model-card-react__groups">
-        {model.predictions.slice(0, 2).map((group) => (
+      <div className="model-list-card__meta">
+        <div className="model-list-card__field">
+          <span>模型名称</span>
+          <strong>{model.model_name}</strong>
+        </div>
+        <div className="model-list-card__field">
+          <span>历史评分</span>
+          <strong>{score}</strong>
+        </div>
+        <div className="model-list-card__field">
+          <span>接口模型</span>
+          <strong>{model.model_api_model || model.model_id}</strong>
+        </div>
+      </div>
+      <div className="model-list-card__groups">
+        {model.predictions.map((group) => (
           <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
         ))}
       </div>
-      <button className="ghost-button ghost-button--full" onClick={onDetail}>
-        查看全部 {model.predictions.length} 组
-      </button>
+      <div className="model-list-card__footer">
+        <span>本期预测号码</span>
+        <button className="ghost-button" onClick={onDetail}>
+          查看详情
+        </button>
+      </div>
     </article>
   )
 }
@@ -586,21 +578,30 @@ function PredictionNumberRow({ group, actualResult }: { group: PredictionGroup; 
 function SummaryList({
   title,
   items,
+  color,
 }: {
   title: string
-  items: Array<{ ball: string; count: number; matchedModelCount: number }>
+  items: BallStatItem[]
+  color: 'red' | 'blue'
 }) {
   return (
     <div className="summary-list">
       <h3>{title}</h3>
       <div className="summary-list__items">
         {items.map((item) => (
-          <div key={`${title}-${item.ball}`} className="summary-list__item">
-            <span>{item.ball}</span>
-            <span>
-              {item.count} / {item.matchedModelCount} 模型
-            </span>
-          </div>
+          <article key={`${title}-${item.ball}`} className="ball-stat-card">
+            <div className="ball-stat-card__ball">
+              <NumberBall value={item.ball} color={color} />
+            </div>
+            <p className="ball-stat-card__appearance">
+              出现 {item.appearanceCount}/{item.totalGroupCount}
+            </p>
+            <div className="ball-stat-card__badge">命中 {item.matchedModelCount} 个模型</div>
+            <div className="ball-stat-card__bar">
+              <div className="ball-stat-card__bar-fill" style={{ width: `${Math.round(item.appearanceRatio * 100)}%` }} />
+            </div>
+            <p className="ball-stat-card__ratio">命中占比 {Math.round(item.appearanceRatio * 100)}%</p>
+          </article>
         ))}
       </div>
     </div>

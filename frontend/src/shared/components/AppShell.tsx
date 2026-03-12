@@ -13,7 +13,7 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
         </div>
         <nav className="app-nav">
-          <NavLink className={({ isActive }) => `app-nav__link${isActive ? ' is-active' : ''}`} to="/">
+          <NavLink className={({ isActive }) => `app-nav__link${isActive ? ' is-active' : ''}`} to="/dashboard">
             预测总览
           </NavLink>
           <NavLink className={({ isActive }) => `app-nav__link${isActive ? ' is-active' : ''}`} to="/settings">

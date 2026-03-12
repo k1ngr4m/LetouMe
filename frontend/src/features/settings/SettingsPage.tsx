@@ -99,6 +99,16 @@ export function SettingsPage() {
   const models = modelsQuery.data?.models || []
   const providers = providersQuery.data?.providers || []
   const selectedModel = models.find((model) => model.model_code === selectedModelCode) || null
+  const activeModels = models.filter((model) => model.is_active && !model.is_deleted)
+  const deletedModels = models.filter((model) => model.is_deleted)
+  const configuredKeys = models.filter((model) => model.api_key).length
+  const providerDistribution = providers
+    .map((provider) => ({
+      code: provider.code,
+      name: provider.name,
+      count: models.filter((model) => model.provider === provider.code && !model.is_deleted).length,
+    }))
+    .filter((provider) => provider.count > 0)
 
   function openCreateModal() {
     setMode('create')
@@ -159,10 +169,16 @@ export function SettingsPage() {
       <section className="hero-panel hero-panel--settings">
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Model Runtime Studio</p>
-          <h2 className="hero-panel__title">把模型目录、密钥和连接参数统一收敛到独立的设置工作台</h2>
+          <h2 className="hero-panel__title">统一管理模型目录、连接参数与运行状态</h2>
           <p className="hero-panel__description">
-            这里的改动会直接写入数据库，并立即影响后端的模型读取与预测执行。
+            这里的改动会直接写入数据库，并立即影响后端的模型读取与预测执行。当前工作台按运行概览、模型目录和编辑面板来组织。
           </p>
+          <div className="hero-panel__meta">
+            <span>模型总数 {models.length}</span>
+            <span>启用中 {activeModels.length}</span>
+            <span>已删除 {deletedModels.length}</span>
+            <span>已配置密钥 {configuredKeys}</span>
+          </div>
         </div>
         <div className="toolbar-inline">
           <label className="toggle-chip">
@@ -177,27 +193,93 @@ export function SettingsPage() {
 
       {message ? <div className={clsx('banner-message', messageType === 'error' && 'is-error')}>{message}</div> : null}
 
-      <StatusCard title="模型列表" subtitle={`当前共 ${models.length} 个模型，启用 ${models.filter((item) => item.is_active && !item.is_deleted).length} 个。`}>
-        <div className="settings-grid-react">
-          {models.map((model) => (
-            <button key={model.model_code} className="settings-model-card-react" onClick={() => void openEditModal(model.model_code)}>
-              <div className="settings-model-card-react__header">
-                <div>
-                  <p className="settings-model-card-react__provider">{model.provider}</p>
-                  <h3>{model.display_name}</h3>
+      <section className="settings-overview-grid">
+        <article className="settings-overview-card">
+          <p className="settings-overview-card__label">运行中模型</p>
+          <strong className="settings-overview-card__value">{activeModels.length}</strong>
+          <span className="settings-overview-card__hint">参与当前预测执行的模型数量</span>
+        </article>
+        <article className="settings-overview-card">
+          <p className="settings-overview-card__label">Provider 覆盖</p>
+          <strong className="settings-overview-card__value">{providerDistribution.length}</strong>
+          <span className="settings-overview-card__hint">已接入且至少包含一个可见模型的 Provider</span>
+        </article>
+        <article className="settings-overview-card">
+          <p className="settings-overview-card__label">已配置密钥</p>
+          <strong className="settings-overview-card__value">{configuredKeys}</strong>
+          <span className="settings-overview-card__hint">已录入 API Key 的模型数量</span>
+        </article>
+        <article className="settings-overview-card">
+          <p className="settings-overview-card__label">待处理项</p>
+          <strong className="settings-overview-card__value">{models.length - activeModels.length - deletedModels.length}</strong>
+          <span className="settings-overview-card__hint">已保留但未启用的模型数量</span>
+        </article>
+      </section>
+
+      <section className="settings-console-grid">
+        <StatusCard title="控制侧栏" subtitle="快速查看运行分布，并决定是否在目录中包含已删除模型。">
+          <div className="settings-side-stack">
+            <div className="settings-side-card">
+              <p className="settings-side-card__title">运行摘要</p>
+              <div className="settings-side-card__list">
+                <span>总模型数</span>
+                <strong>{models.length}</strong>
+                <span>启用模型</span>
+                <strong>{activeModels.length}</strong>
+                <span>已删除</span>
+                <strong>{deletedModels.length}</strong>
+                <span>停用待命</span>
+                <strong>{models.length - activeModels.length - deletedModels.length}</strong>
+              </div>
+            </div>
+            <div className="settings-side-card">
+              <p className="settings-side-card__title">Provider 分布</p>
+              <div className="settings-provider-list">
+                {providerDistribution.length ? (
+                  providerDistribution.map((provider) => (
+                    <div key={provider.code} className="settings-provider-item">
+                      <span>{provider.name}</span>
+                      <strong>{provider.count}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <p className="settings-provider-empty">当前还没有可展示的 Provider 分布。</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </StatusCard>
+
+        <StatusCard
+          title="模型目录"
+          subtitle={`当前共 ${models.length} 个模型，点击卡片进入编辑；目录会保留现有 CRUD、启停和恢复能力。`}
+        >
+          <div className="settings-grid-react">
+            {models.map((model) => (
+              <button key={model.model_code} className="settings-model-card-react" onClick={() => void openEditModal(model.model_code)}>
+                <div className="settings-model-card-react__header">
+                  <div>
+                    <p className="settings-model-card-react__provider">{model.provider}</p>
+                    <h3>{model.display_name}</h3>
+                  </div>
+                  <span className={clsx('status-pill', model.is_active && 'is-active', model.is_deleted && 'is-deleted')}>
+                    {model.is_deleted ? '已删除' : model.is_active ? '已启用' : '已停用'}
+                  </span>
                 </div>
-                <span className={clsx('status-pill', model.is_active && 'is-active', model.is_deleted && 'is-deleted')}>
-                  {model.is_deleted ? '已删除' : model.is_active ? '已启用' : '已停用'}
-                </span>
-              </div>
-              <p className="settings-model-card-react__meta">{model.api_model_name}</p>
-              <div className="tag-row">
-                {(model.tags || []).length ? model.tags.map((tag) => <span key={`${model.model_code}-${tag}`} className="tag">{tag}</span>) : <span className="tag tag--muted">无标签</span>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </StatusCard>
+                <p className="settings-model-card-react__meta">{model.api_model_name}</p>
+                <div className="settings-model-card-react__facts">
+                  <span>版本 {model.version || '-'}</span>
+                  <span>{model.base_url ? '已配置 Base URL' : '未配置 Base URL'}</span>
+                  <span>{model.api_key ? '已录入密钥' : '未录入密钥'}</span>
+                </div>
+                <div className="tag-row">
+                  {(model.tags || []).length ? model.tags.map((tag) => <span key={`${model.model_code}-${tag}`} className="tag">{tag}</span>) : <span className="tag tag--muted">无标签</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </StatusCard>
+      </section>
 
       {isModalOpen ? (
         <div className="modal-shell" role="presentation" onClick={() => setIsModalOpen(false)}>
@@ -213,73 +295,97 @@ export function SettingsPage() {
             </div>
 
             <form className="form-grid" onSubmit={submitForm}>
-              <label className="field">
-                <span>模型编码</span>
-                <input
-                  value={form.model_code || ''}
-                  disabled={mode === 'edit'}
-                  onChange={(event) => updateField('model_code', event.target.value)}
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>显示名称</span>
-                <input value={form.display_name} onChange={(event) => updateField('display_name', event.target.value)} required />
-              </label>
-              <label className="field">
-                <span>Provider</span>
-                <select value={form.provider} onChange={(event) => updateField('provider', event.target.value)}>
-                  {providers.map((provider) => (
-                    <option key={provider.code} value={provider.code}>
-                      {provider.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>API Model</span>
-                <input value={form.api_model_name} onChange={(event) => updateField('api_model_name', event.target.value)} required />
-              </label>
-              <label className="field">
-                <span>版本</span>
-                <input value={form.version} onChange={(event) => updateField('version', event.target.value)} />
-              </label>
-              <label className="field">
-                <span>Temperature</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={form.temperature ?? ''}
-                  onChange={(event) => updateField('temperature', event.target.value ? Number(event.target.value) : null)}
-                />
-              </label>
-              <label className="field field--full">
-                <span>标签</span>
-                <input
-                  value={form.tags.join(',')}
-                  onChange={(event) =>
-                    updateField(
-                      'tags',
-                      event.target.value
-                        .split(',')
-                        .map((tag) => tag.trim())
-                        .filter(Boolean),
-                    )
-                  }
-                />
-              </label>
-              <label className="field field--full">
-                <span>Base URL</span>
-                <input value={form.base_url} onChange={(event) => updateField('base_url', event.target.value)} />
-              </label>
-              <label className="field">
-                <span>API Key</span>
-                <input value={form.api_key} onChange={(event) => updateField('api_key', event.target.value)} />
-              </label>
-              <label className="field">
-                <span>APP Code</span>
-                <input value={form.app_code} onChange={(event) => updateField('app_code', event.target.value)} />
-              </label>
+              <div className="form-section field--full">
+                <div className="form-section__header">
+                  <p className="form-section__eyebrow">Identity</p>
+                  <h4 className="form-section__title">基础信息</h4>
+                </div>
+                <div className="form-section__grid">
+                  <label className="field">
+                    <span>模型编码</span>
+                    <input
+                      value={form.model_code || ''}
+                      disabled={mode === 'edit'}
+                      onChange={(event) => updateField('model_code', event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>显示名称</span>
+                    <input value={form.display_name} onChange={(event) => updateField('display_name', event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Provider</span>
+                    <select value={form.provider} onChange={(event) => updateField('provider', event.target.value)}>
+                      {providers.map((provider) => (
+                        <option key={provider.code} value={provider.code}>
+                          {provider.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>API Model</span>
+                    <input value={form.api_model_name} onChange={(event) => updateField('api_model_name', event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>版本</span>
+                    <input value={form.version} onChange={(event) => updateField('version', event.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>标签</span>
+                    <input
+                      value={form.tags.join(',')}
+                      onChange={(event) =>
+                        updateField(
+                          'tags',
+                          event.target.value
+                            .split(',')
+                            .map((tag) => tag.trim())
+                            .filter(Boolean),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="form-section field--full">
+                <div className="form-section__header">
+                  <p className="form-section__eyebrow">Connection</p>
+                  <h4 className="form-section__title">连接信息</h4>
+                </div>
+                <div className="form-section__grid">
+                  <label className="field field--full">
+                    <span>Base URL</span>
+                    <input value={form.base_url} onChange={(event) => updateField('base_url', event.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>API Key</span>
+                    <input value={form.api_key} onChange={(event) => updateField('api_key', event.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>APP Code</span>
+                    <input value={form.app_code} onChange={(event) => updateField('app_code', event.target.value)} />
+                  </label>
+                </div>
+              </div>
+              <div className="form-section field--full">
+                <div className="form-section__header">
+                  <p className="form-section__eyebrow">Runtime</p>
+                  <h4 className="form-section__title">运行参数</h4>
+                </div>
+                <div className="form-section__grid">
+                  <label className="field">
+                    <span>Temperature</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={form.temperature ?? ''}
+                      onChange={(event) => updateField('temperature', event.target.value ? Number(event.target.value) : null)}
+                    />
+                  </label>
+                </div>
+              </div>
               <label className="checkbox-field field--full">
                 <input type="checkbox" checked={form.is_active} onChange={(event) => updateField('is_active', event.target.checked)} />
                 <span>启用该模型参与预测</span>
