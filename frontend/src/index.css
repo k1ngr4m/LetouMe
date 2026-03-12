@@ -3,11 +3,12 @@
   line-height: 1.5;
   font-weight: 400;
   color: #f3efe8;
-  background:
+  color-scheme: dark;
+  --app-bg:
     radial-gradient(circle at top left, rgba(232, 120, 70, 0.22), transparent 26%),
     radial-gradient(circle at 85% 20%, rgba(78, 176, 248, 0.2), transparent 24%),
     linear-gradient(180deg, #0d1422 0%, #141d2f 42%, #101827 100%);
-  color-scheme: dark;
+  --grid-line: rgba(255, 255, 255, 0.02);
   --surface-0: rgba(255, 255, 255, 0.05);
   --surface-1: rgba(255, 255, 255, 0.08);
   --surface-2: rgba(255, 255, 255, 0.12);
@@ -15,10 +16,63 @@
   --text-1: #f3efe8;
   --text-2: #b8c2d3;
   --text-3: #8b95aa;
+  --header-bg: rgba(10, 15, 25, 0.72);
+  --panel-card-bg: rgba(15, 22, 36, 0.74);
+  --sidebar-bg: rgba(10, 15, 25, 0.72);
+  --landing-bg:
+    radial-gradient(circle at top left, rgba(240, 169, 74, 0.28), transparent 28%),
+    radial-gradient(circle at 80% 18%, rgba(61, 141, 245, 0.18), transparent 24%),
+    linear-gradient(145deg, rgba(12, 19, 31, 0.94), rgba(15, 24, 40, 0.9));
+  --hero-bg:
+    radial-gradient(circle at 10% 0%, rgba(245, 162, 71, 0.2), transparent 25%),
+    linear-gradient(135deg, rgba(22, 31, 49, 0.94), rgba(13, 20, 34, 0.92));
+  --modal-bg: rgba(12, 19, 31, 0.96);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --ghost-bg: rgba(255, 255, 255, 0.08);
+  --theme-toggle-bg: rgba(12, 19, 31, 0.78);
+  --theme-toggle-shadow: 0 16px 32px rgba(7, 12, 20, 0.24);
+  --ball-stat-bg: rgba(255, 255, 255, 0.88);
+  --ball-stat-border: rgba(201, 211, 228, 0.22);
+  --ball-stat-text: #6c7a93;
   --red-500: #d7405a;
   --blue-500: #3d8df5;
   --amber-500: #f2a54f;
   --green-500: #3fc27d;
+}
+
+:root[data-theme='light'] {
+  color: #1f2a3d;
+  color-scheme: light;
+  --app-bg:
+    radial-gradient(circle at top left, rgba(244, 171, 108, 0.24), transparent 26%),
+    radial-gradient(circle at 85% 16%, rgba(116, 170, 247, 0.22), transparent 24%),
+    linear-gradient(180deg, #f8f2ea 0%, #f2f6fb 46%, #edf2f7 100%);
+  --grid-line: rgba(86, 102, 130, 0.08);
+  --surface-0: rgba(255, 255, 255, 0.8);
+  --surface-1: rgba(230, 237, 247, 0.88);
+  --surface-2: rgba(221, 229, 240, 0.96);
+  --border-1: rgba(150, 167, 194, 0.28);
+  --text-1: #213047;
+  --text-2: #62728d;
+  --text-3: #8d99ad;
+  --header-bg: rgba(255, 251, 246, 0.82);
+  --panel-card-bg: rgba(255, 251, 246, 0.82);
+  --sidebar-bg: rgba(255, 251, 246, 0.82);
+  --landing-bg:
+    radial-gradient(circle at top left, rgba(244, 171, 108, 0.22), transparent 30%),
+    radial-gradient(circle at 80% 18%, rgba(122, 171, 244, 0.18), transparent 24%),
+    linear-gradient(145deg, rgba(255, 250, 245, 0.98), rgba(242, 246, 251, 0.96));
+  --hero-bg:
+    radial-gradient(circle at 10% 0%, rgba(244, 171, 108, 0.18), transparent 24%),
+    linear-gradient(135deg, rgba(255, 250, 245, 0.96), rgba(239, 244, 251, 0.94));
+  --modal-bg: rgba(255, 250, 245, 0.98);
+  --input-bg: rgba(241, 245, 251, 0.95);
+  --ghost-bg: rgba(229, 236, 245, 0.9);
+  --theme-toggle-bg: rgba(255, 251, 246, 0.92);
+  --theme-toggle-shadow: 0 16px 32px rgba(113, 130, 153, 0.18);
+  --ball-stat-bg: rgba(255, 255, 255, 0.92);
+  --ball-stat-border: rgba(201, 211, 228, 0.5);
+  --ball-stat-text: #677691;
 }
 
 * {
@@ -34,6 +88,8 @@ body,
 
 body {
   min-height: 100vh;
+  color: var(--text-1);
+  background: var(--app-bg);
 }
 
 body::before {
@@ -41,7 +97,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 32px 32px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 85%);
 }
@@ -66,6 +122,20 @@ a {
   padding: 1.25rem;
 }
 
+.app-theme-toggle {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 120;
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  padding: 0.78rem 1rem;
+  color: var(--text-1);
+  background: var(--theme-toggle-bg);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--theme-toggle-shadow);
+}
+
 .landing-shell {
   min-height: 100vh;
   padding: 1.5rem;
@@ -77,11 +147,8 @@ a {
   width: min(880px, 100%);
   padding: clamp(1.6rem, 4vw, 3rem);
   border-radius: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    radial-gradient(circle at top left, rgba(240, 169, 74, 0.28), transparent 28%),
-    radial-gradient(circle at 80% 18%, rgba(61, 141, 245, 0.18), transparent 24%),
-    linear-gradient(145deg, rgba(12, 19, 31, 0.94), rgba(15, 24, 40, 0.9));
+  border: 1px solid var(--border-1);
+  background: var(--landing-bg);
   box-shadow: 0 30px 60px rgba(5, 9, 18, 0.32);
   display: grid;
   gap: 2rem;
@@ -140,7 +207,7 @@ a {
   margin: 0 auto 1.25rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border-1);
-  background: rgba(10, 15, 25, 0.72);
+  background: var(--header-bg);
   backdrop-filter: blur(16px);
   border-radius: 1.5rem;
   display: flex;
@@ -232,7 +299,7 @@ a {
   padding: 1rem;
   border: 1px solid var(--border-1);
   border-radius: 1.4rem;
-  background: rgba(10, 15, 25, 0.72);
+  background: var(--sidebar-bg);
   backdrop-filter: blur(16px);
 }
 
@@ -256,9 +323,7 @@ a {
   overflow: hidden;
   padding: 1.7rem;
   border-radius: 1.8rem;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(245, 162, 71, 0.2), transparent 25%),
-    linear-gradient(135deg, rgba(22, 31, 49, 0.94), rgba(13, 20, 34, 0.92));
+  background: var(--hero-bg);
   border: 1px solid var(--border-1);
   display: flex;
   justify-content: space-between;
@@ -309,7 +374,7 @@ a {
 .history-record-card,
 .settings-model-card-react {
   border: 1px solid var(--border-1);
-  background: rgba(15, 22, 36, 0.74);
+  background: var(--panel-card-bg);
   backdrop-filter: blur(14px);
   border-radius: 1.4rem;
   box-shadow: 0 24px 50px rgba(8, 12, 22, 0.22);
@@ -451,7 +516,7 @@ a {
 
 .ghost-button {
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--ghost-bg);
 }
 
 .ghost-button--full {
@@ -494,7 +559,7 @@ a {
 .model-list-card {
   position: relative;
   border: 1px solid var(--border-1);
-  background: rgba(15, 22, 36, 0.74);
+  background: var(--panel-card-bg);
   backdrop-filter: blur(14px);
   border-radius: 1.4rem;
   box-shadow: 0 24px 50px rgba(8, 12, 22, 0.22);
@@ -613,14 +678,15 @@ a {
 .summary-list__items {
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 120px));
+  justify-content: start;
 }
 
 .ball-stat-card {
   padding: 0.75rem 0.7rem;
   border-radius: 1.15rem;
-  border: 1px solid rgba(201, 211, 228, 0.22);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--ball-stat-border);
+  background: var(--ball-stat-bg);
   display: grid;
   justify-items: center;
   gap: 0.5rem;
@@ -637,7 +703,7 @@ a {
 .ball-stat-card__appearance,
 .ball-stat-card__ratio {
   margin: 0;
-  color: #6c7a93;
+  color: var(--ball-stat-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -771,7 +837,7 @@ a {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--input-bg);
   color: var(--text-1);
   padding: 0.82rem 0.95rem;
 }
@@ -834,7 +900,7 @@ a {
   padding: 1.25rem;
   border-radius: 1.5rem;
   border: 1px solid var(--border-1);
-  background: rgba(12, 19, 31, 0.96);
+  background: var(--modal-bg);
 }
 
 .modal-card--form {
@@ -1118,6 +1184,11 @@ a {
 
   .landing-shell {
     padding: 0.8rem;
+  }
+
+  .app-theme-toggle {
+    top: 0.8rem;
+    right: 0.8rem;
   }
 
   .search-input {
