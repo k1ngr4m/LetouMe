@@ -276,7 +276,96 @@ server {
 }
 ```
 
-### 5. 生产如何使用
+### 5. 宝塔面板部署
+
+推荐在宝塔中拆成两部分：
+
+1. `网站`
+   - 用于托管前端静态文件 `frontend/dist`
+   - 对外提供页面入口 `/`
+   - 通过 Nginx 将 `/api/` 反向代理到 FastAPI
+2. `Python 项目`
+   - 仅用于启动 FastAPI
+   - 仅监听本机 `127.0.0.1:8000`
+
+推荐目录：
+
+```text
+/www/wwwroot/LetouMe
+```
+
+#### 宝塔 Python 项目填写示例
+
+- 项目名称：`LetouMe`
+- 项目路径：`/www/wwwroot/LetouMe`
+- 启动方式：`命令行启动`
+- 启动用户：`www`
+- 启动命令：
+
+```bash
+APP_ENV=prod /www/wwwroot/LetouMe/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+如果宝塔要求把环境变量单独填写，则：
+
+- 环境变量：`APP_ENV=prod`
+- 启动命令：
+
+```bash
+/www/wwwroot/LetouMe/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+#### 宝塔网站填写示例
+
+- 站点域名：可以先直接填写服务器 IP，例如 `49.235.37.196`
+- 网站根目录：`/www/wwwroot/LetouMe/frontend/dist`
+- 运行环境：`纯静态`
+
+站点 Nginx 配置可直接参考：
+
+```text
+deploy/baota_nginx.conf
+```
+
+生产环境变量建议：
+
+```env
+API_HOST=127.0.0.1
+API_PORT=8000
+FRONTEND_ORIGIN=http://49.235.37.196
+MYSQL_HOST=49.235.37.196
+MYSQL_PORT=3306
+MYSQL_USER=letoume
+MYSQL_PASSWORD=your-real-password
+MYSQL_DATABASE=letoume
+```
+
+前端生产配置：
+
+- `frontend/.env.production` 中保持 `VITE_API_BASE_URL` 为空
+- 浏览器会直接请求同源 `/api/...`
+
+部署步骤：
+
+```bash
+cd /www/wwwroot/LetouMe/frontend
+npm install
+npm run build
+```
+
+然后在宝塔中：
+
+1. 启动 `Python 项目`
+2. 重载 `Nginx`
+3. 访问 `http://49.235.37.196/`
+
+排查顺序：
+
+1. 先看宝塔 Python 项目日志，确认 FastAPI 已监听 `127.0.0.1:8000`
+2. 再看站点 Nginx 日志，确认 `/api/` 已反向代理到后端
+3. 若页面能打开但没有数据，优先检查 `.env.prod` 与数据库权限
+
+### 6. 生产如何使用
 
 - 浏览器访问：
 
