@@ -32,7 +32,7 @@ import {
   getActualResult,
   sortModels,
 } from './lib/home'
-import type { LotteryDraw, PredictionGroup, PredictionModel } from '../../shared/types/api'
+import type { LotteryDraw, PredictionGroup, PredictionHistorySummaryModel, PredictionModel } from '../../shared/types/api'
 
 type HomeTab = 'prediction' | 'analysis' | 'history'
 
@@ -633,7 +633,11 @@ function getModelTrendColor(index: number) {
   return palette[index % palette.length]
 }
 
-function HistoryRecordCard({ record }: { record: { target_period: string; actual_result: LotteryDraw | null; models: PredictionModel[] } }) {
+function HistoryRecordCard({
+  record,
+}: {
+  record: { target_period: string; actual_result: LotteryDraw | null; models: PredictionHistorySummaryModel[] }
+}) {
   return (
     <article className="history-record-card">
       <div className="history-record-card__header">

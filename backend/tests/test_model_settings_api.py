@@ -34,7 +34,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_list_models_returns_seeded_database_models(self) -> None:
-        response = self.client.get("/api/settings/models")
+        response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -42,7 +42,7 @@ class ModelSettingsApiTests(unittest.TestCase):
 
     def test_create_update_and_soft_delete_model(self) -> None:
         create_response = self.client.post(
-            "/api/settings/models",
+            "/api/settings/models/create",
             json={
                 "model_code": "custom-model",
                 "display_name": "Custom Model",
@@ -60,9 +60,10 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(create_response.status_code, 200)
         self.assertEqual(create_response.json()["model_code"], "custom-model")
 
-        update_response = self.client.put(
-            "/api/settings/models/custom-model",
+        update_response = self.client.post(
+            "/api/settings/models/update",
             json={
+                "model_code": "custom-model",
                 "display_name": "Custom Model Updated",
                 "provider": "openai",
                 "api_model_name": "gpt-custom",
@@ -81,22 +82,22 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(updated_payload["provider"], "openai")
         self.assertFalse(updated_payload["is_active"])
 
-        delete_response = self.client.delete("/api/settings/models/custom-model")
+        delete_response = self.client.post("/api/settings/models/delete", json={"model_code": "custom-model"})
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.json()["is_deleted"])
 
-        list_response = self.client.get("/api/settings/models")
+        list_response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
         visible_codes = [model["model_code"] for model in list_response.json()["models"]]
         self.assertNotIn("custom-model", visible_codes)
 
-        restore_response = self.client.post("/api/settings/models/custom-model/restore")
+        restore_response = self.client.post("/api/settings/models/restore", json={"model_code": "custom-model"})
         self.assertEqual(restore_response.status_code, 200)
         self.assertFalse(restore_response.json()["is_deleted"])
 
     def test_patch_status_toggles_active_flag(self) -> None:
-        response = self.client.patch(
-            "/api/settings/models/claude-sonnet-4.6/status",
-            json={"is_active": False},
+        response = self.client.post(
+            "/api/settings/models/status",
+            json={"model_code": "claude-sonnet-4.6", "is_active": False},
         )
 
         self.assertEqual(response.status_code, 200)

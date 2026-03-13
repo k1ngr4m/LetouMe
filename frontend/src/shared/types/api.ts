@@ -49,10 +49,32 @@ export type PredictionModel = {
   best_hit_count?: number | null
 }
 
+export type PredictionHistorySummaryModel = {
+  model_id: string
+  model_name: string
+  model_provider: string
+  model_version?: string | null
+  model_api_model?: string | null
+  best_group?: number | null
+  best_hit_count?: number | null
+}
+
 export type CurrentPredictionsResponse = {
   prediction_date: string
   target_period: string
   models: PredictionModel[]
+}
+
+export type PredictionsHistoryListRecord = {
+  prediction_date: string
+  target_period: string
+  actual_result: LotteryDraw | null
+  models: PredictionHistorySummaryModel[]
+}
+
+export type PredictionsHistoryListResponse = {
+  predictions_history: PredictionsHistoryListRecord[]
+  total_count: number
 }
 
 export type PredictionsHistoryRecord = {

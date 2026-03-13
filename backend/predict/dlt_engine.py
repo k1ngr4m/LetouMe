@@ -23,6 +23,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.db.connection import ensure_schema
+from backend.app.logging_utils import get_logger, sanitize_mapping
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.prediction_service import PredictionService
 from backend.core.model_config import ModelDefinition, load_model_registry
@@ -32,6 +33,7 @@ PROMPT_FILE = os.path.join(PROJECT_ROOT, "doc", "dlt_prompt2.0.md")
 
 lottery_service = LotteryService()
 prediction_service = PredictionService()
+logger = get_logger("predict.dlt_engine")
 
 
 def load_prompt_template() -> str:
@@ -71,11 +73,14 @@ def validate_prediction(prediction: Dict[str, Any]) -> bool:
         required_fields = ["prediction_date", "target_period", "model_id", "model_name", "predictions"]
         for field in required_fields:
             if field not in prediction:
-                print(f"    Missing field: {field}")
+                logger.warning("Prediction missing required field", extra={"context": {"field": field}})
                 return False
 
         if len(prediction["predictions"]) != 5:
-            print(f"    Invalid group count: {len(prediction['predictions'])}")
+            logger.warning(
+                "Prediction group count invalid",
+                extra={"context": {"group_count": len(prediction["predictions"])}},
+            )
             return False
 
         for group in prediction["predictions"]:
@@ -93,7 +98,7 @@ def validate_prediction(prediction: Dict[str, Any]) -> bool:
                 return False
         return True
     except Exception as exc:
-        print(f"    Validation error: {exc}")
+        logger.exception("Prediction validation failed", extra={"context": {"error": type(exc).__name__}})
         return False
 
 
@@ -132,7 +137,7 @@ def archive_old_prediction(lottery_data: Dict[str, Any]) -> None:
     try:
         prediction_service.archive_current_prediction_if_needed(lottery_data)
     except Exception as exc:
-        print(f"  Archive failed: {exc}")
+        logger.exception("Prediction archive failed", extra={"context": {"error": type(exc).__name__}})
 
 
 def build_prediction_prompt(
@@ -163,15 +168,21 @@ def prepare_models(
         try:
             model = factory.create(model_def)
         except Exception as exc:
-            print(f"  Skip {model_def.name}: {exc}")
+            logger.warning(
+                "Skip model initialization",
+                extra={"context": {"model_id": model_def.model_id, "error": str(exc)}},
+            )
             continue
 
         if enable_health_check:
             ok, message = model.health_check()
             if not ok:
-                print(f"  Health check failed: {model_def.name} ({message})")
+                logger.warning(
+                    "Model health check failed",
+                    extra={"context": {"model_id": model_def.model_id, "message": message}},
+                )
                 continue
-            print(f"  Health check passed: {model_def.name}")
+            logger.info("Model health check passed", extra={"context": {"model_id": model_def.model_id}})
 
         models.append(model)
     return models
@@ -196,20 +207,22 @@ def finalize_prediction(
 
 
 def generate_predictions() -> Optional[Dict[str, Any]]:
-    print("\n" + "=" * 50)
-    print("AI prediction generation")
-    print("=" * 50 + "\n")
+    logger.info("AI prediction generation started")
 
     ensure_schema()
     prompt_template = load_prompt_template()
     lottery_data = load_lottery_history()
+    logger.info(
+        "Loaded lottery history",
+        extra={"context": {"history_count": len(lottery_data.get("data", []))}},
+    )
     archive_old_prediction(lottery_data)
 
     next_draw = lottery_data.get("next_draw", {})
     target_period = next_draw.get("next_period", "")
     target_date = next_draw.get("next_date_display", "")
     if not target_period:
-        print("Unable to determine next period.")
+        logger.error("Unable to determine next period")
         return None
 
     history_data = lottery_data.get("data", [])[:30]
@@ -231,13 +244,20 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
     ]
 
     if existing_model_ids:
-        print(f"Existing models for period {target_period}: {len(existing_model_ids)}")
+        logger.info(
+            "Existing models found for target period",
+            extra={"context": {"target_period": target_period, "count": len(existing_model_ids)}},
+        )
 
     if not pending_definitions:
-        print(f"No missing models for target period {target_period}.")
+        logger.info("No missing models for target period", extra={"context": {"target_period": target_period}})
         return current_prediction
 
     models = prepare_models(pending_definitions, enable_health_check=True)
+    logger.info(
+        "Prepared prediction models",
+        extra={"context": {"target_period": target_period, "model_count": len(models)}},
+    )
 
     all_predictions = []
     for model in models:
@@ -255,12 +275,18 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
             prediction = finalize_prediction(raw_prediction, model_def, prediction_date, target_period)
             if validate_prediction(prediction):
                 all_predictions.append(prediction)
-                print(f"  Prediction accepted: {model_def.name}")
+                logger.info(
+                    "Prediction accepted",
+                    extra={"context": {"target_period": target_period, "model_id": model_def.model_id}},
+                )
         except Exception as exc:
-            print(f"  Prediction failed for {model_def.name}: {exc}")
+            logger.exception(
+                "Prediction failed",
+                extra={"context": {"target_period": target_period, "model_id": model_def.model_id}},
+            )
 
     if not all_predictions:
-        print("No valid predictions generated.")
+        logger.warning("No valid predictions generated", extra={"context": {"target_period": target_period}})
         return None
 
     return {
@@ -271,23 +297,30 @@ def generate_predictions() -> Optional[Dict[str, Any]]:
 
 
 def save_predictions(predictions: Dict[str, Any]) -> None:
-    print("Saving predictions into normalized MySQL tables...")
+    logger.info(
+        "Saving predictions",
+        extra={"context": sanitize_mapping({"target_period": predictions.get("target_period"), "models": len(predictions.get("models", []))})},
+    )
     saved = prediction_service.save_current_prediction(predictions)
-    print(f"  Saved target period: {saved.get('target_period')}\n")
+    logger.info("Predictions saved", extra={"context": {"target_period": saved.get("target_period")}})
 
 
 def main() -> None:
     predictions = generate_predictions()
     if predictions:
         save_predictions(predictions)
-        print("=" * 50)
-        print("Prediction generation complete")
-        print("=" * 50 + "\n")
-        print(f"Period: {predictions['target_period']}")
-        print(f"Date: {predictions['prediction_date']}")
-        print(f"Models: {len(predictions['models'])}")
+        logger.info(
+            "Prediction generation complete",
+            extra={
+                "context": {
+                    "target_period": predictions["target_period"],
+                    "prediction_date": predictions["prediction_date"],
+                    "model_count": len(predictions["models"]),
+                }
+            },
+        )
     else:
-        print("Prediction generation failed.")
+        logger.error("Prediction generation failed")
 
 
 if __name__ == "__main__":

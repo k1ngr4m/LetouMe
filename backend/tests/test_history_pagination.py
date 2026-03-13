@@ -36,15 +36,15 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
 
 
 class PredictionHistoryPaginationTests(unittest.TestCase):
-    def test_get_history_payload_returns_total_count_and_uses_limit_offset(self) -> None:
+    def test_get_history_list_payload_returns_total_count_and_uses_limit_offset(self) -> None:
         repository = Mock()
-        repository.list_history_records.return_value = [{"target_period": "26025", "models": []}]
+        repository.list_history_record_summaries.return_value = [{"target_period": "26025", "models": []}]
         repository.count_history_records.return_value = 64
 
         service = PredictionService(prediction_repository=repository)
-        payload = service.get_history_payload(limit=20, offset=20)
+        payload = service.get_history_list_payload(limit=20, offset=20)
 
-        repository.list_history_records.assert_called_once_with(limit=20, offset=20)
+        repository.list_history_record_summaries.assert_called_once_with(limit=20, offset=20)
         self.assertEqual(payload["predictions_history"], [{"target_period": "26025", "models": []}])
         self.assertEqual(payload["total_count"], 64)
 

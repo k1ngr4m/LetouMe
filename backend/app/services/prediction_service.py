@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.app.logging_utils import get_logger
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
 
@@ -14,6 +15,7 @@ class PredictionService:
     ) -> None:
         self.prediction_repository = prediction_repository or PredictionRepository()
         self.lottery_service = lottery_service or LotteryService()
+        self.logger = get_logger("services.prediction")
 
     @staticmethod
     def normalize_blue_balls(value: Any) -> list[str]:
@@ -42,11 +44,13 @@ class PredictionService:
         }
 
     def get_current_payload(self) -> dict[str, Any]:
-        return self.prediction_repository.get_current_prediction() or {
+        payload = self.prediction_repository.get_current_prediction() or {
             "prediction_date": "",
             "target_period": "",
             "models": [],
         }
+        self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
+        return payload
 
     def get_current_payload_by_period(self, target_period: str) -> dict[str, Any]:
         return self.prediction_repository.get_current_prediction_by_period(target_period) or {
@@ -60,6 +64,25 @@ class PredictionService:
             "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset),
             "total_count": self.prediction_repository.count_history_records(),
         }
+
+    def get_history_list_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+        payload = {
+            "predictions_history": self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset),
+            "total_count": self.prediction_repository.count_history_records(),
+        }
+        self.logger.info(
+            "Loaded prediction history summaries",
+            extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["predictions_history"])}},
+        )
+        return payload
+
+    def get_history_detail_payload(self, target_period: str) -> dict[str, Any] | None:
+        payload = self.prediction_repository.get_history_record_detail(target_period)
+        self.logger.info(
+            "Loaded prediction history detail",
+            extra={"context": {"target_period": target_period, "found": bool(payload)}},
+        )
+        return payload
 
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
         target_period = str(payload.get("target_period") or "")
@@ -81,6 +104,10 @@ class PredictionService:
             }
 
         self.prediction_repository.upsert_current_prediction(payload)
+        self.logger.info(
+            "Saved current prediction",
+            extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}},
+        )
         return payload
 
     def archive_current_prediction_if_needed(self, lottery_data: dict[str, Any]) -> None:
@@ -93,11 +120,8 @@ class PredictionService:
         if not old_target_period or not latest_period or int(old_target_period) > int(latest_period):
             return
 
-        existing_history = {
-            record.get("target_period")
-            for record in self.prediction_repository.list_history_records()
-        }
-        if old_target_period in existing_history:
+        if self.prediction_repository.history_record_exists(old_target_period):
+            self.logger.debug("Archive skipped because history record already exists", extra={"context": {"target_period": old_target_period}})
             return
 
         actual_result = next(
@@ -141,6 +165,10 @@ class PredictionService:
             "models": models_with_hits,
         }
         self.prediction_repository.upsert_history_record(new_record)
+        self.logger.info(
+            "Archived current prediction into history",
+            extra={"context": {"target_period": old_target_period, "model_count": len(models_with_hits)}},
+        )
 
     @staticmethod
     def calculate_hit_result(prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:

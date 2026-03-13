@@ -120,10 +120,18 @@ start_dev.bat
 
 ## API
 
-- `GET /api/lottery/history`
-- `GET /api/predictions/current`
-- `GET /api/predictions/history`
-- `GET /api/settings/models`
+- `POST /api/lottery/history`
+- `POST /api/predictions/current`
+- `POST /api/predictions/history/list`
+- `POST /api/predictions/history/detail`
+- `POST /api/settings/models/list`
+- `POST /api/settings/model/detail`
+- `POST /api/settings/models/create`
+- `POST /api/settings/models/update`
+- `POST /api/settings/models/status`
+- `POST /api/settings/models/delete`
+- `POST /api/settings/models/restore`
+- `POST /api/settings/providers/list`
 - `GET /`
   返回 API 服务信息与当前允许的前端来源
 

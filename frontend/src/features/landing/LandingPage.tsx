@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { currentPredictionsQueryOptions } from '../home/hooks/useHomeData'
+import { appLogger } from '../../shared/lib/logger'
 
 export function LandingPage() {
   const navigate = useNavigate()
@@ -16,6 +17,9 @@ export function LandingPage() {
       await queryClient.fetchQuery(currentPredictionsQueryOptions())
       navigate('/dashboard')
     } catch (requestError) {
+      appLogger.error('Landing page failed to load predictions', {
+        error: requestError instanceof Error ? requestError.message : 'unknown',
+      })
       setError(requestError instanceof Error ? requestError.message : '预测数据加载失败')
     } finally {
       setIsLoading(false)

@@ -17,7 +17,11 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from backend.app.db.connection import ensure_schema
+from backend.app.logging_utils import get_logger
 from backend.app.services.lottery_service import LotteryService
+
+
+logger = get_logger("fetch_history.dlt")
 
 
 class LotteryDataFetcher:
@@ -43,15 +47,17 @@ class LotteryDataFetcher:
     def fetch_page(self, url: str, retry: int = 3) -> BeautifulSoup | None:
         for attempt in range(retry):
             try:
-                print(f"Fetching data... ({attempt + 1}/{retry})")
-                print(f"  URL: {url}")
+                logger.info(
+                    "Fetching lottery history page",
+                    extra={"context": {"attempt": attempt + 1, "retry": retry, "url": url}},
+                )
                 response = self.session.get(url, timeout=30)
                 response.encoding = "utf-8"
                 if response.status_code == 200:
                     return BeautifulSoup(response.text, "html.parser")
-                print(f"HTTP status: {response.status_code}")
+                logger.warning("Unexpected HTTP status", extra={"context": {"status_code": response.status_code}})
             except requests.exceptions.RequestException as exc:
-                print(f"Request failed: {exc}")
+                logger.warning("Lottery history request failed", extra={"context": {"error": str(exc)}})
                 if attempt < retry - 1:
                     time.sleep(2)
         return None
@@ -60,7 +66,7 @@ class LotteryDataFetcher:
         data_list: list[dict] = []
         table = soup.find("tbody") or soup.find("table")
         if not table:
-            print("No lottery table found.")
+            logger.warning("No lottery table found")
             return data_list
 
         rows = table.find_all("tr")
@@ -83,14 +89,14 @@ class LotteryDataFetcher:
                     }
                 )
             except Exception as exc:
-                print(f"Failed to parse row: {exc}")
+                logger.warning("Failed to parse row", extra={"context": {"error": str(exc)}})
 
-        print(f"Parsed {len(data_list)} draws.")
+        logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list)}})
         return data_list
 
     def save_to_database(self, data: list[dict]) -> None:
         saved_draws = self.lottery_service.save_draws(data)
-        print(f"\nSaved {len(saved_draws)} draws into PostgreSQL.")
+        logger.info("Saved lottery draws", extra={"context": {"count": len(saved_draws)}})
 
     def fetch_and_save(
         self,
@@ -100,9 +106,8 @@ class LotteryDataFetcher:
         end: str | None = None,
     ) -> bool:
         del output_file, preserve_history
-        print("=" * 50)
-        print("Super Lotto history fetcher")
-        print("=" * 50)
+        started_at = time.perf_counter()
+        logger.info("Super Lotto history fetcher started")
 
         url = self.base_url
         params: list[str] = []
@@ -115,25 +120,33 @@ class LotteryDataFetcher:
 
         soup = self.fetch_page(url)
         if not soup:
-            print("Failed to fetch page.")
+            logger.error("Failed to fetch lottery history page")
             return False
 
         lottery_data = self.parse_lottery_data(soup)
         if not lottery_data:
-            print("No draws parsed.")
+            logger.error("No draws parsed from fetched page")
             return False
 
-        print("\nLatest 5 draws preview:")
-        print("-" * 50)
+        logger.info("Latest draws preview follows", extra={"context": {"preview_count": min(5, len(lottery_data))}})
         for item in lottery_data[:5]:
-            print(
-                f"Period: {item['period']} | "
-                f"Red: {' '.join(item['red_balls'])} | "
-                f"Blue: {' '.join(item['blue_balls'])} | "
-                f"Date: {item['date']}"
+            logger.info(
+                "Preview draw",
+                extra={
+                    "context": {
+                        "period": item["period"],
+                        "red": " ".join(item["red_balls"]),
+                        "blue": " ".join(item["blue_balls"]),
+                        "date": item["date"],
+                    }
+                },
             )
 
         self.save_to_database(lottery_data)
+        logger.info(
+            "Super Lotto history fetcher finished",
+            extra={"context": {"duration_ms": round((time.perf_counter() - started_at) * 1000, 2)}},
+        )
         return True
 
 
@@ -141,7 +154,7 @@ def main() -> None:
     fetcher = LotteryDataFetcher()
     success = fetcher.fetch_and_save()
     if success:
-        print(f"\nCompleted at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("Fetch task completed", extra={"context": {"completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}})
     else:
         sys.exit(1)
 

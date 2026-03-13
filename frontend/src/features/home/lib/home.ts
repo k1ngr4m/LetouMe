@@ -1,6 +1,8 @@
 import type {
   CurrentPredictionsResponse,
   LotteryDraw,
+  PredictionHistorySummaryModel,
+  PredictionsHistoryListResponse,
   PredictionsHistoryResponse,
   PredictionGroup,
   PredictionModel,
@@ -75,6 +77,17 @@ export function normalizePredictionsHistory(data: PredictionsHistoryResponse): P
   }
 }
 
+export function normalizePredictionsHistoryList(data: PredictionsHistoryListResponse): PredictionsHistoryListResponse {
+  return {
+    ...data,
+    predictions_history: (data.predictions_history || []).map((record) => ({
+      ...record,
+      actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
+      models: record.models || [],
+    })),
+  }
+}
+
 export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null) {
   if (!actualResult) return null
   const redHits = prediction.red_balls.filter((ball) => actualResult.red_balls.includes(ball))
@@ -88,23 +101,17 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
   }
 }
 
-export function buildModelScores(history: PredictionsHistoryResponse, models: PredictionModel[]): Record<string, ModelScore> {
+export function buildModelScores(history: PredictionsHistoryListResponse, models: PredictionModel[]): Record<string, ModelScore> {
   const records = (history.predictions_history || []).slice(0, SCORE_WINDOW)
   const result: Record<string, ModelScore> = {}
 
   for (const model of models) {
     const periods = records
       .map((record) => record.models.find((item) => item.model_id === model.model_id))
-      .filter((item): item is PredictionModel => Boolean(item && item.predictions.length))
+      .filter((item): item is PredictionHistorySummaryModel => Boolean(item))
       .map((historyModel) => {
-        const scores = historyModel.predictions.map((prediction) => {
-          const hit = prediction.hit_result
-          const redScore = (hit?.red_hit_count || 0) / 5
-          const blueScore = (hit?.blue_hit_count || 0) / 2
-          return (redScore + blueScore) / 2
-        })
-        const bestScore = Math.max(...scores, 0)
-        const avgScore = average(scores)
+        const bestScore = Number(historyModel.best_hit_count || 0) / 7
+        const avgScore = bestScore
         return {
           bestScore,
           avgScore,
@@ -228,7 +235,7 @@ export function buildSumTrendChart(draws: LotteryDraw[]) {
 }
 
 export function buildHistoryHitTrend(
-  records: PredictionsHistoryResponse['predictions_history'],
+  records: PredictionsHistoryListResponse['predictions_history'],
   selectedModelIds: string[],
 ) {
   const seriesModelIds = selectedModelIds.length
@@ -253,7 +260,7 @@ export function buildHistoryHitTrend(
   })
 }
 
-export function filterHistoryRecords(history: PredictionsHistoryResponse, selectedModelIds: string[], periodQuery: string) {
+export function filterHistoryRecords(history: PredictionsHistoryListResponse, selectedModelIds: string[], periodQuery: string) {
   return (history.predictions_history || []).filter((record) => {
     const matchesPeriod = !periodQuery || record.target_period.includes(periodQuery)
     const matchesModel =

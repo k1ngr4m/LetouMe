@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { apiClient } from '../../shared/api/client'
+import { appLogger } from '../../shared/lib/logger'
 import type { SettingsModelPayload } from '../../shared/types/api'
 import { StatusCard } from '../../shared/components/StatusCard'
 
@@ -53,6 +54,7 @@ export function SettingsPage() {
       void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
     },
     onError: (error) => {
+      appLogger.error('Settings model save failed', { error: error instanceof Error ? error.message : 'unknown' })
       setMessage(error instanceof Error ? error.message : '保存失败')
       setMessageType('error')
     },

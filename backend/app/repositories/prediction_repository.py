@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import _insert_number_rows, _upsert_issue
 from backend.app.repositories.write_log_repository import WriteLogRepository
 from backend.core.model_config import ModelDefinition, ModelRegistry, load_model_registry
@@ -12,6 +13,7 @@ class PredictionRepository:
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
         self._registry: ModelRegistry | None = None
+        self.logger = get_logger("repositories.prediction")
 
     def sync_model_catalog(self) -> None:
         self._registry = _load_registry()
@@ -200,6 +202,92 @@ class PredictionRepository:
                 rows = cursor.fetchall()
                 return [self._build_batch_payload(cursor, row, include_actual_result=True) for row in rows]
 
+    def list_history_record_summaries(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        sql = """
+            SELECT
+                pb.id,
+                pb.prediction_date,
+                di.issue_no AS target_period,
+                di.id AS target_issue_id
+            FROM prediction_batch pb
+            INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+            WHERE pb.status = 'archived'
+            ORDER BY di.issue_no DESC
+        """
+        params: list[Any] = []
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        if offset:
+            sql += " OFFSET ?"
+            params.append(offset)
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, tuple(params))
+                batch_rows = cursor.fetchall()
+                batch_ids = [int(row["id"]) for row in batch_rows]
+                issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
+                actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids)
+                model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
+                summaries_by_run = self._fetch_model_summaries(cursor, [int(row["id"]) for row in model_rows])
+        self.logger.debug(
+            "Loaded prediction history summary batches",
+            extra={"context": {"batch_count": len(batch_rows), "model_run_count": len(model_rows)}},
+        )
+
+        models_by_batch: dict[int, list[dict[str, Any]]] = {}
+        for row in model_rows:
+            batch_id = int(row["prediction_batch_id"])
+            summary = summaries_by_run.get(int(row["id"]), {})
+            models_by_batch.setdefault(batch_id, []).append(
+                {
+                    "model_id": row["model_id"],
+                    "model_name": row["model_name"],
+                    "model_provider": row["model_provider"],
+                    "model_version": row.get("model_version"),
+                    "model_api_model": row.get("model_api_model"),
+                    "best_group": summary.get("best_group"),
+                    "best_hit_count": summary.get("best_hit_count"),
+                }
+            )
+
+        return [
+            {
+                "prediction_date": row["prediction_date"],
+                "target_period": row["target_period"],
+                "actual_result": actual_results_by_issue.get(int(row["target_issue_id"])),
+                "models": models_by_batch.get(int(row["id"]), []),
+            }
+            for row in batch_rows
+        ]
+
+    def get_history_record_detail(self, target_period: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        pb.id,
+                        pb.prediction_date,
+                        di.issue_no AS target_period,
+                        di.id AS target_issue_id
+                    FROM prediction_batch pb
+                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                    WHERE pb.status = 'archived' AND di.issue_no = ?
+                    LIMIT 1
+                    """,
+                    (target_period,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return self._build_batch_payload(cursor, row, include_actual_result=True)
+
     def count_history_records(self) -> int:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -212,6 +300,21 @@ class PredictionRepository:
                 )
                 row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
+
+    def history_record_exists(self, target_period: str) -> bool:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM prediction_batch pb
+                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                    WHERE pb.status = 'archived' AND di.issue_no = ?
+                    LIMIT 1
+                    """,
+                    (target_period,),
+                )
+                return cursor.fetchone() is not None
 
     def _sync_registry(self, connection) -> None:
         if self._registry is None:
@@ -622,6 +725,32 @@ class PredictionRepository:
         return payload
 
     @staticmethod
+    def _fetch_model_runs_by_batch(cursor, batch_ids: list[int]) -> list[dict[str, Any]]:
+        if not batch_ids:
+            return []
+        placeholders = ", ".join("?" for _ in batch_ids)
+        cursor.execute(
+            f"""
+            SELECT
+                pmr.id,
+                pmr.prediction_batch_id,
+                pmr.display_order,
+                am.model_code AS model_id,
+                am.display_name AS model_name,
+                mp.provider_code AS model_provider,
+                am.version AS model_version,
+                am.api_model_name AS model_api_model
+            FROM prediction_model_run pmr
+            INNER JOIN ai_model am ON am.id = pmr.model_id
+            INNER JOIN model_provider mp ON mp.id = am.provider_id
+            WHERE pmr.prediction_batch_id IN ({placeholders})
+            ORDER BY pmr.prediction_batch_id ASC, pmr.display_order ASC, pmr.id ASC
+            """,
+            tuple(batch_ids),
+        )
+        return cursor.fetchall()
+
+    @staticmethod
     def _fetch_tags(cursor, model_codes: list[str]) -> dict[str, list[str]]:
         if not model_codes:
             return {}
@@ -769,38 +898,54 @@ class PredictionRepository:
 
     @staticmethod
     def _fetch_actual_result(cursor, target_issue_id: int) -> dict[str, Any] | None:
+        return PredictionRepository._fetch_actual_results(cursor, [target_issue_id]).get(target_issue_id)
+
+    @staticmethod
+    def _fetch_actual_results(cursor, target_issue_ids: list[int]) -> dict[int, dict[str, Any]]:
+        if not target_issue_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in target_issue_ids)
         cursor.execute(
             """
-            SELECT dr.id AS draw_result_id, di.issue_no AS period, di.draw_date
+            SELECT dr.id AS draw_result_id, dr.issue_id, di.issue_no AS period, di.draw_date
             FROM draw_result dr
             INNER JOIN draw_issue di ON di.id = dr.issue_id
-            WHERE dr.issue_id = ?
-            LIMIT 1
-            """,
-            (target_issue_id,),
+            WHERE dr.issue_id IN ("""
+            + placeholders
+            + ")",
+            tuple(target_issue_ids),
         )
-        row = cursor.fetchone()
-        if not row:
-            return None
+        rows = cursor.fetchall()
+        if not rows:
+            return {}
+        draw_result_ids = [int(row["draw_result_id"]) for row in rows]
+        placeholders = ", ".join("?" for _ in draw_result_ids)
         cursor.execute(
-            """
-            SELECT ball_color, ball_position, ball_value
+            f"""
+            SELECT draw_result_id, ball_color, ball_position, ball_value
             FROM draw_result_number
-            WHERE draw_result_id = ?
-            ORDER BY ball_color ASC, ball_position ASC
+            WHERE draw_result_id IN ({placeholders})
+            ORDER BY draw_result_id ASC, ball_color ASC, ball_position ASC
             """,
-            (row["draw_result_id"],),
+            tuple(draw_result_ids),
         )
-        numbers = cursor.fetchall()
-        red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
-        blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
-        return {
-            "period": row["period"],
-            "date": row.get("draw_date") or "",
-            "red_balls": red_balls,
-            "blue_balls": blue_balls,
-            "blue_ball": blue_balls[0] if blue_balls else None,
-        }
+        numbers_by_result: dict[int, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            numbers_by_result.setdefault(int(row["draw_result_id"]), []).append(row)
+
+        result: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            numbers = numbers_by_result.get(int(row["draw_result_id"]), [])
+            red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
+            blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
+            result[int(row["issue_id"])] = {
+                "period": row["period"],
+                "date": row.get("draw_date") or "",
+                "red_balls": red_balls,
+                "blue_balls": blue_balls,
+                "blue_ball": blue_balls[0] if blue_balls else None,
+            }
+        return result
 
 
 def _load_registry() -> ModelRegistry | None:

@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.db.connection import ensure_schema
+from backend.app.logging_utils import get_logger
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
 from backend.core.model_config import load_model_registry
@@ -26,6 +27,7 @@ from backend.predict import dlt_engine as dlt_ai
 
 DEFAULT_PROMPT_PATH = PROJECT_ROOT / "doc" / "dlt_prompt2.0.md"
 DEFAULT_CONTEXT_SIZE = 30
+logger = get_logger("scripts.recalculate_history")
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,21 +151,21 @@ def main() -> None:
         try:
             model = factory.create(model_def)
         except Exception as exc:
-            print(f"[skip] model init failed {model_def.model_id}: {exc}")
+            logger.warning("Model init failed", extra={"context": {"model_id": model_def.model_id, "error": str(exc)}})
             continue
 
         if not args.no_health_check:
             ok, message = model.health_check()
             if not ok:
-                print(f"[skip] model health check failed {model_def.model_id}: {message}")
+                logger.warning("Model health check failed", extra={"context": {"model_id": model_def.model_id, "message": message}})
                 continue
-            print(f"[pass] model health check {model_def.model_id}")
+            logger.info("Model health check passed", extra={"context": {"model_id": model_def.model_id}})
         model_instances[model_def.model_id] = model
 
     for period_int in range(start_period, end_period + 1):
         target_period = str(period_int)
         if period_int not in all_period_ints:
-            print(f"[skip] target period not found: {target_period}")
+            logger.warning("Target period not found", extra={"context": {"target_period": target_period}})
             continue
 
         actual_result = period_map[target_period]
@@ -176,7 +178,7 @@ def main() -> None:
         ]
         history_context = [period_map[p] for p in candidate_periods[: args.context_size]]
         if not history_context:
-            print(f"[skip] no usable history context for {target_period}")
+            logger.warning("No usable history context", extra={"context": {"target_period": target_period}})
             continue
 
         record = existing_by_period.get(target_period)
@@ -202,7 +204,7 @@ def main() -> None:
                 continue
 
             if not args.force and model_def.model_id in existing_models:
-                print(f"[skip] {target_period} already has {model_def.model_id}")
+                logger.info("Skip existing historical prediction", extra={"context": {"target_period": target_period, "model_id": model_def.model_id}})
                 continue
 
             try:
@@ -215,7 +217,7 @@ def main() -> None:
                     history_context=history_context,
                 )
             except Exception as exc:
-                print(f"[error] {target_period} {model_def.model_id}: {exc}")
+                logger.exception("Historical prediction generation failed", extra={"context": {"target_period": target_period, "model_id": model_def.model_id}})
                 continue
 
             predictions_with_hits = []
@@ -243,13 +245,14 @@ def main() -> None:
             }
 
             existing_models[model_def.model_id] = history_model
-            print(f"[ok] {target_period} <- {model_def.model_id}")
+            logger.info("Historical prediction stored in memory", extra={"context": {"target_period": target_period, "model_id": model_def.model_id}})
             time.sleep(0.2)
 
         record["models"] = list(existing_models.values())
         prediction_repository.upsert_history_record(record)
+        logger.info("Historical prediction record upserted", extra={"context": {"target_period": target_period, "model_count": len(record['models'])}})
 
-    print("\n=== batch recalculation complete ===")
+    logger.info("Batch historical recalculation complete", extra={"context": {"start_period": args.start_period, "end_period": args.end_period}})
 
 
 if __name__ == "__main__":

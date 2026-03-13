@@ -6,6 +6,7 @@ from pathlib import Path
 
 from backend.app.config import load_settings
 from backend.app.db.connection import ensure_schema, get_connection
+from backend.app.logging_utils import get_logger
 
 
 TABLE_ORDER = [
@@ -26,6 +27,7 @@ TABLE_ORDER = [
     "write_log",
     "write_log_detail",
 ]
+logger = get_logger("scripts.sqlite_migration")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -88,11 +90,11 @@ def main() -> None:
     try:
         for table_name in TABLE_ORDER:
             copied = _copy_table(sqlite_connection, table_name)
-            print(f"{table_name}: copied {copied} rows")
+            logger.info("Copied SQLite rows", extra={"context": {"table_name": table_name, "row_count": copied}})
     finally:
         sqlite_connection.close()
 
-    print("SQLite -> MySQL migration completed.")
+    logger.info("SQLite to MySQL migration completed", extra={"context": {"sqlite_path": sqlite_path}})
 
 
 if __name__ == "__main__":

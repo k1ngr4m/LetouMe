@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import LotteryRepository
 
 
 class LotteryService:
     def __init__(self, repository: LotteryRepository | None = None) -> None:
         self.repository = repository or LotteryRepository()
+        self.logger = get_logger("services.lottery")
 
     @staticmethod
     def normalize_blue_balls(value: Any) -> list[str]:
@@ -30,13 +32,14 @@ class LotteryService:
 
     def save_draws(self, draws: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized = [self.normalize_draw(draw) for draw in draws]
+        self.logger.info("Saving lottery draws", extra={"context": {"count": len(normalized)}})
         self.repository.upsert_draws(normalized)
         return normalized
 
     def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
         draws = self.repository.list_draws(limit=limit, offset=offset)
         total_count = self.repository.count_draws()
-        latest_draw = self.repository.get_latest_draw()
+        latest_draw = draws[0] if draws and offset == 0 else self.repository.get_latest_draw()
         last_updated = max(
             (draw.get("updated_at") for draw in draws if draw.get("updated_at")),
             default=datetime.utcnow(),
@@ -51,6 +54,10 @@ class LotteryService:
                 latest_draw["period"],
                 latest_draw["date"],
             )
+        self.logger.debug(
+            "Built lottery history payload",
+            extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["data"])}},
+        )
         return payload
 
     def get_draw_by_period(self, period: str) -> dict[str, Any] | None:
