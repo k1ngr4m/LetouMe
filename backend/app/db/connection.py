@@ -19,6 +19,45 @@ def _load_pymysql():
     return pymysql, DictCursor
 
 
+def _format_mysql_operational_error(settings: Settings, exc: Exception) -> str:
+    pymysql, _ = _load_pymysql()
+    if not isinstance(exc, pymysql.err.OperationalError):  # type: ignore[attr-defined]
+        return f"MySQL connection failed: {exc}"
+
+    code = exc.args[0] if exc.args else None
+    details = (
+        f"user={settings.mysql_user} host={settings.mysql_host} port={settings.mysql_port} "
+        f"database={settings.mysql_database}"
+    )
+
+    if code == 1130:
+        return (
+            "MySQL rejected this client host (1130).\n"
+            f"Connection details: {details}\n"
+            "Fix options:\n"
+            "- Use a local MySQL for dev (edit `.env` / `.env.dev`).\n"
+            "- Or on the MySQL server, grant this user for your client IP, e.g. "
+            "`CREATE USER ...; GRANT ...; FLUSH PRIVILEGES;`.\n"
+        )
+    if code == 1045:
+        return (
+            "MySQL access denied (1045) — username/password or host grants are wrong.\n"
+            f"Connection details: {details}\n"
+            "Fix options:\n"
+            "- Update `MYSQL_USER` / `MYSQL_PASSWORD` (prefer putting secrets in `.env`).\n"
+            "- Or create a dedicated dev user and grant privileges to the `letoume` database.\n"
+        )
+    if code == 2003:
+        return (
+            "Cannot connect to MySQL (2003) — server not reachable.\n"
+            f"Connection details: {details}\n"
+            "Fix options:\n"
+            "- Ensure MySQL is running and listening on the given host/port.\n"
+            "- If using Docker/VM/remote, check firewall/security group and bind address.\n"
+        )
+    return f"MySQL connection failed ({code}): {exc}\nConnection details: {details}\n"
+
+
 class CursorContext:
     def __init__(self, connection) -> None:
         self._connection = connection
@@ -90,7 +129,10 @@ def _open_mysql_connection(settings: Settings, *, with_database: bool):
     }
     if with_database:
         connect_kwargs["database"] = settings.mysql_database
-    return pymysql.connect(**connect_kwargs)
+    try:
+        return pymysql.connect(**connect_kwargs)
+    except Exception as exc:
+        raise RuntimeError(_format_mysql_operational_error(settings, exc)) from exc
 
 
 def _ensure_database_exists(settings: Settings) -> None:
