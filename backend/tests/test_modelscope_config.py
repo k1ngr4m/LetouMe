@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from backend.app.db.connection import ensure_schema
@@ -12,9 +11,18 @@ from backend.core.model_config import load_model_registry
 
 class ModelScopeConfigTests(unittest.TestCase):
     def setUp(self) -> None:
+        database_url = os.getenv("MYSQL_TEST_DATABASE_URL")
+        if not database_url:
+            self.skipTest("MYSQL_TEST_DATABASE_URL is required for MySQL integration tests")
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_path = Path(self.temp_dir.name) / "modelscope-test.db"
-        self.env = patch.dict(os.environ, {"DB_PATH": str(self.db_path)}, clear=False)
+        self.env = patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": database_url,
+                "MYSQL_DATABASE": os.getenv("MYSQL_TEST_DATABASE", "letoume_test"),
+            },
+            clear=False,
+        )
         self.env.start()
         ensure_schema()
 

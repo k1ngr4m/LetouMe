@@ -36,7 +36,7 @@ LetouMe 是一个面向中国体彩超级大乐透的预测与展示项目，采
 后端配置来源：
 
 - 根目录 `.env`
-  存放敏感配置，例如 AI API Key、数据库路径等
+  存放敏感配置，例如 AI API Key、MySQL 连接信息等
 - 根目录 `.env.dev`
   本地开发覆盖项
 - 根目录 `.env.prod`
@@ -56,9 +56,10 @@ APP_ENV=prod
 
 说明：
 
-- 默认数据库实际位置是 `backend/letoume.db`
-- 如需自定义位置，可通过 `.env` 中的 `DB_PATH` 指定绝对路径
-- 模型 API Key、Base URL、APP Code 通过设置页写入数据库
+- 运行时数据库已切换为 MySQL
+- 可通过 `DATABASE_URL` 一次性配置连接，或使用 `MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE`
+- `SQLITE_PATH` 仅用于一次性迁移旧的 SQLite 数据
+- 模型 API Key、Base URL、APP Code 通过设置页写入 MySQL
 - `dev` 默认允许 `http://localhost:5173`
 - `prod` 默认按同域反向代理部署，公网示例地址为 `http://116.62.134.169`
 
@@ -164,7 +165,8 @@ AI_BASE_URL=https://aihubmix.com/v1
 APP_CODE=
 MODELSCOPE_API_KEY=
 MODELSCOPE_BASE_URL=https://api-inference.modelscope.cn/v1
-DB_PATH=letoume.db
+DATABASE_URL=mysql+pymysql://root:password@127.0.0.1:3306/letoume?charset=utf8mb4
+SQLITE_PATH=backend/letoume.db
 ```
 
 根目录 `.env.prod`：
@@ -173,6 +175,11 @@ DB_PATH=letoume.db
 API_HOST=127.0.0.1
 API_PORT=8000
 FRONTEND_ORIGIN=http://116.62.134.169
+MYSQL_HOST=49.235.37.196
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=your-real-password
+MYSQL_DATABASE=letoume
 ```
 
 前端生产配置已经在：
@@ -232,6 +239,16 @@ start_prod.bat
 ```
 
 如果你要正式上线，仍然推荐下面的 Nginx 同域部署方式。
+
+### SQLite 旧数据迁移到 MySQL
+
+先确认目标 MySQL 库是空的，再执行：
+
+```bash
+APP_ENV=prod python -m backend.scripts.migrate_sqlite_to_mysql --sqlite-path backend/letoume.db
+```
+
+如果不传 `--sqlite-path`，脚本会读取 `.env` / `.env.prod` 中的 `SQLITE_PATH`。
 
 ### 4. 配置 Nginx（正式推荐）
 

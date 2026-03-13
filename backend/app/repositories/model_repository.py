@@ -235,7 +235,7 @@ class ModelRepository:
                 """
                 INSERT INTO model_tag (tag_code, tag_name)
                 VALUES (?, ?)
-                ON CONFLICT (tag_code) DO UPDATE SET tag_name = excluded.tag_name
+                ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
                 """,
                 (tag, tag),
             )
@@ -255,8 +255,9 @@ class ModelRepository:
             """
             INSERT INTO model_provider (provider_code, provider_name, base_url)
             VALUES (?, ?, ?)
-            ON CONFLICT (provider_code) DO UPDATE SET
-                provider_name = excluded.provider_name
+            ON DUPLICATE KEY UPDATE
+                provider_name = VALUES(provider_name),
+                base_url = COALESCE(VALUES(base_url), base_url)
             """,
             (provider_code, provider_name, DEFAULT_BASE_URL),
         )

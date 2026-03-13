@@ -195,7 +195,7 @@ def bootstrap_default_models() -> None:
                     """
                     INSERT INTO model_provider (provider_code, provider_name)
                     VALUES (?, ?)
-                    ON CONFLICT (provider_code) DO UPDATE SET provider_name = excluded.provider_name
+                    ON DUPLICATE KEY UPDATE provider_name = VALUES(provider_name)
                     """,
                     (provider_code, provider_name),
                 )
@@ -247,7 +247,7 @@ def bootstrap_default_models() -> None:
                         """
                         INSERT INTO model_tag (tag_code, tag_name)
                         VALUES (?, ?)
-                        ON CONFLICT (tag_code) DO UPDATE SET tag_name = excluded.tag_name
+                        ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
                         """,
                         (tag, tag),
                     )
@@ -255,8 +255,9 @@ def bootstrap_default_models() -> None:
                     tag_id = int(cursor.fetchone()["id"])
                     cursor.execute(
                         """
-                        INSERT OR IGNORE INTO ai_model_tag (model_id, tag_id)
+                        INSERT INTO ai_model_tag (model_id, tag_id)
                         VALUES (?, ?)
+                        ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)
                         """,
                         (model_db_id, tag_id),
                     )

@@ -148,7 +148,7 @@ class LotteryRepository:
                 """
                 INSERT INTO draw_result (issue_id)
                 VALUES (?)
-                ON CONFLICT (issue_id) DO NOTHING
+                ON DUPLICATE KEY UPDATE issue_id = VALUES(issue_id)
                 """,
                 (issue_id,),
             )
@@ -207,9 +207,9 @@ def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str)
             """
             INSERT INTO draw_issue (issue_no, draw_date, status, updated_at)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT (issue_no) DO UPDATE SET
-                draw_date = excluded.draw_date,
-                status = excluded.status,
+            ON DUPLICATE KEY UPDATE
+                draw_date = VALUES(draw_date),
+                status = VALUES(status),
                 updated_at = CURRENT_TIMESTAMP
             """,
             (issue_no, draw_date, status),

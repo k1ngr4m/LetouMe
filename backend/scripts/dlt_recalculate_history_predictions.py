@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Batch recalculate historical AI predictions and persist them into normalized SQLite tables."""
+"""Batch recalculate historical AI predictions and persist them into normalized MySQL tables."""
 
 from __future__ import annotations
 

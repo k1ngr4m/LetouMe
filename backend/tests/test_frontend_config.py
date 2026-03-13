@@ -18,7 +18,18 @@ class FrontendConfigTests(unittest.TestCase):
         self.assertEqual(settings.frontend_origin, "http://localhost:5173")
 
     def test_root_and_cors_reflect_frontend_origin(self) -> None:
-        with patch.dict(os.environ, {"FRONTEND_ORIGIN": "http://localhost:5173"}, clear=False):
+        database_url = os.getenv("MYSQL_TEST_DATABASE_URL")
+        if not database_url:
+            self.skipTest("MYSQL_TEST_DATABASE_URL is required for MySQL integration tests")
+
+        with patch.dict(
+            os.environ,
+            {
+                "FRONTEND_ORIGIN": "http://localhost:5173",
+                "DATABASE_URL": database_url,
+            },
+            clear=False,
+        ):
             client = TestClient(create_app())
             response = client.get("/", headers={"Origin": "http://localhost:5173"})
 

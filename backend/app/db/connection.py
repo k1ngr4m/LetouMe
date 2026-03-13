@@ -1,34 +1,67 @@
 from __future__ import annotations
 
-import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
-from backend.app.config import load_settings
+from backend.app.config import Settings, load_settings
 from backend.app.db.schema import SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS
 
+if TYPE_CHECKING:
+    import pymysql
 
-def _dict_row_factory(cursor: sqlite3.Cursor, row: tuple[object, ...]) -> dict[str, object]:
-    return {column[0]: row[index] for index, column in enumerate(cursor.description)}
+
+def _load_pymysql():
+    try:
+        import pymysql  # type: ignore
+        from pymysql.cursors import DictCursor  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("PyMySQL is required. Install it with `pip install pymysql`.") from exc
+    return pymysql, DictCursor
 
 
 class CursorContext:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, connection) -> None:
         self._connection = connection
-        self._cursor: sqlite3.Cursor | None = None
+        self._cursor = None
 
-    def __enter__(self) -> sqlite3.Cursor:
+    def __enter__(self):
         self._cursor = self._connection.cursor()
-        return self._cursor
+        return MySQLCursorAdapter(self._cursor)
 
     def __exit__(self, exc_type, exc, tb) -> None:
         if self._cursor is not None:
             self._cursor.close()
 
 
-class SQLiteConnectionAdapter:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+class MySQLCursorAdapter:
+    def __init__(self, cursor) -> None:
+        self._cursor = cursor
+
+    @property
+    def lastrowid(self) -> int:
+        return int(self._cursor.lastrowid or 0)
+
+    @property
+    def rowcount(self) -> int:
+        return int(self._cursor.rowcount or 0)
+
+    def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None) -> int:
+        normalized_query = query.replace("?", "%s")
+        return self._cursor.execute(normalized_query, params)
+
+    def executemany(self, query: str, params: list[tuple[Any, ...]]) -> int:
+        normalized_query = query.replace("?", "%s")
+        return self._cursor.executemany(normalized_query, params)
+
+    def fetchone(self) -> dict[str, Any] | None:
+        return self._cursor.fetchone()
+
+    def fetchall(self) -> list[dict[str, Any]]:
+        return list(self._cursor.fetchall())
+
+
+class MySQLConnectionAdapter:
+    def __init__(self, connection) -> None:
         self._connection = connection
 
     def cursor(self) -> CursorContext:
@@ -44,18 +77,40 @@ class SQLiteConnectionAdapter:
         self._connection.close()
 
 
-def _open_sqlite_connection(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(path)
-    connection.row_factory = _dict_row_factory
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+def _open_mysql_connection(settings: Settings, *, with_database: bool):
+    pymysql, DictCursor = _load_pymysql()
+    connect_kwargs: dict[str, Any] = {
+        "host": settings.mysql_host,
+        "port": settings.mysql_port,
+        "user": settings.mysql_user,
+        "password": settings.mysql_password,
+        "charset": "utf8mb4",
+        "cursorclass": DictCursor,
+        "autocommit": False,
+    }
+    if with_database:
+        connect_kwargs["database"] = settings.mysql_database
+    return pymysql.connect(**connect_kwargs)
+
+
+def _ensure_database_exists(settings: Settings) -> None:
+    connection = _open_mysql_connection(settings, with_database=False)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{settings.mysql_database}` "
+                "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            )
+        connection.commit()
+    finally:
+        connection.close()
 
 
 @contextmanager
-def get_connection() -> Iterator[SQLiteConnectionAdapter]:
+def get_connection() -> Iterator[MySQLConnectionAdapter]:
     settings = load_settings()
-    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = SQLiteConnectionAdapter(_open_sqlite_connection(settings.database_path))
+    _ensure_database_exists(settings)
+    connection = MySQLConnectionAdapter(_open_mysql_connection(settings, with_database=True))
     try:
         yield connection
         connection.commit()
@@ -67,26 +122,23 @@ def get_connection() -> Iterator[SQLiteConnectionAdapter]:
 
 
 def ensure_schema() -> None:
+    settings = load_settings()
+    _ensure_database_exists(settings)
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            table_statements = []
-            other_statements = []
             for statement in SCHEMA_STATEMENTS:
-                normalized = statement.strip().upper()
-                if normalized.startswith("CREATE TABLE") or normalized.startswith("PRAGMA"):
-                    table_statements.append(statement)
-                else:
-                    other_statements.append(statement)
-
-            for statement in table_statements:
                 cursor.execute(statement)
 
             for table_name, migrations in SCHEMA_MIGRATIONS.items():
-                cursor.execute(f"PRAGMA table_info({table_name})")
-                existing_columns = {str(row["name"]) for row in cursor.fetchall()}
+                cursor.execute(
+                    """
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                    """,
+                    (settings.mysql_database, table_name),
+                )
+                existing_columns = {str(row["COLUMN_NAME"]) for row in cursor.fetchall()}
                 for column_name, statement in migrations.items():
                     if column_name not in existing_columns:
                         cursor.execute(statement)
-
-            for statement in other_statements:
-                cursor.execute(statement)

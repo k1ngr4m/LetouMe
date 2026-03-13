@@ -282,7 +282,7 @@ class PredictionRepository:
                         payload["prediction_date"],
                         "script",
                         status,
-                        "CURRENT_TIMESTAMP" if archive_metadata else None,
+                        None,
                         batch_id,
                     ),
                 )
@@ -335,7 +335,7 @@ class PredictionRepository:
                 """
                 INSERT INTO draw_result (issue_id)
                 VALUES (?)
-                ON CONFLICT (issue_id) DO NOTHING
+                ON DUPLICATE KEY UPDATE issue_id = VALUES(issue_id)
                 """,
                 (issue_id,),
             )
@@ -480,7 +480,7 @@ class PredictionRepository:
                 """
                 INSERT INTO model_provider (provider_code, provider_name)
                 VALUES (?, ?)
-                ON CONFLICT (provider_code) DO UPDATE SET provider_name = excluded.provider_name
+                ON DUPLICATE KEY UPDATE provider_name = VALUES(provider_name)
                 """,
                 (provider_code, provider_name),
             )
@@ -498,11 +498,11 @@ class PredictionRepository:
                     updated_at
                 )
                 VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-                ON CONFLICT (model_code) DO UPDATE SET
-                    display_name = excluded.display_name,
-                    provider_id = excluded.provider_id,
-                    api_model_name = excluded.api_model_name,
-                    version = excluded.version,
+                ON DUPLICATE KEY UPDATE
+                    display_name = VALUES(display_name),
+                    provider_id = VALUES(provider_id),
+                    api_model_name = VALUES(api_model_name),
+                    version = VALUES(version),
                     is_active = 1,
                     updated_at = CURRENT_TIMESTAMP
                 """,
@@ -517,7 +517,7 @@ class PredictionRepository:
                     """
                     INSERT INTO model_tag (tag_code, tag_name)
                     VALUES (?, ?)
-                    ON CONFLICT (tag_code) DO UPDATE SET tag_name = excluded.tag_name
+                    ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
                     """,
                     (tag_code, tag_code),
                 )
@@ -527,6 +527,7 @@ class PredictionRepository:
                     """
                     INSERT INTO ai_model_tag (model_id, tag_id)
                     VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)
                     """,
                     (model_db_id, tag_id),
                 )
