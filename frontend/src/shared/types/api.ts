@@ -131,3 +131,48 @@ export type SettingsModelPayload = {
   temperature: number | null
   is_active: boolean
 }
+
+export type AuthUser = {
+  id: number
+  username: string
+  role: 'admin' | 'user'
+  is_active: boolean
+  last_login_at?: string | null
+  created_at?: string | null
+}
+
+export type CurrentUserResponse = {
+  user: AuthUser | null
+}
+
+export type LoginPayload = {
+  username: string
+  password: string
+}
+
+export type RegisterPayload = {
+  username: string
+  password: string
+}
+
+export type AdminUserCreatePayload = {
+  username: string
+  password: string
+  role: 'admin' | 'user'
+  is_active: boolean
+}
+
+export type AdminUserUpdatePayload = {
+  user_id: number
+  role: 'admin' | 'user'
+  is_active: boolean
+}
+
+export type AdminUserResetPasswordPayload = {
+  user_id: number
+  password: string
+}
+
+export type UserListResponse = {
+  users: AuthUser[]
+}

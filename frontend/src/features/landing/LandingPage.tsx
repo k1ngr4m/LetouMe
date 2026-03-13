@@ -20,6 +20,10 @@ export function LandingPage() {
       appLogger.error('Landing page failed to load predictions', {
         error: requestError instanceof Error ? requestError.message : 'unknown',
       })
+      if (requestError instanceof Error && requestError.message.includes('请先登录')) {
+        navigate('/login')
+        return
+      }
       setError(requestError instanceof Error ? requestError.message : '预测数据加载失败')
     } finally {
       setIsLoading(false)
@@ -36,6 +40,9 @@ export function LandingPage() {
         <div className="landing-panel__actions">
           <button className="landing-panel__button" onClick={() => void handleStart()} disabled={isLoading}>
             {isLoading ? '正在获取预测...' : '获取大乐透预测'}
+          </button>
+          <button className="ghost-button" onClick={() => navigate('/login')}>
+            管理员登录
           </button>
           {error ? <p className="landing-panel__error">加载失败：{error}</p> : null}
         </div>

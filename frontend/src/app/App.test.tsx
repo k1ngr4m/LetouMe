@@ -15,6 +15,27 @@ vi.mock('../features/landing/LandingPage', () => ({
 vi.mock('../features/settings/SettingsPage', () => ({
   SettingsPage: () => <div>Settings Page Mock</div>,
 }))
+vi.mock('../features/auth/LoginPage', () => ({
+  LoginPage: () => <div>Login Page Mock</div>,
+}))
+vi.mock('../features/auth/RegisterPage', () => ({
+  RegisterPage: () => <div>Register Page Mock</div>,
+}))
+vi.mock('../shared/auth/AuthProvider', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({
+    user: { id: 1, username: 'admin', role: 'admin', is_active: true },
+    isLoading: false,
+    isAuthenticated: true,
+    isAdmin: true,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  }),
+}))
+vi.mock('../shared/auth/ProtectedRoute', () => ({
+  ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
 
 function renderApp(initialEntries: string[]) {
   const client = new QueryClient()
@@ -41,5 +62,15 @@ describe('App routing', () => {
   it('renders settings route', () => {
     renderApp(['/settings'])
     expect(screen.getByText('Settings Page Mock')).toBeInTheDocument()
+  })
+
+  it('renders login route', () => {
+    renderApp(['/login'])
+    expect(screen.getByText('Login Page Mock')).toBeInTheDocument()
+  })
+
+  it('renders register route', () => {
+    renderApp(['/register'])
+    expect(screen.getByText('Register Page Mock')).toBeInTheDocument()
   })
 })

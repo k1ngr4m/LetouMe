@@ -3,33 +3,45 @@ import { AppShell } from '../shared/components/AppShell'
 import { HomePage } from '../features/home/HomePage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { LandingPage } from '../features/landing/LandingPage'
+import { LoginPage } from '../features/auth/LoginPage'
+import { RegisterPage } from '../features/auth/RegisterPage'
+import { AuthProvider } from '../shared/auth/AuthProvider'
+import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
 
 export function App() {
   return (
     <ThemeProvider>
-      <ThemeToggle />
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <AppShell>
-              <HomePage />
-            </AppShell>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <AppShell>
-              <SettingsPage />
-            </AppShell>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AuthProvider>
+        <ThemeToggle />
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <HomePage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AppShell>
+                  <SettingsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
     </ThemeProvider>
   )
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { apiClient } from '../../shared/api/client'
 import { appLogger } from '../../shared/lib/logger'
-import type { SettingsModelPayload } from '../../shared/types/api'
+import type { AuthUser, SettingsModelPayload } from '../../shared/types/api'
 import { StatusCard } from '../../shared/components/StatusCard'
 
 const EMPTY_FORM: SettingsModelPayload = {
@@ -29,6 +29,8 @@ export function SettingsPage() {
   const [form, setForm] = useState<SettingsModelPayload>(EMPTY_FORM)
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
+  const [newUserForm, setNewUserForm] = useState({ username: '', password: '', role: 'user' as 'admin' | 'user', is_active: true })
+  const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
 
   const modelsQuery = useQuery({
     queryKey: ['settings-models', includeDeleted],
@@ -37,6 +39,10 @@ export function SettingsPage() {
   const providersQuery = useQuery({
     queryKey: ['settings-providers'],
     queryFn: () => apiClient.getSettingsProviders(),
+  })
+  const usersQuery = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => apiClient.listUsers(),
   })
 
   const saveMutation = useMutation({
@@ -85,6 +91,38 @@ export function SettingsPage() {
       void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
     },
   })
+  const createUserMutation = useMutation({
+    mutationFn: () => apiClient.createUser(newUserForm),
+    onSuccess: () => {
+      setMessage('用户已创建。')
+      setMessageType('success')
+      setNewUserForm({ username: '', password: '', role: 'user', is_active: true })
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建用户失败')
+      setMessageType('error')
+    },
+  })
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, role, isActive }: { userId: number; role: 'admin' | 'user'; isActive: boolean }) =>
+      apiClient.updateUser({ user_id: userId, role, is_active: isActive }),
+    onSuccess: () => {
+      setMessage('用户已更新。')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+  })
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ userId, password }: { userId: number; password: string }) =>
+      apiClient.resetUserPassword({ user_id: userId, password }),
+    onSuccess: () => {
+      setMessage('密码已重置。')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setResetPasswordMap({})
+    },
+  })
 
   useEffect(() => {
     if (!isModalOpen) return
@@ -100,6 +138,7 @@ export function SettingsPage() {
 
   const models = modelsQuery.data?.models || []
   const providers = providersQuery.data?.providers || []
+  const users = usersQuery.data?.users || []
   const selectedModel = models.find((model) => model.model_code === selectedModelCode) || null
   const activeModels = models.filter((model) => model.is_active && !model.is_deleted)
   const deletedModels = models.filter((model) => model.is_deleted)
@@ -158,7 +197,7 @@ export function SettingsPage() {
     })
   }
 
-  if (modelsQuery.isLoading || providersQuery.isLoading) {
+  if (modelsQuery.isLoading || providersQuery.isLoading || usersQuery.isLoading) {
     return <div className="state-shell">正在加载模型设置...</div>
   }
 
@@ -278,6 +317,63 @@ export function SettingsPage() {
                   {(model.tags || []).length ? model.tags.map((tag) => <span key={`${model.model_code}-${tag}`} className="tag">{tag}</span>) : <span className="tag tag--muted">无标签</span>}
                 </div>
               </button>
+            ))}
+          </div>
+        </StatusCard>
+      </section>
+
+      <section className="page-section">
+        <StatusCard title="用户管理" subtitle="管理员可创建本地账号、切换角色并重置密码。">
+          <form
+            className="form-grid"
+            onSubmit={(event) => {
+              event.preventDefault()
+              createUserMutation.mutate()
+            }}
+          >
+            <label className="field">
+              <span>用户名</span>
+              <input value={newUserForm.username} onChange={(event) => setNewUserForm((previous) => ({ ...previous, username: event.target.value }))} required />
+            </label>
+            <label className="field">
+              <span>初始密码</span>
+              <input
+                type="password"
+                value={newUserForm.password}
+                onChange={(event) => setNewUserForm((previous) => ({ ...previous, password: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>角色</span>
+              <select value={newUserForm.role} onChange={(event) => setNewUserForm((previous) => ({ ...previous, role: event.target.value as 'admin' | 'user' }))}>
+                <option value="user">普通用户</option>
+                <option value="admin">管理员</option>
+              </select>
+            </label>
+            <label className="checkbox-field">
+              <input type="checkbox" checked={newUserForm.is_active} onChange={(event) => setNewUserForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
+              <span>创建后立即启用</span>
+            </label>
+            <div className="form-actions field--full">
+              <button className="primary-button" type="submit" disabled={createUserMutation.isPending}>
+                {createUserMutation.isPending ? '创建中...' : '创建用户'}
+              </button>
+            </div>
+          </form>
+
+          <div className="settings-grid-react">
+            {users.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                resetPassword={resetPasswordMap[user.id] || ''}
+                onResetPasswordChange={(password) => setResetPasswordMap((previous) => ({ ...previous, [user.id]: password }))}
+                onRoleToggle={() => updateUserMutation.mutate({ userId: user.id, role: user.role === 'admin' ? 'user' : 'admin', isActive: user.is_active })}
+                onActiveToggle={() => updateUserMutation.mutate({ userId: user.id, role: user.role, isActive: !user.is_active })}
+                onResetPassword={() => resetPasswordMutation.mutate({ userId: user.id, password: resetPasswordMap[user.id] || '' })}
+                isUpdating={updateUserMutation.isPending || resetPasswordMutation.isPending}
+              />
             ))}
           </div>
         </StatusCard>
@@ -424,5 +520,57 @@ export function SettingsPage() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function UserCard({
+  user,
+  resetPassword,
+  onResetPasswordChange,
+  onRoleToggle,
+  onActiveToggle,
+  onResetPassword,
+  isUpdating,
+}: {
+  user: AuthUser
+  resetPassword: string
+  onResetPasswordChange: (password: string) => void
+  onRoleToggle: () => void
+  onActiveToggle: () => void
+  onResetPassword: () => void
+  isUpdating: boolean
+}) {
+  return (
+    <article className="settings-model-card-react">
+      <div className="settings-model-card-react__header">
+        <div>
+          <p className="settings-model-card-react__provider">{user.role}</p>
+          <h3>{user.username}</h3>
+        </div>
+        <span className={clsx('status-pill', user.is_active && 'is-active')}>{user.is_active ? '已启用' : '已停用'}</span>
+      </div>
+      <p className="settings-model-card-react__meta">最近登录 {user.last_login_at || '从未登录'}</p>
+      <div className="settings-model-card-react__facts">
+        <span>创建时间 {user.created_at || '-'}</span>
+        <span>{user.role === 'admin' ? '拥有管理员权限' : '仅可查看预测'}</span>
+      </div>
+      <div className="form-section__grid">
+        <button className="ghost-button" type="button" onClick={onRoleToggle} disabled={isUpdating}>
+          切换角色
+        </button>
+        <button className="ghost-button" type="button" onClick={onActiveToggle} disabled={isUpdating}>
+          {user.is_active ? '禁用账号' : '启用账号'}
+        </button>
+      </div>
+      <label className="field field--full">
+        <span>重置密码</span>
+        <input type="password" value={resetPassword} onChange={(event) => onResetPasswordChange(event.target.value)} placeholder="至少 8 位" />
+      </label>
+      <div className="form-actions">
+        <button className="primary-button" type="button" onClick={onResetPassword} disabled={isUpdating || resetPassword.length < 8}>
+          重置密码
+        </button>
+      </div>
+    </article>
   )
 }

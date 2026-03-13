@@ -60,6 +60,7 @@ APP_ENV=prod
 - 可通过 `DATABASE_URL` 一次性配置连接，或使用 `MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE`
 - `SQLITE_PATH` 仅用于一次性迁移旧的 SQLite 数据
 - 模型 API Key、Base URL、APP Code 通过设置页写入 MySQL
+- 首次启动若无管理员账号，可通过 `AUTH_BOOTSTRAP_ADMIN_USERNAME / AUTH_BOOTSTRAP_ADMIN_PASSWORD` 自动初始化管理员
 - `dev` 默认允许 `http://localhost:5173`
 - `prod` 默认按同域反向代理部署，公网示例地址为 `http://116.62.134.169`
 
@@ -120,6 +121,10 @@ start_dev.bat
 
 ## API
 
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/logout`
+- `POST /api/auth/me`
 - `POST /api/lottery/history`
 - `POST /api/predictions/current`
 - `POST /api/predictions/history/list`
@@ -132,6 +137,10 @@ start_dev.bat
 - `POST /api/settings/models/delete`
 - `POST /api/settings/models/restore`
 - `POST /api/settings/providers/list`
+- `POST /api/admin/users/list`
+- `POST /api/admin/users/create`
+- `POST /api/admin/users/update`
+- `POST /api/admin/users/reset-password`
 - `GET /`
   返回 API 服务信息与当前允许的前端来源
 

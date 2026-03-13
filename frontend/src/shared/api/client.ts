@@ -1,5 +1,10 @@
 import type {
+  AdminUserCreatePayload,
+  AdminUserResetPasswordPayload,
+  AdminUserUpdatePayload,
+  CurrentUserResponse,
   CurrentPredictionsResponse,
+  LoginPayload,
   LotteryHistoryResponse,
   PredictionsHistoryListResponse,
   PredictionsHistoryResponse,
@@ -7,6 +12,8 @@ import type {
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProviderListResponse,
+  UserListResponse,
+  RegisterPayload,
 } from '../types/api'
 import { appLogger, sanitizeForLog } from '../lib/logger'
 
@@ -37,6 +44,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   appLogger.debug('API request started', { method, path, payload: sanitizeForLog(requestPayload) })
 
   const response = await fetch(buildUrl(path).toString(), {
+    credentials: 'include',
     headers,
     ...init,
   })
@@ -63,6 +71,30 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const apiClient = {
+  login(payload: LoginPayload) {
+    return requestJson<CurrentUserResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  register(payload: RegisterPayload) {
+    return requestJson<CurrentUserResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  logout() {
+    return requestJson<CurrentUserResponse>('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  getCurrentUser() {
+    return requestJson<CurrentUserResponse>('/api/auth/me', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
   getLotteryHistory(payload?: { limit?: number; offset?: number }) {
     return requestJson<LotteryHistoryResponse>('/api/lottery/history', {
       method: 'POST',
@@ -133,6 +165,30 @@ export const apiClient = {
     return requestJson<SettingsModel>('/api/settings/models/restore', {
       method: 'POST',
       body: JSON.stringify({ model_code: modelCode }),
+    })
+  },
+  listUsers() {
+    return requestJson<UserListResponse>('/api/admin/users/list', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  createUser(payload: AdminUserCreatePayload) {
+    return requestJson<CurrentUserResponse>('/api/admin/users/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  updateUser(payload: AdminUserUpdatePayload) {
+    return requestJson<CurrentUserResponse>('/api/admin/users/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  resetUserPassword(payload: AdminUserResetPasswordPayload) {
+    return requestJson<CurrentUserResponse>('/api/admin/users/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
 }

@@ -32,6 +32,10 @@ class Settings:
     log_dir: Path = REPO_ROOT / "logs"
     log_to_file: bool = True
     log_plaintext_sensitive: bool = True
+    auth_session_cookie_name: str = "letoume_session"
+    auth_session_days: int = 7
+    auth_bootstrap_admin_username: str = "admin"
+    auth_bootstrap_admin_password: str = "admin123456"
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -92,4 +96,8 @@ def load_settings() -> Settings:
         log_dir=Path(os.getenv("LOG_DIR", str(REPO_ROOT / "logs"))),
         log_to_file=os.getenv("LOG_TO_FILE", "true").lower() in {"1", "true", "yes", "on"},
         log_plaintext_sensitive=os.getenv("LOG_PLAINTEXT_SENSITIVE", "true").lower() in {"1", "true", "yes", "on"},
+        auth_session_cookie_name=os.getenv("AUTH_SESSION_COOKIE_NAME", "letoume_session"),
+        auth_session_days=int(os.getenv("AUTH_SESSION_DAYS", "7")),
+        auth_bootstrap_admin_username=os.getenv("AUTH_BOOTSTRAP_ADMIN_USERNAME", "admin"),
+        auth_bootstrap_admin_password=os.getenv("AUTH_BOOTSTRAP_ADMIN_PASSWORD", "admin123456"),
     )

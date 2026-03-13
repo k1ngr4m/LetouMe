@@ -181,6 +181,12 @@ a {
   gap: 0.9rem;
 }
 
+.auth-form {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 26rem;
+}
+
 .landing-panel__button {
   min-width: min(100%, 19rem);
   padding: 1rem 1.4rem;
@@ -257,6 +263,12 @@ a {
   display: flex;
   gap: 0.65rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.app-nav__meta {
+  color: var(--text-2);
+  padding: 0.2rem 0.4rem;
 }
 
 .app-nav__link {

@@ -7,6 +7,7 @@ from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.routes import router
+from backend.app.auth import AuthService
 from backend.app.config import load_settings
 from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import configure_logging, get_logger
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup() -> None:
         ensure_schema()
+        AuthService(settings=settings).ensure_bootstrap_admin()
         logger.info("Application startup complete", extra={"context": {"env": settings.app_env}})
 
 

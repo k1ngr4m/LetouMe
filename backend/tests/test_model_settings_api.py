@@ -22,12 +22,15 @@ class ModelSettingsApiTests(unittest.TestCase):
             {
                 "DATABASE_URL": database_url,
                 "MYSQL_DATABASE": os.getenv("MYSQL_TEST_DATABASE", "letoume_test"),
+                "AUTH_BOOTSTRAP_ADMIN_USERNAME": "admin",
+                "AUTH_BOOTSTRAP_ADMIN_PASSWORD": "admin123456",
             },
             clear=False,
         )
         self.env.start()
         ensure_schema()
         self.client = TestClient(app)
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
 
     def tearDown(self) -> None:
         self.env.stop()
