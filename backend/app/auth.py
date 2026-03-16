@@ -119,7 +119,7 @@ class AuthService:
         return self._serialize_user(user)
 
     def list_users(self) -> list[dict[str, Any]]:
-        return self.repository.list_users()
+        return [self._serialize_user(user) for user in self.repository.list_users()]
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
         username = str(payload.get("username") or "").strip()

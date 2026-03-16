@@ -42,6 +42,24 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(any(model["model_code"] == "claude-sonnet-4.6" for model in payload["models"]))
+        self.assertTrue(all(isinstance(model["updated_at"], str) for model in payload["models"]))
+        deepseek_chat = next(model for model in payload["models"] if model["model_code"] == "deepseek-v3.2")
+        self.assertEqual(deepseek_chat["provider"], "deepseek")
+        self.assertEqual(deepseek_chat["api_model_name"], "deepseek-chat")
+        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com")
+
+    def test_get_model_detail_serializes_updated_at(self) -> None:
+        response = self.client.post("/api/settings/model/detail", json={"model_code": "claude-sonnet-4.6"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.json()["updated_at"], str)
+
+    def test_list_providers_includes_deepseek(self) -> None:
+        response = self.client.post("/api/settings/providers/list", json={})
+
+        self.assertEqual(response.status_code, 200)
+        providers = response.json()["providers"]
+        self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
 
     def test_create_update_and_soft_delete_model(self) -> None:
         create_response = self.client.post(

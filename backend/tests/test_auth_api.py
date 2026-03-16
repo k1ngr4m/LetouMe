@@ -70,6 +70,20 @@ class AuthApiTests(unittest.TestCase):
         settings_response = user_client.post("/api/settings/models/list", json={"include_deleted": False})
         self.assertEqual(settings_response.status_code, 403)
 
+    def test_admin_user_list_serializes_datetime_fields(self) -> None:
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post(
+            "/api/admin/users/create",
+            json={"username": "viewer", "password": "viewer123", "role": "user", "is_active": True},
+        )
+
+        response = self.client.post("/api/admin/users/list", json={})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["users"]
+        self.assertTrue(all(user["created_at"] is None or isinstance(user["created_at"], str) for user in payload))
+        self.assertTrue(all(user["last_login_at"] is None or isinstance(user["last_login_at"], str) for user in payload))
+
     def test_register_creates_normal_user_and_logs_in(self) -> None:
         register_response = self.client.post(
             "/api/auth/register",

@@ -3,13 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.db.connection import ensure_schema, get_connection
-from backend.core.model_config import DEFAULT_BASE_URL, SUPPORTED_PROVIDERS, bootstrap_default_models
+from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_PROVIDERS, bootstrap_default_models
 
 
 PROVIDER_LABELS = {
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "gemini": "Gemini",
+    "deepseek": "DeepSeek",
     "openai_compatible": "OpenAI Compatible",
 }
 
@@ -17,7 +18,6 @@ PROVIDER_LABELS = {
 class ModelRepository:
     def list_models(self, include_deleted: bool = False) -> list[dict[str, Any]]:
         ensure_schema()
-        bootstrap_default_models()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=include_deleted)
@@ -26,7 +26,6 @@ class ModelRepository:
 
     def get_model(self, model_code: str) -> dict[str, Any] | None:
         ensure_schema()
-        bootstrap_default_models()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=True, model_codes=[model_code])
@@ -37,7 +36,6 @@ class ModelRepository:
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
         ensure_schema()
-        bootstrap_default_models()
         model_code = str(payload["model_code"]).strip()
         self._validate_payload(payload, is_create=True)
         with get_connection() as connection:
@@ -71,7 +69,7 @@ class ModelRepository:
                         str(payload["api_model_name"]).strip(),
                         self._optional_str(payload.get("version")),
                         1 if payload.get("is_active", True) else 0,
-                        self._normalize_base_url(payload.get("base_url")),
+                        self._normalize_base_url(payload.get("base_url"), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
                         payload.get("temperature"),
@@ -85,7 +83,6 @@ class ModelRepository:
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         ensure_schema()
-        bootstrap_default_models()
         self._validate_payload(payload, is_create=False)
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -116,7 +113,7 @@ class ModelRepository:
                         str(payload["api_model_name"]).strip(),
                         self._optional_str(payload.get("version")),
                         1 if payload.get("is_active", True) else 0,
-                        self._normalize_base_url(payload.get("base_url")),
+                        self._normalize_base_url(payload.get("base_url"), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
                         payload.get("temperature"),
@@ -155,7 +152,6 @@ class ModelRepository:
 
     def _update_flag(self, model_code: str, field_name: str, value: int) -> dict[str, Any]:
         ensure_schema()
-        bootstrap_default_models()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -251,6 +247,7 @@ class ModelRepository:
 
     def _upsert_provider(self, cursor, provider_code: str) -> int:
         provider_name = PROVIDER_LABELS[provider_code]
+        provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL
         cursor.execute(
             """
             INSERT INTO model_provider (provider_code, provider_name, base_url)
@@ -259,7 +256,7 @@ class ModelRepository:
                 provider_name = VALUES(provider_name),
                 base_url = COALESCE(VALUES(base_url), base_url)
             """,
-            (provider_code, provider_name, DEFAULT_BASE_URL),
+            (provider_code, provider_name, provider_base_url),
         )
         cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (provider_code,))
         return int(cursor.fetchone()["id"])
@@ -305,9 +302,11 @@ class ModelRepository:
         return tags
 
     @staticmethod
-    def _normalize_base_url(value: Any) -> str:
+    def _normalize_base_url(value: Any, provider_code: str) -> str:
         text = str(value or "").strip()
-        return text or DEFAULT_BASE_URL
+        if text:
+            return text
+        return DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL
 
     @staticmethod
     def _validate_payload(payload: dict[str, Any], *, is_create: bool) -> None:

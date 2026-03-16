@@ -8,6 +8,7 @@ from openai import OpenAI
 from backend.core.model_config import ModelDefinition
 from backend.core.providers import (
     AnthropicModel,
+    DeepSeekModel,
     GeminiModel,
     OpenAICompatibleModel,
     OpenAIModel,
@@ -21,6 +22,7 @@ class ModelFactory:
             "openai": OpenAIModel,
             "gemini": GeminiModel,
             "anthropic": AnthropicModel,
+            "deepseek": DeepSeekModel,
             "openai_compatible": OpenAICompatibleModel,
         }
 

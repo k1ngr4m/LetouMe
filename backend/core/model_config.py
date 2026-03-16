@@ -9,10 +9,12 @@ from backend.app.db.connection import ensure_schema, get_connection
 
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 SUPPORTED_PROVIDERS = (
     "openai",
     "anthropic",
     "gemini",
+    "deepseek",
     "openai_compatible",
 )
 
@@ -56,12 +58,24 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
     {
         "model_code": "deepseek-v3.2",
         "display_name": "DeepSeek-v3.2",
-        "provider": "openai_compatible",
-        "api_model_name": "deepseek-v3.2",
+        "provider": "deepseek",
+        "api_model_name": "deepseek-chat",
         "version": "1",
         "tags": ["reasoning"],
         "is_active": False,
-        "base_url": DEFAULT_BASE_URL,
+        "base_url": DEEPSEEK_BASE_URL,
+        "api_key": "",
+        "app_code": "",
+    },
+    {
+        "model_code": "deepseek-reasoner",
+        "display_name": "DeepSeek-V3.2-Reasoner",
+        "provider": "deepseek",
+        "api_model_name": "deepseek-reasoner",
+        "version": "1",
+        "tags": ["reasoning"],
+        "is_active": False,
+        "base_url": DEEPSEEK_BASE_URL,
         "api_key": "",
         "app_code": "",
     },
@@ -184,20 +198,19 @@ def bootstrap_default_models() -> None:
     ensure_schema()
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) AS total FROM ai_model")
-            total = int((cursor.fetchone() or {}).get("total") or 0)
-            if total:
-                return
             provider_ids: dict[str, int] = {}
             for provider_code in SUPPORTED_PROVIDERS:
-                provider_name = provider_code.replace("_", " ").title()
+                provider_name = _provider_name(provider_code)
+                provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else None
                 cursor.execute(
                     """
-                    INSERT INTO model_provider (provider_code, provider_name)
-                    VALUES (?, ?)
-                    ON DUPLICATE KEY UPDATE provider_name = VALUES(provider_name)
+                    INSERT INTO model_provider (provider_code, provider_name, base_url)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        provider_name = VALUES(provider_name),
+                        base_url = COALESCE(VALUES(base_url), base_url)
                     """,
-                    (provider_code, provider_name),
+                    (provider_code, provider_name, provider_base_url),
                 )
                 cursor.execute(
                     "SELECT id FROM model_provider WHERE provider_code = ?",
@@ -205,7 +218,13 @@ def bootstrap_default_models() -> None:
                 )
                 provider_ids[provider_code] = int(cursor.fetchone()["id"])
 
+            _migrate_deepseek_models(cursor, provider_ids)
+
             for item in DEFAULT_MODEL_CATALOG:
+                cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (item["model_code"],))
+                existing_row = cursor.fetchone()
+                if existing_row:
+                    continue
                 cursor.execute(
                     """
                     INSERT INTO ai_model (
@@ -261,6 +280,39 @@ def bootstrap_default_models() -> None:
                         """,
                         (model_db_id, tag_id),
                     )
+
+
+def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
+    deepseek_provider_id = provider_ids["deepseek"]
+    cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", ("deepseek-v3.2",))
+    row = cursor.fetchone()
+    if row:
+        cursor.execute(
+            """
+            UPDATE ai_model
+            SET provider_id = ?,
+                api_model_name = ?,
+                base_url = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE model_code = ?
+            """,
+            (deepseek_provider_id, "deepseek-chat", DEEPSEEK_BASE_URL, "deepseek-v3.2"),
+        )
+    for tag in ("reasoning",):
+        cursor.execute(
+            """
+            INSERT INTO model_tag (tag_code, tag_name)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
+            """,
+            (tag, tag),
+        )
+
+
+def _provider_name(provider_code: str) -> str:
+    if provider_code == "deepseek":
+        return "DeepSeek"
+    return provider_code.replace("_", " ").title()
 
 
 def load_model_registry(_config_path: str | None = None) -> ModelRegistry:

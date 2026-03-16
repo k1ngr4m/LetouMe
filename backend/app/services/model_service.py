@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from backend.app.repositories.model_repository import ModelRepository
@@ -10,30 +11,38 @@ class ModelService:
         self.repository = repository or ModelRepository()
 
     def list_models(self, include_deleted: bool = False) -> list[dict[str, Any]]:
-        return self.repository.list_models(include_deleted=include_deleted)
+        return [self._serialize_model(model) for model in self.repository.list_models(include_deleted=include_deleted)]
 
     def get_model(self, model_code: str) -> dict[str, Any] | None:
-        return self.repository.get_model(model_code)
+        model = self.repository.get_model(model_code)
+        return self._serialize_model(model) if model else None
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.repository.create_model(self._normalize_payload(payload, is_create=True))
+        return self._serialize_model(self.repository.create_model(self._normalize_payload(payload, is_create=True)))
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = self._normalize_payload(payload, is_create=False)
         normalized.pop("model_code", None)
-        return self.repository.update_model(model_code, normalized)
+        return self._serialize_model(self.repository.update_model(model_code, normalized))
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
-        return self.repository.set_model_active(model_code, is_active)
+        return self._serialize_model(self.repository.set_model_active(model_code, is_active))
 
     def delete_model(self, model_code: str) -> dict[str, Any]:
-        return self.repository.soft_delete_model(model_code)
+        return self._serialize_model(self.repository.soft_delete_model(model_code))
 
     def restore_model(self, model_code: str) -> dict[str, Any]:
-        return self.repository.restore_model(model_code)
+        return self._serialize_model(self.repository.restore_model(model_code))
 
     def list_providers(self) -> list[dict[str, str]]:
         return self.repository.list_providers()
+
+    @staticmethod
+    def _serialize_model(model: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **model,
+            "updated_at": _format_datetime(model.get("updated_at")) or "",
+        }
 
     @staticmethod
     def _normalize_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:
@@ -51,3 +60,11 @@ class ModelService:
         normalized["tags"] = payload.get("tags") or []
         normalized["is_active"] = bool(payload.get("is_active", True))
         return normalized
+
+
+def _format_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return str(value)

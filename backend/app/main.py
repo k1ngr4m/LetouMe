@@ -11,6 +11,7 @@ from backend.app.auth import AuthService
 from backend.app.config import load_settings
 from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import configure_logging, get_logger
+from backend.core.model_config import bootstrap_default_models
 
 
 def create_app() -> FastAPI:
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup() -> None:
         ensure_schema()
+        bootstrap_default_models()
         AuthService(settings=settings).ensure_bootstrap_admin()
         logger.info("Application startup complete", extra={"context": {"env": settings.app_env}})
 

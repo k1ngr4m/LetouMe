@@ -47,6 +47,20 @@ class ModelScopeConfigTests(unittest.TestCase):
         self.assertEqual(definition.api_key(), None)
         self.assertEqual(definition.base_url(), "https://api-inference.modelscope.cn/v1")
 
+    def test_registry_loads_deepseek_models_with_official_provider(self) -> None:
+        registry = load_model_registry()
+
+        chat_definition = registry.get("deepseek-v3.2")
+        reasoner_definition = registry.get("deepseek-reasoner")
+
+        self.assertEqual(chat_definition.provider, "deepseek")
+        self.assertEqual(chat_definition.api_model, "deepseek-chat")
+        self.assertEqual(chat_definition.base_url(), "https://api.deepseek.com")
+        self.assertEqual(reasoner_definition.provider, "deepseek")
+        self.assertEqual(reasoner_definition.api_model, "deepseek-reasoner")
+        self.assertEqual(reasoner_definition.base_url(), "https://api.deepseek.com")
+        self.assertFalse(reasoner_definition.is_active)
+
 
 if __name__ == "__main__":
     unittest.main()

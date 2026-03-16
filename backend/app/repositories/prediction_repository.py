@@ -571,7 +571,7 @@ class PredictionRepository:
             model_payload.get("model_provider")
             or (definition.provider if definition else "openai_compatible")
         )
-        provider_name = provider_code.replace("_", " ").title()
+        provider_name = "DeepSeek" if provider_code == "deepseek" else provider_code.replace("_", " ").title()
         model_code = str(model_payload.get("model_id") or (definition.model_id if definition else ""))
         display_name = str(model_payload.get("model_name") or (definition.name if definition else model_code))
         api_model_name = str(model_payload.get("model_api_model") or (definition.api_model if definition else ""))
