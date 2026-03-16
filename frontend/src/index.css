@@ -1317,6 +1317,7 @@ a {
 }
 
 .settings-model-toolbar__create,
+.settings-model-toolbar__resume-task,
 .settings-menu-trigger,
 .settings-sort-trigger {
   display: inline-flex;
@@ -1326,6 +1327,15 @@ a {
 
 .settings-model-toolbar__create {
   padding-inline: 0.95rem 1rem;
+}
+
+.settings-model-toolbar__resume-task {
+  padding: 0.66rem 0.92rem;
+}
+
+.settings-model-toolbar__resume-task-status {
+  color: var(--text-2);
+  font-size: 0.82rem;
 }
 
 .settings-model-toolbar__create--compact {

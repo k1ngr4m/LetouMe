@@ -775,6 +775,11 @@ export function SettingsPage() {
     setGenerationModalOpen(true)
   }
 
+  function reopenGenerationTaskModal() {
+    if (!generationTask) return
+    setGenerationModalOpen(true)
+  }
+
   function toggleModelSelection(modelCode: string) {
     setSelectedModelCodes((previous) =>
       previous.includes(modelCode) ? previous.filter((item) => item !== modelCode) : [...previous, modelCode],
@@ -1076,6 +1081,16 @@ export function SettingsPage() {
                             onClick={() => setModelManagementView('card')}
                           />
                         </div>
+                        {generationTask && !generationModalOpen ? (
+                          <button
+                            className="ghost-button settings-model-toolbar__resume-task"
+                            type="button"
+                            onClick={reopenGenerationTaskModal}
+                          >
+                            <span>查看进度</span>
+                            <span className="settings-model-toolbar__resume-task-status">{getTaskStatusLabel(generationTask.status)}</span>
+                          </button>
+                        ) : null}
                         <button className="primary-button settings-model-toolbar__create settings-model-toolbar__create--compact" onClick={openCreateModel} aria-label="新增模型">
                           <PlusIcon />
                           <span>新增</span>
