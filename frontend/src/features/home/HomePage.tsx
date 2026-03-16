@@ -40,6 +40,7 @@ import type {
 } from '../../shared/types/api'
 
 type HomeTab = 'prediction' | 'analysis' | 'history'
+type HomeModelView = 'card' | 'list'
 
 const HISTORY_BATCH_SIZE = 20
 const LOTTERY_PAGE_SIZE = 20
@@ -51,9 +52,62 @@ const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> 
   { value: '81-100', label: '81-100 分' },
 ]
 
+function HomeSvgIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+
+function HomeListIcon() {
+  return (
+    <HomeSvgIcon>
+      <path d="M7 5.5h8.5M7 10h8.5M7 14.5h8.5" />
+      <path d="M3.8 5.5h.4M3.8 10h.4M3.8 14.5h.4" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomeGridIcon() {
+  return (
+    <HomeSvgIcon>
+      <rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomeIconButton({
+  label,
+  icon,
+  active = false,
+  onClick,
+}: {
+  label: string
+  icon: ReactNode
+  active?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={clsx('icon-button', active && 'is-active')}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      {icon}
+    </button>
+  )
+}
+
 export function HomePage() {
   const [activeTab, setActiveTab] = useState<HomeTab>('prediction')
   const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
+  const [modelListView, setModelListView] = useState<HomeModelView>('list')
   const [predictionLimit, setPredictionLimit] = useState(HISTORY_BATCH_SIZE)
   const [lotteryPage, setLotteryPage] = useState(1)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
@@ -230,6 +284,20 @@ export function HomePage() {
                 subtitle="统一查看所有模型的历史评分、本期 5 组预测号码和更多操作。"
                 actions={
                   <div className="toolbar-inline">
+                    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
+                      <HomeIconButton
+                        label="列表视图"
+                        icon={<HomeListIcon />}
+                        active={modelListView === 'list'}
+                        onClick={() => setModelListView('list')}
+                      />
+                      <HomeIconButton
+                        label="卡片视图"
+                        icon={<HomeGridIcon />}
+                        active={modelListView === 'card'}
+                        onClick={() => setModelListView('card')}
+                      />
+                    </div>
                     <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
                       {isModelFilterOpen ? '收起筛选' : '展开筛选'}
                     </button>
@@ -254,27 +322,42 @@ export function HomePage() {
                   />
                 ) : null}
 
-                <div className="model-list">
-                  {filteredModels.length ? (
-                    filteredModels.map((model) => (
-                      <ModelListCard
-                        key={model.model_id}
-                        model={model}
-                        score={modelScores[model.model_id]?.score100 || 0}
-                        isPinned={validPinnedModelIds.includes(model.model_id)}
-                        actualResult={actualResult}
-                        isActionMenuOpen={activeActionMenuId === model.model_id}
-                        onToggleActionMenu={() =>
-                          setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
-                        }
-                        onPin={() => togglePinned(model.model_id)}
-                        onDetail={() => setDetailModelId(model.model_id)}
-                      />
-                    ))
-                  ) : (
-                    <div className="state-shell">没有符合当前筛选条件的模型。</div>
-                  )}
-                </div>
+                {modelListView === 'card' ? (
+                  <div className="model-list">
+                    {filteredModels.length ? (
+                      filteredModels.map((model) => (
+                        <ModelListCard
+                          key={model.model_id}
+                          model={model}
+                          score={modelScores[model.model_id]?.score100 || 0}
+                          isPinned={validPinnedModelIds.includes(model.model_id)}
+                          actualResult={actualResult}
+                          isActionMenuOpen={activeActionMenuId === model.model_id}
+                          onToggleActionMenu={() =>
+                            setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
+                          }
+                          onPin={() => togglePinned(model.model_id)}
+                          onDetail={() => setDetailModelId(model.model_id)}
+                        />
+                      ))
+                    ) : (
+                      <div className="state-shell">没有符合当前筛选条件的模型。</div>
+                    )}
+                  </div>
+                ) : (
+                  <ModelListTable
+                    models={filteredModels}
+                    modelScores={modelScores}
+                    validPinnedModelIds={validPinnedModelIds}
+                    actualResult={actualResult}
+                    activeActionMenuId={activeActionMenuId}
+                    onToggleActionMenu={(modelId) =>
+                      setActiveActionMenuId((previous) => (previous === modelId ? null : modelId))
+                    }
+                    onPin={togglePinned}
+                    onDetail={setDetailModelId}
+                  />
+                )}
               </StatusCard>
             </section>
 
@@ -591,6 +674,135 @@ function ModelListCard({
         </button>
       </div>
     </article>
+  )
+}
+
+function ModelListTable({
+  models,
+  modelScores,
+  validPinnedModelIds,
+  actualResult,
+  activeActionMenuId,
+  onToggleActionMenu,
+  onPin,
+  onDetail,
+}: {
+  models: PredictionModel[]
+  modelScores: Record<string, { score100: number }>
+  validPinnedModelIds: string[]
+  actualResult: LotteryDraw | null
+  activeActionMenuId: string | null
+  onToggleActionMenu: (modelId: string) => void
+  onPin: (modelId: string) => void
+  onDetail: (modelId: string) => void
+}) {
+  if (!models.length) {
+    return <div className="state-shell">没有符合当前筛选条件的模型。</div>
+  }
+
+  return (
+    <div className="table-shell home-model-list-table-shell">
+      <table className="history-table home-model-list-table">
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>评分</th>
+            <th>接口模型</th>
+            <th>预测摘要</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {models.map((model) => {
+            const isPinned = validPinnedModelIds.includes(model.model_id)
+            return (
+              <tr key={model.model_id}>
+                <td>
+                  <div className="home-model-list-table__title">
+                    <strong>{model.model_name}</strong>
+                    <span>{model.model_provider}</span>
+                  </div>
+                </td>
+                <td>
+                  <span className="home-model-list-table__score">{modelScores[model.model_id]?.score100 || 0}</span>
+                </td>
+                <td>
+                  <span className="home-model-list-table__api" title={model.model_api_model || model.model_id}>
+                    {model.model_api_model || model.model_id}
+                  </span>
+                </td>
+                <td>
+                  <div className="home-model-list-table__groups">
+                    {model.predictions.map((group) => (
+                      <PredictionGroupCard key={`${model.model_id}-${group.group_id}`} group={group} actualResult={actualResult} compact />
+                    ))}
+                  </div>
+                </td>
+                <td>
+                  {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
+                </td>
+                <td>
+                  <div className="home-model-list-table__actions">
+                    <button
+                      className="icon-button home-model-list-table__detail-button"
+                      onClick={() => onDetail(model.model_id)}
+                      aria-label={`查看详情：${model.model_name}`}
+                      title="查看详情"
+                      type="button"
+                    >
+                      <DetailIcon />
+                    </button>
+                    <div className="action-menu">
+                      <button
+                        className="icon-button home-model-list-table__menu-button"
+                        onClick={() => onToggleActionMenu(model.model_id)}
+                        aria-expanded={activeActionMenuId === model.model_id}
+                        aria-label={`更多操作：${model.model_name}`}
+                        title="更多操作"
+                        type="button"
+                      >
+                        <MoreMenuIcon />
+                      </button>
+                      {activeActionMenuId === model.model_id ? (
+                        <div className="action-menu__panel">
+                          <button className="action-menu__item action-menu__item--disabled" type="button" disabled title="暂未开放">
+                            收藏
+                            <span>暂未开放</span>
+                          </button>
+                          <button className="action-menu__item" type="button" onClick={() => onPin(model.model_id)}>
+                            {isPinned ? '取消置顶' : '置顶'}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MoreMenuIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="4.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function DetailIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.8 10s2.7-4.4 7.2-4.4S17.2 10 17.2 10s-2.7 4.4-7.2 4.4S2.8 10 2.8 10Z" />
+      <circle cx="10" cy="10" r="2.2" />
+    </svg>
   )
 }
 

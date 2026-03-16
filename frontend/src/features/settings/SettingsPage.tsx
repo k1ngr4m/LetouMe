@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
@@ -102,6 +102,148 @@ const EMPTY_USERS: AuthUser[] = []
 const EMPTY_ROLES: RoleItem[] = []
 const EMPTY_PERMISSIONS: PermissionItem[] = []
 
+const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> = {
+  updated_desc: { label: '最近更新', hint: '按更新时间从新到旧排序' },
+  updated_asc: { label: '最早更新', hint: '按更新时间从旧到新排序' },
+  name_asc: { label: '名称 A-Z', hint: '按名称正序排序' },
+  name_desc: { label: '名称 Z-A', hint: '按名称倒序排序' },
+}
+
+function SvgIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+
+function ListIcon() {
+  return (
+    <SvgIcon>
+      <path d="M7 5.5h8.5M7 10h8.5M7 14.5h8.5" />
+      <path d="M3.8 5.5h.4M3.8 10h.4M3.8 14.5h.4" />
+    </SvgIcon>
+  )
+}
+
+function GridIcon() {
+  return (
+    <SvgIcon>
+      <rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
+    </SvgIcon>
+  )
+}
+
+function SortIcon() {
+  return (
+    <SvgIcon>
+      <path d="M6 4.5v11" />
+      <path d="m3.8 6.8 2.2-2.3 2.2 2.3" />
+      <path d="M14 15.5v-11" />
+      <path d="m11.8 13.2 2.2 2.3 2.2-2.3" />
+    </SvgIcon>
+  )
+}
+
+function MoreIcon() {
+  return (
+    <SvgIcon>
+      <circle cx="4.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  )
+}
+
+function EditIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4 14.8 3.5 16.5 5.2 16l8.7-8.7-1.2-1.2L4 14.8Z" />
+      <path d="m11.9 4.9 1.2-1.2a1.6 1.6 0 0 1 2.3 2.3l-1.2 1.2" />
+    </SvgIcon>
+  )
+}
+
+function ToggleIcon({ active }: { active: boolean }) {
+  return (
+    <SvgIcon>
+      <rect x="2.8" y="6" width="14.4" height="8" rx="4" />
+      <circle cx={active ? 13.3 : 6.7} cy="10" r="2.2" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  )
+}
+
+function RestoreIcon() {
+  return (
+    <SvgIcon>
+      <path d="M5.2 8.4A5 5 0 1 1 7 14.8" />
+      <path d="M5.2 4.8v3.6h3.6" />
+    </SvgIcon>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <SvgIcon>
+      <path d="M10 4.5v11M4.5 10h11" />
+    </SvgIcon>
+  )
+}
+
+function CatalogIcon() {
+  return (
+    <SvgIcon>
+      <path d="M5 4.5h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+      <path d="M7 8h6M7 11h4" />
+    </SvgIcon>
+  )
+}
+
+function HistoryIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4.5 10a5.5 5.5 0 1 0 1.7-4" />
+      <path d="M4.5 5.2v2.7h2.7" />
+      <path d="M10 7.3v3.2l2 1.2" />
+    </SvgIcon>
+  )
+}
+
+function IconButton({
+  label,
+  onClick,
+  icon,
+  active = false,
+  danger = false,
+  disabled = false,
+  expanded,
+}: {
+  label: string
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void | Promise<void>
+  icon: ReactNode
+  active?: boolean
+  danger?: boolean
+  disabled?: boolean
+  expanded?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={clsx('icon-button', active && 'is-active', danger && 'is-danger')}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      aria-expanded={expanded}
+    >
+      {icon}
+    </button>
+  )
+}
+
 function getRoleProtectionHint(role: RoleItem | null) {
   if (!role) return '自定义角色可按需分配权限；角色编码创建后不可修改。'
   if (role.role_code === 'super_admin') return '超级管理员始终保留全部权限，系统会阻止移除关键授权。'
@@ -125,12 +267,19 @@ function mapBulkActionLabel(action: 'enable' | 'disable' | 'delete' | 'restore' 
   return '编辑'
 }
 
+function getTaskStatusLabel(status: string) {
+  if (status === 'queued') return '排队中'
+  if (status === 'running') return '执行中'
+  if (status === 'succeeded') return '已完成'
+  if (status === 'failed') return '失败'
+  return status
+}
+
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user, hasPermission, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [includeDeleted, setIncludeDeleted] = useState(false)
   const [modelManagementTab, setModelManagementTab] = useState<ModelManagementTab>('catalog')
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
@@ -156,6 +305,9 @@ export function SettingsPage() {
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
   const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null)
+  const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false)
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const [modelActionMenu, setModelActionMenu] = useState<string | null>(null)
 
   const canManageModels = hasPermission('model_management')
   const canManageUsers = hasPermission('user_management')
@@ -163,8 +315,8 @@ export function SettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin'
 
   const modelsQuery = useQuery({
-    queryKey: ['settings-models', includeDeleted],
-    queryFn: () => apiClient.getSettingsModels(includeDeleted),
+    queryKey: ['settings-models'],
+    queryFn: () => apiClient.getSettingsModels(false),
     enabled: canManageModels,
   })
   const providersQuery = useQuery({
@@ -228,6 +380,17 @@ export function SettingsPage() {
   useEffect(() => {
     setProfileNickname(user?.nickname || '')
   }, [user?.nickname])
+
+  useEffect(() => {
+    if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu) return undefined
+    const closeMenus = () => {
+      setToolbarMenuOpen(false)
+      setSortMenuOpen(false)
+      setModelActionMenu(null)
+    }
+    window.addEventListener('click', closeMenus)
+    return () => window.removeEventListener('click', closeMenus)
+  }, [modelActionMenu, sortMenuOpen, toolbarMenuOpen])
 
   useEffect(() => {
     if (!generationTask || !['queued', 'running'].includes(generationTask.status)) return undefined
@@ -304,6 +467,14 @@ export function SettingsPage() {
       }),
     [predictionRecordPeriodQuery, predictionRecordTypeFilter, predictionRecords],
   )
+  const predictionRecordSummary = useMemo(
+    () => ({
+      total: predictionRecords.length,
+      current: predictionRecords.filter((record) => record.record_type === 'current').length,
+      history: predictionRecords.filter((record) => record.record_type === 'history').length,
+    }),
+    [predictionRecords],
+  )
   const sortedModels = useMemo(() => {
     const items = [...models]
     items.sort((left, right) => {
@@ -323,6 +494,7 @@ export function SettingsPage() {
   const selectedVisibleCount = sortedModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
   const allVisibleModelsSelected = sortedModels.length > 0 && selectedVisibleCount === sortedModels.length
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
+  const currentSortMeta = MODEL_SORT_META[modelSortOption]
 
   useEffect(() => {
     setSelectedModelCodes((previous) => {
@@ -582,6 +754,36 @@ export function SettingsPage() {
     setBulkEditModalOpen(true)
   }
 
+  function stopMenuEvent(event: MouseEvent<HTMLElement>) {
+    event.stopPropagation()
+  }
+
+  function toggleToolbarMenu(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setSortMenuOpen(false)
+    setModelActionMenu(null)
+    setToolbarMenuOpen((previous) => !previous)
+  }
+
+  function toggleSortMenu(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setToolbarMenuOpen(false)
+    setModelActionMenu(null)
+    setSortMenuOpen((previous) => !previous)
+  }
+
+  function toggleModelMenu(menuId: string, event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setToolbarMenuOpen(false)
+    setSortMenuOpen(false)
+    setModelActionMenu((previous) => (previous === menuId ? null : menuId))
+  }
+
+  function selectSortOption(option: ModelSortOption) {
+    setModelSortOption(option)
+    setSortMenuOpen(false)
+  }
+
   async function openEditModel(modelCode: string) {
     const model = await apiClient.getSettingsModel(modelCode)
     setModelMode('edit')
@@ -709,17 +911,43 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard title="基础信息" subtitle="修改昵称和密码，登录账号仅用于身份识别。">
                 <div className="settings-profile-grid">
-                  <div className="settings-side-card">
-                    <p className="settings-side-card__title">账号信息</p>
-                    <div className="settings-side-card__list">
-                      <span>账号：{user?.username || '-'}</span>
-                      <span>昵称：{user?.nickname || '-'}</span>
-                      <span>角色：{user?.role_name || '-'}</span>
+                  <section className="settings-profile-hero">
+                    <div className="settings-profile-hero__main">
+                      <p className="settings-profile-hero__eyebrow">账号概览</p>
+                      <h2>{user?.nickname || user?.username || '未命名用户'}</h2>
+                      <p className="settings-profile-hero__description">当前账号用于登录和身份识别，昵称会展示在系统内的个人信息区域。</p>
                     </div>
-                  </div>
-                  <form className="panel-card settings-form-card" onSubmit={(event) => { event.preventDefault(); profileMutation.mutate() }}>
+                    <div className="settings-profile-hero__badges">
+                      <span className="status-pill">{user?.role_name || '未分配角色'}</span>
+                      <span className={clsx('status-pill', user?.is_active ? 'is-active' : 'is-muted')}>
+                        {user?.is_active ? '状态正常' : '已停用'}
+                      </span>
+                    </div>
+                    <div className="settings-profile-summary">
+                      <article className="settings-profile-summary__item">
+                        <span>账号</span>
+                        <strong>{user?.username || '-'}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>昵称</span>
+                        <strong>{user?.nickname || '-'}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>角色</span>
+                        <strong>{user?.role_name || '-'}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>权限数</span>
+                        <strong>{user?.permissions?.length || 0}</strong>
+                      </article>
+                    </div>
+                  </section>
+                  <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={(event) => { event.preventDefault(); profileMutation.mutate() }}>
                     <div className="panel-card__header">
-                      <h2 className="panel-card__title">修改昵称</h2>
+                      <div>
+                        <h2 className="panel-card__title">修改昵称</h2>
+                        <p className="settings-profile-form-card__hint">更新系统内展示名称，不影响登录账号。</p>
+                      </div>
                     </div>
                     <label className="field">
                       <span>昵称</span>
@@ -730,7 +958,7 @@ export function SettingsPage() {
                     </button>
                   </form>
                   <form
-                    className="panel-card settings-form-card"
+                    className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--security"
                     onSubmit={(event) => {
                       event.preventDefault()
                       if (passwordForm.new_password !== passwordForm.confirm_password) {
@@ -742,7 +970,13 @@ export function SettingsPage() {
                     }}
                   >
                     <div className="panel-card__header">
-                      <h2 className="panel-card__title">修改密码</h2>
+                      <div>
+                        <h2 className="panel-card__title">修改密码</h2>
+                        <p className="settings-profile-form-card__hint">为确保账号安全，修改密码后需要重新登录。</p>
+                      </div>
+                    </div>
+                    <div className="settings-inline-hint settings-profile-security-note">
+                      建议使用更长且不重复的密码，并定期更新账号凭证。
                     </div>
                     <label className="field">
                       <span>当前密码</span>
@@ -771,78 +1005,99 @@ export function SettingsPage() {
                 title="模型管理"
                 subtitle="管理模型目录、Provider 连接与运行状态。"
                 actions={
-                  <div className="toolbar-inline">
-                    <div className="view-switch" role="tablist" aria-label="模型管理标签切换">
+                  <div className="toolbar-inline settings-model-toolbar">
+                    <div className="view-switch settings-model-tabs" role="tablist" aria-label="模型管理标签切换">
                       <button
-                        className={clsx('view-switch__button', modelManagementTab === 'catalog' && 'is-active')}
+                        className={clsx('view-switch__button settings-model-tabs__button', modelManagementTab === 'catalog' && 'is-active')}
                         onClick={() => setModelManagementTab('catalog')}
                         type="button"
                       >
-                        模型列表
+                        <CatalogIcon />
+                        <span>模型列表</span>
                       </button>
                       <button
-                        className={clsx('view-switch__button', modelManagementTab === 'records' && 'is-active')}
+                        className={clsx('view-switch__button settings-model-tabs__button', modelManagementTab === 'records' && 'is-active')}
                         onClick={() => setModelManagementTab('records')}
                         type="button"
                       >
-                        预测记录
+                        <HistoryIcon />
+                        <span>预测记录</span>
                       </button>
                     </div>
                     {modelManagementTab === 'catalog' ? (
-                      <>
-                        <div className="view-switch" role="tablist" aria-label="模型管理视图切换">
-                          <button
-                            className={clsx('view-switch__button', modelManagementView === 'list' && 'is-active')}
+                      <div className="settings-model-toolbar__actions">
+                        <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="模型管理视图切换">
+                          <IconButton
+                            label="列表视图"
+                            icon={<ListIcon />}
+                            active={modelManagementView === 'list'}
                             onClick={() => setModelManagementView('list')}
-                            type="button"
-                          >
-                            列表视图
-                          </button>
-                          <button
-                            className={clsx('view-switch__button', modelManagementView === 'card' && 'is-active')}
+                          />
+                          <IconButton
+                            label="卡片视图"
+                            icon={<GridIcon />}
+                            active={modelManagementView === 'card'}
                             onClick={() => setModelManagementView('card')}
-                            type="button"
-                          >
-                            卡片视图
-                          </button>
+                          />
                         </div>
-                        <label className="toggle-chip">
-                          <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
-                          <span>显示已删除</span>
-                        </label>
-                        <button className="primary-button" onClick={openCreateModel}>
-                          新增模型
+                        <button className="primary-button settings-model-toolbar__create settings-model-toolbar__create--compact" onClick={openCreateModel} aria-label="新增模型">
+                          <PlusIcon />
+                          <span>新增</span>
                         </button>
-                        {modelManagementView === 'list' ? (
+                        {modelManagementView === 'list' && selectedModelCodes.length > 0 ? (
                           <>
                             <span className="status-pill">已选 {selectedVisibleCount}</span>
-                            <button className="ghost-button" onClick={openBulkEditModels} disabled={!selectedModelCodes.length}>
-                              批量编辑
-                            </button>
-                            <button className="ghost-button" onClick={openBulkGenerateModels} disabled={!selectedModelCodes.length}>
-                              批量生成预测
-                            </button>
-                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })} disabled={!selectedModelCodes.length}>
-                              批量启用
-                            </button>
-                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })} disabled={!selectedModelCodes.length}>
-                              批量停用
-                            </button>
-                            <button className="danger-button" onClick={() => bulkModelActionMutation.mutate({ action: 'delete' })} disabled={!selectedModelCodes.length}>
-                              批量删除
-                            </button>
-                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'restore' })} disabled={!selectedModelCodes.length}>
-                              批量恢复
-                            </button>
+                            <div className="action-menu" onClick={stopMenuEvent}>
+                              <button
+                                className="ghost-button settings-menu-trigger"
+                                type="button"
+                                onClick={toggleToolbarMenu}
+                                aria-expanded={toolbarMenuOpen}
+                              >
+                                <MoreIcon />
+                                <span>批量操作</span>
+                              </button>
+                              {toolbarMenuOpen ? (
+                                <div className="action-menu__panel settings-action-menu__panel">
+                                  <button className="action-menu__item" type="button" onClick={openBulkEditModels}>批量编辑</button>
+                                  <button className="action-menu__item" type="button" onClick={openBulkGenerateModels}>批量生成预测</button>
+                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })}>批量启用</button>
+                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })}>批量停用</button>
+                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'restore' })}>批量恢复</button>
+                                  <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'delete' })}>批量删除</button>
+                                </div>
+                              ) : null}
+                            </div>
                           </>
                         ) : null}
-                        <select value={modelSortOption} onChange={(event) => setModelSortOption(event.target.value as ModelSortOption)}>
-                          <option value="updated_desc">更新时间 ↓</option>
-                          <option value="updated_asc">更新时间 ↑</option>
-                          <option value="name_asc">名称 A-Z</option>
-                          <option value="name_desc">名称 Z-A</option>
-                        </select>
-                      </>
+                        <div className="action-menu" onClick={stopMenuEvent}>
+                          <button
+                            className={clsx('icon-button settings-sort-trigger', sortMenuOpen && 'is-active')}
+                            type="button"
+                            onClick={toggleSortMenu}
+                            aria-expanded={sortMenuOpen}
+                            aria-label={`排序：${currentSortMeta.label}`}
+                            title={currentSortMeta.hint}
+                          >
+                            <SortIcon />
+                          </button>
+                          {sortMenuOpen ? (
+                            <div className="action-menu__panel settings-action-menu__panel settings-sort-menu">
+                              {(Object.entries(MODEL_SORT_META) as Array<[ModelSortOption, { label: string; hint: string }]>).map(([option, meta]) => (
+                                <button
+                                  key={option}
+                                  className={clsx('action-menu__item', option === modelSortOption && 'is-active')}
+                                  type="button"
+                                  onClick={() => selectSortOption(option)}
+                                >
+                                  <span>{meta.label}</span>
+                                  <small>{meta.hint}</small>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     ) : null}
                   </div>
                 }
@@ -853,7 +1108,7 @@ export function SettingsPage() {
                     <table className="history-table settings-model-table">
                       <thead>
                         <tr>
-                          <th>
+                          <th className="settings-model-table__select-head">
                             <input
                               type="checkbox"
                               aria-label="全选模型"
@@ -862,9 +1117,9 @@ export function SettingsPage() {
                             />
                           </th>
                           <th>模型名称</th>
-                          <th>Provider</th>
-                          <th>接口模型</th>
-                          <th>Tag</th>
+                          <th className="settings-model-table__compact-head">Provider</th>
+                          <th className="settings-model-table__compact-head">接口模型</th>
+                          <th className="settings-model-table__compact-head">Tag</th>
                           <th>状态</th>
                           <th>更新时间</th>
                           <th>操作</th>
@@ -873,7 +1128,7 @@ export function SettingsPage() {
                       <tbody>
                         {sortedModels.map((model) => (
                           <tr key={model.model_code}>
-                            <td>
+                            <td className="settings-model-table__select-cell">
                               <input
                                 type="checkbox"
                                 aria-label={`选择模型 ${model.display_name}`}
@@ -887,35 +1142,78 @@ export function SettingsPage() {
                                 <span>{model.model_code}</span>
                               </div>
                             </td>
-                            <td>{model.provider}</td>
-                            <td>{model.api_model_name}</td>
                             <td>
-                              <div className="settings-model-table__tags">
-                                {model.tags.length ? model.tags.map((tag) => <span key={`${model.model_code}-${tag}`} className="tag tag--muted">{tag}</span>) : <span className="tag tag--muted">无标签</span>}
+                              <span className="settings-model-table__chip">{model.provider}</span>
+                            </td>
+                            <td>
+                              <div className="settings-model-table__api">
+                                <strong>{model.api_model_name}</strong>
                               </div>
                             </td>
                             <td>
-                              <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
+                              <div className="settings-model-table__tags">
+                                {model.tags.length ? (
+                                  model.tags.map((tag) => (
+                                    <span key={`${model.model_code}-${tag}`} className="tag tag--muted settings-model-table__tag-compact">
+                                      {tag}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="tag tag--muted settings-model-table__tag-compact is-empty">无标签</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <span className={clsx('status-pill settings-model-table__status', model.is_active ? 'is-active' : 'is-muted')}>
                                 {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
                               </span>
                             </td>
-                            <td>{formatDateTimeLocal(model.updated_at)}</td>
+                            <td>
+                              <time className="settings-model-table__time" dateTime={model.updated_at}>
+                                {formatDateTimeLocal(model.updated_at)}
+                              </time>
+                            </td>
                             <td>
                               <div className="settings-model-table__actions">
-                                <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
+                                <IconButton
+                                  label={`编辑模型 ${model.display_name}`}
+                                  icon={<EditIcon />}
+                                  onClick={() => void openEditModel(model.model_code)}
+                                />
                                 {!model.is_deleted ? (
                                   <>
-                                    <button className="ghost-button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>生成预测数据</button>
-                                    <button
-                                      className="ghost-button"
+                                    <IconButton
+                                      label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
+                                      icon={<ToggleIcon active={model.is_active} />}
                                       onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
-                                    >
-                                      {model.is_active ? '停用' : '启用'}
-                                    </button>
-                                    <button className="danger-button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>删除</button>
+                                    />
+                                    <div className="action-menu" onClick={stopMenuEvent}>
+                                      <IconButton
+                                        label={`更多操作：${model.display_name}`}
+                                        icon={<MoreIcon />}
+                                        onClick={(event) => toggleModelMenu(`list:${model.model_code}`, event)}
+                                        expanded={modelActionMenu === `list:${model.model_code}`}
+                                      />
+                                      {modelActionMenu === `list:${model.model_code}` ? (
+                                        <div className="action-menu__panel settings-action-menu__panel">
+                                          <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
+                                            生成预测数据
+                                          </button>
+                                          <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
+                                            删除模型
+                                          </button>
+                                        </div>
+                                      ) : null}
+                                    </div>
                                   </>
                                 ) : (
-                                  <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}>恢复</button>
+                                  <div className="action-menu" onClick={stopMenuEvent}>
+                                    <IconButton
+                                      label={`恢复模型 ${model.display_name}`}
+                                      icon={<RestoreIcon />}
+                                      onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
+                                    />
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -933,9 +1231,51 @@ export function SettingsPage() {
                             <p className="settings-model-card-react__provider">{model.provider}</p>
                             <h3>{model.display_name}</h3>
                           </div>
-                          <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
-                            {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
-                          </span>
+                          <div className="settings-model-card-react__header-actions">
+                            <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
+                              {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
+                            </span>
+                            <div className="settings-model-card-react__action-strip">
+                              <IconButton
+                                label={`编辑模型 ${model.display_name}`}
+                                icon={<EditIcon />}
+                                onClick={() => void openEditModel(model.model_code)}
+                              />
+                              {!model.is_deleted ? (
+                                <>
+                                  <IconButton
+                                    label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
+                                    icon={<ToggleIcon active={model.is_active} />}
+                                    onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
+                                  />
+                                  <div className="action-menu" onClick={stopMenuEvent}>
+                                    <IconButton
+                                      label={`更多操作：${model.display_name}`}
+                                      icon={<MoreIcon />}
+                                      onClick={(event) => toggleModelMenu(`card:${model.model_code}`, event)}
+                                      expanded={modelActionMenu === `card:${model.model_code}`}
+                                    />
+                                    {modelActionMenu === `card:${model.model_code}` ? (
+                                      <div className="action-menu__panel settings-action-menu__panel">
+                                        <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
+                                          生成预测数据
+                                        </button>
+                                        <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
+                                          删除模型
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </>
+                              ) : (
+                                <IconButton
+                                  label={`恢复模型 ${model.display_name}`}
+                                  icon={<RestoreIcon />}
+                                  onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <p className="settings-model-card-react__meta">{model.api_model_name}</p>
                         <div className="settings-model-card-react__facts">
@@ -943,49 +1283,60 @@ export function SettingsPage() {
                           <span>{model.tags.join(', ') || '无标签'}</span>
                           <span>{formatDateTimeLocal(model.updated_at)}</span>
                         </div>
-                        <div className="toolbar-inline">
-                          <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
-                          {!model.is_deleted ? (
-                            <>
-                              <button className="ghost-button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>生成预测数据</button>
-                              <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}>
-                                {model.is_active ? '停用' : '启用'}
-                              </button>
-                              <button className="danger-button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>删除</button>
-                            </>
-                          ) : (
-                            <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}>恢复</button>
-                          )}
-                        </div>
                       </article>
                     ))}
                   </div>
                   )
                 ) : (
                   <>
-                    <div className="history-toolbar">
-                      <div className="filter-chip-group">
-                        {[
-                          { value: 'all', label: '全部' },
-                          { value: 'current', label: '当前期' },
-                          { value: 'history', label: '历史' },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            className={clsx('filter-chip', predictionRecordTypeFilter === option.value && 'is-active')}
-                            onClick={() => setPredictionRecordTypeFilter(option.value as PredictionRecordTypeFilter)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                    <section className="settings-profile-hero settings-records-hero">
+                      <div className="settings-profile-hero__main">
+                        <p className="settings-profile-hero__eyebrow">记录概览</p>
+                        <h2>预测记录</h2>
+                        <p className="settings-profile-hero__description">按期号快速检索当前期与历史预测记录，并查看每期的模型覆盖情况与开奖结果。</p>
                       </div>
-                      <input
-                        className="search-input"
-                        value={predictionRecordPeriodQuery}
-                        onChange={(event) => setPredictionRecordPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
-                        placeholder="输入期号过滤"
-                      />
-                    </div>
+                      <div className="settings-profile-summary">
+                        <article className="settings-profile-summary__item">
+                          <span>全部记录</span>
+                          <strong>{predictionRecordSummary.total}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>当前期</span>
+                          <strong>{predictionRecordSummary.current}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>历史</span>
+                          <strong>{predictionRecordSummary.history}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>筛选结果</span>
+                          <strong>{filteredPredictionRecords.length}</strong>
+                        </article>
+                      </div>
+                      <div className="history-toolbar settings-records-hero__toolbar">
+                        <div className="filter-chip-group">
+                          {[
+                            { value: 'all', label: '全部' },
+                            { value: 'current', label: '当前期' },
+                            { value: 'history', label: '历史' },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              className={clsx('filter-chip', predictionRecordTypeFilter === option.value && 'is-active')}
+                              onClick={() => setPredictionRecordTypeFilter(option.value as PredictionRecordTypeFilter)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          className="search-input"
+                          value={predictionRecordPeriodQuery}
+                          onChange={(event) => setPredictionRecordPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
+                          placeholder="输入期号过滤"
+                        />
+                      </div>
+                    </section>
                     {filteredPredictionRecords.length ? (
                       <div className="table-shell settings-model-table-shell">
                         <table className="history-table settings-model-table">
@@ -1039,29 +1390,43 @@ export function SettingsPage() {
               </StatusCard>
               {isSuperAdmin ? (
                 <StatusCard title="数据维护" subtitle="手动抓取大乐透开奖历史数据并更新到数据库。">
-                  <div className="toolbar-inline">
-                    <button className="primary-button" onClick={() => fetchLotteryMutation.mutate()} disabled={fetchLotteryMutation.isPending || Boolean(lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))}>
-                      {fetchLotteryMutation.isPending || (lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))
-                        ? '正在获取大乐透数据...'
-                        : '获取大乐透数据'}
-                    </button>
-                    {lotteryFetchTask ? (
-                      <span className="status-pill">
-                        任务状态：{lotteryFetchTask.status === 'queued' ? '排队中' : lotteryFetchTask.status === 'running' ? '执行中' : lotteryFetchTask.status === 'succeeded' ? '已完成' : '失败'}
-                      </span>
-                    ) : null}
-                  </div>
-                  {lotteryFetchTask ? (
-                    <div className="settings-side-card">
-                      <p className="settings-side-card__title">最近一次执行</p>
-                      <div className="settings-side-card__list">
-                        <span>创建时间：{formatDateTimeLocal(lotteryFetchTask.created_at)}</span>
-                        <span>抓取条数：{lotteryFetchTask.progress_summary.fetched_count}</span>
-                        <span>写入条数：{lotteryFetchTask.progress_summary.saved_count}</span>
-                        <span>最新期号：{lotteryFetchTask.progress_summary.latest_period || '-'}</span>
-                      </div>
+                  <section className="settings-profile-hero settings-maintenance-hero">
+                    <div className="settings-profile-hero__main">
+                      <p className="settings-profile-hero__eyebrow">数据维护</p>
+                      <h2>大乐透历史同步</h2>
+                      <p className="settings-profile-hero__description">手动抓取开奖历史并写入数据库，用于更新首页统计、预测记录和后续模型分析。</p>
                     </div>
-                  ) : null}
+                    <div className="settings-profile-hero__badges">
+                      <span className="status-pill">
+                        {lotteryFetchTask ? `任务状态：${getTaskStatusLabel(lotteryFetchTask.status)}` : '尚未执行'}
+                      </span>
+                    </div>
+                    <div className="settings-profile-summary">
+                      <article className="settings-profile-summary__item">
+                        <span>抓取条数</span>
+                        <strong>{lotteryFetchTask?.progress_summary.fetched_count ?? 0}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>写入条数</span>
+                        <strong>{lotteryFetchTask?.progress_summary.saved_count ?? 0}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>最新期号</span>
+                        <strong>{lotteryFetchTask?.progress_summary.latest_period || '-'}</strong>
+                      </article>
+                      <article className="settings-profile-summary__item">
+                        <span>创建时间</span>
+                        <strong>{lotteryFetchTask ? formatDateTimeLocal(lotteryFetchTask.created_at) : '-'}</strong>
+                      </article>
+                    </div>
+                    <div className="settings-maintenance-hero__actions">
+                      <button className="primary-button" onClick={() => fetchLotteryMutation.mutate()} disabled={fetchLotteryMutation.isPending || Boolean(lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))}>
+                        {fetchLotteryMutation.isPending || (lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))
+                          ? '正在获取大乐透数据...'
+                          : '获取大乐透数据'}
+                      </button>
+                    </div>
+                  </section>
                 </StatusCard>
               ) : null}
             </div>
@@ -1071,54 +1436,66 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard title="用户管理" subtitle="按角色分配权限，普通用户默认仅可修改基础信息。">
                 <form
-                  className="settings-inline-form"
+                  className="panel-card settings-form-card settings-user-create-card"
                   onSubmit={(event) => {
                     event.preventDefault()
                     createUserMutation.mutate()
                   }}
                 >
-                  <label className="field">
-                    <span>账号</span>
-                    <input value={newUserForm.username} onChange={(event) => setNewUserForm((previous) => ({ ...previous, username: event.target.value }))} required />
-                  </label>
-                  <label className="field">
-                    <span>昵称</span>
-                    <input value={newUserForm.nickname} onChange={(event) => setNewUserForm((previous) => ({ ...previous, nickname: event.target.value }))} />
-                  </label>
-                  <label className="field">
-                    <span>密码</span>
-                    <input type="password" value={newUserForm.password} onChange={(event) => setNewUserForm((previous) => ({ ...previous, password: event.target.value }))} required />
-                  </label>
-                  <label className="field">
-                    <span>角色</span>
-                    <select value={newUserForm.role} onChange={(event) => setNewUserForm((previous) => ({ ...previous, role: event.target.value }))}>
-                      {roles.map((role) => (
-                        <option key={role.role_code} value={role.role_code}>
-                          {role.role_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="toggle-chip">
-                    <input type="checkbox" checked={newUserForm.is_active} onChange={(event) => setNewUserForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
-                    <span>启用</span>
-                  </label>
-                  <button className="primary-button" type="submit">创建用户</button>
+                  <div className="panel-card__header">
+                    <div>
+                      <h2 className="panel-card__title">新增用户</h2>
+                      <p className="settings-profile-form-card__hint">快速创建账号并分配默认角色，后续仍可在下方卡片中调整。</p>
+                    </div>
+                    <label className="toggle-chip settings-user-create-card__toggle">
+                      <input type="checkbox" checked={newUserForm.is_active} onChange={(event) => setNewUserForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
+                      <span>启用</span>
+                    </label>
+                  </div>
+                  <div className="settings-inline-form settings-inline-form--users">
+                    <label className="field">
+                      <span>账号</span>
+                      <input value={newUserForm.username} onChange={(event) => setNewUserForm((previous) => ({ ...previous, username: event.target.value }))} required />
+                    </label>
+                    <label className="field">
+                      <span>昵称</span>
+                      <input value={newUserForm.nickname} onChange={(event) => setNewUserForm((previous) => ({ ...previous, nickname: event.target.value }))} />
+                    </label>
+                    <label className="field">
+                      <span>密码</span>
+                      <input type="password" value={newUserForm.password} onChange={(event) => setNewUserForm((previous) => ({ ...previous, password: event.target.value }))} required />
+                    </label>
+                    <label className="field">
+                      <span>角色</span>
+                      <select value={newUserForm.role} onChange={(event) => setNewUserForm((previous) => ({ ...previous, role: event.target.value }))}>
+                        {roles.map((role) => (
+                          <option key={role.role_code} value={role.role_code}>
+                            {role.role_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="primary-button settings-user-create-card__submit" type="submit">创建用户</button>
+                  </div>
                 </form>
 
                 <div className="settings-grid-react">
                   {users.map((account) => (
-                    <article key={account.id} className="settings-model-card-react">
+                    <article key={account.id} className="settings-model-card-react settings-entity-card">
                       <div className="settings-model-card-react__header">
                         <div>
                           <p className="settings-model-card-react__provider">{account.role_name}</p>
-                          <h3>{account.nickname}</h3>
+                          <h3>{account.nickname || account.username}</h3>
                         </div>
                         <span className={clsx('status-pill', account.is_active ? 'is-active' : 'is-muted')}>
                           {account.is_active ? '启用中' : '已停用'}
                         </span>
                       </div>
                       <p className="settings-model-card-react__meta">{account.username}</p>
+                      <div className="settings-model-card-react__facts">
+                        <span>ID #{account.id}</span>
+                        <span>{account.permissions.length} 项权限</span>
+                      </div>
                       <div className="field">
                         <span>角色</span>
                         <select
@@ -1132,19 +1509,21 @@ export function SettingsPage() {
                           ))}
                         </select>
                       </div>
-                      <div className="toolbar-inline">
+                      <div className="settings-entity-card__footer">
                         <button className="ghost-button" onClick={() => updateUserMutation.mutate({ userId: account.id, role: account.role, isActive: !account.is_active })}>
                           {account.is_active ? '禁用' : '启用'}
                         </button>
-                        <input
-                          className="search-input"
-                          placeholder="新密码"
-                          value={resetPasswordMap[account.id] || ''}
-                          onChange={(event) => setResetPasswordMap((previous) => ({ ...previous, [account.id]: event.target.value }))}
-                        />
-                        <button className="ghost-button" onClick={() => resetPasswordMutation.mutate({ userId: account.id, password: resetPasswordMap[account.id] || '' })}>
-                          重置密码
-                        </button>
+                        <div className="settings-entity-card__inline-form">
+                          <input
+                            className="search-input"
+                            placeholder="新密码"
+                            value={resetPasswordMap[account.id] || ''}
+                            onChange={(event) => setResetPasswordMap((previous) => ({ ...previous, [account.id]: event.target.value }))}
+                          />
+                          <button className="ghost-button" onClick={() => resetPasswordMutation.mutate({ userId: account.id, password: resetPasswordMap[account.id] || '' })}>
+                            重置密码
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))}
@@ -1157,8 +1536,12 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard title="角色管理" subtitle="创建自定义角色、维护权限说明，并通过清晰提示降低误操作风险。">
                 <div className="settings-center-roles">
-                  <div className="settings-role-guardrail">
-                    <h3>保护规则</h3>
+                  <div className="settings-profile-hero settings-role-guardrail settings-role-guardrail--hero">
+                    <div className="settings-profile-hero__main">
+                      <p className="settings-profile-hero__eyebrow">保护规则</p>
+                      <h2>角色与权限边界</h2>
+                      <p className="settings-profile-hero__description">通过更清晰的角色说明和风险提示，降低误删、误授权和关键角色失控的概率。</p>
+                    </div>
                     <div className="settings-role-guardrail__list">
                       <span>超级管理员默认拥有全部权限，系统至少保留 1 个启用中的超级管理员。</span>
                       <span>普通用户默认仅开放基础信息，进入设置中心后只能修改昵称和密码。</span>
@@ -1168,7 +1551,7 @@ export function SettingsPage() {
 
                   <div className="settings-grid-react">
                     {roles.map((role) => (
-                      <article key={role.role_code} className={clsx('settings-model-card-react', selectedRoleCode === role.role_code && 'is-selected')}>
+                      <article key={role.role_code} className={clsx('settings-model-card-react settings-entity-card', selectedRoleCode === role.role_code && 'is-selected')}>
                         <div className="settings-model-card-react__header">
                           <div>
                             <p className="settings-model-card-react__provider">{role.is_system ? '系统角色' : '自定义角色'}</p>
@@ -1178,10 +1561,11 @@ export function SettingsPage() {
                         </div>
                         <p className="settings-model-card-react__meta">{role.role_code}</p>
                         <div className="settings-model-card-react__facts">
+                          <span>{role.permissions.length} 项权限</span>
                           <span>{role.permissions.map((permission) => getPermissionLabel(permission)).join(' / ') || '未分配权限'}</span>
                         </div>
                         <p className="settings-role-card__hint">{getRoleProtectionHint(role)}</p>
-                        <div className="toolbar-inline">
+                        <div className="settings-entity-card__footer">
                           <button className="ghost-button" onClick={() => selectRole(role)}>编辑</button>
                           {!role.is_system ? (
                             <button
@@ -1199,9 +1583,12 @@ export function SettingsPage() {
                     ))}
                   </div>
 
-                  <form className="panel-card settings-form-card" onSubmit={submitRoleForm}>
+                  <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={submitRoleForm}>
                     <div className="panel-card__header">
-                      <h2 className="panel-card__title">{selectedRole ? '编辑角色' : '新增角色'}</h2>
+                      <div>
+                        <h2 className="panel-card__title">{selectedRole ? '编辑角色' : '新增角色'}</h2>
+                        <p className="settings-profile-form-card__hint">维护角色编码、展示名称与可用权限，系统角色默认不可删除。</p>
+                      </div>
                     </div>
                     <div className="settings-inline-hint">{selectedRoleProtectionHint}</div>
                     <label className="field">
@@ -1250,9 +1637,12 @@ export function SettingsPage() {
                     </div>
                   </form>
 
-                  <div className="panel-card settings-form-card">
+                  <div className="panel-card settings-form-card settings-profile-form-card">
                     <div className="panel-card__header">
-                      <h2 className="panel-card__title">权限说明维护</h2>
+                      <div>
+                        <h2 className="panel-card__title">权限说明维护</h2>
+                        <p className="settings-profile-form-card__hint">统一维护权限展示名称与说明文案，方便后台成员理解边界。</p>
+                      </div>
                     </div>
                     <div className="settings-permission-docs">
                       {permissions.map((permission: PermissionItem) => (

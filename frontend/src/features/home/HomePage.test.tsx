@@ -167,8 +167,23 @@ describe('HomePage dashboard sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('已显示 2 / 2 个模型')).toBeInTheDocument()
     })
+    expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('模型B').length).toBeGreaterThan(0)
+  })
+
+  it('switches model overview between card and list views', async () => {
+    renderPage()
+
+    expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('is-active')
+    expect(screen.getByRole('columnheader', { name: '模型' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '预测摘要' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /查看详情：/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
+
+    expect(screen.getByRole('button', { name: '卡片视图' })).toHaveClass('is-active')
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '模型B' })).toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {

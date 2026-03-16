@@ -159,6 +159,8 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    expect(screen.queryByRole('button', { name: '批量操作' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: '列表视图' })).toHaveClass('is-active')
     expect(screen.getByRole('columnheader', { name: '模型名称' })).toBeInTheDocument()
     expect(screen.getByText('DeepSeek-V3.2')).toBeInTheDocument()
@@ -168,7 +170,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByText('2026-03-16T15:39:25Z')).not.toBeInTheDocument()
     expect(screen.getAllByText((content) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(content)).length).toBeGreaterThan(1)
 
-    await userEvent.selectOptions(screen.getByDisplayValue('更新时间 ↓'), 'name_desc')
+    await userEvent.click(screen.getByRole('button', { name: '排序：最近更新' }))
+    await userEvent.click(screen.getByRole('button', { name: /名称 Z-A/ }))
     const nameDescRows = screen.getAllByRole('row').slice(1).map((row) => row.textContent || '')
     expect(nameDescRows[0]).toContain('DeepSeek-V3.2')
 
@@ -225,6 +228,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
     await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
 
     expect(screen.getByRole('heading', { name: 'DeepSeek-V3.2' })).toBeInTheDocument()
@@ -330,7 +334,7 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getAllByText('历史').length).toBeGreaterThan(0)
 
     await userEvent.click(screen.getByRole('button', { name: '历史' }))
-    expect(screen.getAllByText('当前期').length).toBe(1)
+    expect(screen.getAllByRole('row')).toHaveLength(2)
     expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
 
     await userEvent.type(screen.getByPlaceholderText('输入期号过滤'), '2026031')
@@ -340,7 +344,7 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.clear(input)
     await userEvent.type(input, '2026032')
     expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
-    expect(screen.getAllByText('当前期').length).toBe(1)
+    expect(screen.getAllByRole('row')).toHaveLength(2)
 
     await userEvent.click(screen.getByRole('button', { name: '全部' }))
     expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
@@ -391,7 +395,7 @@ describe('SettingsPage model management view switch', () => {
 
     expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })
-    expect(await screen.findByText('最新期号：2026033')).toBeInTheDocument()
+    expect(await screen.findByText('2026033')).toBeInTheDocument()
   })
 
   it('supports selecting all models and bulk actions in list view', async () => {
@@ -467,13 +471,16 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
     expect(screen.getByText('已选 2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '批量操作' })).toBeInTheDocument()
 
+    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
     await userEvent.click(screen.getByRole('button', { name: '批量编辑' }))
     await userEvent.click(screen.getByRole('checkbox', { name: /Provider/ }))
     await userEvent.click(screen.getByRole('button', { name: '保存批量修改' }))
     await waitFor(() => expect(apiClientMock.bulkUpdateSettingsModels).toHaveBeenCalled())
 
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
     await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
     expect(screen.getByRole('heading', { name: '已选 2 个模型' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
