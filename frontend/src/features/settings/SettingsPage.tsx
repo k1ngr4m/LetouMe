@@ -9,6 +9,9 @@ import { useAuth } from '../../shared/auth/AuthProvider'
 import { normalizeCurrentPredictions, normalizePredictionsHistory } from '../home/lib/home'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import type {
+  AuthUser,
+  BulkModelActionResult,
+  LotteryFetchTask,
   PasswordChangePayload,
   PermissionItem,
   PermissionUpdatePayload,
@@ -16,6 +19,8 @@ import type {
   RoleItem,
   RolePayload,
   SettingsPredictionRecordDetail,
+  SettingsPredictionRecordSummary,
+  SettingsModel,
   SettingsModelPayload,
 } from '../../shared/types/api'
 
@@ -25,6 +30,20 @@ type ModelPredictionMode = 'current' | 'history'
 type ModelManagementTab = 'catalog' | 'records'
 type PredictionRecordTypeFilter = 'all' | 'current' | 'history'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
+type BulkEditForm = {
+  providerEnabled: boolean
+  provider: string
+  baseUrlEnabled: boolean
+  base_url: string
+  apiKeyEnabled: boolean
+  api_key: string
+  tagsEnabled: boolean
+  tags: string
+  temperatureEnabled: boolean
+  temperature: string
+  isActiveEnabled: boolean
+  is_active: boolean
+}
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -53,13 +72,35 @@ const EMPTY_ROLE_FORM: RolePayload = {
 }
 
 const EMPTY_GENERATION_FORM = {
-  modelCode: '',
+  modelCodes: [] as string[],
   displayName: '',
   mode: 'current' as ModelPredictionMode,
   overwrite: false,
   startPeriod: '',
   endPeriod: '',
 }
+
+const EMPTY_BULK_EDIT_FORM: BulkEditForm = {
+  providerEnabled: false,
+  provider: 'openai_compatible',
+  baseUrlEnabled: false,
+  base_url: '',
+  apiKeyEnabled: false,
+  api_key: '',
+  tagsEnabled: false,
+  tags: '',
+  temperatureEnabled: false,
+  temperature: '',
+  isActiveEnabled: false,
+  is_active: true,
+}
+
+const EMPTY_MODELS: SettingsModel[] = []
+const EMPTY_PROVIDERS: Array<{ code: string; name: string }> = []
+const EMPTY_RECORDS: SettingsPredictionRecordSummary[] = []
+const EMPTY_USERS: AuthUser[] = []
+const EMPTY_ROLES: RoleItem[] = []
+const EMPTY_PERMISSIONS: PermissionItem[] = []
 
 function getRoleProtectionHint(role: RoleItem | null) {
   if (!role) return '自定义角色可按需分配权限；角色编码创建后不可修改。'
@@ -74,6 +115,14 @@ function mapRoleActionError(message: string) {
   if (message.includes('仍有用户使用该角色')) return '该角色仍有成员在使用，需先为这些用户改绑其他角色后才能删除。'
   if (message.includes('至少保留一个超级管理员')) return '系统至少需要保留一个启用中的超级管理员，请先确认还有其他超级管理员可用。'
   return message
+}
+
+function mapBulkActionLabel(action: 'enable' | 'disable' | 'delete' | 'restore' | 'edit') {
+  if (action === 'enable') return '启用'
+  if (action === 'disable') return '停用'
+  if (action === 'delete') return '删除'
+  if (action === 'restore') return '恢复'
+  return '编辑'
 }
 
 export function SettingsPage() {
@@ -96,6 +145,10 @@ export function SettingsPage() {
   const [generationModalOpen, setGenerationModalOpen] = useState(false)
   const [generationForm, setGenerationForm] = useState(EMPTY_GENERATION_FORM)
   const [generationTask, setGenerationTask] = useState<PredictionGenerationTask | null>(null)
+  const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
+  const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
+  const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
+  const [lotteryFetchTask, setLotteryFetchTask] = useState<LotteryFetchTask | null>(null)
   const [selectedPredictionRecord, setSelectedPredictionRecord] = useState<{ recordType: 'current' | 'history'; targetPeriod: string } | null>(null)
   const [predictionRecordPeriodQuery, setPredictionRecordPeriodQuery] = useState('')
   const [predictionRecordTypeFilter, setPredictionRecordTypeFilter] = useState<PredictionRecordTypeFilter>('all')
@@ -107,6 +160,7 @@ export function SettingsPage() {
   const canManageModels = hasPermission('model_management')
   const canManageUsers = hasPermission('user_management')
   const canManageRoles = hasPermission('role_management')
+  const isSuperAdmin = user?.role === 'super_admin'
 
   const modelsQuery = useQuery({
     queryKey: ['settings-models', includeDeleted],
@@ -183,7 +237,11 @@ export function SettingsPage() {
         setGenerationTask(task)
         if (task.status === 'succeeded') {
           const summary = task.progress_summary
-          setMessage(`预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
+          if (task.model_code === '__bulk__') {
+            setMessage(`批量预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
+          } else {
+            setMessage(`预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
+          }
           setMessageType('success')
           void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
           void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records'] })
@@ -199,12 +257,38 @@ export function SettingsPage() {
     return () => window.clearTimeout(timer)
   }, [generationTask, queryClient])
 
-  const models = modelsQuery.data?.models || []
-  const predictionRecords = predictionRecordsQuery.data?.records || []
-  const providers = providersQuery.data?.providers || []
-  const users = usersQuery.data?.users || []
-  const roles = rolesQuery.data?.roles || []
-  const permissions = permissionsQuery.data?.permissions || []
+  useEffect(() => {
+    if (!lotteryFetchTask || !['queued', 'running'].includes(lotteryFetchTask.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const task = await apiClient.getLotteryFetchTaskDetail(lotteryFetchTask.task_id)
+        setLotteryFetchTask(task)
+        if (task.status === 'succeeded') {
+          const summary = task.progress_summary
+          setMessage(`大乐透数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history'] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions'] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records'] })
+        } else if (task.status === 'failed') {
+          setMessage(task.error_message || '大乐透数据更新失败')
+          setMessageType('error')
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取大乐透抓取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [lotteryFetchTask, queryClient])
+
+  const models = modelsQuery.data?.models ?? EMPTY_MODELS
+  const predictionRecords = predictionRecordsQuery.data?.records ?? EMPTY_RECORDS
+  const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
+  const users = usersQuery.data?.users ?? EMPTY_USERS
+  const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
+  const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
   const selectedRole = roles.find((role) => role.role_code === selectedRoleCode) || null
   const permissionMap = useMemo(
     () => Object.fromEntries(permissions.map((permission) => [permission.permission_code, permission])),
@@ -236,7 +320,16 @@ export function SettingsPage() {
     })
     return items
   }, [modelSortOption, models])
+  const selectedVisibleCount = sortedModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
+  const allVisibleModelsSelected = sortedModels.length > 0 && selectedVisibleCount === sortedModels.length
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
+
+  useEffect(() => {
+    setSelectedModelCodes((previous) => {
+      const next = previous.filter((code) => sortedModels.some((model) => model.model_code === code))
+      return next.length === previous.length && next.every((code, index) => code === previous[index]) ? previous : next
+    })
+  }, [sortedModels])
 
   const profileMutation = useMutation({
     mutationFn: () => apiClient.updateProfile({ nickname: profileNickname.trim() }),
@@ -296,21 +389,62 @@ export function SettingsPage() {
 
   const generatePredictionMutation = useMutation({
     mutationFn: () =>
-      apiClient.generateSettingsModelPredictions({
-        model_code: generationForm.modelCode,
-        mode: generationForm.mode,
-        overwrite: generationForm.overwrite,
-        start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
-        end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
-      }),
+      generationForm.modelCodes.length > 1
+        ? apiClient.bulkGenerateSettingsModelPredictions({
+            model_codes: generationForm.modelCodes,
+            mode: generationForm.mode,
+            overwrite: generationForm.overwrite,
+            start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
+            end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
+          })
+        : apiClient.generateSettingsModelPredictions({
+            model_code: generationForm.modelCodes[0] || '',
+            mode: generationForm.mode,
+            overwrite: generationForm.overwrite,
+            start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
+            end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
+          }),
     onSuccess: (task) => {
       setGenerationTask(task)
       setGenerationModalOpen(false)
-      setMessage('预测生成任务已创建，正在后台执行。')
+      setSelectedModelCodes([])
+      setMessage(generationForm.modelCodes.length > 1 ? '批量预测任务已创建，正在后台执行。' : '预测生成任务已创建，正在后台执行。')
       setMessageType('success')
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建预测任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const bulkModelActionMutation = useMutation({
+    mutationFn: (payload: {
+      action: 'enable' | 'disable' | 'delete' | 'restore' | 'edit'
+      updates?: Record<string, unknown>
+    }) => apiClient.bulkUpdateSettingsModels({ model_codes: selectedModelCodes, action: payload.action, updates: payload.updates }),
+    onSuccess: (result: BulkModelActionResult, variables) => {
+      setSelectedModelCodes([])
+      setBulkEditModalOpen(false)
+      setBulkEditForm(EMPTY_BULK_EDIT_FORM)
+      setMessage(`批量${mapBulkActionLabel(variables.action)}完成：成功 ${result.processed_count}，跳过 ${result.skipped_count}，失败 ${result.failed_count}。`)
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '批量模型操作失败')
+      setMessageType('error')
+    },
+  })
+
+  const fetchLotteryMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory(),
+    onSuccess: (task) => {
+      setLotteryFetchTask(task)
+      setMessage('大乐透数据更新任务已创建，正在后台执行。')
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建大乐透数据更新任务失败')
       setMessageType('error')
     },
   })
@@ -411,7 +545,7 @@ export function SettingsPage() {
 
   function openGenerateModel(modelCode: string, displayName: string) {
     setGenerationForm({
-      modelCode,
+      modelCodes: [modelCode],
       displayName,
       mode: 'current',
       overwrite: false,
@@ -419,6 +553,33 @@ export function SettingsPage() {
       endPeriod: '',
     })
     setGenerationModalOpen(true)
+  }
+
+  function openBulkGenerateModels() {
+    setGenerationForm({
+      modelCodes: selectedModelCodes,
+      displayName: `已选 ${selectedModelCodes.length} 个模型`,
+      mode: 'current',
+      overwrite: false,
+      startPeriod: '',
+      endPeriod: '',
+    })
+    setGenerationModalOpen(true)
+  }
+
+  function toggleModelSelection(modelCode: string) {
+    setSelectedModelCodes((previous) =>
+      previous.includes(modelCode) ? previous.filter((item) => item !== modelCode) : [...previous, modelCode],
+    )
+  }
+
+  function toggleSelectAllModels(checked: boolean) {
+    setSelectedModelCodes(checked ? sortedModels.map((model) => model.model_code) : [])
+  }
+
+  function openBulkEditModels() {
+    setBulkEditForm(EMPTY_BULK_EDIT_FORM)
+    setBulkEditModalOpen(true)
   }
 
   async function openEditModel(modelCode: string) {
@@ -477,6 +638,11 @@ export function SettingsPage() {
 
   function submitGenerationForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!generationForm.modelCodes.length) {
+      setMessage('请至少选择一个模型')
+      setMessageType('error')
+      return
+    }
     if (generationForm.mode === 'history') {
       if (!generationForm.startPeriod.trim() || !generationForm.endPeriod.trim()) {
         setMessage('历史重算必须填写开始期号和结束期号')
@@ -490,6 +656,18 @@ export function SettingsPage() {
       }
     }
     generatePredictionMutation.mutate()
+  }
+
+  function submitBulkEditForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const updates: Record<string, unknown> = {}
+    if (bulkEditForm.providerEnabled) updates.provider = bulkEditForm.provider.trim()
+    if (bulkEditForm.baseUrlEnabled) updates.base_url = bulkEditForm.base_url.trim()
+    if (bulkEditForm.apiKeyEnabled) updates.api_key = bulkEditForm.api_key.trim()
+    if (bulkEditForm.tagsEnabled) updates.tags = bulkEditForm.tags.split(',').map((item) => item.trim()).filter(Boolean)
+    if (bulkEditForm.temperatureEnabled) updates.temperature = bulkEditForm.temperature ? Number(bulkEditForm.temperature) : null
+    if (bulkEditForm.isActiveEnabled) updates.is_active = bulkEditForm.is_active
+    bulkModelActionMutation.mutate({ action: 'edit', updates })
   }
 
   function getPermissionLabel(permissionCode: string) {
@@ -635,6 +813,29 @@ export function SettingsPage() {
                         <button className="primary-button" onClick={openCreateModel}>
                           新增模型
                         </button>
+                        {modelManagementView === 'list' ? (
+                          <>
+                            <span className="status-pill">已选 {selectedVisibleCount}</span>
+                            <button className="ghost-button" onClick={openBulkEditModels} disabled={!selectedModelCodes.length}>
+                              批量编辑
+                            </button>
+                            <button className="ghost-button" onClick={openBulkGenerateModels} disabled={!selectedModelCodes.length}>
+                              批量生成预测
+                            </button>
+                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })} disabled={!selectedModelCodes.length}>
+                              批量启用
+                            </button>
+                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })} disabled={!selectedModelCodes.length}>
+                              批量停用
+                            </button>
+                            <button className="danger-button" onClick={() => bulkModelActionMutation.mutate({ action: 'delete' })} disabled={!selectedModelCodes.length}>
+                              批量删除
+                            </button>
+                            <button className="ghost-button" onClick={() => bulkModelActionMutation.mutate({ action: 'restore' })} disabled={!selectedModelCodes.length}>
+                              批量恢复
+                            </button>
+                          </>
+                        ) : null}
                         <select value={modelSortOption} onChange={(event) => setModelSortOption(event.target.value as ModelSortOption)}>
                           <option value="updated_desc">更新时间 ↓</option>
                           <option value="updated_asc">更新时间 ↑</option>
@@ -652,6 +853,14 @@ export function SettingsPage() {
                     <table className="history-table settings-model-table">
                       <thead>
                         <tr>
+                          <th>
+                            <input
+                              type="checkbox"
+                              aria-label="全选模型"
+                              checked={allVisibleModelsSelected}
+                              onChange={(event) => toggleSelectAllModels(event.target.checked)}
+                            />
+                          </th>
                           <th>模型名称</th>
                           <th>Provider</th>
                           <th>接口模型</th>
@@ -664,6 +873,14 @@ export function SettingsPage() {
                       <tbody>
                         {sortedModels.map((model) => (
                           <tr key={model.model_code}>
+                            <td>
+                              <input
+                                type="checkbox"
+                                aria-label={`选择模型 ${model.display_name}`}
+                                checked={selectedModelCodes.includes(model.model_code)}
+                                onChange={() => toggleModelSelection(model.model_code)}
+                              />
+                            </td>
                             <td>
                               <div className="settings-model-table__title">
                                 <strong>{model.display_name}</strong>
@@ -820,6 +1037,33 @@ export function SettingsPage() {
                   </>
                 )}
               </StatusCard>
+              {isSuperAdmin ? (
+                <StatusCard title="数据维护" subtitle="手动抓取大乐透开奖历史数据并更新到数据库。">
+                  <div className="toolbar-inline">
+                    <button className="primary-button" onClick={() => fetchLotteryMutation.mutate()} disabled={fetchLotteryMutation.isPending || Boolean(lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))}>
+                      {fetchLotteryMutation.isPending || (lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))
+                        ? '正在获取大乐透数据...'
+                        : '获取大乐透数据'}
+                    </button>
+                    {lotteryFetchTask ? (
+                      <span className="status-pill">
+                        任务状态：{lotteryFetchTask.status === 'queued' ? '排队中' : lotteryFetchTask.status === 'running' ? '执行中' : lotteryFetchTask.status === 'succeeded' ? '已完成' : '失败'}
+                      </span>
+                    ) : null}
+                  </div>
+                  {lotteryFetchTask ? (
+                    <div className="settings-side-card">
+                      <p className="settings-side-card__title">最近一次执行</p>
+                      <div className="settings-side-card__list">
+                        <span>创建时间：{formatDateTimeLocal(lotteryFetchTask.created_at)}</span>
+                        <span>抓取条数：{lotteryFetchTask.progress_summary.fetched_count}</span>
+                        <span>写入条数：{lotteryFetchTask.progress_summary.saved_count}</span>
+                        <span>最新期号：{lotteryFetchTask.progress_summary.latest_period || '-'}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                </StatusCard>
+              ) : null}
             </div>
           ) : null}
 
@@ -1135,6 +1379,68 @@ export function SettingsPage() {
         </div>
       ) : null}
 
+      {bulkEditModalOpen ? (
+        <div className="modal-shell" role="presentation" onClick={() => setBulkEditModalOpen(false)}>
+          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid" onSubmit={submitBulkEditForm}>
+              <div className="modal-card__header">
+                <div>
+                  <p className="modal-card__eyebrow">批量编辑</p>
+                  <h3>已选 {selectedModelCodes.length} 个模型</h3>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setBulkEditModalOpen(false)}>关闭</button>
+              </div>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.providerEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, providerEnabled: event.target.checked }))} /> Provider
+                </span>
+                <select value={bulkEditForm.provider} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, provider: event.target.value }))} disabled={!bulkEditForm.providerEnabled}>
+                  {providers.map((provider) => (
+                    <option key={provider.code} value={provider.code}>{provider.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.baseUrlEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, baseUrlEnabled: event.target.checked }))} /> Base URL
+                </span>
+                <input value={bulkEditForm.base_url} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, base_url: event.target.value }))} disabled={!bulkEditForm.baseUrlEnabled} />
+              </label>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.apiKeyEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, apiKeyEnabled: event.target.checked }))} /> API Key
+                </span>
+                <input value={bulkEditForm.api_key} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, api_key: event.target.value }))} disabled={!bulkEditForm.apiKeyEnabled} />
+              </label>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.tagsEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, tagsEnabled: event.target.checked }))} /> 标签
+                </span>
+                <input value={bulkEditForm.tags} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, tags: event.target.value }))} disabled={!bulkEditForm.tagsEnabled} />
+              </label>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.temperatureEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, temperatureEnabled: event.target.checked }))} /> Temperature
+                </span>
+                <input type="number" step="0.1" value={bulkEditForm.temperature} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, temperature: event.target.value }))} disabled={!bulkEditForm.temperatureEnabled} />
+              </label>
+              <label className="field">
+                <span>
+                  <input type="checkbox" checked={bulkEditForm.isActiveEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, isActiveEnabled: event.target.checked }))} /> 启用状态
+                </span>
+                <select value={bulkEditForm.is_active ? 'true' : 'false'} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, is_active: event.target.value === 'true' }))} disabled={!bulkEditForm.isActiveEnabled}>
+                  <option value="true">启用</option>
+                  <option value="false">停用</option>
+                </select>
+              </label>
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={bulkModelActionMutation.isPending}>保存批量修改</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {generationModalOpen ? (
         <div className="modal-shell" role="presentation" onClick={() => setGenerationModalOpen(false)}>
           <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -1142,7 +1448,7 @@ export function SettingsPage() {
               <div className="modal-card__header">
                 <div>
                   <p className="modal-card__eyebrow">预测生成</p>
-                  <h3>{generationForm.displayName || generationForm.modelCode}</h3>
+                  <h3>{generationForm.displayName || generationForm.modelCodes.join(', ')}</h3>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
               </div>

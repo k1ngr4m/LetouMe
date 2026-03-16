@@ -159,6 +159,60 @@ class ModelSettingsApiTests(unittest.TestCase):
         validate_model.assert_called_once_with("claude-sonnet-4.6")
         create_task.assert_called_once()
 
+    def test_bulk_action_endpoint_returns_summary_payload(self) -> None:
+        with patch("backend.app.api.routes.model_service.bulk_action") as bulk_action:
+            bulk_action.return_value = {
+                "selected_count": 2,
+                "processed_count": 1,
+                "skipped_count": 1,
+                "failed_count": 0,
+                "processed_models": ["claude-sonnet-4.6"],
+                "skipped_models": ["deepseek-v3.2"],
+                "failed_models": [],
+            }
+
+            response = self.client.post(
+                "/api/settings/models/bulk-action",
+                json={"model_codes": ["claude-sonnet-4.6", "deepseek-v3.2"], "action": "disable"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["processed_count"], 1)
+        bulk_action.assert_called_once_with(["claude-sonnet-4.6", "deepseek-v3.2"], "disable", {})
+
+    def test_bulk_generate_prediction_task_endpoint_returns_task_payload(self) -> None:
+        with patch("backend.app.api.routes.prediction_generation_task_service.create_task") as create_task:
+            create_task.return_value = {
+                "task_id": "bulk-task-1",
+                "status": "queued",
+                "mode": "current",
+                "model_code": "__bulk__",
+                "created_at": "2026-03-16T00:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "mode": "current",
+                    "model_code": "__bulk__",
+                    "selected_count": 2,
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                    "processed_models": [],
+                    "skipped_models": [],
+                    "failed_models": [],
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post(
+                "/api/settings/models/predictions/bulk-generate",
+                json={"model_codes": ["claude-sonnet-4.6", "deepseek-v3.2"], "mode": "current", "overwrite": False},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "bulk-task-1")
+        create_task.assert_called_once()
+
     def test_settings_prediction_records_list_endpoint(self) -> None:
         with patch("backend.app.api.routes.prediction_service.get_settings_record_list_payload") as get_payload:
             get_payload.return_value = {
@@ -178,6 +232,29 @@ class ModelSettingsApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["records"][0]["record_type"], "current")
+
+    def test_fetch_lottery_task_endpoint_returns_task_payload(self) -> None:
+        with patch("backend.app.api.routes.lottery_fetch_task_service.create_task") as create_task:
+            create_task.return_value = {
+                "task_id": "lottery-task-1",
+                "status": "queued",
+                "created_at": "2026-03-16T00:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "fetched_count": 0,
+                    "saved_count": 0,
+                    "latest_period": None,
+                    "duration_ms": 0,
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post("/api/settings/lottery/fetch", json={})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "lottery-task-1")
+        create_task.assert_called_once()
 
 
 if __name__ == "__main__":

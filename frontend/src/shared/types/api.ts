@@ -140,6 +140,37 @@ export type GenerateSettingsModelPredictionsPayload = {
   end_period?: string
 }
 
+export type BulkSettingsModelActionPayload = {
+  model_codes: string[]
+  action: 'enable' | 'disable' | 'delete' | 'restore' | 'edit'
+  updates?: {
+    provider?: string
+    base_url?: string
+    api_key?: string
+    tags?: string[]
+    temperature?: number | null
+    is_active?: boolean
+  }
+}
+
+export type BulkGenerateSettingsModelPredictionsPayload = {
+  model_codes: string[]
+  mode: 'current' | 'history'
+  overwrite: boolean
+  start_period?: string
+  end_period?: string
+}
+
+export type BulkModelActionResult = {
+  selected_count: number
+  processed_count: number
+  skipped_count: number
+  failed_count: number
+  processed_models: string[]
+  skipped_models: string[]
+  failed_models: string[]
+}
+
 export type PredictionGenerationTask = {
   task_id: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
@@ -156,6 +187,21 @@ export type PredictionGenerationTask = {
     skipped_count: number
     failed_count: number
     failed_periods: string[]
+  }
+  error_message?: string | null
+}
+
+export type LotteryFetchTask = {
+  task_id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  created_at: string
+  started_at?: string | null
+  finished_at?: string | null
+  progress_summary: {
+    fetched_count: number
+    saved_count: number
+    latest_period?: string | null
+    duration_ms: number
   }
   error_message?: string | null
 }

@@ -225,6 +225,70 @@ class PredictionGenerationService:
 
         return summary.to_dict()
 
+    def generate_for_models(
+        self,
+        *,
+        model_codes: list[str],
+        mode: str,
+        overwrite: bool,
+        start_period: str | None = None,
+        end_period: str | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
+        unique_codes = list(dict.fromkeys(normalized_codes))
+        if not unique_codes:
+            raise ValueError("请选择至少一个模型")
+        if mode not in {"current", "history"}:
+            raise ValueError("不支持的生成模式")
+        if mode == "history" and (not start_period or not end_period):
+            raise ValueError("历史重算必须提供开始期号和结束期号")
+
+        summary = {
+            "mode": mode,
+            "model_code": "__bulk__",
+            "selected_count": len(unique_codes),
+            "processed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "processed_models": [],
+            "skipped_models": [],
+            "failed_models": [],
+        }
+
+        for model_code in unique_codes:
+            try:
+                result = (
+                    self.generate_current_for_model(
+                        model_code=model_code,
+                        overwrite=overwrite,
+                    )
+                    if mode == "current"
+                    else self.recalculate_history_for_model(
+                        model_code=model_code,
+                        start_period=str(start_period or ""),
+                        end_period=str(end_period or ""),
+                        overwrite=overwrite,
+                    )
+                )
+                if result.get("processed_count", 0) > 0:
+                    summary["processed_count"] += 1
+                    summary["processed_models"].append(model_code)
+                elif result.get("skipped_count", 0) > 0:
+                    summary["skipped_count"] += 1
+                    summary["skipped_models"].append(model_code)
+                else:
+                    summary["failed_count"] += 1
+                    summary["failed_models"].append(model_code)
+            except Exception:
+                self.logger.exception("Bulk prediction generation failed", extra={"context": {"model_code": model_code, "mode": mode}})
+                summary["failed_count"] += 1
+                summary["failed_models"].append(model_code)
+            if progress_callback:
+                progress_callback(dict(summary))
+
+        return summary
+
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         model = ModelFactory().create(model_def)
         ok, message = model.health_check()

@@ -99,6 +99,9 @@ class AuthApiTests(unittest.TestCase):
         forbidden_response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
         self.assertEqual(forbidden_response.status_code, 403)
 
+        lottery_fetch_forbidden = self.client.post("/api/settings/lottery/fetch", json={})
+        self.assertEqual(lottery_fetch_forbidden.status_code, 403)
+
     def test_register_rejects_duplicate_username(self) -> None:
         self.client.post("/api/auth/register", json={"username": "dup-user", "password": "signup123"})
         response = self.client.post("/api/auth/register", json={"username": "dup-user", "password": "signup123"})

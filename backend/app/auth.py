@@ -334,3 +334,9 @@ def require_user_management_permission(current_user: dict[str, Any] = Depends(re
 
 def require_role_management_permission(current_user: dict[str, Any] = Depends(require_permission(ROLE_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
     return current_user
+
+
+def require_super_admin(current_user: dict[str, Any] = Depends(require_current_user)) -> dict[str, Any]:
+    if str(current_user.get("role") or "") != SUPER_ADMIN_ROLE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="没有权限")
+    return current_user

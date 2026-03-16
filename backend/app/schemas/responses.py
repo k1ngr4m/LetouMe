@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LotteryHistoryResponse(BaseModel):
@@ -33,6 +33,26 @@ class PredictionGenerationTaskResponse(BaseModel):
     finished_at: str | None = None
     progress_summary: dict[str, Any]
     error_message: str | None = None
+
+
+class LotteryFetchTaskResponse(BaseModel):
+    task_id: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    progress_summary: dict[str, Any]
+    error_message: str | None = None
+
+
+class BulkModelActionResponse(BaseModel):
+    selected_count: int = 0
+    processed_count: int = 0
+    skipped_count: int = 0
+    failed_count: int = 0
+    processed_models: list[str] = Field(default_factory=list)
+    skipped_models: list[str] = Field(default_factory=list)
+    failed_models: list[str] = Field(default_factory=list)
 
 
 class SettingsPredictionRecordSummaryResponse(BaseModel):

@@ -2,11 +2,15 @@ import type {
   AdminUserCreatePayload,
   AdminUserResetPasswordPayload,
   AdminUserUpdatePayload,
+  BulkGenerateSettingsModelPredictionsPayload,
+  BulkModelActionResult,
+  BulkSettingsModelActionPayload,
   CurrentUserResponse,
   CurrentPredictionsResponse,
   GenerateSettingsModelPredictionsPayload,
   LoginPayload,
   LotteryHistoryResponse,
+  LotteryFetchTask,
   PasswordChangePayload,
   PermissionListResponse,
   PermissionUpdatePayload,
@@ -160,6 +164,18 @@ export const apiClient = {
       body: JSON.stringify({}),
     })
   },
+  fetchSettingsLotteryHistory() {
+    return requestJson<LotteryFetchTask>('/api/settings/lottery/fetch', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  getLotteryFetchTaskDetail(taskId: string) {
+    return requestJson<LotteryFetchTask>('/api/settings/lottery/fetch/task-detail', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
+    })
+  },
   createSettingsModel(payload: SettingsModelPayload) {
     return requestJson<SettingsModel>('/api/settings/models/create', {
       method: 'POST',
@@ -190,8 +206,20 @@ export const apiClient = {
       body: JSON.stringify({ model_code: modelCode }),
     })
   },
+  bulkUpdateSettingsModels(payload: BulkSettingsModelActionPayload) {
+    return requestJson<BulkModelActionResult>('/api/settings/models/bulk-action', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
   generateSettingsModelPredictions(payload: GenerateSettingsModelPredictionsPayload) {
     return requestJson<PredictionGenerationTask>('/api/settings/models/predictions/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  bulkGenerateSettingsModelPredictions(payload: BulkGenerateSettingsModelPredictionsPayload) {
+    return requestJson<PredictionGenerationTask>('/api/settings/models/predictions/bulk-generate', {
       method: 'POST',
       body: JSON.stringify(payload),
     })

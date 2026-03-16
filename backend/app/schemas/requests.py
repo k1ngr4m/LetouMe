@@ -35,7 +35,25 @@ class GenerateModelPredictionsPayload(BaseModel):
     end_period: str | None = None
 
 
+class BulkModelActionPayload(BaseModel):
+    model_codes: list[str] = Field(default_factory=list)
+    action: str
+    updates: dict[str, object] | None = None
+
+
+class BulkGenerateModelPredictionsPayload(BaseModel):
+    model_codes: list[str] = Field(default_factory=list)
+    mode: str
+    overwrite: bool = False
+    start_period: str | None = None
+    end_period: str | None = None
+
+
 class PredictionGenerationTaskPayload(BaseModel):
+    task_id: str
+
+
+class LotteryFetchTaskPayload(BaseModel):
     task_id: str
 
 

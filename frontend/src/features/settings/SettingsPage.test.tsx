@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from './SettingsPage'
 
 const { apiClientMock } = vi.hoisted(() => ({
@@ -19,8 +19,12 @@ const { apiClientMock } = vi.hoisted(() => ({
     toggleSettingsModel: vi.fn(),
     deleteSettingsModel: vi.fn(),
     restoreSettingsModel: vi.fn(),
+    bulkUpdateSettingsModels: vi.fn(),
     generateSettingsModelPredictions: vi.fn(),
+    bulkGenerateSettingsModelPredictions: vi.fn(),
     getPredictionGenerationTaskDetail: vi.fn(),
+    fetchSettingsLotteryHistory: vi.fn(),
+    getLotteryFetchTaskDetail: vi.fn(),
     getSettingsPredictionRecords: vi.fn(),
     getSettingsPredictionRecordDetail: vi.fn(),
     createUser: vi.fn(),
@@ -71,6 +75,10 @@ function renderPage() {
 }
 
 describe('SettingsPage model management view switch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('defaults to list view and can switch to card view', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [
@@ -336,5 +344,139 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '全部' }))
     expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
+  })
+
+  it('shows lottery maintenance card and starts fetch task for super admin', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.fetchSettingsLotteryHistory.mockResolvedValue({
+      task_id: 'lottery-task-1',
+      status: 'queued',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        fetched_count: 0,
+        saved_count: 0,
+        latest_period: null,
+        duration_ms: 0,
+      },
+      error_message: null,
+    })
+    apiClientMock.getLotteryFetchTaskDetail.mockResolvedValue({
+      task_id: 'lottery-task-1',
+      status: 'succeeded',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: '2026-03-16T12:00:01Z',
+      finished_at: '2026-03-16T12:00:03Z',
+      progress_summary: {
+        fetched_count: 120,
+        saved_count: 120,
+        latest_period: '2026033',
+        duration_ms: 2034,
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    expect(screen.getByRole('heading', { name: '数据维护' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '获取大乐透数据' }))
+
+    expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })
+    expect(await screen.findByText('最新期号：2026033')).toBeInTheDocument()
+  })
+
+  it('supports selecting all models and bulk actions in list view', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v3.2',
+          display_name: 'DeepSeek-V3.2',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'claude-sonnet-4.6',
+          display_name: 'Claude-4.6',
+          provider: 'anthropic',
+          api_model_name: 'claude-sonnet-4-6',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://example.test',
+          api_key: '',
+          app_code: 'dlt',
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16T15:39:25Z',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [{ code: 'deepseek', name: 'DeepSeek' }] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.bulkUpdateSettingsModels.mockResolvedValue({
+      selected_count: 2,
+      processed_count: 2,
+      skipped_count: 0,
+      failed_count: 0,
+      processed_models: ['deepseek-v3.2', 'claude-sonnet-4.6'],
+      skipped_models: [],
+      failed_models: [],
+    })
+    apiClientMock.bulkGenerateSettingsModelPredictions.mockResolvedValue({
+      task_id: 'bulk-task-1',
+      status: 'queued',
+      mode: 'current',
+      model_code: '__bulk__',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: '__bulk__',
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
+    expect(screen.getByText('已选 2')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '批量编辑' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: /Provider/ }))
+    await userEvent.click(screen.getByRole('button', { name: '保存批量修改' }))
+    await waitFor(() => expect(apiClientMock.bulkUpdateSettingsModels).toHaveBeenCalled())
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
+    expect(screen.getByRole('heading', { name: '已选 2 个模型' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+    await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
   })
 })

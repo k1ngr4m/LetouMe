@@ -10,6 +10,7 @@ from backend.app.auth import (
     require_current_user,
     require_model_management_permission,
     require_role_management_permission,
+    require_super_admin,
     require_user_management_permission,
     set_session_cookie,
 )
@@ -33,11 +34,14 @@ from backend.app.schemas.model_settings import (
     ProviderListResponse,
 )
 from backend.app.schemas.requests import (
+    BulkGenerateModelPredictionsPayload,
+    BulkModelActionPayload,
     GenerateModelPredictionsPayload,
     ModelCodePayload,
     ModelListPayload,
     ModelStatusUpdatePayload,
     ModelUpdatePayload,
+    LotteryFetchTaskPayload,
     PasswordChangePayload,
     PaginationPayload,
     PermissionUpdatePayload,
@@ -49,7 +53,9 @@ from backend.app.schemas.requests import (
     RolePayload,
 )
 from backend.app.schemas.responses import (
+    BulkModelActionResponse,
     CurrentPredictionsResponse,
+    LotteryFetchTaskResponse,
     LotteryHistoryResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
@@ -57,6 +63,7 @@ from backend.app.schemas.responses import (
     SettingsPredictionRecordListResponse,
 )
 from backend.app.services.lottery_service import LotteryService
+from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.model_service import ModelService
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
@@ -236,6 +243,22 @@ def get_settings_providers(_: dict = Depends(require_model_management_permission
     return {"providers": model_service.list_providers()}
 
 
+@router.post("/settings/lottery/fetch", response_model=LotteryFetchTaskResponse)
+def fetch_settings_lottery_history(_: dict = Depends(require_super_admin)) -> dict:
+    return lottery_fetch_task_service.create_task()
+
+
+@router.post("/settings/lottery/fetch/task-detail", response_model=LotteryFetchTaskResponse)
+def get_settings_lottery_fetch_task(
+    payload: LotteryFetchTaskPayload,
+    _: dict = Depends(require_super_admin),
+) -> dict:
+    task = lottery_fetch_task_service.get_task(payload.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return task
+
+
 @router.post("/settings/models/predictions/generate", response_model=PredictionGenerationTaskResponse)
 def generate_model_predictions(
     payload: GenerateModelPredictionsPayload,
@@ -269,6 +292,45 @@ def generate_model_predictions(
         return task
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="模型不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/models/bulk-action", response_model=BulkModelActionResponse)
+def bulk_action_settings_models(
+    payload: BulkModelActionPayload,
+    _: dict = Depends(require_model_management_permission),
+) -> dict:
+    try:
+        return model_service.bulk_action(payload.model_codes, payload.action.strip().lower(), payload.updates or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/models/predictions/bulk-generate", response_model=PredictionGenerationTaskResponse)
+def bulk_generate_model_predictions(
+    payload: BulkGenerateModelPredictionsPayload,
+    _: dict = Depends(require_model_management_permission),
+) -> dict:
+    mode = payload.mode.strip().lower()
+    if mode not in {"current", "history"}:
+        raise HTTPException(status_code=400, detail="不支持的生成模式")
+    if mode == "history" and (not payload.start_period or not payload.end_period):
+        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号")
+
+    try:
+        return prediction_generation_task_service.create_task(
+            mode=mode,
+            model_code="__bulk__",
+            worker=lambda progress_callback: prediction_generation_service.generate_for_models(
+                model_codes=payload.model_codes,
+                mode=mode,
+                overwrite=payload.overwrite,
+                start_period=payload.start_period,
+                end_period=payload.end_period,
+                progress_callback=progress_callback,
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

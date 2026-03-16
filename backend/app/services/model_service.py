@@ -54,6 +54,80 @@ class ModelService:
     def list_providers(self) -> list[dict[str, str]]:
         return runtime_cache.get_or_set("models:providers", ttl_seconds=600, loader=self.repository.list_providers)
 
+    def bulk_action(self, model_codes: list[str], action: str, updates: dict[str, Any] | None = None) -> dict[str, Any]:
+        normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
+        unique_codes = list(dict.fromkeys(normalized_codes))
+        if not unique_codes:
+            raise ValueError("请选择至少一个模型")
+
+        supported_actions = {"enable", "disable", "delete", "restore", "edit"}
+        if action not in supported_actions:
+            raise ValueError("不支持的批量操作")
+
+        summary = {
+            "selected_count": len(unique_codes),
+            "processed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "processed_models": [],
+            "skipped_models": [],
+            "failed_models": [],
+        }
+
+        normalized_updates = self._normalize_bulk_updates(updates or {}) if action == "edit" else {}
+        if action == "edit" and not normalized_updates:
+            raise ValueError("请至少选择一个可批量修改的字段")
+
+        for model_code in unique_codes:
+            model = self.get_model(model_code)
+            if not model:
+                summary["failed_count"] += 1
+                summary["failed_models"].append(model_code)
+                continue
+            try:
+                if action == "enable":
+                    if model.get("is_deleted") or model.get("is_active"):
+                        summary["skipped_count"] += 1
+                        summary["skipped_models"].append(model_code)
+                        continue
+                    self.set_model_active(model_code, True)
+                elif action == "disable":
+                    if model.get("is_deleted") or not model.get("is_active"):
+                        summary["skipped_count"] += 1
+                        summary["skipped_models"].append(model_code)
+                        continue
+                    self.set_model_active(model_code, False)
+                elif action == "delete":
+                    if model.get("is_deleted"):
+                        summary["skipped_count"] += 1
+                        summary["skipped_models"].append(model_code)
+                        continue
+                    self.delete_model(model_code)
+                elif action == "restore":
+                    if not model.get("is_deleted"):
+                        summary["skipped_count"] += 1
+                        summary["skipped_models"].append(model_code)
+                        continue
+                    self.restore_model(model_code)
+                else:
+                    if model.get("is_deleted"):
+                        summary["skipped_count"] += 1
+                        summary["skipped_models"].append(model_code)
+                        continue
+                    merged_payload = {
+                        **model,
+                        **normalized_updates,
+                    }
+                    self.update_model(model_code, merged_payload)
+                summary["processed_count"] += 1
+                summary["processed_models"].append(model_code)
+            except Exception:
+                summary["failed_count"] += 1
+                summary["failed_models"].append(model_code)
+
+        self._invalidate_model_cache()
+        return summary
+
     @staticmethod
     def _invalidate_model_cache(model_code: str | None = None) -> None:
         runtime_cache.invalidate_prefix("models:list:")
@@ -85,6 +159,24 @@ class ModelService:
         normalized["temperature"] = payload.get("temperature")
         normalized["tags"] = payload.get("tags") or []
         normalized["is_active"] = bool(payload.get("is_active", True))
+        return normalized
+
+    @staticmethod
+    def _normalize_bulk_updates(payload: dict[str, Any]) -> dict[str, Any]:
+        allowed_fields = {"provider", "base_url", "api_key", "tags", "temperature", "is_active"}
+        normalized: dict[str, Any] = {}
+        for key in allowed_fields:
+            if key not in payload:
+                continue
+            value = payload[key]
+            if key in {"provider", "base_url", "api_key"}:
+                normalized[key] = str(value or "").strip()
+            elif key == "tags":
+                normalized[key] = [str(item).strip() for item in (value or []) if str(item).strip()]
+            elif key == "temperature":
+                normalized[key] = value
+            elif key == "is_active":
+                normalized[key] = bool(value)
         return normalized
 
 
