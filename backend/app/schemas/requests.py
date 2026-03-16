@@ -29,3 +29,28 @@ class ModelStatusUpdatePayload(BaseModel):
 
 class PredictionHistoryDetailPayload(BaseModel):
     target_period: str
+
+
+class ProfileUpdatePayload(BaseModel):
+    nickname: str
+
+
+class PasswordChangePayload(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class RoleCodePayload(BaseModel):
+    role_code: str
+
+
+class RolePayload(BaseModel):
+    role_code: str
+    role_name: str
+    permissions: list[str] = Field(default_factory=list)
+
+
+class PermissionUpdatePayload(BaseModel):
+    permission_code: str
+    permission_name: str
+    permission_description: str

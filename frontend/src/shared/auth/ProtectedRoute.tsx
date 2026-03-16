@@ -3,13 +3,13 @@ import { useAuth } from './AuthProvider'
 
 export function ProtectedRoute({
   children,
-  requireAdmin = false,
+  requiredPermission,
 }: {
   children: React.ReactNode
-  requireAdmin?: boolean
+  requiredPermission?: string
 }) {
   const location = useLocation()
-  const { isLoading, isAuthenticated, isAdmin } = useAuth()
+  const { isLoading, isAuthenticated, hasPermission } = useAuth()
 
   if (isLoading) {
     return <div className="state-shell">正在验证登录状态...</div>
@@ -17,7 +17,7 @@ export function ProtectedRoute({
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-  if (requireAdmin && !isAdmin) {
+  if (requiredPermission && !hasPermission(requiredPermission)) {
     return <Navigate to="/dashboard" replace />
   }
   return <>{children}</>

@@ -4,18 +4,19 @@ from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import ensure_schema, get_connection
+from backend.app.rbac import NORMAL_USER_ROLE, SUPER_ADMIN_ROLE, ensure_rbac_setup
 
 
 class UserRepository:
     def has_any_admin(self) -> bool:
-        ensure_schema()
+        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT 1 FROM app_user WHERE role = 'admin' LIMIT 1")
+                cursor.execute("SELECT 1 FROM app_user WHERE role = ? AND is_active = 1 LIMIT 1", (SUPER_ADMIN_ROLE,))
                 return cursor.fetchone() is not None
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_schema()
+        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 FROM app_user WHERE username = ?", (payload["username"],))
@@ -23,32 +24,39 @@ class UserRepository:
                     raise ValueError(f"用户名已存在: {payload['username']}")
                 cursor.execute(
                     """
-                    INSERT INTO app_user (username, password_hash, role, is_active)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO app_user (username, nickname, password_hash, role, is_active)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (payload["username"], payload["password_hash"], payload["role"], 1 if payload.get("is_active", True) else 0),
+                    (
+                        payload["username"],
+                        payload.get("nickname") or payload["username"],
+                        payload["password_hash"],
+                        payload.get("role") or NORMAL_USER_ROLE,
+                        1 if payload.get("is_active", True) else 0,
+                    ),
                 )
                 user_id = int(cursor.lastrowid)
         return self.get_user_by_id(user_id) or {}
 
     def list_users(self) -> list[dict[str, Any]]:
-        ensure_schema()
+        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, username, role, is_active, last_login_at, created_at
-                    FROM app_user
-                    ORDER BY role DESC, created_at ASC
+                    SELECT au.id, au.username, au.nickname, au.role, ar.role_name, au.is_active, au.last_login_at, au.created_at
+                    FROM app_user au
+                    LEFT JOIN app_role ar ON ar.role_code = au.role
+                    ORDER BY au.role DESC, au.created_at ASC
                     """
                 )
                 return cursor.fetchall()
 
     def get_user_by_username(self, username: str) -> dict[str, Any] | None:
-        return self._get_user("username = ?", (username,))
+        return self._get_user("au.username = ?", (username,))
 
     def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
-        return self._get_user("id = ?", (user_id,))
+        return self._get_user("au.id = ?", (user_id,))
 
     def update_user(self, user_id: int, *, role: str, is_active: bool) -> dict[str, Any]:
         with get_connection() as connection:
@@ -60,6 +68,21 @@ class UserRepository:
                     WHERE id = ?
                     """,
                     (role, 1 if is_active else 0, user_id),
+                )
+                if cursor.rowcount == 0:
+                    raise KeyError(user_id)
+        return self.get_user_by_id(user_id) or {}
+
+    def update_profile(self, user_id: int, *, nickname: str) -> dict[str, Any]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE app_user
+                    SET nickname = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (nickname, user_id),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(user_id)
@@ -137,16 +160,32 @@ class UserRepository:
                 cursor.execute("DELETE FROM user_session WHERE user_id = ?", (user_id,))
 
     def _get_user(self, where_clause: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
-        ensure_schema()
+        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT id, username, password_hash, role, is_active, last_login_at, created_at
-                    FROM app_user
+                    SELECT au.id, au.username, au.nickname, au.password_hash, au.role, ar.role_name, au.is_active, au.last_login_at, au.created_at
+                    FROM app_user au
+                    LEFT JOIN app_role ar ON ar.role_code = au.role
                     WHERE {where_clause}
                     LIMIT 1
                     """,
                     params,
                 )
-                return cursor.fetchone()
+                user = cursor.fetchone()
+                if not user:
+                    return None
+                cursor.execute(
+                    """
+                    SELECT ap.permission_code
+                    FROM app_role ar
+                    INNER JOIN app_role_permission arp ON arp.role_id = ar.id
+                    INNER JOIN app_permission ap ON ap.id = arp.permission_id
+                    WHERE ar.role_code = ?
+                    ORDER BY ap.permission_code ASC
+                    """,
+                    (user["role"],),
+                )
+                user["permissions"] = [str(row["permission_code"]) for row in cursor.fetchall()]
+                return user

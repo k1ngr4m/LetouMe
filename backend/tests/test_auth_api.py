@@ -46,7 +46,7 @@ class AuthApiTests(unittest.TestCase):
 
         me_response = self.client.post("/api/auth/me", json={})
         self.assertEqual(me_response.status_code, 200)
-        self.assertEqual(me_response.json()["user"]["role"], "admin")
+        self.assertEqual(me_response.json()["user"]["role"], "super_admin")
 
         logout_response = self.client.post("/api/auth/logout", json={})
         self.assertEqual(logout_response.status_code, 200)
@@ -90,7 +90,7 @@ class AuthApiTests(unittest.TestCase):
             json={"username": "signup-user", "password": "signup123"},
         )
         self.assertEqual(register_response.status_code, 200)
-        self.assertEqual(register_response.json()["user"]["role"], "user")
+        self.assertEqual(register_response.json()["user"]["role"], "normal_user")
 
         me_response = self.client.post("/api/auth/me", json={})
         self.assertEqual(me_response.status_code, 200)
@@ -110,7 +110,30 @@ class AuthApiTests(unittest.TestCase):
             json={"username": "escalate-user", "password": "signup123", "role": "admin"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["user"]["role"], "user")
+        self.assertEqual(response.json()["user"]["role"], "normal_user")
+
+    def test_role_permissions_include_description_and_can_be_updated(self) -> None:
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+
+        list_response = self.client.post("/api/admin/roles/permissions", json={})
+
+        self.assertEqual(list_response.status_code, 200)
+        permissions = list_response.json()["permissions"]
+        self.assertTrue(all("permission_description" in item for item in permissions))
+
+        update_response = self.client.post(
+            "/api/admin/roles/permissions/update",
+            json={
+                "permission_code": "basic_profile",
+                "permission_name": "基础资料",
+                "permission_description": "允许用户查看账号信息并修改昵称与密码。",
+            },
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        updated = next(item for item in update_response.json()["permissions"] if item["permission_code"] == "basic_profile")
+        self.assertEqual(updated["permission_name"], "基础资料")
+        self.assertEqual(updated["permission_description"], "允许用户查看账号信息并修改昵称与密码。")
 
 
 if __name__ == "__main__":

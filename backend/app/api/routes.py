@@ -6,15 +6,21 @@ from backend.app.auth import (
     AuthService,
     clear_session_cookie,
     get_auth_service,
-    require_admin_user,
+    require_basic_profile_permission,
     require_current_user,
+    require_model_management_permission,
+    require_role_management_permission,
+    require_user_management_permission,
     set_session_cookie,
 )
 from backend.app.schemas.auth import (
     CurrentUserResponse,
     LoginPayload,
+    PermissionListResponse,
+    RoleListResponse,
     RegisterPayload,
     ResetPasswordPayload,
+    RoleResponse,
     UserCreatePayload,
     UserListResponse,
     UserUpdatePayload,
@@ -31,8 +37,13 @@ from backend.app.schemas.requests import (
     ModelListPayload,
     ModelStatusUpdatePayload,
     ModelUpdatePayload,
+    PasswordChangePayload,
     PaginationPayload,
+    PermissionUpdatePayload,
+    ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
+    RoleCodePayload,
+    RolePayload,
 )
 from backend.app.schemas.responses import (
     CurrentPredictionsResponse,
@@ -129,13 +140,40 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
     return {"predictions_history": [record], "total_count": 1}
 
 
+@router.post("/settings/profile/update", response_model=CurrentUserResponse)
+def update_profile(
+    payload: ProfileUpdatePayload,
+    current_user: dict = Depends(require_basic_profile_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        return {"user": auth_service.update_profile(int(current_user["id"]), payload.nickname)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/profile/password", response_model=CurrentUserResponse)
+def change_profile_password(
+    payload: PasswordChangePayload,
+    current_user: dict = Depends(require_basic_profile_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        auth_service.change_password(int(current_user["id"]), payload.current_password, payload.new_password)
+        return {"user": None}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="用户不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/settings/models/list", response_model=ModelListResponse)
-def get_settings_models(payload: ModelListPayload, _: dict = Depends(require_admin_user)) -> dict:
+def get_settings_models(payload: ModelListPayload, _: dict = Depends(require_model_management_permission)) -> dict:
     return {"models": model_service.list_models(include_deleted=payload.include_deleted)}
 
 
 @router.post("/settings/model/detail", response_model=ModelResponse)
-def get_settings_model(payload: ModelCodePayload, _: dict = Depends(require_admin_user)) -> dict:
+def get_settings_model(payload: ModelCodePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     model = model_service.get_model(payload.model_code)
     if not model:
         raise HTTPException(status_code=404, detail="模型不存在")
@@ -143,7 +181,7 @@ def get_settings_model(payload: ModelCodePayload, _: dict = Depends(require_admi
 
 
 @router.post("/settings/models/create", response_model=ModelResponse)
-def create_settings_model(payload: ModelSettingsPayload, _: dict = Depends(require_admin_user)) -> dict:
+def create_settings_model(payload: ModelSettingsPayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
         return model_service.create_model(payload.model_dump())
     except ValueError as exc:
@@ -151,7 +189,7 @@ def create_settings_model(payload: ModelSettingsPayload, _: dict = Depends(requi
 
 
 @router.post("/settings/models/update", response_model=ModelResponse)
-def update_settings_model(payload: ModelUpdatePayload, _: dict = Depends(require_admin_user)) -> dict:
+def update_settings_model(payload: ModelUpdatePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
         return model_service.update_model(payload.model_code, payload.model_dump())
     except KeyError as exc:
@@ -161,7 +199,7 @@ def update_settings_model(payload: ModelUpdatePayload, _: dict = Depends(require
 
 
 @router.post("/settings/models/status", response_model=ModelResponse)
-def update_settings_model_status(payload: ModelStatusUpdatePayload, _: dict = Depends(require_admin_user)) -> dict:
+def update_settings_model_status(payload: ModelStatusUpdatePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
         return model_service.set_model_active(payload.model_code, payload.is_active)
     except KeyError as exc:
@@ -169,7 +207,7 @@ def update_settings_model_status(payload: ModelStatusUpdatePayload, _: dict = De
 
 
 @router.post("/settings/models/delete", response_model=ModelResponse)
-def delete_settings_model(payload: ModelCodePayload, _: dict = Depends(require_admin_user)) -> dict:
+def delete_settings_model(payload: ModelCodePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
         return model_service.delete_model(payload.model_code)
     except KeyError as exc:
@@ -177,7 +215,7 @@ def delete_settings_model(payload: ModelCodePayload, _: dict = Depends(require_a
 
 
 @router.post("/settings/models/restore", response_model=ModelResponse)
-def restore_settings_model(payload: ModelCodePayload, _: dict = Depends(require_admin_user)) -> dict:
+def restore_settings_model(payload: ModelCodePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
         return model_service.restore_model(payload.model_code)
     except KeyError as exc:
@@ -185,19 +223,19 @@ def restore_settings_model(payload: ModelCodePayload, _: dict = Depends(require_
 
 
 @router.post("/settings/providers/list", response_model=ProviderListResponse)
-def get_settings_providers(_: dict = Depends(require_current_user)) -> dict:
+def get_settings_providers(_: dict = Depends(require_model_management_permission)) -> dict:
     return {"providers": model_service.list_providers()}
 
 
 @router.post("/admin/users/list", response_model=UserListResponse)
-def list_users(_: dict = Depends(require_admin_user), auth_service: AuthService = Depends(get_auth_service)) -> dict:
+def list_users(_: dict = Depends(require_user_management_permission), auth_service: AuthService = Depends(get_auth_service)) -> dict:
     return {"users": auth_service.list_users()}
 
 
 @router.post("/admin/users/create", response_model=CurrentUserResponse)
 def create_user(
     payload: UserCreatePayload,
-    _: dict = Depends(require_admin_user),
+    _: dict = Depends(require_user_management_permission),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict:
     try:
@@ -209,24 +247,96 @@ def create_user(
 @router.post("/admin/users/update", response_model=CurrentUserResponse)
 def update_user(
     payload: UserUpdatePayload,
-    _: dict = Depends(require_admin_user),
+    _: dict = Depends(require_user_management_permission),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict:
     try:
         return {"user": auth_service.update_user(payload.user_id, payload.model_dump())}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="用户不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/admin/users/reset-password", response_model=CurrentUserResponse)
 def reset_user_password(
     payload: ResetPasswordPayload,
-    _: dict = Depends(require_admin_user),
+    _: dict = Depends(require_user_management_permission),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict:
     try:
         return {"user": auth_service.reset_password(payload.user_id, payload.password)}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="用户不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/admin/roles/list", response_model=RoleListResponse)
+def list_roles(_: dict = Depends(require_role_management_permission), auth_service: AuthService = Depends(get_auth_service)) -> dict:
+    return {"roles": auth_service.list_roles()}
+
+
+@router.post("/admin/roles/permissions", response_model=PermissionListResponse)
+def list_permissions(
+    _: dict = Depends(require_role_management_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+    ) -> dict:
+    return {"permissions": auth_service.list_permissions()}
+
+
+@router.post("/admin/roles/permissions/update", response_model=PermissionListResponse)
+def update_permission(
+    payload: PermissionUpdatePayload,
+    _: dict = Depends(require_role_management_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        auth_service.update_permission(payload.permission_code, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="权限不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"permissions": auth_service.list_permissions()}
+
+
+@router.post("/admin/roles/create", response_model=RoleResponse)
+def create_role(
+    payload: RolePayload,
+    _: dict = Depends(require_role_management_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        return auth_service.create_role(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/admin/roles/update", response_model=RoleResponse)
+def update_role(
+    payload: RolePayload,
+    _: dict = Depends(require_role_management_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        return auth_service.update_role(payload.role_code, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="角色不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/admin/roles/delete", response_model=RoleResponse)
+def delete_role(
+    payload: RoleCodePayload,
+    _: dict = Depends(require_role_management_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    role = next((item for item in auth_service.list_roles() if item["role_code"] == payload.role_code), None)
+    if not role:
+        raise HTTPException(status_code=404, detail="角色不存在")
+    try:
+        auth_service.delete_role(payload.role_code)
+        return role
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

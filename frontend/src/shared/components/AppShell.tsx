@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthProvider'
 
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, hasPermission } = useAuth()
+  const canOpenSettings = hasPermission('basic_profile')
 
   return (
     <div className="app-shell">
@@ -21,12 +22,12 @@ export function AppShell({ children }: PropsWithChildren) {
           <NavLink className={({ isActive }) => `app-nav__link${isActive ? ' is-active' : ''}`} to="/dashboard">
             预测总览
           </NavLink>
-          {isAdmin ? (
+          {canOpenSettings ? (
             <NavLink className={({ isActive }) => `app-nav__link${isActive ? ' is-active' : ''}`} to="/settings">
-              模型设置
+              设置中心
             </NavLink>
           ) : null}
-          <span className="app-nav__meta">{user?.username || '-'}</span>
+          <span className="app-nav__meta">{user?.nickname || user?.username || '-'}</span>
           <button
             className="ghost-button"
             onClick={() => {

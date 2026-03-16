@@ -16,8 +16,11 @@ class RegisterPayload(BaseModel):
 class AuthUserResponse(BaseModel):
     id: int
     username: str
+    nickname: str
     role: str
+    role_name: str
     is_active: bool
+    permissions: list[str] = Field(default_factory=list)
     last_login_at: str | None = None
     created_at: str | None = None
 
@@ -30,10 +33,33 @@ class UserListResponse(BaseModel):
     users: list[AuthUserResponse] = Field(default_factory=list)
 
 
+class RoleResponse(BaseModel):
+    role_code: str
+    role_name: str
+    is_system: bool
+    member_count: int = 0
+    permissions: list[str] = Field(default_factory=list)
+
+
+class RoleListResponse(BaseModel):
+    roles: list[RoleResponse] = Field(default_factory=list)
+
+
+class PermissionResponse(BaseModel):
+    permission_code: str
+    permission_name: str
+    permission_description: str
+
+
+class PermissionListResponse(BaseModel):
+    permissions: list[PermissionResponse] = Field(default_factory=list)
+
+
 class UserCreatePayload(BaseModel):
     username: str
+    nickname: str | None = None
     password: str
-    role: str = "user"
+    role: str = "normal_user"
     is_active: bool = True
 
 

@@ -24,10 +24,10 @@ vi.mock('../features/auth/RegisterPage', () => ({
 vi.mock('../shared/auth/AuthProvider', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => ({
-    user: { id: 1, username: 'admin', role: 'admin', is_active: true },
+    user: { id: 1, username: 'admin', nickname: '管理员', role: 'super_admin', role_name: '超级管理员', is_active: true, permissions: ['basic_profile'] },
     isLoading: false,
     isAuthenticated: true,
-    isAdmin: true,
+    hasPermission: () => true,
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),

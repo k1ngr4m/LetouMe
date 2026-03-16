@@ -6,8 +6,15 @@ import type {
   CurrentPredictionsResponse,
   LoginPayload,
   LotteryHistoryResponse,
+  PasswordChangePayload,
+  PermissionListResponse,
+  PermissionUpdatePayload,
   PredictionsHistoryListResponse,
   PredictionsHistoryResponse,
+  ProfileUpdatePayload,
+  RoleItem,
+  RoleListResponse,
+  RolePayload,
   SettingsModel,
   SettingsModelListResponse,
   SettingsModelPayload,
@@ -93,6 +100,18 @@ export const apiClient = {
     return requestJson<CurrentUserResponse>('/api/auth/me', {
       method: 'POST',
       body: JSON.stringify({}),
+    })
+  },
+  updateProfile(payload: ProfileUpdatePayload) {
+    return requestJson<CurrentUserResponse>('/api/settings/profile/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  changePassword(payload: PasswordChangePayload) {
+    return requestJson<CurrentUserResponse>('/api/settings/profile/password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
   getLotteryHistory(payload?: { limit?: number; offset?: number }) {
@@ -189,6 +208,42 @@ export const apiClient = {
     return requestJson<CurrentUserResponse>('/api/admin/users/reset-password', {
       method: 'POST',
       body: JSON.stringify(payload),
+    })
+  },
+  listRoles() {
+    return requestJson<RoleListResponse>('/api/admin/roles/list', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  listPermissions() {
+    return requestJson<PermissionListResponse>('/api/admin/roles/permissions', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  updatePermission(payload: PermissionUpdatePayload) {
+    return requestJson<PermissionListResponse>('/api/admin/roles/permissions/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  createRole(payload: RolePayload) {
+    return requestJson<RoleItem>('/api/admin/roles/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  updateRole(payload: RolePayload) {
+    return requestJson<RoleItem>('/api/admin/roles/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  deleteRole(roleCode: string) {
+    return requestJson<RoleItem>('/api/admin/roles/delete', {
+      method: 'POST',
+      body: JSON.stringify({ role_code: roleCode }),
     })
   },
 }

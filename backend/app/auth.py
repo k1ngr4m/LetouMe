@@ -10,6 +10,16 @@ from fastapi import Depends, HTTPException, Request, Response, status
 
 from backend.app.config import Settings, load_settings
 from backend.app.logging_utils import get_logger
+from backend.app.rbac import (
+    BASIC_PROFILE_PERMISSION,
+    MODEL_MANAGEMENT_PERMISSION,
+    NORMAL_USER_ROLE,
+    ROLE_MANAGEMENT_PERMISSION,
+    SUPER_ADMIN_ROLE,
+    USER_MANAGEMENT_PERMISSION,
+    ensure_rbac_setup,
+)
+from backend.app.repositories.role_repository import RoleRepository
 from backend.app.repositories.user_repository import UserRepository
 
 
@@ -32,11 +42,18 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 class AuthService:
-    def __init__(self, repository: UserRepository | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        repository: UserRepository | None = None,
+        settings: Settings | None = None,
+        role_repository: RoleRepository | None = None,
+    ) -> None:
         self.repository = repository or UserRepository()
         self.settings = settings or load_settings()
+        self.role_repository = role_repository or RoleRepository()
 
     def ensure_bootstrap_admin(self) -> None:
+        ensure_rbac_setup()
         if self.repository.has_any_admin():
             return
         username = self.settings.auth_bootstrap_admin_username.strip()
@@ -47,8 +64,9 @@ class AuthService:
         self.repository.create_user(
             {
                 "username": username,
+                "nickname": username,
                 "password_hash": hash_password(password),
-                "role": "admin",
+                "role": SUPER_ADMIN_ROLE,
                 "is_active": True,
             }
         )
@@ -77,8 +95,9 @@ class AuthService:
         created = self.create_user(
             {
                 "username": normalized_username,
+                "nickname": normalized_username,
                 "password": password,
-                "role": "user",
+                "role": NORMAL_USER_ROLE,
                 "is_active": True,
             }
         )
@@ -123,25 +142,40 @@ class AuthService:
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
         username = str(payload.get("username") or "").strip()
+        nickname = str(payload.get("nickname") or username).strip() or username
         password = str(payload.get("password") or "")
+        role_code = self._normalize_role_code(payload.get("role"))
         if not username:
             raise ValueError("用户名不能为空")
         if len(password) < 8:
             raise ValueError("密码长度至少为 8 位")
+        if not self.role_repository.get_role(role_code):
+            raise ValueError("角色不存在")
         created = self.repository.create_user(
             {
                 "username": username,
+                "nickname": nickname,
                 "password_hash": hash_password(password),
-                "role": payload.get("role") or "user",
+                "role": role_code,
                 "is_active": bool(payload.get("is_active", True)),
             }
         )
         return self._serialize_user(created)
 
     def update_user(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        current = self.repository.get_user_by_id(user_id)
+        if not current:
+            raise KeyError(user_id)
+        target_role = self._normalize_role_code(payload.get("role"))
+        if not self.role_repository.get_role(target_role):
+            raise ValueError("角色不存在")
+        if current.get("role") == SUPER_ADMIN_ROLE and target_role != SUPER_ADMIN_ROLE and self.role_repository.active_super_admin_count() <= 1:
+            raise ValueError("至少保留一个超级管理员")
+        if current.get("role") == SUPER_ADMIN_ROLE and not bool(payload.get("is_active", True)) and self.role_repository.active_super_admin_count() <= 1:
+            raise ValueError("至少保留一个超级管理员")
         updated = self.repository.update_user(
             user_id,
-            role=str(payload.get("role") or "user"),
+            role=target_role,
             is_active=bool(payload.get("is_active", True)),
         )
         return self._serialize_user(updated)
@@ -153,16 +187,76 @@ class AuthService:
         self.repository.delete_sessions_for_user(user_id)
         return self._serialize_user(updated)
 
+    def update_profile(self, user_id: int, nickname: str) -> dict[str, Any]:
+        normalized_nickname = nickname.strip()
+        if not normalized_nickname:
+            raise ValueError("昵称不能为空")
+        updated = self.repository.update_profile(user_id, nickname=normalized_nickname)
+        return self._serialize_user(updated)
+
+    def change_password(self, user_id: int, current_password: str, new_password: str) -> None:
+        user = self.repository.get_user_by_id(user_id)
+        if not user:
+            raise KeyError(user_id)
+        if not verify_password(current_password, str(user["password_hash"])):
+            raise ValueError("当前密码不正确")
+        if len(new_password) < 8:
+            raise ValueError("密码长度至少为 8 位")
+        self.repository.update_password(user_id, hash_password(new_password))
+        self.repository.delete_sessions_for_user(user_id)
+
+    def list_roles(self) -> list[dict[str, Any]]:
+        return self.role_repository.list_roles()
+
+    def list_permissions(self) -> list[dict[str, str]]:
+        return self.role_repository.list_permissions()
+
+    def update_permission(self, permission_code: str, payload: dict[str, Any]) -> dict[str, str]:
+        normalized_name = str(payload.get("permission_name") or "").strip()
+        normalized_description = str(payload.get("permission_description") or "").strip()
+        if not normalized_name:
+            raise ValueError("权限名称不能为空")
+        if not normalized_description:
+            raise ValueError("权限说明不能为空")
+        return self.role_repository.update_permission(
+            permission_code,
+            {
+                "permission_name": normalized_name,
+                "permission_description": normalized_description,
+            },
+        )
+
+    def create_role(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.role_repository.create_role(payload)
+
+    def update_role(self, role_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.role_repository.update_role(role_code, payload)
+
+    def delete_role(self, role_code: str) -> None:
+        self.role_repository.delete_role(role_code)
+
     @staticmethod
     def _serialize_user(user: dict[str, Any]) -> dict[str, Any]:
         return {
             "id": int(user["id"]),
             "username": str(user["username"]),
+            "nickname": str(user.get("nickname") or user["username"]),
             "role": str(user["role"]),
+            "role_name": str(user.get("role_name") or user["role"]),
             "is_active": bool(user["is_active"]),
+            "permissions": [str(permission) for permission in user.get("permissions", [])],
             "last_login_at": _format_datetime(user.get("last_login_at")),
             "created_at": _format_datetime(user.get("created_at")),
         }
+
+    @staticmethod
+    def _normalize_role_code(value: Any) -> str:
+        role_code = str(value or NORMAL_USER_ROLE).strip()
+        if role_code == "admin":
+            return SUPER_ADMIN_ROLE
+        if role_code == "user":
+            return NORMAL_USER_ROLE
+        return role_code
 
 
 def _format_datetime(value: Any) -> str | None:
@@ -210,6 +304,30 @@ def require_current_user(current_user: dict[str, Any] | None = Depends(get_optio
 
 
 def require_admin_user(current_user: dict[str, Any] = Depends(require_current_user)) -> dict[str, Any]:
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="没有权限")
+    return require_permission(ROLE_MANAGEMENT_PERMISSION)(current_user)
+
+
+def require_permission(permission_code: str):
+    def dependency(current_user: dict[str, Any] = Depends(require_current_user)) -> dict[str, Any]:
+        permissions = set(current_user.get("permissions") or [])
+        if permission_code not in permissions:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="没有权限")
+        return current_user
+
+    return dependency
+
+
+def require_basic_profile_permission(current_user: dict[str, Any] = Depends(require_permission(BASIC_PROFILE_PERMISSION))) -> dict[str, Any]:
+    return current_user
+
+
+def require_model_management_permission(current_user: dict[str, Any] = Depends(require_permission(MODEL_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
+    return current_user
+
+
+def require_user_management_permission(current_user: dict[str, Any] = Depends(require_permission(USER_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
+    return current_user
+
+
+def require_role_management_permission(current_user: dict[str, Any] = Depends(require_permission(ROLE_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
     return current_user

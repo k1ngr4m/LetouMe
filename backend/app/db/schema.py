@@ -209,6 +209,7 @@ SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS app_user (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(128) NOT NULL UNIQUE,
+        nickname VARCHAR(128) NULL,
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(32) NOT NULL DEFAULT 'user',
         is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -233,7 +234,41 @@ SCHEMA_STATEMENTS = [
         INDEX idx_user_session_expiry (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS app_role (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        role_code VARCHAR(64) NOT NULL UNIQUE,
+        role_name VARCHAR(128) NOT NULL,
+        is_system TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS app_permission (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        permission_code VARCHAR(64) NOT NULL UNIQUE,
+        permission_name VARCHAR(128) NOT NULL,
+        permission_description TEXT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS app_role_permission (
+        role_id BIGINT NOT NULL,
+        permission_id BIGINT NOT NULL,
+        PRIMARY KEY (role_id, permission_id),
+        CONSTRAINT fk_app_role_permission_role FOREIGN KEY (role_id) REFERENCES app_role(id) ON DELETE CASCADE,
+        CONSTRAINT fk_app_role_permission_permission FOREIGN KEY (permission_id) REFERENCES app_permission(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 
-SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {}
+SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
+    "app_user": {
+        "nickname": "ALTER TABLE app_user ADD COLUMN nickname VARCHAR(128) NULL AFTER username",
+    },
+    "app_permission": {
+        "permission_description": "ALTER TABLE app_permission ADD COLUMN permission_description TEXT NULL AFTER permission_name",
+    }
+}

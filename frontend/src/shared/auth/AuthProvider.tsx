@@ -7,7 +7,7 @@ type AuthContextValue = {
   user: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  isAdmin: boolean
+  hasPermission: (permission: string) => boolean
   login: (payload: LoginPayload) => Promise<AuthUser | null>
   register: (payload: RegisterPayload) => Promise<AuthUser | null>
   logout: () => Promise<void>
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: currentUser.data || null,
       isLoading: currentUser.isLoading,
       isAuthenticated: Boolean(currentUser.data),
-      isAdmin: currentUser.data?.role === 'admin',
+      hasPermission: (permission) => Boolean(currentUser.data?.permissions?.includes(permission)),
       login: async (payload) => loginMutation.mutateAsync(payload),
       register: async (payload) => registerMutation.mutateAsync(payload),
       logout: async () => {

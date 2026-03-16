@@ -10,6 +10,8 @@ import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
 
+const BASIC_PROFILE_PERMISSION = 'basic_profile'
+
 export function App() {
   return (
     <ThemeProvider>
@@ -32,7 +34,7 @@ export function App() {
           <Route
             path="/settings"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute requiredPermission={BASIC_PROFILE_PERMISSION}>
                 <AppShell>
                   <SettingsPage />
                 </AppShell>

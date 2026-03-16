@@ -135,8 +135,11 @@ export type SettingsModelPayload = {
 export type AuthUser = {
   id: number
   username: string
-  role: 'admin' | 'user'
+  nickname: string
+  role: string
+  role_name: string
   is_active: boolean
+  permissions: string[]
   last_login_at?: string | null
   created_at?: string | null
 }
@@ -157,14 +160,15 @@ export type RegisterPayload = {
 
 export type AdminUserCreatePayload = {
   username: string
+  nickname?: string
   password: string
-  role: 'admin' | 'user'
+  role: string
   is_active: boolean
 }
 
 export type AdminUserUpdatePayload = {
   user_id: number
-  role: 'admin' | 'user'
+  role: string
   is_active: boolean
 }
 
@@ -175,4 +179,47 @@ export type AdminUserResetPasswordPayload = {
 
 export type UserListResponse = {
   users: AuthUser[]
+}
+
+export type RoleItem = {
+  role_code: string
+  role_name: string
+  is_system: boolean
+  member_count: number
+  permissions: string[]
+}
+
+export type RoleListResponse = {
+  roles: RoleItem[]
+}
+
+export type PermissionItem = {
+  permission_code: string
+  permission_name: string
+  permission_description: string
+}
+
+export type PermissionListResponse = {
+  permissions: PermissionItem[]
+}
+
+export type RolePayload = {
+  role_code: string
+  role_name: string
+  permissions: string[]
+}
+
+export type PermissionUpdatePayload = {
+  permission_code: string
+  permission_name: string
+  permission_description: string
+}
+
+export type ProfileUpdatePayload = {
+  nickname: string
+}
+
+export type PasswordChangePayload = {
+  current_password: string
+  new_password: string
 }
