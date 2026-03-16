@@ -100,6 +100,7 @@ export function HomePage() {
     selectedTags,
     scoreRange: selectedScoreRange,
   })
+  const visibleSummaryModelIds = filteredModels.map((model) => model.model_id)
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   useEffect(() => {
@@ -136,9 +137,17 @@ export function HomePage() {
     }
   }, [activeTab])
 
-  const selectedSummaryIds = summarySelectedModelIds ?? models.map((model) => model.model_id)
+  useEffect(() => {
+    setSummarySelectedModelIds((previous) => {
+      if (previous === null) return null
+      const next = previous.filter((modelId) => visibleSummaryModelIds.includes(modelId))
+      return next.length === previous.length ? previous : next
+    })
+  }, [visibleSummaryModelIds])
+
+  const selectedSummaryIds = summarySelectedModelIds ?? visibleSummaryModelIds
   const selectedHistoryIds = historySelectedModelIds ?? models.map((model) => model.model_id)
-  const summary = buildSummary(models, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
+  const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
   const filteredHistory = history ? filterHistoryRecords(history, selectedHistoryIds, historyPeriodQuery) : []
   const historyHitTrend = buildHistoryHitTrend(filteredHistory, selectedHistoryIds)
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
@@ -169,7 +178,7 @@ export function HomePage() {
   }
 
   function toggleSummaryModel(modelId: string) {
-    const fallbackIds = models.map((model) => model.model_id)
+    const fallbackIds = visibleSummaryModelIds
     setSummarySelectedModelIds((previous) => {
       const current = previous ?? fallbackIds
       return current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
@@ -388,7 +397,7 @@ export function HomePage() {
                 }
               >
                 <div className="filter-chip-group">
-                  {orderedModels.map((model) => (
+                  {filteredModels.map((model) => (
                     <button
                       key={model.model_id}
                       className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) && 'is-active')}
@@ -398,10 +407,16 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
-                <div className="summary-columns">
-                  <SummaryList title="前区统计" items={summary.red} color="red" />
-                  <SummaryList title="后区统计" items={summary.blue} color="blue" />
-                </div>
+                {!filteredModels.length ? (
+                  <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
+                ) : !selectedSummaryIds.length ? (
+                  <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
+                ) : (
+                  <div className="summary-columns">
+                    <SummaryList title="前区统计" items={summary.red} color="red" />
+                    <SummaryList title="后区统计" items={summary.blue} color="blue" />
+                  </div>
+                )}
               </StatusCard>
             </section>
           </div>

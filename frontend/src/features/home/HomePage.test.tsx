@@ -25,11 +25,24 @@ vi.mock('./hooks/useHomeData', () => ({
             model_id: 'model-a',
             model_name: '模型A',
             model_provider: 'openai_compatible',
+            model_tags: ['reasoning'],
             model_api_model: 'model-a-api',
             predictions: Array.from({ length: 5 }, (_, index) => ({
               group_id: index + 1,
               red_balls: ['01', '02', '03', '04', '05'],
               blue_balls: ['06', '07'],
+            })),
+          },
+          {
+            model_id: 'model-b',
+            model_name: '模型B',
+            model_provider: 'deepseek',
+            model_tags: ['fast'],
+            model_api_model: 'model-b-api',
+            predictions: Array.from({ length: 5 }, (_, index) => ({
+              group_id: index + 1,
+              red_balls: ['08', '09', '10', '11', '12'],
+              blue_balls: ['01', '02'],
             })),
           },
         ],
@@ -65,6 +78,12 @@ vi.mock('./hooks/useHomeData', () => ({
                 model_name: '模型A',
                 model_provider: 'openai_compatible',
                 best_hit_count: 3,
+              },
+              {
+                model_id: 'model-b',
+                model_name: '模型B',
+                model_provider: 'deepseek',
+                best_hit_count: 1,
               },
             ],
           },
@@ -119,18 +138,35 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
-    await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
+    await userEvent.click(screen.getByRole('button', { name: 'deepseek' }))
     await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
 
-    expect(screen.getByText('已显示 0 / 1 个模型')).toBeInTheDocument()
+    expect(screen.getByText('已显示 0 / 2 个模型')).toBeInTheDocument()
     expect(screen.getByText('没有符合当前筛选条件的模型。')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '清空筛选' }))
 
     await waitFor(() => {
-      expect(screen.getByText('已显示 1 / 1 个模型')).toBeInTheDocument()
+      expect(screen.getByText('已显示 2 / 2 个模型')).toBeInTheDocument()
     })
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '模型B' })).toBeInTheDocument()
+  })
+
+  it('applies model list filters to number summary candidates', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
+
+    const summarySection = screen.getByRole('heading', { name: '号码预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+
+    expect(within(summarySection as HTMLElement).getByRole('button', { name: '模型A' })).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).queryByRole('button', { name: '模型B' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
+    expect(within(summarySection as HTMLElement).getByText('当前筛选条件下没有可统计的模型。')).toBeInTheDocument()
   })
 
   it('hides local sidebar navigation outside prediction tab', async () => {
