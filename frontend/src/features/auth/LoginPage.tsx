@@ -31,7 +31,7 @@ export function LoginPage() {
         <div className="landing-panel__copy">
           <p className="landing-panel__eyebrow">Authentication</p>
           <h1 className="landing-panel__title">登录 LetouMe</h1>
-          <p className="landing-panel__description">请输入系统账号后进入控制台。普通用户可查看预测，管理员可管理模型和用户。</p>
+          <p className="landing-panel__description">请输入系统账号后进入控制台。</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           <input className="search-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="用户名" />

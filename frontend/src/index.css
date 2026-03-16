@@ -1045,6 +1045,28 @@ a {
   overflow-x: auto;
 }
 
+.view-switch {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.view-switch__button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.62rem 0.9rem;
+  color: var(--text-2);
+  background: transparent;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.view-switch__button.is-active {
+  color: white;
+  background: linear-gradient(135deg, #e46c40, #f1b24c);
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
@@ -1055,6 +1077,41 @@ a {
   padding: 0.85rem 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   text-align: left;
+}
+
+.settings-model-table-shell {
+  margin-top: 0.8rem;
+}
+
+.settings-model-table th {
+  white-space: nowrap;
+}
+
+.settings-model-table__title {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.settings-model-table__title strong {
+  font-size: 0.94rem;
+}
+
+.settings-model-table__title span {
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
+.settings-model-table__tags,
+.settings-model-table__actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.settings-model-table__actions .ghost-button,
+.settings-model-table__actions .danger-button {
+  padding: 0.58rem 0.8rem;
 }
 
 .pagination-row {

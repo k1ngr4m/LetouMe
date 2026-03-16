@@ -15,6 +15,7 @@ import type {
 } from '../../shared/types/api'
 
 type SettingsTab = 'profile' | 'models' | 'users' | 'roles'
+type ModelManagementView = 'list' | 'card'
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -63,6 +64,7 @@ export function SettingsPage() {
   const { user, hasPermission, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   const [includeDeleted, setIncludeDeleted] = useState(false)
+  const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
@@ -349,8 +351,8 @@ export function SettingsPage() {
       <section className="hero-panel hero-panel--settings">
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Settings Center</p>
-          <h2 className="hero-panel__title">统一管理个人资料、模型、用户与角色</h2>
-          <p className="hero-panel__description">左侧 Tab 会根据你的权限自动展示，普通用户仅可修改基础信息。</p>
+          <h2 className="hero-panel__title">设置中心</h2>
+          <p className="hero-panel__description">可修改基础信息</p>
           <div className="hero-panel__meta">
             <span>当前角色 {user?.role_name || '-'}</span>
             <span>权限数 {user?.permissions?.length || 0}</span>
@@ -442,6 +444,22 @@ export function SettingsPage() {
                 subtitle="管理模型目录、Provider 连接与运行状态。"
                 actions={
                   <div className="toolbar-inline">
+                    <div className="view-switch" role="tablist" aria-label="模型管理视图切换">
+                      <button
+                        className={clsx('view-switch__button', modelManagementView === 'list' && 'is-active')}
+                        onClick={() => setModelManagementView('list')}
+                        type="button"
+                      >
+                        列表视图
+                      </button>
+                      <button
+                        className={clsx('view-switch__button', modelManagementView === 'card' && 'is-active')}
+                        onClick={() => setModelManagementView('card')}
+                        type="button"
+                      >
+                        卡片视图
+                      </button>
+                    </div>
                     <label className="toggle-chip">
                       <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
                       <span>显示已删除</span>
@@ -452,39 +470,100 @@ export function SettingsPage() {
                   </div>
                 }
               >
-                <div className="settings-grid-react">
-                  {models.map((model) => (
-                    <article key={model.model_code} className="settings-model-card-react">
-                      <div className="settings-model-card-react__header">
-                        <div>
-                          <p className="settings-model-card-react__provider">{model.provider}</p>
-                          <h3>{model.display_name}</h3>
+                {modelManagementView === 'list' ? (
+                  <div className="table-shell settings-model-table-shell">
+                    <table className="history-table settings-model-table">
+                      <thead>
+                        <tr>
+                          <th>模型名称</th>
+                          <th>Provider</th>
+                          <th>接口模型</th>
+                          <th>Tag</th>
+                          <th>状态</th>
+                          <th>更新时间</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {models.map((model) => (
+                          <tr key={model.model_code}>
+                            <td>
+                              <div className="settings-model-table__title">
+                                <strong>{model.display_name}</strong>
+                                <span>{model.model_code}</span>
+                              </div>
+                            </td>
+                            <td>{model.provider}</td>
+                            <td>{model.api_model_name}</td>
+                            <td>
+                              <div className="settings-model-table__tags">
+                                {model.tags.length ? model.tags.map((tag) => <span key={`${model.model_code}-${tag}`} className="tag tag--muted">{tag}</span>) : <span className="tag tag--muted">无标签</span>}
+                              </div>
+                            </td>
+                            <td>
+                              <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
+                                {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
+                              </span>
+                            </td>
+                            <td>{model.updated_at || '-'}</td>
+                            <td>
+                              <div className="settings-model-table__actions">
+                                <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
+                                {!model.is_deleted ? (
+                                  <>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
+                                    >
+                                      {model.is_active ? '停用' : '启用'}
+                                    </button>
+                                    <button className="danger-button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>删除</button>
+                                  </>
+                                ) : (
+                                  <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}>恢复</button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="settings-grid-react">
+                    {models.map((model) => (
+                      <article key={model.model_code} className="settings-model-card-react">
+                        <div className="settings-model-card-react__header">
+                          <div>
+                            <p className="settings-model-card-react__provider">{model.provider}</p>
+                            <h3>{model.display_name}</h3>
+                          </div>
+                          <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
+                            {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
+                          </span>
                         </div>
-                        <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
-                          {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
-                        </span>
-                      </div>
-                      <p className="settings-model-card-react__meta">{model.api_model_name}</p>
-                      <div className="settings-model-card-react__facts">
-                        <span>{model.base_url}</span>
-                        <span>{model.tags.join(', ') || '无标签'}</span>
-                      </div>
-                      <div className="toolbar-inline">
-                        <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
-                        {!model.is_deleted ? (
-                          <>
-                            <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}>
-                              {model.is_active ? '停用' : '启用'}
-                            </button>
-                            <button className="danger-button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>删除</button>
-                          </>
-                        ) : (
-                          <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}>恢复</button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                        <p className="settings-model-card-react__meta">{model.api_model_name}</p>
+                        <div className="settings-model-card-react__facts">
+                          <span>{model.base_url}</span>
+                          <span>{model.tags.join(', ') || '无标签'}</span>
+                        </div>
+                        <div className="toolbar-inline">
+                          <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
+                          {!model.is_deleted ? (
+                            <>
+                              <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}>
+                                {model.is_active ? '停用' : '启用'}
+                              </button>
+                              <button className="danger-button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>删除</button>
+                            </>
+                          ) : (
+                            <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}>恢复</button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </StatusCard>
             </div>
           ) : null}
