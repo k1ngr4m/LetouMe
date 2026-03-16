@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildSummary } from './home'
+import { buildHistoryHitTrend, buildSummary, filterModels } from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -111,5 +111,70 @@ describe('buildSummary', () => {
     )
 
     expect(commonOnly.red.map((item) => item.ball)).toEqual(['01'])
+  })
+})
+
+describe('filterModels', () => {
+  const models = [
+    {
+      model_id: 'deepseek-chat',
+      model_name: 'DeepSeek-V3.2',
+      model_provider: 'deepseek',
+      model_tags: ['reasoning', 'fast'],
+      predictions: [],
+    },
+    {
+      model_id: 'gemini-pro',
+      model_name: 'Gemini-3.1',
+      model_provider: 'gemini',
+      model_tags: ['reasoning'],
+      predictions: [],
+    },
+    {
+      model_id: 'gpt-4o',
+      model_name: 'GPT-4o',
+      model_provider: 'openai',
+      model_tags: ['fast'],
+      predictions: [],
+    },
+  ]
+
+  const scores = {
+    'deepseek-chat': { score100: 85, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
+    'gemini-pro': { score100: 58, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
+    'gpt-4o': { score100: 28, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
+  }
+
+  it('applies all filter conditions together', () => {
+    const result = filterModels(models, scores, {
+      nameQuery: 'deepseek',
+      selectedProviders: ['deepseek'],
+      selectedTags: ['reasoning', 'fast'],
+      scoreRange: '81-100',
+    })
+
+    expect(result.map((item) => item.model_id)).toEqual(['deepseek-chat'])
+  })
+
+  it('requires all selected tags to be present', () => {
+    const result = filterModels(models, scores, {
+      nameQuery: '',
+      selectedProviders: [],
+      selectedTags: ['reasoning', 'fast'],
+      scoreRange: 'all',
+    })
+
+    expect(result.map((item) => item.model_id)).toEqual(['deepseek-chat'])
+  })
+
+  it('filters by score range', () => {
+    const result = filterModels(models, scores, {
+      nameQuery: '',
+      selectedProviders: [],
+      selectedTags: [],
+      scoreRange: '31-60',
+    })
+
+    expect(result.map((item) => item.model_id)).toEqual(['gemini-pro'])
   })
 })

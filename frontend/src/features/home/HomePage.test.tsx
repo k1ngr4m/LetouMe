@@ -115,6 +115,24 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('评分加权')).not.toBeInTheDocument()
   })
 
+  it('filters model list with model provider, tag and score range', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
+    await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
+
+    expect(screen.getByText('已显示 0 / 1 个模型')).toBeInTheDocument()
+    expect(screen.getByText('没有符合当前筛选条件的模型。')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '清空筛选' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('已显示 1 / 1 个模型')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
+  })
+
   it('hides local sidebar navigation outside prediction tab', async () => {
     renderPage()
 

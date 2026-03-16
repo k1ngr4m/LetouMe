@@ -28,6 +28,15 @@ export type BallStatItem = {
   weightedScore: number
 }
 
+export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
+
+export type ModelListFilters = {
+  nameQuery: string
+  selectedProviders: string[]
+  selectedTags: string[]
+  scoreRange: ModelListScoreRange
+}
+
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
   return {
     ...draw,
@@ -143,6 +152,47 @@ export function sortModels(models: PredictionModel[], scores: Record<string, Mod
     if (leftPinned) return -1
     if (rightPinned) return 1
     return (scores[right.model_id]?.score100 || 0) - (scores[left.model_id]?.score100 || 0)
+  })
+}
+
+function matchesScoreRange(score: number, scoreRange: ModelListScoreRange) {
+  if (scoreRange === 'all') return true
+  if (scoreRange === '0-30') return score >= 0 && score <= 30
+  if (scoreRange === '31-60') return score >= 31 && score <= 60
+  if (scoreRange === '61-80') return score >= 61 && score <= 80
+  return score >= 81 && score <= 100
+}
+
+export function filterModels(
+  models: PredictionModel[],
+  scores: Record<string, ModelScore>,
+  filters: ModelListFilters,
+) {
+  const normalizedQuery = filters.nameQuery.trim().toLowerCase()
+  return models.filter((model) => {
+    const score = scores[model.model_id]?.score100 || 0
+    const modelName = (model.model_name || '').toLowerCase()
+    const modelId = (model.model_id || '').toLowerCase()
+    const provider = model.model_provider || ''
+    const tags = model.model_tags || []
+
+    if (normalizedQuery && !modelName.includes(normalizedQuery) && !modelId.includes(normalizedQuery)) {
+      return false
+    }
+
+    if (filters.selectedProviders.length && !filters.selectedProviders.includes(provider)) {
+      return false
+    }
+
+    if (filters.selectedTags.length && !filters.selectedTags.every((tag) => tags.includes(tag))) {
+      return false
+    }
+
+    if (!matchesScoreRange(score, filters.scoreRange)) {
+      return false
+    }
+
+    return true
   })
 }
 

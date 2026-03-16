@@ -30,8 +30,10 @@ import {
   buildSumTrendChart,
   buildSummary,
   compareNumbers,
+  filterModels,
   filterHistoryRecords,
   getActualResult,
+  type ModelListScoreRange,
   normalizePredictionsHistory,
   sortModels,
 } from './lib/home'
@@ -46,6 +48,13 @@ type HomeTab = 'prediction' | 'analysis' | 'history'
 
 const HISTORY_BATCH_SIZE = 20
 const LOTTERY_PAGE_SIZE = 20
+const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
+  { value: 'all', label: '全部评分' },
+  { value: '0-30', label: '0-30 分' },
+  { value: '31-60', label: '31-60 分' },
+  { value: '61-80', label: '61-80 分' },
+  { value: '81-100', label: '81-100 分' },
+]
 
 export function HomePage() {
   const [activeTab, setActiveTab] = useState<HomeTab>('prediction')
@@ -55,6 +64,11 @@ export function HomePage() {
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [detailModelId, setDetailModelId] = useState<string | null>(null)
+  const [isModelFilterOpen, setIsModelFilterOpen] = useState(false)
+  const [modelNameQuery, setModelNameQuery] = useState('')
+  const [selectedProviders, setSelectedProviders] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedScoreRange, setSelectedScoreRange] = useState<ModelListScoreRange>('all')
   const [summarySelectedModelIds, setSummarySelectedModelIds] = useState<string[] | null>(null)
   const [historySelectedModelIds, setHistorySelectedModelIds] = useState<string[] | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
@@ -76,6 +90,16 @@ export function HomePage() {
   const modelScores = history ? buildModelScores(history, models) : {}
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
   const orderedModels = sortModels(models, modelScores, validPinnedModelIds)
+  const availableProviders = [...new Set(orderedModels.map((model) => model.model_provider).filter(Boolean))]
+  const availableTags = [...new Set(orderedModels.flatMap((model) => model.model_tags || []).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right),
+  )
+  const filteredModels = filterModels(orderedModels, modelScores, {
+    nameQuery: modelNameQuery,
+    selectedProviders,
+    selectedTags,
+    scoreRange: selectedScoreRange,
+  })
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   useEffect(() => {
@@ -160,6 +184,23 @@ export function HomePage() {
     })
   }
 
+  function toggleModelProvider(provider: string) {
+    setSelectedProviders((previous) =>
+      previous.includes(provider) ? previous.filter((item) => item !== provider) : [...previous, provider],
+    )
+  }
+
+  function toggleModelTag(tag: string) {
+    setSelectedTags((previous) => (previous.includes(tag) ? previous.filter((item) => item !== tag) : [...previous, tag]))
+  }
+
+  function clearModelFilters() {
+    setModelNameQuery('')
+    setSelectedProviders([])
+    setSelectedTags([])
+    setSelectedScoreRange('all')
+  }
+
   function scrollToSection(section: 'models' | 'weights') {
     const target = section === 'models' ? modelSectionRef.current : weightsSectionRef.current
     setActiveSection(section)
@@ -223,23 +264,112 @@ export function HomePage() {
 
           <div className="page-section dashboard-content">
             <section ref={modelSectionRef} data-section="models">
-              <StatusCard title="模型列表" subtitle="统一查看所有模型的历史评分、本期 5 组预测号码和更多操作。">
+              <StatusCard
+                title="模型列表"
+                subtitle="统一查看所有模型的历史评分、本期 5 组预测号码和更多操作。"
+                actions={
+                  <div className="toolbar-inline">
+                    <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
+                      {isModelFilterOpen ? '收起筛选' : '展开筛选'}
+                    </button>
+                  </div>
+                }
+              >
+                {isModelFilterOpen ? (
+                  <div className="model-filter-panel">
+                    <div className="model-filter-panel__top">
+                      <label className="model-filter-panel__search">
+                        <span>名称搜索</span>
+                        <input
+                          type="text"
+                          placeholder="按模型名称或ID筛选"
+                          value={modelNameQuery}
+                          onChange={(event) => setModelNameQuery(event.target.value)}
+                        />
+                      </label>
+                      <div className="model-filter-panel__summary">
+                        <span>
+                          已显示 {filteredModels.length} / {orderedModels.length} 个模型
+                        </span>
+                        <button className="ghost-button" onClick={clearModelFilters}>
+                          清空筛选
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="model-filter-panel__grid">
+                      <div className="model-filter-panel__group">
+                        <strong>模型商</strong>
+                        <div className="filter-chip-group">
+                          {availableProviders.map((provider) => (
+                            <button
+                              key={provider}
+                              className={clsx('filter-chip', selectedProviders.includes(provider) && 'is-active')}
+                              onClick={() => toggleModelProvider(provider)}
+                            >
+                              {provider}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="model-filter-panel__group">
+                        <strong>Tag</strong>
+                        <div className="filter-chip-group">
+                          {availableTags.length ? (
+                            availableTags.map((tag) => (
+                              <button
+                                key={tag}
+                                className={clsx('filter-chip', selectedTags.includes(tag) && 'is-active')}
+                                onClick={() => toggleModelTag(tag)}
+                              >
+                                {tag}
+                              </button>
+                            ))
+                          ) : (
+                            <span className="model-filter-panel__empty">暂无 tag</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="model-filter-panel__group">
+                        <strong>近期评分</strong>
+                        <div className="filter-chip-group">
+                          {MODEL_SCORE_FILTERS.map((option) => (
+                            <button
+                              key={option.value}
+                              className={clsx('filter-chip', selectedScoreRange === option.value && 'is-active')}
+                              onClick={() => setSelectedScoreRange(option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="model-list">
-                  {orderedModels.map((model) => (
-                    <ModelListCard
-                      key={model.model_id}
-                      model={model}
-                      score={modelScores[model.model_id]?.score100 || 0}
-                      isPinned={validPinnedModelIds.includes(model.model_id)}
-                      actualResult={actualResult}
-                      isActionMenuOpen={activeActionMenuId === model.model_id}
-                      onToggleActionMenu={() =>
-                        setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
-                      }
-                      onPin={() => togglePinned(model.model_id)}
-                      onDetail={() => setDetailModelId(model.model_id)}
-                    />
-                  ))}
+                  {filteredModels.length ? (
+                    filteredModels.map((model) => (
+                      <ModelListCard
+                        key={model.model_id}
+                        model={model}
+                        score={modelScores[model.model_id]?.score100 || 0}
+                        isPinned={validPinnedModelIds.includes(model.model_id)}
+                        actualResult={actualResult}
+                        isActionMenuOpen={activeActionMenuId === model.model_id}
+                        onToggleActionMenu={() =>
+                          setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
+                        }
+                        onPin={() => togglePinned(model.model_id)}
+                        onDetail={() => setDetailModelId(model.model_id)}
+                      />
+                    ))
+                  ) : (
+                    <div className="state-shell">没有符合当前筛选条件的模型。</div>
+                  )}
                 </div>
               </StatusCard>
             </section>
@@ -573,10 +703,10 @@ function PredictionGroupCard({
     <article className={clsx('prediction-group-card', compact && 'is-compact', hitTierClass)}>
       <div className="prediction-group-card__header">
         <span className="prediction-group-card__badge">G-{group.group_id}</span>
-        <span>{group.strategy || 'AI 组合策略'}</span>
-        {hit ? <strong>{hit.totalHits} 中</strong> : null}
+        <span className="prediction-group-card__strategy">{group.strategy || 'AI 组合策略'}</span>
+        {hit ? <strong className="prediction-group-card__hit">{hit.totalHits} 中</strong> : null}
       </div>
-      <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} />
+      <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} compact={compact} />
       {compact ? null : <p className="prediction-group-card__desc">{group.description || '暂无说明'}</p>}
     </article>
   )
@@ -586,14 +716,16 @@ function PredictionNumberRow({
   group,
   actualResult,
   grayMisses = false,
+  compact = false,
 }: {
   group: PredictionGroup
   actualResult: LotteryDraw | null
   grayMisses?: boolean
+  compact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
   return (
-    <div className="number-row">
+    <div className={clsx('number-row', compact && 'number-row--compact')}>
       {group.red_balls.map((ball) => {
         const isHit = Boolean(hit?.redHits.includes(ball))
         return (
