@@ -126,7 +126,7 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
     record = prediction_service.get_history_detail_payload(payload.target_period)
     if not record:
         raise HTTPException(status_code=404, detail="历史记录不存在")
-    return record
+    return {"predictions_history": [record], "total_count": 1}
 
 
 @router.post("/settings/models/list", response_model=ModelListResponse)

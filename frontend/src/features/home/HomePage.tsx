@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Area,
   AreaChart,
@@ -14,6 +15,7 @@ import {
   YAxis,
 } from 'recharts'
 import clsx from 'clsx'
+import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
@@ -30,9 +32,15 @@ import {
   compareNumbers,
   filterHistoryRecords,
   getActualResult,
+  normalizePredictionsHistory,
   sortModels,
 } from './lib/home'
-import type { LotteryDraw, PredictionGroup, PredictionHistorySummaryModel, PredictionModel } from '../../shared/types/api'
+import type {
+  LotteryDraw,
+  PredictionGroup,
+  PredictionModel,
+  PredictionsHistoryListRecord,
+} from '../../shared/types/api'
 
 type HomeTab = 'prediction' | 'analysis' | 'history'
 
@@ -541,10 +549,12 @@ function PredictionGroupCard({
   group,
   actualResult,
   compact = false,
+  grayMisses = false,
 }: {
   group: PredictionGroup
   actualResult: LotteryDraw | null
   compact?: boolean
+  grayMisses?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
   return (
@@ -554,23 +564,49 @@ function PredictionGroupCard({
         <span>{group.strategy || 'AI 组合策略'}</span>
         {hit ? <strong>{hit.totalHits} 中</strong> : null}
       </div>
-      <PredictionNumberRow group={group} actualResult={actualResult} />
+      <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} />
       {compact ? null : <p className="prediction-group-card__desc">{group.description || '暂无说明'}</p>}
     </article>
   )
 }
 
-function PredictionNumberRow({ group, actualResult }: { group: PredictionGroup; actualResult: LotteryDraw | null }) {
+function PredictionNumberRow({
+  group,
+  actualResult,
+  grayMisses = false,
+}: {
+  group: PredictionGroup
+  actualResult: LotteryDraw | null
+  grayMisses?: boolean
+}) {
   const hit = compareNumbers(group, actualResult)
   return (
     <div className="number-row">
-      {group.red_balls.map((ball) => (
-        <NumberBall key={`r-${group.group_id}-${ball}`} value={ball} color="red" isHit={Boolean(hit?.redHits.includes(ball))} />
-      ))}
+      {group.red_balls.map((ball) => {
+        const isHit = Boolean(hit?.redHits.includes(ball))
+        return (
+          <NumberBall
+            key={`r-${group.group_id}-${ball}`}
+            value={ball}
+            color="red"
+            isHit={isHit}
+            tone={grayMisses && !isHit ? 'muted' : 'default'}
+          />
+        )
+      })}
       <span className="number-row__divider" />
-      {group.blue_balls.map((ball) => (
-        <NumberBall key={`b-${group.group_id}-${ball}`} value={ball} color="blue" isHit={Boolean(hit?.blueHits.includes(ball))} />
-      ))}
+      {group.blue_balls.map((ball) => {
+        const isHit = Boolean(hit?.blueHits.includes(ball))
+        return (
+          <NumberBall
+            key={`b-${group.group_id}-${ball}`}
+            value={ball}
+            color="blue"
+            isHit={isHit}
+            tone={grayMisses && !isHit ? 'muted' : 'default'}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -636,8 +672,16 @@ function getModelTrendColor(index: number) {
 function HistoryRecordCard({
   record,
 }: {
-  record: { target_period: string; actual_result: LotteryDraw | null; models: PredictionHistorySummaryModel[] }
+  record: PredictionsHistoryListRecord
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const detailQuery = useQuery({
+    queryKey: ['predictions-history-detail', record.target_period],
+    enabled: expanded,
+    queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period)),
+  })
+  const detailRecord = detailQuery.data?.predictions_history?.[0] || null
+
   return (
     <article className="history-record-card">
       <div className="history-record-card__header">
@@ -645,7 +689,12 @@ function HistoryRecordCard({
           <p className="history-record-card__eyebrow">第 {record.target_period} 期</p>
           <h3>开奖回溯</h3>
         </div>
-        <span>{record.actual_result?.date || '-'}</span>
+        <div className="history-record-card__actions">
+          <span>{record.actual_result?.date || '-'}</span>
+          <button className="ghost-button" onClick={() => setExpanded((value) => !value)}>
+            {expanded ? '收起详情' : '展开详情'}
+          </button>
+        </div>
       </div>
       {record.actual_result ? (
         <div className="number-row">
@@ -666,6 +715,39 @@ function HistoryRecordCard({
           </div>
         ))}
       </div>
+      {expanded ? (
+        <div className="history-record-card__detail">
+          {detailQuery.isLoading ? <div className="state-shell">正在加载该期预测详情...</div> : null}
+          {detailQuery.error instanceof Error ? (
+            <div className="state-shell state-shell--error">详情加载失败：{detailQuery.error.message}</div>
+          ) : null}
+          {!detailQuery.isLoading && !detailQuery.error && detailRecord ? (
+            <div className="history-record-card__detail-list">
+              {detailRecord.models.map((model) => (
+                <section key={`${record.target_period}-${model.model_id}-detail`} className="history-record-card__detail-model">
+                  <div className="history-record-card__detail-header">
+                    <div>
+                      <strong>{model.model_name}</strong>
+                      <p>{model.model_provider}</p>
+                    </div>
+                    <span>最佳命中 {model.best_hit_count || 0}</span>
+                  </div>
+                  <div className="detail-group-list">
+                    {model.predictions.map((group) => (
+                      <PredictionGroupCard
+                        key={`${record.target_period}-${model.model_id}-${group.group_id}`}
+                        group={group}
+                        actualResult={record.actual_result}
+                        grayMisses
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   )
 }

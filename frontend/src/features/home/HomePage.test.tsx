@@ -1,8 +1,18 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
+
+const { getPredictionsHistoryDetail } = vi.hoisted(() => ({
+  getPredictionsHistoryDetail: vi.fn(),
+}))
+
+vi.mock('../../shared/api/client', () => ({
+  apiClient: {
+    getPredictionsHistoryDetail,
+  },
+}))
 
 vi.mock('./hooks/useHomeData', () => ({
   useHomeData: () => ({
@@ -39,8 +49,27 @@ vi.mock('./hooks/useHomeData', () => ({
     },
     predictionsHistory: {
       data: {
-        predictions_history: [],
-        total_count: 0,
+        predictions_history: [
+          {
+            prediction_date: '2026-03-12',
+            target_period: '2026031',
+            actual_result: {
+              period: '2026031',
+              date: '2026-03-10',
+              red_balls: ['01', '08', '12', '19', '25'],
+              blue_balls: ['06', '11'],
+            },
+            models: [
+              {
+                model_id: 'model-a',
+                model_name: '模型A',
+                model_provider: 'openai_compatible',
+                best_hit_count: 3,
+              },
+            ],
+          },
+        ],
+        total_count: 1,
       },
       isLoading: false,
       error: null,
@@ -72,6 +101,10 @@ function renderPage() {
   )
 }
 
+beforeEach(() => {
+  getPredictionsHistoryDetail.mockReset()
+})
+
 describe('HomePage dashboard sidebar', () => {
   it('shows local sidebar navigation on prediction tab', () => {
     renderPage()
@@ -90,5 +123,63 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('button', { name: '模型列表' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '号码预测统计' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '号码预测统计' })).not.toBeInTheDocument()
+  })
+
+  it('loads history detail on expand and highlights hit numbers', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 3,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['01', '02', '03', '12', '15'],
+                  blue_balls: ['06', '10'],
+                  hit_result: {
+                    red_hits: ['01', '12'],
+                    red_hit_count: 2,
+                    blue_hits: ['06'],
+                    blue_hit_count: 1,
+                    total_hits: 3,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '展开详情' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031'))
+    expect(await screen.findByText('收起详情')).toBeInTheDocument()
+
+    const groupCard = screen.getByText('G-1').closest('.prediction-group-card')
+    expect(groupCard).not.toBeNull()
+    const cardScope = within(groupCard as HTMLElement)
+    expect(cardScope.getByText('01')).toHaveClass('is-hit')
+    expect(cardScope.getByText('12')).toHaveClass('is-hit')
+    expect(cardScope.getByText('06')).toHaveClass('is-hit')
+    expect(cardScope.getByText('02')).not.toHaveClass('is-hit')
+    expect(cardScope.getByText('02')).toHaveClass('number-ball--muted')
+    expect(cardScope.getByText('10')).toHaveClass('number-ball--muted')
+    expect(cardScope.getByText('01')).not.toHaveClass('number-ball--muted')
   })
 })
