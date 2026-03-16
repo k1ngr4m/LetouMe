@@ -27,6 +27,8 @@ class PredictionGenerationTaskService:
                 "skipped_count": 0,
                 "failed_count": 0,
                 "failed_periods": [],
+                "completed_count": 0,
+                "failed_details": [],
             },
             "error_message": None,
             },

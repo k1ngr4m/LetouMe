@@ -171,6 +171,12 @@ export type BulkModelActionResult = {
   failed_models: string[]
 }
 
+export type PredictionGenerationFailureDetail = {
+  model_code: string
+  model_name?: string
+  reason: string
+}
+
 export type PredictionGenerationTask = {
   task_id: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
@@ -183,10 +189,16 @@ export type PredictionGenerationTask = {
     mode: string
     model_code: string
     target_period?: string | null
+    selected_count?: number
+    completed_count?: number
     processed_count: number
     skipped_count: number
     failed_count: number
     failed_periods: string[]
+    processed_models?: string[]
+    skipped_models?: string[]
+    failed_models?: string[]
+    failed_details?: PredictionGenerationFailureDetail[]
   }
   error_message?: string | null
 }

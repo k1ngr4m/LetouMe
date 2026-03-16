@@ -145,6 +145,8 @@ class ModelSettingsApiTests(unittest.TestCase):
                     "skipped_count": 0,
                     "failed_count": 0,
                     "failed_periods": [],
+                    "completed_count": 0,
+                    "failed_details": [],
                 },
                 "error_message": None,
             }
@@ -194,12 +196,14 @@ class ModelSettingsApiTests(unittest.TestCase):
                     "mode": "current",
                     "model_code": "__bulk__",
                     "selected_count": 2,
+                    "completed_count": 0,
                     "processed_count": 0,
                     "skipped_count": 0,
                     "failed_count": 0,
                     "processed_models": [],
                     "skipped_models": [],
                     "failed_models": [],
+                    "failed_details": [],
                 },
                 "error_message": None,
             }

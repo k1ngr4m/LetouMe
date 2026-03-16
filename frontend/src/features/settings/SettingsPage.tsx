@@ -275,6 +275,24 @@ function getTaskStatusLabel(status: string) {
   return status
 }
 
+function getGenerationTaskTotal(task: PredictionGenerationTask | null) {
+  if (!task) return 0
+  return task.progress_summary.selected_count ?? (
+    task.progress_summary.processed_count +
+    task.progress_summary.skipped_count +
+    task.progress_summary.failed_count
+  )
+}
+
+function getGenerationTaskCompleted(task: PredictionGenerationTask | null) {
+  if (!task) return 0
+  return task.progress_summary.completed_count ?? (
+    task.progress_summary.processed_count +
+    task.progress_summary.skipped_count +
+    task.progress_summary.failed_count
+  )
+}
+
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -495,6 +513,22 @@ export function SettingsPage() {
   const allVisibleModelsSelected = sortedModels.length > 0 && selectedVisibleCount === sortedModels.length
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
   const currentSortMeta = MODEL_SORT_META[modelSortOption]
+  const modelNameMap = useMemo(
+    () => Object.fromEntries(models.map((model) => [model.model_code, model.display_name])),
+    [models],
+  )
+  const isBulkGenerationTask = generationTask?.model_code === '__bulk__'
+  const generationTaskTotal = getGenerationTaskTotal(generationTask)
+  const generationTaskCompleted = getGenerationTaskCompleted(generationTask)
+  const generationProgressPercent = generationTaskTotal > 0 ? Math.min(100, Math.round((generationTaskCompleted / generationTaskTotal) * 100)) : 0
+  const generationFailedDetails = useMemo(
+    () =>
+      (generationTask?.progress_summary.failed_details ?? []).map((item) => ({
+        ...item,
+        model_name: item.model_name || modelNameMap[item.model_code] || item.model_code,
+      })),
+    [generationTask?.progress_summary.failed_details, modelNameMap],
+  )
 
   useEffect(() => {
     setSelectedModelCodes((previous) => {
@@ -578,7 +612,7 @@ export function SettingsPage() {
           }),
     onSuccess: (task) => {
       setGenerationTask(task)
-      setGenerationModalOpen(false)
+      setGenerationModalOpen(true)
       setSelectedModelCodes([])
       setMessage(generationForm.modelCodes.length > 1 ? '批量预测任务已创建，正在后台执行。' : '预测生成任务已创建，正在后台执行。')
       setMessageType('success')
@@ -716,6 +750,7 @@ export function SettingsPage() {
   }
 
   function openGenerateModel(modelCode: string, displayName: string) {
+    setGenerationTask(null)
     setGenerationForm({
       modelCodes: [modelCode],
       displayName,
@@ -728,6 +763,7 @@ export function SettingsPage() {
   }
 
   function openBulkGenerateModels() {
+    setGenerationTask(null)
     setGenerationForm({
       modelCodes: selectedModelCodes,
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
@@ -1873,6 +1909,89 @@ export function SettingsPage() {
                     <input value={generationForm.endPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))} required />
                   </label>
                 </>
+              ) : null}
+              {generationTask ? (
+                <section className="generation-task-panel" aria-live="polite">
+                  <div className="generation-task-panel__header">
+                    <div>
+                      <p className="modal-card__eyebrow">任务状态</p>
+                      <h4>{isBulkGenerationTask ? '批量生成任务' : '单模型生成任务'}</h4>
+                    </div>
+                    <span className={clsx('status-pill', generationTask.status === 'succeeded' && 'is-active', generationTask.status === 'failed' && 'is-deleted')}>
+                      {getTaskStatusLabel(generationTask.status)}
+                    </span>
+                  </div>
+                  {isBulkGenerationTask ? (
+                    <>
+                      <div className="generation-task-panel__progress-meta">
+                        <strong>{generationProgressPercent}%</strong>
+                        <span>{generationTaskCompleted} / {generationTaskTotal || generationForm.modelCodes.length} 个模型</span>
+                      </div>
+                      <div
+                        className="generation-task-panel__progress-bar"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={generationTaskTotal || generationForm.modelCodes.length || 0}
+                        aria-valuenow={generationTaskCompleted}
+                      >
+                        <span style={{ width: `${generationProgressPercent}%` }} />
+                      </div>
+                      <div className="generation-task-panel__stats">
+                        <article>
+                          <strong>{generationTaskTotal || generationForm.modelCodes.length}</strong>
+                          <span>总模型数</span>
+                        </article>
+                        <article>
+                          <strong>{generationTask.progress_summary.processed_count}</strong>
+                          <span>成功</span>
+                        </article>
+                        <article>
+                          <strong>{generationTask.progress_summary.skipped_count}</strong>
+                          <span>跳过</span>
+                        </article>
+                        <article>
+                          <strong>{generationTask.progress_summary.failed_count}</strong>
+                          <span>失败</span>
+                        </article>
+                      </div>
+                      {generationFailedDetails.length ? (
+                        <div className="generation-task-panel__failures">
+                          <div className="generation-task-panel__failures-title">
+                            <strong>失败模型</strong>
+                            <span>{generationFailedDetails.length} 个</span>
+                          </div>
+                          <div className="generation-task-panel__failure-list">
+                            {generationFailedDetails.map((item) => (
+                              <article key={`${item.model_code}-${item.reason}`} className="generation-task-panel__failure-item">
+                                <div>
+                                  <strong>{item.model_name}</strong>
+                                  <span>{item.model_code}</span>
+                                </div>
+                                <p>{item.reason}</p>
+                              </article>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="generation-task-panel__stats">
+                      <article>
+                        <strong>{generationTask.progress_summary.processed_count}</strong>
+                        <span>成功</span>
+                      </article>
+                      <article>
+                        <strong>{generationTask.progress_summary.skipped_count}</strong>
+                        <span>跳过</span>
+                      </article>
+                      <article>
+                        <strong>{generationTask.progress_summary.failed_count}</strong>
+                        <span>失败</span>
+                      </article>
+                    </div>
+                  )}
+                  {generationTask.error_message ? <div className="state-shell state-shell--error">任务失败：{generationTask.error_message}</div> : null}
+                </section>
               ) : null}
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending}>创建任务</button>

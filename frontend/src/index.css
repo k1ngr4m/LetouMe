@@ -1684,6 +1684,88 @@ a {
   background: rgba(215, 64, 90, 0.12);
 }
 
+.generation-task-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-1);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.generation-task-panel__header,
+.generation-task-panel__progress-meta,
+.generation-task-panel__failures-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.generation-task-panel__header h4 {
+  margin: 0.3rem 0 0;
+}
+
+.generation-task-panel__progress-meta strong {
+  font-size: 1.3rem;
+}
+
+.generation-task-panel__progress-meta span,
+.generation-task-panel__failures-title span,
+.generation-task-panel__failure-item span {
+  color: var(--text-2);
+}
+
+.generation-task-panel__progress-bar {
+  height: 0.8rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.generation-task-panel__progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #e46c40, #f1b24c);
+  transition: width 0.25s ease;
+}
+
+.generation-task-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.generation-task-panel__stats article,
+.generation-task-panel__failure-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border-1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.generation-task-panel__stats article strong,
+.generation-task-panel__failure-item strong {
+  font-size: 1.1rem;
+}
+
+.generation-task-panel__stats article span {
+  color: var(--text-2);
+}
+
+.generation-task-panel__failure-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.generation-task-panel__failure-item p {
+  margin: 0;
+  color: #ffb9c2;
+}
+
 .settings-overview-grid,
 .settings-console-grid {
   display: grid;

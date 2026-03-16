@@ -248,12 +248,14 @@ class PredictionGenerationService:
             "mode": mode,
             "model_code": "__bulk__",
             "selected_count": len(unique_codes),
+            "completed_count": 0,
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
             "processed_models": [],
             "skipped_models": [],
             "failed_models": [],
+            "failed_details": [],
         }
 
         for model_code in unique_codes:
@@ -280,14 +282,24 @@ class PredictionGenerationService:
                 else:
                     summary["failed_count"] += 1
                     summary["failed_models"].append(model_code)
-            except Exception:
+                    summary["failed_details"].append(self._build_failed_detail(model_code, "模型未生成结果"))
+            except Exception as exc:
                 self.logger.exception("Bulk prediction generation failed", extra={"context": {"model_code": model_code, "mode": mode}})
                 summary["failed_count"] += 1
                 summary["failed_models"].append(model_code)
+                summary["failed_details"].append(self._build_failed_detail(model_code, str(exc)))
+            summary["completed_count"] += 1
             if progress_callback:
                 progress_callback(dict(summary))
 
         return summary
+
+    @staticmethod
+    def _build_failed_detail(model_code: str, reason: str) -> dict[str, str]:
+        return {
+            "model_code": model_code,
+            "reason": reason or "未知错误",
+        }
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         model = ModelFactory().create(model_def)
