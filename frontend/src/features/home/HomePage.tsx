@@ -550,15 +550,27 @@ function PredictionGroupCard({
   actualResult,
   compact = false,
   grayMisses = false,
+  emphasizeHitTier = false,
 }: {
   group: PredictionGroup
   actualResult: LotteryDraw | null
   compact?: boolean
   grayMisses?: boolean
+  emphasizeHitTier?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
+  const hitTierClass =
+    emphasizeHitTier && hit
+      ? hit.totalHits >= 6
+        ? 'is-hit-tier-6'
+        : hit.totalHits === 5
+          ? 'is-hit-tier-5'
+          : hit.totalHits === 4
+            ? 'is-hit-tier-4'
+            : null
+      : null
   return (
-    <article className={clsx('prediction-group-card', compact && 'is-compact')}>
+    <article className={clsx('prediction-group-card', compact && 'is-compact', hitTierClass)}>
       <div className="prediction-group-card__header">
         <span className="prediction-group-card__badge">G-{group.group_id}</span>
         <span>{group.strategy || 'AI 组合策略'}</span>
@@ -739,6 +751,7 @@ function HistoryRecordCard({
                         group={group}
                         actualResult={record.actual_result}
                         grayMisses
+                        emphasizeHitTier
                       />
                     ))}
                   </div>

@@ -156,6 +156,42 @@ describe('HomePage dashboard sidebar', () => {
                     total_hits: 3,
                   },
                 },
+                {
+                  group_id: 2,
+                  red_balls: ['01', '08', '12', '19', '30'],
+                  blue_balls: ['09', '10'],
+                  hit_result: {
+                    red_hits: ['01', '08', '12', '19'],
+                    red_hit_count: 4,
+                    blue_hits: [],
+                    blue_hit_count: 0,
+                    total_hits: 4,
+                  },
+                },
+                {
+                  group_id: 3,
+                  red_balls: ['01', '08', '12', '19', '30'],
+                  blue_balls: ['06', '10'],
+                  hit_result: {
+                    red_hits: ['01', '08', '12', '19'],
+                    red_hit_count: 4,
+                    blue_hits: ['06'],
+                    blue_hit_count: 1,
+                    total_hits: 5,
+                  },
+                },
+                {
+                  group_id: 4,
+                  red_balls: ['01', '08', '12', '19', '25'],
+                  blue_balls: ['06', '11'],
+                  hit_result: {
+                    red_hits: ['01', '08', '12', '19', '25'],
+                    red_hit_count: 5,
+                    blue_hits: ['06'],
+                    blue_hit_count: 1,
+                    total_hits: 6,
+                  },
+                },
               ],
             },
           ],
@@ -181,5 +217,15 @@ describe('HomePage dashboard sidebar', () => {
     expect(cardScope.getByText('02')).toHaveClass('number-ball--muted')
     expect(cardScope.getByText('10')).toHaveClass('number-ball--muted')
     expect(cardScope.getByText('01')).not.toHaveClass('number-ball--muted')
+
+    const hit4Card = screen.getByText('G-2').closest('.prediction-group-card')
+    const hit5Card = screen.getByText('G-3').closest('.prediction-group-card')
+    const hit6Card = screen.getByText('G-4').closest('.prediction-group-card')
+    expect(groupCard).not.toHaveClass('is-hit-tier-4')
+    expect(groupCard).not.toHaveClass('is-hit-tier-5')
+    expect(groupCard).not.toHaveClass('is-hit-tier-6')
+    expect(hit4Card).toHaveClass('is-hit-tier-4')
+    expect(hit5Card).toHaveClass('is-hit-tier-5')
+    expect(hit6Card).toHaveClass('is-hit-tier-6')
   })
 })
