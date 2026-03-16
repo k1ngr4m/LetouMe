@@ -124,6 +124,41 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["is_active"])
 
+    def test_generate_prediction_task_endpoint_returns_task_payload(self) -> None:
+        with (
+            patch("backend.app.api.routes.prediction_generation_service.validate_model") as validate_model,
+            patch("backend.app.api.routes.prediction_generation_task_service.create_task") as create_task,
+        ):
+            validate_model.return_value = {"model_code": "claude-sonnet-4.6", "is_deleted": False}
+            create_task.return_value = {
+                "task_id": "task-1",
+                "status": "queued",
+                "mode": "current",
+                "model_code": "claude-sonnet-4.6",
+                "created_at": "2026-03-16T00:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "mode": "current",
+                    "model_code": "claude-sonnet-4.6",
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                    "failed_periods": [],
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post(
+                "/api/settings/models/predictions/generate",
+                json={"model_code": "claude-sonnet-4.6", "mode": "current", "overwrite": False},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "task-1")
+        validate_model.assert_called_once_with("claude-sonnet-4.6")
+        create_task.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

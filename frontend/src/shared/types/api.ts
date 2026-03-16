@@ -132,6 +132,34 @@ export type SettingsModelPayload = {
   is_active: boolean
 }
 
+export type GenerateSettingsModelPredictionsPayload = {
+  model_code: string
+  mode: 'current' | 'history'
+  overwrite: boolean
+  start_period?: string
+  end_period?: string
+}
+
+export type PredictionGenerationTask = {
+  task_id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  mode: 'current' | 'history'
+  model_code: string
+  created_at: string
+  started_at?: string | null
+  finished_at?: string | null
+  progress_summary: {
+    mode: string
+    model_code: string
+    target_period?: string | null
+    processed_count: number
+    skipped_count: number
+    failed_count: number
+    failed_periods: string[]
+  }
+  error_message?: string | null
+}
+
 export type AuthUser = {
   id: number
   username: string

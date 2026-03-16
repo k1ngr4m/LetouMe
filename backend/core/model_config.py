@@ -326,7 +326,6 @@ def _provider_name(provider_code: str) -> str:
 
 
 def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
-    bootstrap_default_models()
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(

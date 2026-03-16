@@ -21,3 +21,15 @@ class CurrentPredictionsResponse(BaseModel):
 class PredictionsHistoryResponse(BaseModel):
     predictions_history: list[dict[str, Any]]
     total_count: int = 0
+
+
+class PredictionGenerationTaskResponse(BaseModel):
+    task_id: str
+    status: str
+    mode: str
+    model_code: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    progress_summary: dict[str, Any]
+    error_message: str | None = None

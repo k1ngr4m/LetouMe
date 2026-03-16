@@ -3,10 +3,27 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from backend.app.db.connection import ensure_schema
 from backend.core.model_config import load_model_registry
+
+
+class ModelScopeConfigUnitTests(unittest.TestCase):
+    def test_load_registry_does_not_bootstrap_default_models(self) -> None:
+        connection = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchall.return_value = []
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.__enter__.return_value = connection
+        with (
+            patch("backend.core.model_config.bootstrap_default_models") as bootstrap_default_models,
+            patch("backend.core.model_config.get_connection", return_value=connection),
+        ):
+            with self.assertRaisesRegex(ValueError, "数据库中没有模型配置"):
+                load_model_registry()
+
+        bootstrap_default_models.assert_not_called()
 
 
 class ModelScopeConfigTests(unittest.TestCase):

@@ -9,6 +9,7 @@ import type {
   PasswordChangePayload,
   PermissionItem,
   PermissionUpdatePayload,
+  PredictionGenerationTask,
   RoleItem,
   RolePayload,
   SettingsModelPayload,
@@ -16,6 +17,7 @@ import type {
 
 type SettingsTab = 'profile' | 'models' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
+type ModelPredictionMode = 'current' | 'history'
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -41,6 +43,15 @@ const EMPTY_ROLE_FORM: RolePayload = {
   role_code: '',
   role_name: '',
   permissions: [],
+}
+
+const EMPTY_GENERATION_FORM = {
+  modelCode: '',
+  displayName: '',
+  mode: 'current' as ModelPredictionMode,
+  overwrite: false,
+  startPeriod: '',
+  endPeriod: '',
 }
 
 function getRoleProtectionHint(role: RoleItem | null) {
@@ -73,6 +84,9 @@ export function SettingsPage() {
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
+  const [generationModalOpen, setGenerationModalOpen] = useState(false)
+  const [generationForm, setGenerationForm] = useState(EMPTY_GENERATION_FORM)
+  const [generationTask, setGenerationTask] = useState<PredictionGenerationTask | null>(null)
   const [newUserForm, setNewUserForm] = useState({ username: '', nickname: '', password: '', role: 'normal_user', is_active: true })
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
@@ -125,6 +139,29 @@ export function SettingsPage() {
   useEffect(() => {
     setProfileNickname(user?.nickname || '')
   }, [user?.nickname])
+
+  useEffect(() => {
+    if (!generationTask || !['queued', 'running'].includes(generationTask.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const task = await apiClient.getPredictionGenerationTaskDetail(generationTask.task_id)
+        setGenerationTask(task)
+        if (task.status === 'succeeded') {
+          const summary = task.progress_summary
+          setMessage(`预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+        } else if (task.status === 'failed') {
+          setMessage(task.error_message || '预测任务执行失败')
+          setMessageType('error')
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [generationTask, queryClient])
 
   const models = modelsQuery.data?.models || []
   const providers = providersQuery.data?.providers || []
@@ -190,6 +227,27 @@ export function SettingsPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings-models'] }),
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型操作失败')
+      setMessageType('error')
+    },
+  })
+
+  const generatePredictionMutation = useMutation({
+    mutationFn: () =>
+      apiClient.generateSettingsModelPredictions({
+        model_code: generationForm.modelCode,
+        mode: generationForm.mode,
+        overwrite: generationForm.overwrite,
+        start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
+        end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
+      }),
+    onSuccess: (task) => {
+      setGenerationTask(task)
+      setGenerationModalOpen(false)
+      setMessage('预测生成任务已创建，正在后台执行。')
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建预测任务失败')
       setMessageType('error')
     },
   })
@@ -288,6 +346,18 @@ export function SettingsPage() {
     setModelModalOpen(true)
   }
 
+  function openGenerateModel(modelCode: string, displayName: string) {
+    setGenerationForm({
+      modelCode,
+      displayName,
+      mode: 'current',
+      overwrite: false,
+      startPeriod: '',
+      endPeriod: '',
+    })
+    setGenerationModalOpen(true)
+  }
+
   async function openEditModel(modelCode: string) {
     const model = await apiClient.getSettingsModel(modelCode)
     setModelMode('edit')
@@ -340,6 +410,23 @@ export function SettingsPage() {
       role_name: roleForm.role_name.trim(),
       permissions: roleForm.permissions,
     })
+  }
+
+  function submitGenerationForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (generationForm.mode === 'history') {
+      if (!generationForm.startPeriod.trim() || !generationForm.endPeriod.trim()) {
+        setMessage('历史重算必须填写开始期号和结束期号')
+        setMessageType('error')
+        return
+      }
+      if (Number(generationForm.startPeriod) > Number(generationForm.endPeriod)) {
+        setMessage('开始期号不能大于结束期号')
+        setMessageType('error')
+        return
+      }
+    }
+    generatePredictionMutation.mutate()
   }
 
   function getPermissionLabel(permissionCode: string) {
@@ -511,6 +598,7 @@ export function SettingsPage() {
                                 <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
                                 {!model.is_deleted ? (
                                   <>
+                                    <button className="ghost-button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>生成预测数据</button>
                                     <button
                                       className="ghost-button"
                                       onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
@@ -551,6 +639,7 @@ export function SettingsPage() {
                           <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
                           {!model.is_deleted ? (
                             <>
+                              <button className="ghost-button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>生成预测数据</button>
                               <button className="ghost-button" onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}>
                                 {model.is_active ? '停用' : '启用'}
                               </button>
@@ -874,6 +963,57 @@ export function SettingsPage() {
               </label>
               <div className="form-actions">
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {generationModalOpen ? (
+        <div className="modal-shell" role="presentation" onClick={() => setGenerationModalOpen(false)}>
+          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid" onSubmit={submitGenerationForm}>
+              <div className="modal-card__header">
+                <div>
+                  <p className="modal-card__eyebrow">预测生成</p>
+                  <h3>{generationForm.displayName || generationForm.modelCode}</h3>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
+              </div>
+              <label className="field">
+                <span>生成模式</span>
+                <select
+                  value={generationForm.mode}
+                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
+                >
+                  <option value="current">当前期生成</option>
+                  <option value="history">历史重算</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>结果策略</span>
+                <select
+                  value={generationForm.overwrite ? 'overwrite' : 'skip'}
+                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, overwrite: event.target.value === 'overwrite' }))}
+                >
+                  <option value="skip">已有结果时跳过</option>
+                  <option value="overwrite">已有结果时覆盖</option>
+                </select>
+              </label>
+              {generationForm.mode === 'history' ? (
+                <>
+                  <label className="field">
+                    <span>开始期号</span>
+                    <input value={generationForm.startPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))} required />
+                  </label>
+                  <label className="field">
+                    <span>结束期号</span>
+                    <input value={generationForm.endPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))} required />
+                  </label>
+                </>
+              ) : null}
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending}>创建任务</button>
               </div>
             </form>
           </div>

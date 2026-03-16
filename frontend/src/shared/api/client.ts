@@ -4,6 +4,7 @@ import type {
   AdminUserUpdatePayload,
   CurrentUserResponse,
   CurrentPredictionsResponse,
+  GenerateSettingsModelPredictionsPayload,
   LoginPayload,
   LotteryHistoryResponse,
   PasswordChangePayload,
@@ -15,6 +16,7 @@ import type {
   RoleItem,
   RoleListResponse,
   RolePayload,
+  PredictionGenerationTask,
   SettingsModel,
   SettingsModelListResponse,
   SettingsModelPayload,
@@ -184,6 +186,18 @@ export const apiClient = {
     return requestJson<SettingsModel>('/api/settings/models/restore', {
       method: 'POST',
       body: JSON.stringify({ model_code: modelCode }),
+    })
+  },
+  generateSettingsModelPredictions(payload: GenerateSettingsModelPredictionsPayload) {
+    return requestJson<PredictionGenerationTask>('/api/settings/models/predictions/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  getPredictionGenerationTaskDetail(taskId: string) {
+    return requestJson<PredictionGenerationTask>('/api/settings/models/predictions/task-detail', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
     })
   },
   listUsers() {

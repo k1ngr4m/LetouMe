@@ -27,6 +27,18 @@ class ModelStatusUpdatePayload(BaseModel):
     is_active: bool
 
 
+class GenerateModelPredictionsPayload(BaseModel):
+    model_code: str
+    mode: str
+    overwrite: bool = False
+    start_period: str | None = None
+    end_period: str | None = None
+
+
+class PredictionGenerationTaskPayload(BaseModel):
+    task_id: str
+
+
 class PredictionHistoryDetailPayload(BaseModel):
     target_period: str
 
