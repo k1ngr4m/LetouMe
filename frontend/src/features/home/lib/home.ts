@@ -23,6 +23,7 @@ export type BallStatItem = {
   appearanceCount: number
   totalGroupCount: number
   matchedModelCount: number
+  matchedModelIds: string[]
   selectedModelCount: number
   appearanceRatio: number
   weightedScore: number
@@ -234,6 +235,7 @@ export function buildSummary(models: PredictionModel[], scores: Record<string, M
         appearanceCount: meta.appearanceCount,
         totalGroupCount,
         matchedModelCount: meta.models.size,
+        matchedModelIds: [...meta.models].sort((left, right) => left.localeCompare(right)),
         selectedModelCount: modelCount,
         appearanceRatio: totalGroupCount ? meta.appearanceCount / totalGroupCount : 0,
         weightedScore: Number(meta.weightedScore.toFixed(2)),

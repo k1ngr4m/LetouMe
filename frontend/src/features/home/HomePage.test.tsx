@@ -187,6 +187,23 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(summarySection as HTMLElement).getByText('当前筛选条件下没有可统计的模型。')).toBeInTheDocument()
   })
 
+  it('shows matched and unmatched models in summary tooltip', async () => {
+    renderPage()
+
+    const summarySection = screen.getByRole('heading', { name: '号码预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+
+    const badge = within(summarySection as HTMLElement).getAllByRole('button', { name: '命中 1 个模型' })[0]
+    await userEvent.hover(badge)
+
+    const tooltip = await screen.findByRole('tooltip')
+    const modelA = within(tooltip).getByText('模型A')
+    const modelB = within(tooltip).getByText('模型B')
+
+    expect(modelA).toHaveClass('is-hit')
+    expect(modelB).not.toHaveClass('is-hit')
+  })
+
   it('hides local sidebar navigation outside prediction tab', async () => {
     renderPage()
 

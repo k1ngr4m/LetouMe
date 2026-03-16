@@ -817,12 +817,69 @@ a {
 }
 
 .ball-stat-card__badge {
+  border: 0;
+  cursor: default;
+  font: inherit;
   padding: 0.35rem 0.55rem;
   border-radius: 999px;
   background: rgba(244, 98, 98, 0.12);
   color: #ef4444;
   font-weight: 700;
   font-size: 0.78rem;
+}
+
+.ball-stat-card__badge-shell {
+  position: relative;
+}
+
+.ball-stat-card__badge-shell:hover .ball-stat-card__tooltip,
+.ball-stat-card__badge-shell:focus-within .ball-stat-card__tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.ball-stat-card__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.65rem);
+  z-index: 10;
+  width: 220px;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(9, 13, 22, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.35rem);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.ball-stat-card__tooltip-title {
+  margin: 0 0 0.55rem;
+  color: var(--text-1);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ball-stat-card__tooltip-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ball-stat-card__tooltip-model {
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-3);
+  font-size: 0.76rem;
+}
+
+.ball-stat-card__tooltip-model.is-hit {
+  background: rgba(63, 194, 125, 0.2);
+  color: #9df2bf;
 }
 
 .ball-stat-card__bar {

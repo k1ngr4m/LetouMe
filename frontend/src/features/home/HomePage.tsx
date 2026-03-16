@@ -134,6 +134,7 @@ export function HomePage() {
   }, [activeTab])
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(historyPeriodQuery, commonOnly, weightedSummary)
+  const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
   const redChart = buildRedFrequencyChart(chartDraws)
   const blueChart = buildBlueFrequencyChart(chartDraws)
@@ -307,8 +308,8 @@ export function HomePage() {
                   <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
                 ) : (
                   <div className="summary-columns">
-                    <SummaryList title="前区统计" items={summary.red} color="red" />
-                    <SummaryList title="后区统计" items={summary.blue} color="blue" />
+                    <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
+                    <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
                   </div>
                 )}
               </StatusCard>
@@ -677,10 +678,12 @@ function SummaryList({
   title,
   items,
   color,
+  models,
 }: {
   title: string
   items: BallStatItem[]
   color: 'red' | 'blue'
+  models: PredictionModel[]
 }) {
   return (
     <div className="summary-list">
@@ -694,7 +697,7 @@ function SummaryList({
             <p className="ball-stat-card__appearance">
               出现 {item.appearanceCount}/{item.totalGroupCount}
             </p>
-            <div className="ball-stat-card__badge">命中 {item.matchedModelCount} 个模型</div>
+            <SummaryHitTooltipBadge title={title} item={item} models={models} />
             <div className="ball-stat-card__bar">
               <div className="ball-stat-card__bar-fill" style={{ width: `${Math.round(item.appearanceRatio * 100)}%` }} />
             </div>
@@ -702,6 +705,50 @@ function SummaryList({
           </article>
         ))}
       </div>
+    </div>
+  )
+}
+
+function SummaryHitTooltipBadge({
+  title,
+  item,
+  models,
+}: {
+  title: string
+  item: BallStatItem
+  models: PredictionModel[]
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div
+      className="ball-stat-card__badge-shell"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onFocus={() => setIsOpen(true)}
+      onBlur={() => setIsOpen(false)}
+    >
+      <button className="ball-stat-card__badge" type="button">
+        命中 {item.matchedModelCount} 个模型
+      </button>
+      {isOpen ? (
+        <div className="ball-stat-card__tooltip" role="tooltip">
+          <p className="ball-stat-card__tooltip-title">命中模型</p>
+          <div className="ball-stat-card__tooltip-models">
+            {models.map((model) => {
+              const isMatched = item.matchedModelIds.includes(model.model_id)
+              return (
+                <span
+                  key={`${title}-${item.ball}-${model.model_id}`}
+                  className={clsx('ball-stat-card__tooltip-model', isMatched && 'is-hit')}
+                >
+                  {model.model_name}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
