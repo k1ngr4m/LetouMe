@@ -9,8 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.api.routes import router
 from backend.app.auth import AuthService
 from backend.app.config import load_settings
-from backend.app.db.connection import ensure_schema
+from backend.app.db.connection import ensure_schema, get_request_metrics, reset_request_metrics
 from backend.app.logging_utils import configure_logging, get_logger
+from backend.app.rbac import ensure_rbac_setup
 from backend.core.model_config import bootstrap_default_models
 
 
@@ -31,9 +32,11 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
         started_at = perf_counter()
+        reset_request_metrics()
         try:
             response = await call_next(request)
         except Exception as exc:
+            db_metrics = get_request_metrics()
             logger.exception(
                 "Unhandled request error",
                 extra={
@@ -42,11 +45,13 @@ def create_app() -> FastAPI:
                         "path": request.url.path,
                         "duration_ms": round((perf_counter() - started_at) * 1000, 2),
                         "error": type(exc).__name__,
+                        **db_metrics,
                     }
                 },
             )
             raise
 
+        db_metrics = get_request_metrics()
         logger.info(
             "Request completed",
             extra={
@@ -55,14 +60,20 @@ def create_app() -> FastAPI:
                     "path": request.url.path,
                     "status_code": response.status_code,
                     "duration_ms": round((perf_counter() - started_at) * 1000, 2),
+                    **db_metrics,
                 }
             },
+        )
+        response.headers["Server-Timing"] = (
+            f"app;dur={round((perf_counter() - started_at) * 1000, 2)}, "
+            f"db;dur={db_metrics['db_time_ms']}"
         )
         return response
 
     @app.on_event("startup")
     def on_startup() -> None:
         ensure_schema()
+        ensure_rbac_setup()
         bootstrap_default_models()
         AuthService(settings=settings).ensure_bootstrap_admin()
         logger.info("Application startup complete", extra={"context": {"env": settings.app_env}})

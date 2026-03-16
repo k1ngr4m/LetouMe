@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.app.cache import runtime_cache
 from backend.app.db.connection import get_connection
-from backend.app.rbac import DEFAULT_PERMISSIONS, DEFAULT_ROLES, ROLE_MANAGEMENT_PERMISSION, SUPER_ADMIN_ROLE, ensure_rbac_setup
+from backend.app.rbac import DEFAULT_PERMISSIONS, DEFAULT_ROLES, SUPER_ADMIN_ROLE
 
 
 class RoleRepository:
     def list_roles(self) -> list[dict[str, Any]]:
-        ensure_rbac_setup()
+        cached = runtime_cache.get("roles:list")
+        if cached is not None:
+            return list(cached)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -27,7 +30,7 @@ class RoleRepository:
                 )
                 rows = cursor.fetchall()
                 permissions = self._load_permissions(cursor)
-        return [
+        roles = [
             {
                 "role_code": row["role_code"],
                 "role_name": row["role_name"],
@@ -37,13 +40,17 @@ class RoleRepository:
             }
             for row in rows
         ]
+        runtime_cache.set("roles:list", roles, ttl_seconds=300)
+        return roles
 
     def get_role(self, role_code: str) -> dict[str, Any] | None:
         roles = self.list_roles()
         return next((role for role in roles if role["role_code"] == role_code), None)
 
     def list_permissions(self) -> list[dict[str, str]]:
-        ensure_rbac_setup()
+        cached = runtime_cache.get("permissions:list")
+        if cached is not None:
+            return list(cached)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -54,7 +61,7 @@ class RoleRepository:
                     """
                 )
                 rows = cursor.fetchall()
-        return [
+        permissions = [
             {
                 "permission_code": str(row["permission_code"]),
                 "permission_name": str(
@@ -70,9 +77,10 @@ class RoleRepository:
             }
             for row in rows
         ]
+        runtime_cache.set("permissions:list", permissions, ttl_seconds=300)
+        return permissions
 
     def update_permission(self, permission_code: str, payload: dict[str, Any]) -> dict[str, str]:
-        ensure_rbac_setup()
         permission_name = str(payload["permission_name"]).strip()
         permission_description = str(payload.get("permission_description") or "").strip()
         with get_connection() as connection:
@@ -88,11 +96,12 @@ class RoleRepository:
                     """,
                     (permission_name, permission_description, permission_code),
                 )
+        runtime_cache.invalidate_prefix("permissions:")
+        runtime_cache.invalidate_prefix("role-permissions:")
         permission = next((item for item in self.list_permissions() if item["permission_code"] == permission_code), None)
         return permission or {}
 
     def create_role(self, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_rbac_setup()
         role_code = str(payload["role_code"]).strip()
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -107,10 +116,10 @@ class RoleRepository:
                     (role_code, str(payload["role_name"]).strip()),
                 )
                 self._replace_role_permissions(cursor, role_code, payload.get("permissions") or [])
+        runtime_cache.invalidate_prefix("roles:")
         return self.get_role(role_code) or {}
 
     def update_role(self, role_code: str, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT role_code, is_system FROM app_role WHERE role_code = ?", (role_code,))
@@ -129,10 +138,11 @@ class RoleRepository:
                     (str(payload["role_name"]).strip(), role_code),
                 )
                 self._replace_role_permissions(cursor, role_code, effective_permissions)
+        runtime_cache.invalidate_prefix("roles:")
+        runtime_cache.invalidate_prefix("role-permissions:")
         return self.get_role(role_code) or {}
 
     def delete_role(self, role_code: str) -> None:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT is_system FROM app_role WHERE role_code = ?", (role_code,))
@@ -145,9 +155,10 @@ class RoleRepository:
                 if cursor.fetchone():
                     raise ValueError("仍有用户使用该角色，不能删除")
                 cursor.execute("DELETE FROM app_role WHERE role_code = ?", (role_code,))
+        runtime_cache.invalidate_prefix("roles:")
+        runtime_cache.invalidate_prefix("role-permissions:")
 
     def active_super_admin_count(self) -> int:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT COUNT(*) AS total FROM app_user WHERE role = ? AND is_active = 1", (SUPER_ADMIN_ROLE,))

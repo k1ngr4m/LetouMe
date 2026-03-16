@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
@@ -17,6 +18,8 @@ SUPPORTED_PROVIDERS = (
     "deepseek",
     "openai_compatible",
 )
+_bootstrap_ready = False
+_bootstrap_lock = Lock()
 
 DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
     {
@@ -195,91 +198,98 @@ class ModelRegistry:
 
 
 def bootstrap_default_models() -> None:
+    global _bootstrap_ready
+    if _bootstrap_ready:
+        return
     ensure_schema()
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            provider_ids: dict[str, int] = {}
-            for provider_code in SUPPORTED_PROVIDERS:
-                provider_name = _provider_name(provider_code)
-                provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else None
-                cursor.execute(
-                    """
-                    INSERT INTO model_provider (provider_code, provider_name, base_url)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        provider_name = VALUES(provider_name),
-                        base_url = COALESCE(VALUES(base_url), base_url)
-                    """,
-                    (provider_code, provider_name, provider_base_url),
-                )
-                cursor.execute(
-                    "SELECT id FROM model_provider WHERE provider_code = ?",
-                    (provider_code,),
-                )
-                provider_ids[provider_code] = int(cursor.fetchone()["id"])
-
-            _migrate_deepseek_models(cursor, provider_ids)
-
-            for item in DEFAULT_MODEL_CATALOG:
-                cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (item["model_code"],))
-                existing_row = cursor.fetchone()
-                if existing_row:
-                    continue
-                cursor.execute(
-                    """
-                    INSERT INTO ai_model (
-                        model_code,
-                        display_name,
-                        provider_id,
-                        api_model_name,
-                        version,
-                        is_active,
-                        base_url,
-                        api_key,
-                        app_code,
-                        temperature,
-                        is_deleted,
-                        updated_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-                    """,
-                    (
-                        item["model_code"],
-                        item["display_name"],
-                        provider_ids[item["provider"]],
-                        item["api_model_name"],
-                        item.get("version"),
-                        1 if item.get("is_active") else 0,
-                        item.get("base_url") or DEFAULT_BASE_URL,
-                        item.get("api_key") or "",
-                        item.get("app_code") or "",
-                        item.get("temperature"),
-                    ),
-                )
-                cursor.execute(
-                    "SELECT id FROM ai_model WHERE model_code = ?",
-                    (item["model_code"],),
-                )
-                model_db_id = int(cursor.fetchone()["id"])
-                for tag in item.get("tags", []):
+    with _bootstrap_lock:
+        if _bootstrap_ready:
+            return
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                provider_ids: dict[str, int] = {}
+                for provider_code in SUPPORTED_PROVIDERS:
+                    provider_name = _provider_name(provider_code)
+                    provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else None
                     cursor.execute(
                         """
-                        INSERT INTO model_tag (tag_code, tag_name)
-                        VALUES (?, ?)
-                        ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
+                        INSERT INTO model_provider (provider_code, provider_name, base_url)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            provider_name = VALUES(provider_name),
+                            base_url = COALESCE(VALUES(base_url), base_url)
                         """,
-                        (tag, tag),
+                        (provider_code, provider_name, provider_base_url),
                     )
-                    cursor.execute("SELECT id FROM model_tag WHERE tag_code = ?", (tag,))
-                    tag_id = int(cursor.fetchone()["id"])
+                    cursor.execute(
+                        "SELECT id FROM model_provider WHERE provider_code = ?",
+                        (provider_code,),
+                    )
+                    provider_ids[provider_code] = int(cursor.fetchone()["id"])
+
+                _migrate_deepseek_models(cursor, provider_ids)
+
+                for item in DEFAULT_MODEL_CATALOG:
+                    cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (item["model_code"],))
+                    existing_row = cursor.fetchone()
+                    if existing_row:
+                        continue
                     cursor.execute(
                         """
-                        INSERT INTO ai_model_tag (model_id, tag_id)
-                        VALUES (?, ?)
-                        ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)
+                        INSERT INTO ai_model (
+                            model_code,
+                            display_name,
+                            provider_id,
+                            api_model_name,
+                            version,
+                            is_active,
+                            base_url,
+                            api_key,
+                            app_code,
+                            temperature,
+                            is_deleted,
+                            updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
                         """,
-                        (model_db_id, tag_id),
+                        (
+                            item["model_code"],
+                            item["display_name"],
+                            provider_ids[item["provider"]],
+                            item["api_model_name"],
+                            item.get("version"),
+                            1 if item.get("is_active") else 0,
+                            item.get("base_url") or DEFAULT_BASE_URL,
+                            item.get("api_key") or "",
+                            item.get("app_code") or "",
+                            item.get("temperature"),
+                        ),
                     )
+                    cursor.execute(
+                        "SELECT id FROM ai_model WHERE model_code = ?",
+                        (item["model_code"],),
+                    )
+                    model_db_id = int(cursor.fetchone()["id"])
+                    for tag in item.get("tags", []):
+                        cursor.execute(
+                            """
+                            INSERT INTO model_tag (tag_code, tag_name)
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
+                            """,
+                            (tag, tag),
+                        )
+                        cursor.execute("SELECT id FROM model_tag WHERE tag_code = ?", (tag,))
+                        tag_id = int(cursor.fetchone()["id"])
+                        cursor.execute(
+                            """
+                            INSERT INTO ai_model_tag (model_id, tag_id)
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)
+                            """,
+                            (model_db_id, tag_id),
+                        )
+        _bootstrap_ready = True
 
 
 def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:

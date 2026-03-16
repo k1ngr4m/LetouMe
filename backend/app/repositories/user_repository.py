@@ -3,20 +3,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from backend.app.db.connection import ensure_schema, get_connection
-from backend.app.rbac import NORMAL_USER_ROLE, SUPER_ADMIN_ROLE, ensure_rbac_setup
+from backend.app.cache import runtime_cache
+from backend.app.db.connection import get_connection
+from backend.app.rbac import NORMAL_USER_ROLE, SUPER_ADMIN_ROLE
 
 
 class UserRepository:
     def has_any_admin(self) -> bool:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 FROM app_user WHERE role = ? AND is_active = 1 LIMIT 1", (SUPER_ADMIN_ROLE,))
                 return cursor.fetchone() is not None
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 FROM app_user WHERE username = ?", (payload["username"],))
@@ -39,7 +38,6 @@ class UserRepository:
         return self.get_user_by_id(user_id) or {}
 
     def list_users(self) -> list[dict[str, Any]]:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -141,6 +139,39 @@ class UserRepository:
                 )
                 return cursor.fetchone()
 
+    def get_user_by_session_token(self, session_token: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        us.id AS session_id,
+                        us.user_id,
+                        us.session_token,
+                        us.expires_at,
+                        au.id,
+                        au.username,
+                        au.nickname,
+                        au.password_hash,
+                        au.role,
+                        ar.role_name,
+                        au.is_active,
+                        au.last_login_at,
+                        au.created_at
+                    FROM user_session us
+                    INNER JOIN app_user au ON au.id = us.user_id
+                    LEFT JOIN app_role ar ON ar.role_code = au.role
+                    WHERE us.session_token = ?
+                    LIMIT 1
+                    """,
+                    (session_token,),
+                )
+                user = cursor.fetchone()
+                if not user:
+                    return None
+                user["permissions"] = self._get_permissions_for_role(cursor, str(user["role"]))
+                return user
+
     def touch_session(self, session_token: str) -> None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -160,7 +191,6 @@ class UserRepository:
                 cursor.execute("DELETE FROM user_session WHERE user_id = ?", (user_id,))
 
     def _get_user(self, where_clause: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
-        ensure_rbac_setup()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -176,16 +206,26 @@ class UserRepository:
                 user = cursor.fetchone()
                 if not user:
                     return None
-                cursor.execute(
-                    """
-                    SELECT ap.permission_code
-                    FROM app_role ar
-                    INNER JOIN app_role_permission arp ON arp.role_id = ar.id
-                    INNER JOIN app_permission ap ON ap.id = arp.permission_id
-                    WHERE ar.role_code = ?
-                    ORDER BY ap.permission_code ASC
-                    """,
-                    (user["role"],),
-                )
-                user["permissions"] = [str(row["permission_code"]) for row in cursor.fetchall()]
+                user["permissions"] = self._get_permissions_for_role(cursor, str(user["role"]))
                 return user
+
+    @staticmethod
+    def _get_permissions_for_role(cursor, role_code: str) -> list[str]:
+        cache_key = f"role-permissions:{role_code}"
+        cached = runtime_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+        cursor.execute(
+            """
+            SELECT ap.permission_code
+            FROM app_role ar
+            INNER JOIN app_role_permission arp ON arp.role_id = ar.id
+            INNER JOIN app_permission ap ON ap.id = arp.permission_id
+            WHERE ar.role_code = ?
+            ORDER BY ap.permission_code ASC
+            """,
+            (role_code,),
+        )
+        permissions = [str(row["permission_code"]) for row in cursor.fetchall()]
+        runtime_cache.set(cache_key, permissions, ttl_seconds=300)
+        return permissions

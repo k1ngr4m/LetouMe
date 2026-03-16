@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
@@ -44,32 +45,48 @@ class PredictionService:
         }
 
     def get_current_payload(self) -> dict[str, Any]:
-        payload = self.prediction_repository.get_current_prediction() or {
-            "prediction_date": "",
-            "target_period": "",
-            "models": [],
-        }
+        payload = runtime_cache.get_or_set(
+            "predictions:current",
+            ttl_seconds=60,
+            loader=lambda: self.prediction_repository.get_current_prediction() or {
+                "prediction_date": "",
+                "target_period": "",
+                "models": [],
+            },
+        )
         self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
         return payload
 
     def get_current_payload_by_period(self, target_period: str) -> dict[str, Any]:
-        return self.prediction_repository.get_current_prediction_by_period(target_period) or {
-            "prediction_date": "",
-            "target_period": target_period,
-            "models": [],
-        }
+        return runtime_cache.get_or_set(
+            f"predictions:current:{target_period}",
+            ttl_seconds=60,
+            loader=lambda: self.prediction_repository.get_current_prediction_by_period(target_period) or {
+                "prediction_date": "",
+                "target_period": target_period,
+                "models": [],
+            },
+        )
 
     def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
-        return {
-            "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset),
-            "total_count": self.prediction_repository.count_history_records(),
-        }
+        return runtime_cache.get_or_set(
+            f"predictions:history:full:{limit or 'all'}:{offset}",
+            ttl_seconds=60,
+            loader=lambda: {
+                "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset),
+                "total_count": self.prediction_repository.count_history_records(),
+            },
+        )
 
     def get_history_list_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
-        payload = {
-            "predictions_history": self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset),
-            "total_count": self.prediction_repository.count_history_records(),
-        }
+        payload = runtime_cache.get_or_set(
+            f"predictions:history:list:{limit or 'all'}:{offset}",
+            ttl_seconds=60,
+            loader=lambda: {
+                "predictions_history": self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset),
+                "total_count": self.prediction_repository.count_history_records(),
+            },
+        )
         self.logger.info(
             "Loaded prediction history summaries",
             extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["predictions_history"])}},
@@ -77,7 +94,11 @@ class PredictionService:
         return payload
 
     def get_history_detail_payload(self, target_period: str) -> dict[str, Any] | None:
-        payload = self.prediction_repository.get_history_record_detail(target_period)
+        payload = runtime_cache.get_or_set(
+            f"predictions:history:detail:{target_period}",
+            ttl_seconds=60,
+            loader=lambda: self.prediction_repository.get_history_record_detail(target_period),
+        )
         self.logger.info(
             "Loaded prediction history detail",
             extra={"context": {"target_period": target_period, "found": bool(payload)}},
@@ -104,6 +125,7 @@ class PredictionService:
             }
 
         self.prediction_repository.upsert_current_prediction(payload)
+        self._invalidate_prediction_cache(target_period=target_period)
         self.logger.info(
             "Saved current prediction",
             extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}},
@@ -165,6 +187,7 @@ class PredictionService:
             "models": models_with_hits,
         }
         self.prediction_repository.upsert_history_record(new_record)
+        self._invalidate_prediction_cache(target_period=old_target_period)
         self.logger.info(
             "Archived current prediction into history",
             extra={"context": {"target_period": old_target_period, "model_count": len(models_with_hits)}},
@@ -181,3 +204,14 @@ class PredictionService:
             "blue_hit_count": len(blue_hits),
             "total_hits": len(red_hits) + len(blue_hits),
         }
+
+    @staticmethod
+    def _invalidate_prediction_cache(target_period: str | None = None) -> None:
+        runtime_cache.delete("predictions:current")
+        runtime_cache.invalidate_prefix("predictions:current:")
+        runtime_cache.invalidate_prefix("predictions:history:full:")
+        runtime_cache.invalidate_prefix("predictions:history:list:")
+        if target_period:
+            runtime_cache.delete(f"predictions:history:detail:{target_period}")
+        else:
+            runtime_cache.invalidate_prefix("predictions:history:detail:")

@@ -6,6 +6,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Any
 
+from backend.app.cache import runtime_cache
 from fastapi import Depends, HTTPException, Request, Response, status
 
 from backend.app.config import Settings, load_settings
@@ -121,20 +122,22 @@ class AuthService:
     def get_current_user(self, session_token: str | None) -> dict[str, Any] | None:
         if not session_token:
             return None
-        session = self.repository.get_session(session_token)
-        if not session:
+        user = self.repository.get_user_by_session_token(session_token)
+        if not user:
             return None
-        expires_at = session.get("expires_at")
+        expires_at = user.get("expires_at")
         if isinstance(expires_at, str):
             expires_at = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
         if not isinstance(expires_at, datetime) or expires_at <= datetime.utcnow():
             self.repository.delete_session(session_token)
             return None
-        user = self.repository.get_user_by_id(int(session["user_id"]))
         if not user or not user.get("is_active"):
             self.repository.delete_session(session_token)
             return None
-        self.repository.touch_session(session_token)
+        touch_key = f"auth:touch:{session_token}"
+        if runtime_cache.get(touch_key) is None:
+            self.repository.touch_session(session_token)
+            runtime_cache.set(touch_key, True, ttl_seconds=60)
         return self._serialize_user(user)
 
     def list_users(self) -> list[dict[str, Any]]:

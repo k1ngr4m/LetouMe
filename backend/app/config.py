@@ -36,6 +36,7 @@ class Settings:
     auth_session_days: int = 7
     auth_bootstrap_admin_username: str = "admin"
     auth_bootstrap_admin_password: str = "admin123456"
+    mysql_pool_size: int = 6
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -100,4 +101,5 @@ def load_settings() -> Settings:
         auth_session_days=int(os.getenv("AUTH_SESSION_DAYS", "7")),
         auth_bootstrap_admin_username=os.getenv("AUTH_BOOTSTRAP_ADMIN_USERNAME", "admin"),
         auth_bootstrap_admin_password=os.getenv("AUTH_BOOTSTRAP_ADMIN_PASSWORD", "admin123456"),
+        mysql_pool_size=int(os.getenv("MYSQL_POOL_SIZE", "6")),
     )

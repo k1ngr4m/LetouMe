@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from threading import Lock
 
 from backend.app.db.connection import ensure_schema, get_connection
 
@@ -43,54 +44,63 @@ DEFAULT_ROLES = {
         "permissions": [BASIC_PROFILE_PERMISSION],
     },
 }
+_rbac_ready = False
+_rbac_lock = Lock()
 
 
 def ensure_rbac_setup() -> None:
+    global _rbac_ready
+    if _rbac_ready:
+        return
     ensure_schema()
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            for permission_code, meta in DEFAULT_PERMISSIONS.items():
-                cursor.execute(
-                    """
-                    INSERT INTO app_permission (permission_code, permission_name, permission_description)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE permission_code = VALUES(permission_code)
-                    """,
-                    (permission_code, meta["name"], meta["description"]),
-                )
-                cursor.execute(
-                    """
-                    UPDATE app_permission
-                    SET
-                        permission_name = CASE
-                            WHEN permission_name IS NULL OR permission_name = '' THEN ?
-                            ELSE permission_name
-                        END,
-                        permission_description = CASE
-                            WHEN permission_description IS NULL OR permission_description = '' THEN ?
-                            ELSE permission_description
-                        END
-                    WHERE permission_code = ?
-                    """,
-                    (meta["name"], meta["description"], permission_code),
-                )
+    with _rbac_lock:
+        if _rbac_ready:
+            return
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                for permission_code, meta in DEFAULT_PERMISSIONS.items():
+                    cursor.execute(
+                        """
+                        INSERT INTO app_permission (permission_code, permission_name, permission_description)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE permission_code = VALUES(permission_code)
+                        """,
+                        (permission_code, meta["name"], meta["description"]),
+                    )
+                    cursor.execute(
+                        """
+                        UPDATE app_permission
+                        SET
+                            permission_name = CASE
+                                WHEN permission_name IS NULL OR permission_name = '' THEN ?
+                                ELSE permission_name
+                            END,
+                            permission_description = CASE
+                                WHEN permission_description IS NULL OR permission_description = '' THEN ?
+                                ELSE permission_description
+                            END
+                        WHERE permission_code = ?
+                        """,
+                        (meta["name"], meta["description"], permission_code),
+                    )
 
-            permission_ids = _load_permission_ids(cursor)
-            role_ids: dict[str, int] = {}
-            for role_code, meta in DEFAULT_ROLES.items():
-                cursor.execute(
-                    """
-                    INSERT INTO app_role (role_code, role_name, is_system)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE role_name = VALUES(role_name), is_system = VALUES(is_system)
-                    """,
-                    (role_code, meta["name"], 1 if meta["is_system"] else 0),
-                )
-                cursor.execute("SELECT id FROM app_role WHERE role_code = ?", (role_code,))
-                role_ids[role_code] = int(cursor.fetchone()["id"])
+                permission_ids = _load_permission_ids(cursor)
+                role_ids: dict[str, int] = {}
+                for role_code, meta in DEFAULT_ROLES.items():
+                    cursor.execute(
+                        """
+                        INSERT INTO app_role (role_code, role_name, is_system)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE role_name = VALUES(role_name), is_system = VALUES(is_system)
+                        """,
+                        (role_code, meta["name"], 1 if meta["is_system"] else 0),
+                    )
+                    cursor.execute("SELECT id FROM app_role WHERE role_code = ?", (role_code,))
+                    role_ids[role_code] = int(cursor.fetchone()["id"])
 
-            _sync_role_permissions(cursor, role_ids, permission_ids)
-            _migrate_legacy_user_roles(cursor)
+                _sync_role_permissions(cursor, role_ids, permission_ids)
+                _migrate_legacy_user_roles(cursor)
+        _rbac_ready = True
 
 
 def _load_permission_ids(cursor) -> dict[str, int]:

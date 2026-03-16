@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.app.db.connection import ensure_schema, get_connection
-from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_PROVIDERS, bootstrap_default_models
+from backend.app.db.connection import get_connection
+from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_PROVIDERS
 
 
 PROVIDER_LABELS = {
@@ -17,7 +17,6 @@ PROVIDER_LABELS = {
 
 class ModelRepository:
     def list_models(self, include_deleted: bool = False) -> list[dict[str, Any]]:
-        ensure_schema()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=include_deleted)
@@ -25,7 +24,6 @@ class ModelRepository:
         return [self._serialize_model(row, tags_by_code.get(row["model_code"], [])) for row in rows]
 
     def get_model(self, model_code: str) -> dict[str, Any] | None:
-        ensure_schema()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=True, model_codes=[model_code])
@@ -35,7 +33,6 @@ class ModelRepository:
         return self._serialize_model(rows[0], tags_by_code.get(model_code, []))
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_schema()
         model_code = str(payload["model_code"]).strip()
         self._validate_payload(payload, is_create=True)
         with get_connection() as connection:
@@ -82,7 +79,6 @@ class ModelRepository:
         return self.get_model(model_code) or {}
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
-        ensure_schema()
         self._validate_payload(payload, is_create=False)
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -151,7 +147,6 @@ class ModelRepository:
         ]
 
     def _update_flag(self, model_code: str, field_name: str, value: int) -> dict[str, Any]:
-        ensure_schema()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(

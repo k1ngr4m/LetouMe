@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import LotteryRepository
 
@@ -34,38 +35,48 @@ class LotteryService:
         normalized = [self.normalize_draw(draw) for draw in draws]
         self.logger.info("Saving lottery draws", extra={"context": {"count": len(normalized)}})
         self.repository.upsert_draws(normalized)
+        runtime_cache.invalidate_prefix("lottery:")
         return normalized
 
     def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
-        draws = self.repository.list_draws(limit=limit, offset=offset)
-        total_count = self.repository.count_draws()
-        latest_draw = draws[0] if draws and offset == 0 else self.repository.get_latest_draw()
-        last_updated = max(
-            (draw.get("updated_at") for draw in draws if draw.get("updated_at")),
-            default=datetime.utcnow(),
-        )
-        payload = {
-            "last_updated": last_updated.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "data": [self.normalize_draw(draw) for draw in draws],
-            "total_count": total_count,
-        }
-        if latest_draw:
-            payload["next_draw"] = self.predict_next_draw(
-                latest_draw["period"],
-                latest_draw["date"],
+        cache_key = f"lottery:history:{limit or 'all'}:{offset}"
+
+        def load_payload() -> dict[str, Any]:
+            draws = self.repository.list_draws(limit=limit, offset=offset)
+            total_count = self.repository.count_draws()
+            latest_draw = draws[0] if draws and offset == 0 else self.repository.get_latest_draw()
+            last_updated = max(
+                (draw.get("updated_at") for draw in draws if draw.get("updated_at")),
+                default=datetime.utcnow(),
             )
-        self.logger.debug(
-            "Built lottery history payload",
-            extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["data"])}},
-        )
-        return payload
+            payload = {
+                "last_updated": last_updated.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "data": [self.normalize_draw(draw) for draw in draws],
+                "total_count": total_count,
+            }
+            if latest_draw:
+                payload["next_draw"] = self.predict_next_draw(
+                    latest_draw["period"],
+                    latest_draw["date"],
+                )
+            self.logger.debug(
+                "Built lottery history payload",
+                extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["data"])}},
+            )
+            return payload
+
+        return runtime_cache.get_or_set(cache_key, ttl_seconds=120, loader=load_payload)
 
     def get_draw_by_period(self, period: str) -> dict[str, Any] | None:
-        draw = self.repository.get_draw_by_period(period)
+        draw = runtime_cache.get_or_set(f"lottery:period:{period}", ttl_seconds=120, loader=lambda: self.repository.get_draw_by_period(period))
         return self.normalize_draw(draw) if draw else None
 
     def get_recent_draws(self, limit: int = 30) -> list[dict[str, Any]]:
-        return [self.normalize_draw(draw) for draw in self.repository.list_draws(limit=limit)]
+        return runtime_cache.get_or_set(
+            f"lottery:recent:{limit}",
+            ttl_seconds=120,
+            loader=lambda: [self.normalize_draw(draw) for draw in self.repository.list_draws(limit=limit)],
+        )
 
     @staticmethod
     def predict_next_draw(latest_period: str, latest_date: str) -> dict[str, Any] | None:
