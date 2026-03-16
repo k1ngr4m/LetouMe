@@ -39,6 +39,11 @@ class PredictionGenerationTaskPayload(BaseModel):
     task_id: str
 
 
+class SettingsPredictionRecordDetailPayload(BaseModel):
+    record_type: str
+    target_period: str
+
+
 class PredictionHistoryDetailPayload(BaseModel):
     target_period: str
 

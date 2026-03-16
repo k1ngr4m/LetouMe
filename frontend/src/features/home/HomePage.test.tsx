@@ -87,8 +87,26 @@ vi.mock('./hooks/useHomeData', () => ({
               },
             ],
           },
+          {
+            prediction_date: '2026-03-11',
+            target_period: '2026030',
+            actual_result: {
+              period: '2026030',
+              date: '2026-03-08',
+              red_balls: ['03', '04', '05', '06', '07'],
+              blue_balls: ['08', '09'],
+            },
+            models: [
+              {
+                model_id: 'model-b',
+                model_name: '模型B',
+                model_provider: 'deepseek',
+                best_hit_count: 2,
+              },
+            ],
+          },
         ],
-        total_count: 1,
+        total_count: 2,
       },
       isLoading: false,
       error: null,
@@ -248,6 +266,26 @@ describe('HomePage dashboard sidebar', () => {
                 },
               ],
             },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              best_hit_count: 1,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['08', '09', '10', '11', '12'],
+                  blue_balls: ['01', '02'],
+                  hit_result: {
+                    red_hits: ['08', '12'],
+                    red_hit_count: 2,
+                    blue_hits: [],
+                    blue_hit_count: 0,
+                    total_hits: 2,
+                  },
+                },
+              ],
+            },
           ],
         },
       ],
@@ -256,12 +294,16 @@ describe('HomePage dashboard sidebar', () => {
 
     renderPage()
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    await userEvent.click(screen.getByRole('button', { name: '展开详情' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
 
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031'))
     expect(await screen.findByText('收起详情')).toBeInTheDocument()
 
-    const groupCard = screen.getByText('G-1').closest('.prediction-group-card')
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    const detailSection = within(firstHistoryCard as HTMLElement).getAllByText('模型A')[1].closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
     const cardScope = within(groupCard as HTMLElement)
     expect(cardScope.getByText('01')).toHaveClass('is-hit')
@@ -281,5 +323,69 @@ describe('HomePage dashboard sidebar', () => {
     expect(hit4Card).toHaveClass('is-hit-tier-4')
     expect(hit5Card).toHaveClass('is-hit-tier-5')
     expect(hit6Card).toHaveClass('is-hit-tier-6')
+  })
+
+  it('reuses shared model filters in history and trims record details', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 3,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['01', '02', '03', '12', '15'],
+                  blue_balls: ['06', '10'],
+                },
+              ],
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              best_hit_count: 1,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['08', '09', '10', '11', '12'],
+                  blue_balls: ['01', '02'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+
+    expect(screen.getByText('已显示 1 / 2 个模型')).toBeInTheDocument()
+    expect(screen.getByText('模型A')).toBeInTheDocument()
+    expect(screen.queryByText('模型B')).not.toBeInTheDocument()
+    expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '展开详情' }))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031'))
+
+    expect(await screen.findByText('收起详情')).toBeInTheDocument()
+    expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
+    expect(screen.queryByText('模型B')).not.toBeInTheDocument()
   })
 })

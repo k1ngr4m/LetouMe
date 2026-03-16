@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
+import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { normalizeCurrentPredictions, normalizePredictionsHistory } from '../home/lib/home'
+import { formatDateTimeLocal } from '../../shared/lib/format'
 import type {
   PasswordChangePayload,
   PermissionItem,
@@ -12,12 +15,16 @@ import type {
   PredictionGenerationTask,
   RoleItem,
   RolePayload,
+  SettingsPredictionRecordDetail,
   SettingsModelPayload,
 } from '../../shared/types/api'
 
 type SettingsTab = 'profile' | 'models' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
+type ModelManagementTab = 'catalog' | 'records'
+type PredictionRecordTypeFilter = 'all' | 'current' | 'history'
+type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -75,7 +82,9 @@ export function SettingsPage() {
   const { user, hasPermission, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   const [includeDeleted, setIncludeDeleted] = useState(false)
+  const [modelManagementTab, setModelManagementTab] = useState<ModelManagementTab>('catalog')
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
+  const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
@@ -87,6 +96,9 @@ export function SettingsPage() {
   const [generationModalOpen, setGenerationModalOpen] = useState(false)
   const [generationForm, setGenerationForm] = useState(EMPTY_GENERATION_FORM)
   const [generationTask, setGenerationTask] = useState<PredictionGenerationTask | null>(null)
+  const [selectedPredictionRecord, setSelectedPredictionRecord] = useState<{ recordType: 'current' | 'history'; targetPeriod: string } | null>(null)
+  const [predictionRecordPeriodQuery, setPredictionRecordPeriodQuery] = useState('')
+  const [predictionRecordTypeFilter, setPredictionRecordTypeFilter] = useState<PredictionRecordTypeFilter>('all')
   const [newUserForm, setNewUserForm] = useState({ username: '', nickname: '', password: '', role: 'normal_user', is_active: true })
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
@@ -105,6 +117,29 @@ export function SettingsPage() {
     queryKey: ['settings-providers'],
     queryFn: () => apiClient.getSettingsProviders(),
     enabled: canManageModels,
+  })
+  const predictionRecordsQuery = useQuery({
+    queryKey: ['settings-prediction-records'],
+    queryFn: () => apiClient.getSettingsPredictionRecords(),
+    enabled: canManageModels,
+  })
+  const predictionRecordDetailQuery = useQuery({
+    queryKey: ['settings-prediction-record-detail', selectedPredictionRecord?.recordType, selectedPredictionRecord?.targetPeriod],
+    queryFn: async () => {
+      const detail = await apiClient.getSettingsPredictionRecordDetail(
+        selectedPredictionRecord?.recordType || 'history',
+        selectedPredictionRecord?.targetPeriod || '',
+      )
+      if (detail.record_type === 'history') {
+        return normalizePredictionsHistory({ predictions_history: [detail], total_count: 1 }).predictions_history[0] as SettingsPredictionRecordDetail
+      }
+      return normalizeCurrentPredictions({
+        prediction_date: detail.prediction_date,
+        target_period: detail.target_period,
+        models: detail.models,
+      }) as unknown as SettingsPredictionRecordDetail
+    },
+    enabled: canManageModels && Boolean(selectedPredictionRecord),
   })
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
@@ -151,6 +186,7 @@ export function SettingsPage() {
           setMessage(`预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
           setMessageType('success')
           void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records'] })
         } else if (task.status === 'failed') {
           setMessage(task.error_message || '预测任务执行失败')
           setMessageType('error')
@@ -164,6 +200,7 @@ export function SettingsPage() {
   }, [generationTask, queryClient])
 
   const models = modelsQuery.data?.models || []
+  const predictionRecords = predictionRecordsQuery.data?.records || []
   const providers = providersQuery.data?.providers || []
   const users = usersQuery.data?.users || []
   const roles = rolesQuery.data?.roles || []
@@ -173,6 +210,32 @@ export function SettingsPage() {
     () => Object.fromEntries(permissions.map((permission) => [permission.permission_code, permission])),
     [permissions],
   )
+  const filteredPredictionRecords = useMemo(
+    () =>
+      predictionRecords.filter((record) => {
+        const matchesType = predictionRecordTypeFilter === 'all' || record.record_type === predictionRecordTypeFilter
+        const matchesPeriod =
+          !predictionRecordPeriodQuery || record.target_period.includes(predictionRecordPeriodQuery.trim())
+        return matchesType && matchesPeriod
+      }),
+    [predictionRecordPeriodQuery, predictionRecordTypeFilter, predictionRecords],
+  )
+  const sortedModels = useMemo(() => {
+    const items = [...models]
+    items.sort((left, right) => {
+      if (modelSortOption === 'updated_desc') {
+        return new Date(right.updated_at || 0).getTime() - new Date(left.updated_at || 0).getTime()
+      }
+      if (modelSortOption === 'updated_asc') {
+        return new Date(left.updated_at || 0).getTime() - new Date(right.updated_at || 0).getTime()
+      }
+      if (modelSortOption === 'name_asc') {
+        return left.display_name.localeCompare(right.display_name)
+      }
+      return right.display_name.localeCompare(left.display_name)
+    })
+    return items
+  }, [modelSortOption, models])
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
 
   const profileMutation = useMutation({
@@ -531,33 +594,60 @@ export function SettingsPage() {
                 subtitle="管理模型目录、Provider 连接与运行状态。"
                 actions={
                   <div className="toolbar-inline">
-                    <div className="view-switch" role="tablist" aria-label="模型管理视图切换">
+                    <div className="view-switch" role="tablist" aria-label="模型管理标签切换">
                       <button
-                        className={clsx('view-switch__button', modelManagementView === 'list' && 'is-active')}
-                        onClick={() => setModelManagementView('list')}
+                        className={clsx('view-switch__button', modelManagementTab === 'catalog' && 'is-active')}
+                        onClick={() => setModelManagementTab('catalog')}
                         type="button"
                       >
-                        列表视图
+                        模型列表
                       </button>
                       <button
-                        className={clsx('view-switch__button', modelManagementView === 'card' && 'is-active')}
-                        onClick={() => setModelManagementView('card')}
+                        className={clsx('view-switch__button', modelManagementTab === 'records' && 'is-active')}
+                        onClick={() => setModelManagementTab('records')}
                         type="button"
                       >
-                        卡片视图
+                        预测记录
                       </button>
                     </div>
-                    <label className="toggle-chip">
-                      <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
-                      <span>显示已删除</span>
-                    </label>
-                    <button className="primary-button" onClick={openCreateModel}>
-                      新增模型
-                    </button>
+                    {modelManagementTab === 'catalog' ? (
+                      <>
+                        <div className="view-switch" role="tablist" aria-label="模型管理视图切换">
+                          <button
+                            className={clsx('view-switch__button', modelManagementView === 'list' && 'is-active')}
+                            onClick={() => setModelManagementView('list')}
+                            type="button"
+                          >
+                            列表视图
+                          </button>
+                          <button
+                            className={clsx('view-switch__button', modelManagementView === 'card' && 'is-active')}
+                            onClick={() => setModelManagementView('card')}
+                            type="button"
+                          >
+                            卡片视图
+                          </button>
+                        </div>
+                        <label className="toggle-chip">
+                          <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
+                          <span>显示已删除</span>
+                        </label>
+                        <button className="primary-button" onClick={openCreateModel}>
+                          新增模型
+                        </button>
+                        <select value={modelSortOption} onChange={(event) => setModelSortOption(event.target.value as ModelSortOption)}>
+                          <option value="updated_desc">更新时间 ↓</option>
+                          <option value="updated_asc">更新时间 ↑</option>
+                          <option value="name_asc">名称 A-Z</option>
+                          <option value="name_desc">名称 Z-A</option>
+                        </select>
+                      </>
+                    ) : null}
                   </div>
                 }
               >
-                {modelManagementView === 'list' ? (
+                {modelManagementTab === 'catalog' ? (
+                  modelManagementView === 'list' ? (
                   <div className="table-shell settings-model-table-shell">
                     <table className="history-table settings-model-table">
                       <thead>
@@ -572,7 +662,7 @@ export function SettingsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {models.map((model) => (
+                        {sortedModels.map((model) => (
                           <tr key={model.model_code}>
                             <td>
                               <div className="settings-model-table__title">
@@ -592,7 +682,7 @@ export function SettingsPage() {
                                 {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
                               </span>
                             </td>
-                            <td>{model.updated_at || '-'}</td>
+                            <td>{formatDateTimeLocal(model.updated_at)}</td>
                             <td>
                               <div className="settings-model-table__actions">
                                 <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
@@ -617,9 +707,9 @@ export function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                  ) : (
                   <div className="settings-grid-react">
-                    {models.map((model) => (
+                    {sortedModels.map((model) => (
                       <article key={model.model_code} className="settings-model-card-react">
                         <div className="settings-model-card-react__header">
                           <div>
@@ -634,6 +724,7 @@ export function SettingsPage() {
                         <div className="settings-model-card-react__facts">
                           <span>{model.base_url}</span>
                           <span>{model.tags.join(', ') || '无标签'}</span>
+                          <span>{formatDateTimeLocal(model.updated_at)}</span>
                         </div>
                         <div className="toolbar-inline">
                           <button className="ghost-button" onClick={() => void openEditModel(model.model_code)}>编辑</button>
@@ -652,6 +743,81 @@ export function SettingsPage() {
                       </article>
                     ))}
                   </div>
+                  )
+                ) : (
+                  <>
+                    <div className="history-toolbar">
+                      <div className="filter-chip-group">
+                        {[
+                          { value: 'all', label: '全部' },
+                          { value: 'current', label: '当前期' },
+                          { value: 'history', label: '历史' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            className={clsx('filter-chip', predictionRecordTypeFilter === option.value && 'is-active')}
+                            onClick={() => setPredictionRecordTypeFilter(option.value as PredictionRecordTypeFilter)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        className="search-input"
+                        value={predictionRecordPeriodQuery}
+                        onChange={(event) => setPredictionRecordPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
+                        placeholder="输入期号过滤"
+                      />
+                    </div>
+                    {filteredPredictionRecords.length ? (
+                      <div className="table-shell settings-model-table-shell">
+                        <table className="history-table settings-model-table">
+                          <thead>
+                            <tr>
+                              <th>记录类型</th>
+                              <th>期号</th>
+                              <th>预测日期</th>
+                              <th>开奖结果</th>
+                              <th>模型数</th>
+                              <th>状态</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredPredictionRecords.map((record) => (
+                              <tr key={`${record.record_type}-${record.target_period}`}>
+                                <td>{record.record_type === 'current' ? '当前期' : '历史'}</td>
+                                <td>{record.target_period}</td>
+                                <td>{record.prediction_date || '-'}</td>
+                                <td>
+                                  {record.actual_result ? (
+                                    <div className="settings-model-table__tags">
+                                      {record.actual_result.red_balls.map((ball) => <NumberBall key={`${record.target_period}-red-${ball}`} value={ball} color="red" size="sm" />)}
+                                      {record.actual_result.blue_balls.map((ball) => <NumberBall key={`${record.target_period}-blue-${ball}`} value={ball} color="blue" size="sm" />)}
+                                    </div>
+                                  ) : (
+                                    <span>待开奖</span>
+                                  )}
+                                </td>
+                                <td>{record.model_count}</td>
+                                <td>{record.status_label}</td>
+                                <td>
+                                  <button
+                                    className="ghost-button"
+                                    onClick={() => setSelectedPredictionRecord({ recordType: record.record_type, targetPeriod: record.target_period })}
+                                  >
+                                    查看详情
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="state-shell">没有符合当前筛选条件的预测记录。</div>
+                    )}
+                  </>
                 )}
               </StatusCard>
             </div>
@@ -1016,6 +1182,64 @@ export function SettingsPage() {
                 <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending}>创建任务</button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedPredictionRecord ? (
+        <div className="modal-shell" role="presentation" onClick={() => setSelectedPredictionRecord(null)}>
+          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="settings-form-grid">
+              <div className="modal-card__header">
+                <div>
+                  <p className="modal-card__eyebrow">预测记录详情</p>
+                  <h3>第 {selectedPredictionRecord.targetPeriod} 期</h3>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setSelectedPredictionRecord(null)}>关闭</button>
+              </div>
+              {predictionRecordDetailQuery.isLoading ? <div className="state-shell">正在加载预测详情...</div> : null}
+              {predictionRecordDetailQuery.error instanceof Error ? <div className="state-shell state-shell--error">详情加载失败：{predictionRecordDetailQuery.error.message}</div> : null}
+              {predictionRecordDetailQuery.data ? (
+                <>
+                  <div className="settings-model-card-react__facts">
+                    <span>记录类型：{predictionRecordDetailQuery.data.record_type === 'current' ? '当前期' : '历史'}</span>
+                    <span>预测日期：{predictionRecordDetailQuery.data.prediction_date || '-'}</span>
+                    <span>状态：{predictionRecordDetailQuery.data.record_type === 'current' ? '待开奖' : '已归档'}</span>
+                  </div>
+                  {predictionRecordDetailQuery.data.actual_result ? (
+                    <div className="number-row">
+                      {predictionRecordDetailQuery.data.actual_result.red_balls.map((ball) => (
+                        <NumberBall key={`detail-red-${ball}`} value={ball} color="red" />
+                      ))}
+                      <span className="number-row__divider" />
+                      {predictionRecordDetailQuery.data.actual_result.blue_balls.map((ball) => (
+                        <NumberBall key={`detail-blue-${ball}`} value={ball} color="blue" />
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="history-record-card__detail-list">
+                    {predictionRecordDetailQuery.data.models.map((model) => (
+                      <section key={`${predictionRecordDetailQuery.data?.target_period}-${model.model_id}`} className="history-record-card__detail-model">
+                        <div className="history-record-card__detail-header">
+                          <div>
+                            <strong>{model.model_name}</strong>
+                            <p>{model.model_provider}</p>
+                          </div>
+                          <span>最佳命中 {model.best_hit_count || 0}</span>
+                        </div>
+                        <div className="settings-model-table__tags">
+                          {model.predictions.map((group) => (
+                            <span key={`${model.model_id}-${group.group_id}`} className="tag tag--muted">
+                              第{group.group_id}组 {group.red_balls.join(' ')} | {group.blue_balls.join(' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

@@ -20,22 +20,17 @@ import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
+import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import {
   type BallStatItem,
   buildBlueFrequencyChart,
-  buildHistoryHitTrend,
-  buildModelScores,
   buildOddEvenChart,
   buildRedFrequencyChart,
   buildSumTrendChart,
-  buildSummary,
   compareNumbers,
-  filterModels,
-  filterHistoryRecords,
   getActualResult,
   type ModelListScoreRange,
   normalizePredictionsHistory,
-  sortModels,
 } from './lib/home'
 import type {
   LotteryDraw,
@@ -64,13 +59,6 @@ export function HomePage() {
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [detailModelId, setDetailModelId] = useState<string | null>(null)
-  const [isModelFilterOpen, setIsModelFilterOpen] = useState(false)
-  const [modelNameQuery, setModelNameQuery] = useState('')
-  const [selectedProviders, setSelectedProviders] = useState<string[]>([])
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [selectedScoreRange, setSelectedScoreRange] = useState<ModelListScoreRange>('all')
-  const [summarySelectedModelIds, setSummarySelectedModelIds] = useState<string[] | null>(null)
-  const [historySelectedModelIds, setHistorySelectedModelIds] = useState<string[] | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [weightedSummary] = useState(true)
@@ -87,20 +75,28 @@ export function HomePage() {
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []
   const pagedDraws = pagedLotteryHistory.data?.data || []
-  const modelScores = history ? buildModelScores(history, models) : {}
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
-  const orderedModels = sortModels(models, modelScores, validPinnedModelIds)
-  const availableProviders = [...new Set(orderedModels.map((model) => model.model_provider).filter(Boolean))]
-  const availableTags = [...new Set(orderedModels.flatMap((model) => model.model_tags || []).filter(Boolean))].sort((left, right) =>
-    left.localeCompare(right),
-  )
-  const filteredModels = filterModels(orderedModels, modelScores, {
-    nameQuery: modelNameQuery,
+  const {
+    isModelFilterOpen,
+    setIsModelFilterOpen,
+    modelNameQuery,
+    setModelNameQuery,
     selectedProviders,
     selectedTags,
-    scoreRange: selectedScoreRange,
-  })
-  const visibleSummaryModelIds = filteredModels.map((model) => model.model_id)
+    selectedScoreRange,
+    setSelectedScoreRange,
+    orderedModels,
+    modelScores,
+    availableProviders,
+    availableTags,
+    filteredModels,
+    filteredModelIds,
+    toggleModelProvider,
+    toggleModelTag,
+    clearModelFilters,
+    toggleSummaryModel,
+    buildHistoryState,
+  } = useHomeModelFilters(models, history, validPinnedModelIds)
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   useEffect(() => {
@@ -137,19 +133,7 @@ export function HomePage() {
     }
   }, [activeTab])
 
-  useEffect(() => {
-    setSummarySelectedModelIds((previous) => {
-      if (previous === null) return null
-      const next = previous.filter((modelId) => visibleSummaryModelIds.includes(modelId))
-      return next.length === previous.length ? previous : next
-    })
-  }, [visibleSummaryModelIds])
-
-  const selectedSummaryIds = summarySelectedModelIds ?? visibleSummaryModelIds
-  const selectedHistoryIds = historySelectedModelIds ?? models.map((model) => model.model_id)
-  const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
-  const filteredHistory = history ? filterHistoryRecords(history, selectedHistoryIds, historyPeriodQuery) : []
-  const historyHitTrend = buildHistoryHitTrend(filteredHistory, selectedHistoryIds)
+  const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(historyPeriodQuery, commonOnly, weightedSummary)
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
   const redChart = buildRedFrequencyChart(chartDraws)
   const blueChart = buildBlueFrequencyChart(chartDraws)
@@ -175,39 +159,6 @@ export function HomePage() {
       return [modelId, ...previous]
     })
     setActiveActionMenuId(null)
-  }
-
-  function toggleSummaryModel(modelId: string) {
-    const fallbackIds = visibleSummaryModelIds
-    setSummarySelectedModelIds((previous) => {
-      const current = previous ?? fallbackIds
-      return current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
-    })
-  }
-
-  function toggleHistoryModel(modelId: string) {
-    const fallbackIds = models.map((model) => model.model_id)
-    setHistorySelectedModelIds((previous) => {
-      const current = previous ?? fallbackIds
-      return current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
-    })
-  }
-
-  function toggleModelProvider(provider: string) {
-    setSelectedProviders((previous) =>
-      previous.includes(provider) ? previous.filter((item) => item !== provider) : [...previous, provider],
-    )
-  }
-
-  function toggleModelTag(tag: string) {
-    setSelectedTags((previous) => (previous.includes(tag) ? previous.filter((item) => item !== tag) : [...previous, tag]))
-  }
-
-  function clearModelFilters() {
-    setModelNameQuery('')
-    setSelectedProviders([])
-    setSelectedTags([])
-    setSelectedScoreRange('all')
   }
 
   function scrollToSection(section: 'models' | 'weights') {
@@ -285,78 +236,21 @@ export function HomePage() {
                 }
               >
                 {isModelFilterOpen ? (
-                  <div className="model-filter-panel">
-                    <div className="model-filter-panel__top">
-                      <label className="model-filter-panel__search">
-                        <span>名称搜索</span>
-                        <input
-                          type="text"
-                          placeholder="按模型名称或ID筛选"
-                          value={modelNameQuery}
-                          onChange={(event) => setModelNameQuery(event.target.value)}
-                        />
-                      </label>
-                      <div className="model-filter-panel__summary">
-                        <span>
-                          已显示 {filteredModels.length} / {orderedModels.length} 个模型
-                        </span>
-                        <button className="ghost-button" onClick={clearModelFilters}>
-                          清空筛选
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="model-filter-panel__grid">
-                      <div className="model-filter-panel__group">
-                        <strong>模型商</strong>
-                        <div className="filter-chip-group">
-                          {availableProviders.map((provider) => (
-                            <button
-                              key={provider}
-                              className={clsx('filter-chip', selectedProviders.includes(provider) && 'is-active')}
-                              onClick={() => toggleModelProvider(provider)}
-                            >
-                              {provider}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="model-filter-panel__group">
-                        <strong>Tag</strong>
-                        <div className="filter-chip-group">
-                          {availableTags.length ? (
-                            availableTags.map((tag) => (
-                              <button
-                                key={tag}
-                                className={clsx('filter-chip', selectedTags.includes(tag) && 'is-active')}
-                                onClick={() => toggleModelTag(tag)}
-                              >
-                                {tag}
-                              </button>
-                            ))
-                          ) : (
-                            <span className="model-filter-panel__empty">暂无 tag</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="model-filter-panel__group">
-                        <strong>近期评分</strong>
-                        <div className="filter-chip-group">
-                          {MODEL_SCORE_FILTERS.map((option) => (
-                            <button
-                              key={option.value}
-                              className={clsx('filter-chip', selectedScoreRange === option.value && 'is-active')}
-                              onClick={() => setSelectedScoreRange(option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <ModelFilterPanel
+                    modelNameQuery={modelNameQuery}
+                    onModelNameQueryChange={setModelNameQuery}
+                    filteredCount={filteredModels.length}
+                    totalCount={orderedModels.length}
+                    onClear={clearModelFilters}
+                    availableProviders={availableProviders}
+                    selectedProviders={selectedProviders}
+                    onToggleProvider={toggleModelProvider}
+                    availableTags={availableTags}
+                    selectedTags={selectedTags}
+                    onToggleTag={toggleModelTag}
+                    selectedScoreRange={selectedScoreRange}
+                    onSelectScoreRange={setSelectedScoreRange}
+                  />
                 ) : null}
 
                 <div className="model-list">
@@ -477,7 +371,7 @@ export function HomePage() {
       {activeTab === 'history' ? (
         <div className="page-section">
           <ChartCard title="模型历史命中趋势">
-            {historyHitTrend.length ? (
+            {filteredModels.length && historyHitTrend.length ? (
               <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={historyHitTrend}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -485,20 +379,18 @@ export function HomePage() {
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  {orderedModels
-                    .filter((model) => selectedHistoryIds.includes(model.model_id))
-                    .map((model, index) => (
-                      <Line
-                        key={model.model_id}
-                        type="monotone"
-                        dataKey={model.model_id}
-                        name={model.model_name}
-                        stroke={getModelTrendColor(index)}
-                        strokeWidth={3}
-                        dot={{ r: 2 }}
-                        activeDot={{ r: 5 }}
-                      />
-                    ))}
+                  {filteredModels.map((model, index) => (
+                    <Line
+                      key={model.model_id}
+                      type="monotone"
+                      dataKey={model.model_id}
+                      name={model.model_name}
+                      stroke={getModelTrendColor(index)}
+                      strokeWidth={3}
+                      dot={{ r: 2 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -507,18 +399,27 @@ export function HomePage() {
           </ChartCard>
 
           <StatusCard title="命中回溯" subtitle="按模型和期号筛选历史预测表现。">
+            {isModelFilterOpen ? (
+              <ModelFilterPanel
+                modelNameQuery={modelNameQuery}
+                onModelNameQueryChange={setModelNameQuery}
+                filteredCount={filteredModels.length}
+                totalCount={orderedModels.length}
+                onClear={clearModelFilters}
+                availableProviders={availableProviders}
+                selectedProviders={selectedProviders}
+                onToggleProvider={toggleModelProvider}
+                availableTags={availableTags}
+                selectedTags={selectedTags}
+                onToggleTag={toggleModelTag}
+                selectedScoreRange={selectedScoreRange}
+                onSelectScoreRange={setSelectedScoreRange}
+              />
+            ) : null}
             <div className="history-toolbar">
-              <div className="filter-chip-group">
-                {orderedModels.map((model) => (
-                  <button
-                    key={model.model_id}
-                    className={clsx('filter-chip', selectedHistoryIds.includes(model.model_id) && 'is-active')}
-                    onClick={() => toggleHistoryModel(model.model_id)}
-                  >
-                    {model.model_name}
-                  </button>
-                ))}
-              </div>
+              <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
+                {isModelFilterOpen ? '收起筛选' : '展开筛选'}
+              </button>
               <input
                 className="search-input"
                 value={historyPeriodQuery}
@@ -528,8 +429,10 @@ export function HomePage() {
             </div>
 
             <div className="history-card-list">
+              {!filteredModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
+              {filteredModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
               {filteredHistory.map((record) => (
-                <HistoryRecordCard key={record.target_period} record={record} />
+                <HistoryRecordCard key={record.target_period} record={record} visibleModelIds={filteredModelIds} />
               ))}
             </div>
 
@@ -828,10 +731,117 @@ function getModelTrendColor(index: number) {
   return palette[index % palette.length]
 }
 
+function ModelFilterPanel({
+  modelNameQuery,
+  onModelNameQueryChange,
+  filteredCount,
+  totalCount,
+  onClear,
+  availableProviders,
+  selectedProviders,
+  onToggleProvider,
+  availableTags,
+  selectedTags,
+  onToggleTag,
+  selectedScoreRange,
+  onSelectScoreRange,
+}: {
+  modelNameQuery: string
+  onModelNameQueryChange: (value: string) => void
+  filteredCount: number
+  totalCount: number
+  onClear: () => void
+  availableProviders: string[]
+  selectedProviders: string[]
+  onToggleProvider: (provider: string) => void
+  availableTags: string[]
+  selectedTags: string[]
+  onToggleTag: (tag: string) => void
+  selectedScoreRange: ModelListScoreRange
+  onSelectScoreRange: (value: ModelListScoreRange) => void
+}) {
+  return (
+    <div className="model-filter-panel">
+      <div className="model-filter-panel__top">
+        <label className="model-filter-panel__search">
+          <span>名称搜索</span>
+          <input
+            type="text"
+            placeholder="按模型名称或ID筛选"
+            value={modelNameQuery}
+            onChange={(event) => onModelNameQueryChange(event.target.value)}
+          />
+        </label>
+        <div className="model-filter-panel__summary">
+          <span>
+            已显示 {filteredCount} / {totalCount} 个模型
+          </span>
+          <button className="ghost-button" onClick={onClear}>
+            清空筛选
+          </button>
+        </div>
+      </div>
+
+      <div className="model-filter-panel__grid">
+        <div className="model-filter-panel__group">
+          <strong>模型商</strong>
+          <div className="filter-chip-group">
+            {availableProviders.map((provider) => (
+              <button
+                key={provider}
+                className={clsx('filter-chip', selectedProviders.includes(provider) && 'is-active')}
+                onClick={() => onToggleProvider(provider)}
+              >
+                {provider}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="model-filter-panel__group">
+          <strong>Tag</strong>
+          <div className="filter-chip-group">
+            {availableTags.length ? (
+              availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  className={clsx('filter-chip', selectedTags.includes(tag) && 'is-active')}
+                  onClick={() => onToggleTag(tag)}
+                >
+                  {tag}
+                </button>
+              ))
+            ) : (
+              <span className="model-filter-panel__empty">暂无 tag</span>
+            )}
+          </div>
+        </div>
+
+        <div className="model-filter-panel__group">
+          <strong>近期评分</strong>
+          <div className="filter-chip-group">
+            {MODEL_SCORE_FILTERS.map((option) => (
+              <button
+                key={option.value}
+                className={clsx('filter-chip', selectedScoreRange === option.value && 'is-active')}
+                onClick={() => onSelectScoreRange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function HistoryRecordCard({
   record,
+  visibleModelIds,
 }: {
   record: PredictionsHistoryListRecord
+  visibleModelIds: string[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const detailQuery = useQuery({
@@ -839,7 +849,14 @@ function HistoryRecordCard({
     enabled: expanded,
     queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period)),
   })
-  const detailRecord = detailQuery.data?.predictions_history?.[0] || null
+  const detailRecord = detailQuery.data?.predictions_history?.[0]
+    ? {
+        ...detailQuery.data.predictions_history[0],
+        models: visibleModelIds.length
+          ? detailQuery.data.predictions_history[0].models.filter((model) => visibleModelIds.includes(model.model_id))
+          : detailQuery.data.predictions_history[0].models,
+      }
+    : null
 
   return (
     <article className="history-record-card">

@@ -33,3 +33,24 @@ class PredictionGenerationTaskResponse(BaseModel):
     finished_at: str | None = None
     progress_summary: dict[str, Any]
     error_message: str | None = None
+
+
+class SettingsPredictionRecordSummaryResponse(BaseModel):
+    record_type: str
+    target_period: str
+    prediction_date: str
+    actual_result: dict[str, Any] | None = None
+    model_count: int = 0
+    status_label: str
+
+
+class SettingsPredictionRecordListResponse(BaseModel):
+    records: list[SettingsPredictionRecordSummaryResponse]
+
+
+class SettingsPredictionRecordDetailResponse(BaseModel):
+    record_type: str
+    prediction_date: str
+    target_period: str
+    actual_result: dict[str, Any] | None = None
+    models: list[dict[str, Any]]

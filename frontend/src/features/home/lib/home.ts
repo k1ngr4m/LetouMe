@@ -311,11 +311,16 @@ export function buildHistoryHitTrend(
 }
 
 export function filterHistoryRecords(history: PredictionsHistoryListResponse, selectedModelIds: string[], periodQuery: string) {
-  return (history.predictions_history || []).filter((record) => {
-    const matchesPeriod = !periodQuery || record.target_period.includes(periodQuery)
-    const matchesModel =
-      !selectedModelIds.length ||
-      record.models.some((model) => selectedModelIds.includes(model.model_id))
-    return matchesPeriod && matchesModel
-  })
+  return (history.predictions_history || [])
+    .map((record) => ({
+      ...record,
+      models: selectedModelIds.length
+        ? (record.models || []).filter((model) => selectedModelIds.includes(model.model_id))
+        : record.models || [],
+    }))
+    .filter((record) => {
+      const matchesPeriod = !periodQuery || record.target_period.includes(periodQuery)
+      const matchesModel = !selectedModelIds.length || record.models.length > 0
+      return matchesPeriod && matchesModel
+    })
 }

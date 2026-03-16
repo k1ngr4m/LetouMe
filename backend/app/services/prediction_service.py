@@ -105,6 +105,69 @@ class PredictionService:
         )
         return payload
 
+    def get_current_detail_payload(self, target_period: str) -> dict[str, Any] | None:
+        payload = self.get_current_payload_by_period(target_period)
+        if not payload.get("target_period") or payload.get("target_period") != target_period:
+            return None
+        return payload
+
+    def get_settings_record_list_payload(self) -> dict[str, Any]:
+        current_payload = self.get_current_payload()
+        history_payload = self.get_history_list_payload()
+        records: list[dict[str, Any]] = []
+
+        if current_payload.get("target_period"):
+            records.append(
+                {
+                    "record_type": "current",
+                    "target_period": current_payload.get("target_period", ""),
+                    "prediction_date": current_payload.get("prediction_date", ""),
+                    "actual_result": None,
+                    "model_count": len(current_payload.get("models", [])),
+                    "status_label": "待开奖",
+                }
+            )
+
+        for record in history_payload.get("predictions_history", []):
+            records.append(
+                {
+                    "record_type": "history",
+                    "target_period": record.get("target_period", ""),
+                    "prediction_date": record.get("prediction_date", ""),
+                    "actual_result": record.get("actual_result"),
+                    "model_count": len(record.get("models", [])),
+                    "status_label": "已归档",
+                }
+            )
+
+        records.sort(key=lambda item: (0 if item["record_type"] == "current" else 1, str(item["target_period"])), reverse=False)
+        if records and any(item["record_type"] == "history" for item in records[1:]):
+            history_records = [item for item in records if item["record_type"] == "history"]
+            history_records.sort(key=lambda item: str(item["target_period"]), reverse=True)
+            current_records = [item for item in records if item["record_type"] == "current"]
+            records = current_records + history_records
+        self.logger.info("Loaded settings prediction records", extra={"context": {"record_count": len(records)}})
+        return {"records": records}
+
+    def get_settings_record_detail_payload(self, record_type: str, target_period: str) -> dict[str, Any] | None:
+        normalized_type = str(record_type or "").strip().lower()
+        if normalized_type == "current":
+            payload = self.get_current_detail_payload(target_period)
+        elif normalized_type == "history":
+            payload = self.get_history_detail_payload(target_period)
+        else:
+            raise ValueError("不支持的预测记录类型")
+
+        if not payload:
+            return None
+        return {
+            "record_type": normalized_type,
+            "prediction_date": payload.get("prediction_date", ""),
+            "target_period": payload.get("target_period", ""),
+            "actual_result": payload.get("actual_result"),
+            "models": payload.get("models", []),
+        }
+
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
         target_period = str(payload.get("target_period") or "")
         current = self.get_current_payload_by_period(target_period) if target_period else self.get_current_payload()

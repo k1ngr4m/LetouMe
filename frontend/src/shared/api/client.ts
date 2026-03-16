@@ -17,6 +17,8 @@ import type {
   RoleListResponse,
   RolePayload,
   PredictionGenerationTask,
+  SettingsPredictionRecordDetail,
+  SettingsPredictionRecordListResponse,
   SettingsModel,
   SettingsModelListResponse,
   SettingsModelPayload,
@@ -198,6 +200,18 @@ export const apiClient = {
     return requestJson<PredictionGenerationTask>('/api/settings/models/predictions/task-detail', {
       method: 'POST',
       body: JSON.stringify({ task_id: taskId }),
+    })
+  },
+  getSettingsPredictionRecords() {
+    return requestJson<SettingsPredictionRecordListResponse>('/api/settings/predictions/records/list', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  getSettingsPredictionRecordDetail(recordType: 'current' | 'history', targetPeriod: string) {
+    return requestJson<SettingsPredictionRecordDetail>('/api/settings/predictions/records/detail', {
+      method: 'POST',
+      body: JSON.stringify({ record_type: recordType, target_period: targetPeriod }),
     })
   },
   listUsers() {

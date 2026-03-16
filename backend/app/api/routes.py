@@ -44,6 +44,7 @@ from backend.app.schemas.requests import (
     PredictionGenerationTaskPayload,
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
+    SettingsPredictionRecordDetailPayload,
     RoleCodePayload,
     RolePayload,
 )
@@ -52,6 +53,8 @@ from backend.app.schemas.responses import (
     LotteryHistoryResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
+    SettingsPredictionRecordDetailResponse,
+    SettingsPredictionRecordListResponse,
 )
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.model_service import ModelService
@@ -279,6 +282,25 @@ def get_model_prediction_generation_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task
+
+
+@router.post("/settings/predictions/records/list", response_model=SettingsPredictionRecordListResponse)
+def get_settings_prediction_records(_: dict = Depends(require_model_management_permission)) -> dict:
+    return prediction_service.get_settings_record_list_payload()
+
+
+@router.post("/settings/predictions/records/detail", response_model=SettingsPredictionRecordDetailResponse)
+def get_settings_prediction_record_detail(
+    payload: SettingsPredictionRecordDetailPayload,
+    _: dict = Depends(require_model_management_permission),
+) -> dict:
+    try:
+        record = prediction_service.get_settings_record_detail_payload(payload.record_type, payload.target_period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not record:
+        raise HTTPException(status_code=404, detail="预测记录不存在")
+    return record
 
 
 @router.post("/admin/users/list", response_model=UserListResponse)

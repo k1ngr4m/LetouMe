@@ -159,6 +159,26 @@ class ModelSettingsApiTests(unittest.TestCase):
         validate_model.assert_called_once_with("claude-sonnet-4.6")
         create_task.assert_called_once()
 
+    def test_settings_prediction_records_list_endpoint(self) -> None:
+        with patch("backend.app.api.routes.prediction_service.get_settings_record_list_payload") as get_payload:
+            get_payload.return_value = {
+                "records": [
+                    {
+                        "record_type": "current",
+                        "target_period": "2026033",
+                        "prediction_date": "2026-03-16",
+                        "actual_result": None,
+                        "model_count": 2,
+                        "status_label": "待开奖",
+                    }
+                ]
+            }
+
+            response = self.client.post("/api/settings/predictions/records/list", json={})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["records"][0]["record_type"], "current")
+
 
 if __name__ == "__main__":
     unittest.main()

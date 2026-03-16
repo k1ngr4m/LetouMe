@@ -160,6 +160,27 @@ export type PredictionGenerationTask = {
   error_message?: string | null
 }
 
+export type SettingsPredictionRecordSummary = {
+  record_type: 'current' | 'history'
+  target_period: string
+  prediction_date: string
+  actual_result: LotteryDraw | null
+  model_count: number
+  status_label: string
+}
+
+export type SettingsPredictionRecordListResponse = {
+  records: SettingsPredictionRecordSummary[]
+}
+
+export type SettingsPredictionRecordDetail = {
+  record_type: 'current' | 'history'
+  prediction_date: string
+  target_period: string
+  actual_result: LotteryDraw | null
+  models: PredictionModel[]
+}
+
 export type AuthUser = {
   id: number
   username: string
