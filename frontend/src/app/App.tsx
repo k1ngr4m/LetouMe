@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '../shared/components/AppShell'
 import { HomePage } from '../features/home/HomePage'
+import { HomeModelDetailPage } from '../features/home/HomeModelDetailPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { LandingPage } from '../features/landing/LandingPage'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -27,6 +28,16 @@ export function App() {
               <ProtectedRoute>
                 <AppShell>
                   <HomePage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/models/:modelId"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <HomeModelDetailPage />
                 </AppShell>
               </ProtectedRoute>
             }

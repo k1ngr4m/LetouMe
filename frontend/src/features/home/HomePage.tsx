@@ -15,6 +15,7 @@ import {
   YAxis,
 } from 'recharts'
 import clsx from 'clsx'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -34,21 +35,7 @@ import {
   normalizePredictionsHistory,
 } from './lib/home'
 import type { LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord } from '../../shared/types/api'
-
-type HomeTab = 'prediction' | 'analysis' | 'history'
-type HomeModelView = 'card' | 'list' | 'score'
-type ScoreViewSortKey =
-  | 'overallScore'
-  | 'perBetScore'
-  | 'perPeriodScore'
-  | 'recentScore'
-  | 'longTermScore'
-  | 'profit'
-  | 'hit_rate'
-  | 'stability'
-  | 'ceiling'
-  | 'floor'
-type ScoreViewSortDirection = 'desc' | 'asc'
+import type { HomeDashboardState, HomeDetailRouteState, HomeModelView, HomeTab, ScoreViewSortDirection, ScoreViewSortKey } from './navigation'
 
 const HISTORY_BATCH_SIZE = 20
 const LOTTERY_PAGE_SIZE = 20
@@ -222,21 +209,24 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
 }
 
 export function HomePage() {
-  const [activeTab, setActiveTab] = useState<HomeTab>('prediction')
-  const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
-  const [modelListView, setModelListView] = useState<HomeModelView>('list')
-  const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>('overallScore')
-  const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
-  const [predictionLimit, setPredictionLimit] = useState(HISTORY_BATCH_SIZE)
-  const [lotteryPage, setLotteryPage] = useState(1)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const restoredState = (location.state as HomeDetailRouteState | null)?.dashboardState
+  const [activeTab, setActiveTab] = useState<HomeTab>(restoredState?.activeTab || 'prediction')
+  const [activeSection, setActiveSection] = useState<'models' | 'weights'>(restoredState?.activeSection || 'models')
+  const [modelListView, setModelListView] = useState<HomeModelView>(restoredState?.modelListView || 'list')
+  const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>(restoredState?.scoreViewSortKey || 'overallScore')
+  const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>(restoredState?.scoreViewSortDirection || 'desc')
+  const [predictionLimit, setPredictionLimit] = useState(restoredState?.predictionLimit || HISTORY_BATCH_SIZE)
+  const [lotteryPage, setLotteryPage] = useState(restoredState?.lotteryPage || 1)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
-  const [detailModelId, setDetailModelId] = useState<string | null>(null)
-  const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
-  const [commonOnly, setCommonOnly] = useState(false)
+  const [historyPeriodQuery, setHistoryPeriodQuery] = useState(restoredState?.historyPeriodQuery || '')
+  const [commonOnly, setCommonOnly] = useState(Boolean(restoredState?.commonOnly))
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
+  const hasRestoredScrollRef = useRef(false)
 
   const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
     predictionLimit,
@@ -269,12 +259,25 @@ export function HomePage() {
     clearModelFilters,
     toggleSummaryModel,
     buildHistoryState,
-  } = useHomeModelFilters(models, history, validPinnedModelIds)
+  } = useHomeModelFilters(models, history, validPinnedModelIds, {
+    isModelFilterOpen: restoredState?.isModelFilterOpen,
+    modelNameQuery: restoredState?.modelNameQuery,
+    selectedProviders: restoredState?.selectedProviders,
+    selectedTags: restoredState?.selectedTags,
+    selectedScoreRange: restoredState?.selectedScoreRange,
+  })
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   useEffect(() => {
     savePinnedModels(validPinnedModelIds)
   }, [validPinnedModelIds])
+
+  useEffect(() => {
+    if (hasRestoredScrollRef.current || typeof restoredState?.scrollY !== 'number') return
+    hasRestoredScrollRef.current = true
+    const frameId = requestAnimationFrame(() => window.scrollTo({ top: restoredState.scrollY }))
+    return () => cancelAnimationFrame(frameId)
+  }, [restoredState?.scrollY])
 
   useEffect(() => {
     if (activeTab !== 'prediction') return
@@ -314,8 +317,6 @@ export function HomePage() {
   const blueChart = buildBlueFrequencyChart(chartDraws)
   const oddEvenChart = buildOddEvenChart(chartDraws)
   const sumTrendChart = buildSumTrendChart(chartDraws)
-  const selectedDetailModel = orderedModels.find((model) => model.model_id === detailModelId) || null
-  const selectedDetailScore = selectedDetailModel ? modelScores[selectedDetailModel.model_id] : null
   const scoreViewModels = useMemo(
     () => sortModelsForScoreView(filteredModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [filteredModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
@@ -353,6 +354,32 @@ export function HomePage() {
 
   if (error) {
     return <div className="state-shell state-shell--error">加载失败：{error.message}</div>
+  }
+
+  function openModelDetail(modelId: string) {
+    const dashboardState: HomeDashboardState = {
+      activeTab,
+      activeSection,
+      modelListView,
+      scoreViewSortKey,
+      scoreViewSortDirection,
+      predictionLimit,
+      lotteryPage,
+      historyPeriodQuery,
+      commonOnly,
+      isModelFilterOpen,
+      modelNameQuery,
+      selectedProviders,
+      selectedTags,
+      selectedScoreRange,
+      scrollY: window.scrollY,
+    }
+
+    navigate(`/dashboard/models/${modelId}`, {
+      state: {
+        dashboardState,
+      } satisfies HomeDetailRouteState,
+    })
   }
 
   return (
@@ -489,7 +516,7 @@ export function HomePage() {
                             setActiveActionMenuId((previous) => (previous === model.model_id ? null : model.model_id))
                           }
                           onPin={() => togglePinned(model.model_id)}
-                          onDetail={() => setDetailModelId(model.model_id)}
+                          onDetail={() => openModelDetail(model.model_id)}
                         />
                       ))
                     ) : (
@@ -511,7 +538,7 @@ export function HomePage() {
                       setScoreViewSortKey(key)
                       setScoreViewSortDirection('desc')
                     }}
-                    onDetail={setDetailModelId}
+                    onDetail={openModelDetail}
                   />
                 ) : (
                   <ModelListTable
@@ -524,7 +551,7 @@ export function HomePage() {
                       setActiveActionMenuId((previous) => (previous === modelId ? null : modelId))
                     }
                     onPin={togglePinned}
-                    onDetail={setDetailModelId}
+                    onDetail={openModelDetail}
                   />
                 )}
               </StatusCard>
@@ -771,36 +798,6 @@ export function HomePage() {
           </StatusCard>
         </div>
       ) : null}
-
-      {selectedDetailModel ? (
-        <div className="modal-shell" role="presentation" onClick={() => setDetailModelId(null)}>
-          <div className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-card__header">
-              <div>
-                <p className="modal-card__eyebrow">模型详情</p>
-                <h3>{selectedDetailModel.model_name}</h3>
-              </div>
-              <button className="ghost-button" onClick={() => setDetailModelId(null)}>
-                关闭
-              </button>
-            </div>
-            <div className="detail-group-list">
-              {selectedDetailModel.predictions.map((group) => (
-                <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} />
-              ))}
-            </div>
-            {selectedDetailScore ? (
-              <section className="detail-score-section" aria-label="能力画像">
-                <div className="detail-score-section__header">
-                  <span>能力画像</span>
-                  <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
-                </div>
-                <ModelScoreShowcase score={selectedDetailScore} compact={false} />
-              </section>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -1023,7 +1020,7 @@ function DetailIcon() {
   )
 }
 
-function PredictionGroupCard({
+export function PredictionGroupCard({
   group,
   actualResult,
   compact = false,
@@ -1215,7 +1212,7 @@ function getModelTrendColor(index: number) {
   return palette[index % palette.length]
 }
 
-function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; compact?: boolean }) {
+export function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; compact?: boolean }) {
   if (!score) return null
 
   const components = [

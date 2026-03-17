@@ -8,6 +8,10 @@ vi.mock('../features/home/HomePage', () => ({
   HomePage: () => <div>Home Page Mock</div>,
 }))
 
+vi.mock('../features/home/HomeModelDetailPage', () => ({
+  HomeModelDetailPage: () => <div>Home Model Detail Page Mock</div>,
+}))
+
 vi.mock('../features/landing/LandingPage', () => ({
   LandingPage: () => <div>Landing Page Mock</div>,
 }))
@@ -57,6 +61,11 @@ describe('App routing', () => {
   it('renders dashboard route', () => {
     renderApp(['/dashboard'])
     expect(screen.getByText('Home Page Mock')).toBeInTheDocument()
+  })
+
+  it('renders dashboard model detail route', () => {
+    renderApp(['/dashboard/models/model-a'])
+    expect(screen.getByText('Home Model Detail Page Mock')).toBeInTheDocument()
   })
 
   it('renders settings route', () => {

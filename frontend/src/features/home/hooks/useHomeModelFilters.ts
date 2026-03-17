@@ -10,12 +10,25 @@ import {
 } from '../lib/home'
 import type { PredictionModel, PredictionsHistoryListResponse } from '../../../shared/types/api'
 
-export function useHomeModelFilters(models: PredictionModel[], history: PredictionsHistoryListResponse | undefined, pinnedModelIds: string[]) {
-  const [isModelFilterOpen, setIsModelFilterOpen] = useState(false)
-  const [modelNameQuery, setModelNameQuery] = useState('')
-  const [selectedProviders, setSelectedProviders] = useState<string[]>([])
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [selectedScoreRange, setSelectedScoreRange] = useState<ModelListScoreRange>('all')
+type HomeModelFilterInitialState = {
+  isModelFilterOpen?: boolean
+  modelNameQuery?: string
+  selectedProviders?: string[]
+  selectedTags?: string[]
+  selectedScoreRange?: ModelListScoreRange
+}
+
+export function useHomeModelFilters(
+  models: PredictionModel[],
+  history: PredictionsHistoryListResponse | undefined,
+  pinnedModelIds: string[],
+  initialState?: HomeModelFilterInitialState,
+) {
+  const [isModelFilterOpen, setIsModelFilterOpen] = useState(Boolean(initialState?.isModelFilterOpen))
+  const [modelNameQuery, setModelNameQuery] = useState(initialState?.modelNameQuery || '')
+  const [selectedProviders, setSelectedProviders] = useState<string[]>(initialState?.selectedProviders || [])
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialState?.selectedTags || [])
+  const [selectedScoreRange, setSelectedScoreRange] = useState<ModelListScoreRange>(initialState?.selectedScoreRange || 'all')
   const [summarySelectedModelIds, setSummarySelectedModelIds] = useState<string[] | null>(null)
 
   const modelScores = useMemo(() => (history ? buildModelScores(history, models) : {}), [history, models])

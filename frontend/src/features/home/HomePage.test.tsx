@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
@@ -210,9 +211,27 @@ function renderPage() {
     },
   })
 
+  function LocationDisplay() {
+    const location = useLocation()
+    return <div data-testid="location-display">{location.pathname}</div>
+  }
+
   render(
     <QueryClientProvider client={client}>
-      <HomePage />
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
+              <>
+                <HomePage />
+                <LocationDisplay />
+              </>
+            }
+          />
+          <Route path="/dashboard/models/:modelId" element={<LocationDisplay />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -310,19 +329,13 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(rowsAfterHover[0]).getByText('模型A')).toBeInTheDocument()
   })
 
-  it('keeps full ability portrait in model detail dialog', async () => {
+  it('navigates to model detail page when opening model detail', async () => {
     renderPage()
 
     await userEvent.click(screen.getAllByRole('button', { name: /查看详情：/ })[0])
 
-    const dialog = await screen.findByRole('dialog')
-    const dialogScope = within(dialog)
-    expect(dialog).toBeInTheDocument()
-    expect(dialogScope.getByText('能力画像')).toBeInTheDocument()
-    expect(dialogScope.getByText('综合分')).toBeInTheDocument()
-    expect(dialogScope.getByText('能力上限')).toBeInTheDocument()
-    expect(dialogScope.getByText('能力下限')).toBeInTheDocument()
-    expect(dialogScope.getByText('近期 20 期')).toBeInTheDocument()
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {
