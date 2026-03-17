@@ -285,6 +285,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
     expect(screen.getAllByText('本期预测号码').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/综合 \d+/).length).toBeGreaterThan(0)
+    expect(screen.queryByText('接口模型')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
 
@@ -292,6 +293,13 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('button', { name: '收益分排序' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '稳定性排序' })).toBeInTheDocument()
     expect(screen.queryByText('本期预测号码')).not.toBeInTheDocument()
+  })
+
+  it('removes standalone overall score and api model columns from list view', () => {
+    renderPage()
+
+    expect(screen.queryByRole('columnheader', { name: '综合分' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: '接口模型' })).not.toBeInTheDocument()
   })
 
   it('sorts score view by selected score dimension', async () => {

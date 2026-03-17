@@ -1155,38 +1155,16 @@ a {
   font-size: 0.92rem;
 }
 
-.home-model-list-table__title span,
-.home-model-list-table__api {
+.home-model-list-table__title span {
   font-size: 0.76rem;
   color: var(--text-2);
 }
 
-.home-model-list-table__api {
-  display: inline-block;
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.home-model-list-table__score {
-  display: inline-flex;
-  min-width: 2.6rem;
-  justify-content: center;
-  padding: 0.18rem 0.46rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-2);
-  font-size: 0.74rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
 .home-model-list-table__groups {
   display: grid;
-  grid-template-columns: repeat(2, minmax(10rem, 1fr));
+  grid-template-columns: repeat(3, minmax(8rem, 1fr));
   gap: 0.42rem;
-  min-width: 24rem;
+  min-width: 30rem;
 }
 
 .home-model-list-table__groups .prediction-group-card,

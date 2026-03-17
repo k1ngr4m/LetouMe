@@ -864,20 +864,6 @@ function ModelListCard({
           </div>
         </div>
       </div>
-      <div className="model-list-card__meta">
-        <div className="model-list-card__field">
-          <span>模型名称</span>
-          <strong>{model.model_name}</strong>
-        </div>
-        <div className="model-list-card__field">
-          <span>综合分</span>
-          <strong>{score?.overallScore || 0}</strong>
-        </div>
-        <div className="model-list-card__field">
-          <span>接口模型</span>
-          <strong>{model.model_api_model || model.model_id}</strong>
-        </div>
-      </div>
       <div className="model-list-card__groups">
         {model.predictions.map((group) => (
           <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
@@ -920,8 +906,6 @@ function ModelListTable({
         <thead>
           <tr>
             <th>模型</th>
-            <th>综合分</th>
-            <th>接口模型</th>
             <th>预测号码</th>
             <th>评分摘要</th>
             <th>状态</th>
@@ -938,14 +922,6 @@ function ModelListTable({
                     <strong>{model.model_name}</strong>
                     <span>{model.model_provider}</span>
                   </div>
-                </td>
-                <td>
-                  <span className="home-model-list-table__score">{modelScores[model.model_id]?.overallScore || 0}</span>
-                </td>
-                <td>
-                  <span className="home-model-list-table__api" title={model.model_api_model || model.model_id}>
-                    {model.model_api_model || model.model_id}
-                  </span>
                 </td>
                 <td>
                   <div className="home-model-list-table__groups">
