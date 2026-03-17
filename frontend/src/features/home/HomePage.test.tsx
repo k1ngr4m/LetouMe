@@ -62,6 +62,60 @@ vi.mock('./hooks/useHomeData', () => ({
     },
     predictionsHistory: {
       data: {
+        model_stats: [
+          {
+            model_id: 'model-a',
+            model_name: '模型A',
+            periods: 8,
+            winning_periods: 5,
+            bet_count: 40,
+            winning_bet_count: 10,
+            cost_amount: 80,
+            prize_amount: 160,
+            win_rate_by_period: 0.625,
+            win_rate_by_bet: 0.25,
+            score_profile: {
+              overall_score: 72,
+              per_bet_score: 68,
+              per_period_score: 75,
+              recent_score: 78,
+              long_term_score: 70,
+              component_scores: {
+                profit: 74,
+                hit_rate: 71,
+                stability: 69,
+                ceiling: 80,
+                floor: 58,
+              },
+            },
+          },
+          {
+            model_id: 'model-b',
+            model_name: '模型B',
+            periods: 8,
+            winning_periods: 4,
+            bet_count: 40,
+            winning_bet_count: 8,
+            cost_amount: 80,
+            prize_amount: 110,
+            win_rate_by_period: 0.5,
+            win_rate_by_bet: 0.2,
+            score_profile: {
+              overall_score: 61,
+              per_bet_score: 57,
+              per_period_score: 64,
+              recent_score: 59,
+              long_term_score: 63,
+              component_scores: {
+                profit: 60,
+                hit_rate: 62,
+                stability: 58,
+                ceiling: 67,
+                floor: 52,
+              },
+            },
+          },
+        ],
         predictions_history: [
           {
             prediction_date: '2026-03-12',
@@ -196,7 +250,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByText('模型B').length).toBeGreaterThan(0)
   })
 
-  it('switches model overview between card and list views', async () => {
+  it('switches model overview across list, card and score views', async () => {
     renderPage()
 
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('is-active')
@@ -212,6 +266,48 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
     expect(screen.getAllByText('本期预测号码').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/综合 \d+/).length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+
+    expect(screen.getByRole('button', { name: '评分视图' })).toHaveClass('is-active')
+    expect(screen.getByRole('button', { name: '收益分排序' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '稳定性排序' })).toBeInTheDocument()
+    expect(screen.queryByText('本期预测号码')).not.toBeInTheDocument()
+  })
+
+  it('sorts score view by selected score dimension', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+
+    const rowsBefore = screen.getAllByRole('row').slice(1)
+    expect(within(rowsBefore[0]).getByText('模型A')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '下限分排序' }))
+
+    const rowsAfterFirstSort = screen.getAllByRole('row').slice(1)
+    expect(within(rowsAfterFirstSort[0]).getByText('模型A')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '下限分排序' }))
+
+    const rowsAfterSecondSort = screen.getAllByRole('row').slice(1)
+    expect(within(rowsAfterSecondSort[0]).getByText('模型B')).toBeInTheDocument()
+  })
+
+  it('shows score definition tooltip in score view without affecting sorting', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+
+    const profitInfoButton = screen.getByRole('button', { name: '收益分定义' })
+    await userEvent.hover(profitInfoButton)
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(within(tooltip).getByText('收益分')).toBeInTheDocument()
+    expect(within(tooltip).getByText('反映模型历史奖金回报和盈利能力的评分。')).toBeInTheDocument()
+
+    const rowsAfterHover = screen.getAllByRole('row').slice(1)
+    expect(within(rowsAfterHover[0]).getByText('模型A')).toBeInTheDocument()
   })
 
   it('keeps full ability portrait in model detail dialog', async () => {

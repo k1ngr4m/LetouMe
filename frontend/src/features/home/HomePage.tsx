@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Area,
@@ -36,7 +36,19 @@ import {
 import type { LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord } from '../../shared/types/api'
 
 type HomeTab = 'prediction' | 'analysis' | 'history'
-type HomeModelView = 'card' | 'list'
+type HomeModelView = 'card' | 'list' | 'score'
+type ScoreViewSortKey =
+  | 'overallScore'
+  | 'perBetScore'
+  | 'perPeriodScore'
+  | 'recentScore'
+  | 'longTermScore'
+  | 'profit'
+  | 'hit_rate'
+  | 'stability'
+  | 'ceiling'
+  | 'floor'
+type ScoreViewSortDirection = 'desc' | 'asc'
 
 const HISTORY_BATCH_SIZE = 20
 const LOTTERY_PAGE_SIZE = 20
@@ -72,6 +84,17 @@ function HomeGridIcon() {
       <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
       <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
       <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomeScoreIcon() {
+  return (
+    <HomeSvgIcon>
+      <path d="M4 15.5h12" />
+      <path d="M5.5 13V9.5" />
+      <path d="M10 13V6.5" />
+      <path d="M14.5 13V4.5" />
     </HomeSvgIcon>
   )
 }
@@ -172,6 +195,8 @@ export function HomePage() {
   const [activeTab, setActiveTab] = useState<HomeTab>('prediction')
   const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
   const [modelListView, setModelListView] = useState<HomeModelView>('list')
+  const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>('overallScore')
+  const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
   const [predictionLimit, setPredictionLimit] = useState(HISTORY_BATCH_SIZE)
   const [lotteryPage, setLotteryPage] = useState(1)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels())
@@ -261,6 +286,10 @@ export function HomePage() {
   const sumTrendChart = buildSumTrendChart(chartDraws)
   const selectedDetailModel = orderedModels.find((model) => model.model_id === detailModelId) || null
   const selectedDetailScore = selectedDetailModel ? modelScores[selectedDetailModel.model_id] : null
+  const scoreViewModels = useMemo(
+    () => sortModelsForScoreView(filteredModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
+    [filteredModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
+  )
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || predictionsHistory.isLoading
   const error =
@@ -362,7 +391,7 @@ export function HomePage() {
             <section ref={modelSectionRef} data-section="models">
               <StatusCard
                 title="模型列表"
-                subtitle="列表页先看本期预测号码与轻量评分，点进详情再看完整能力画像。"
+                subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
                   <div className="toolbar-inline">
                     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
@@ -377,6 +406,12 @@ export function HomePage() {
                         icon={<HomeGridIcon />}
                         active={modelListView === 'card'}
                         onClick={() => setModelListView('card')}
+                      />
+                      <HomeIconButton
+                        label="评分视图"
+                        icon={<HomeScoreIcon />}
+                        active={modelListView === 'score'}
+                        onClick={() => setModelListView('score')}
                       />
                     </div>
                     <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
@@ -425,6 +460,23 @@ export function HomePage() {
                       <div className="state-shell">没有符合当前筛选条件的模型。</div>
                     )}
                   </div>
+                ) : modelListView === 'score' ? (
+                  <ModelScoreComparisonTable
+                    models={scoreViewModels}
+                    modelScores={modelScores}
+                    validPinnedModelIds={validPinnedModelIds}
+                    sortKey={scoreViewSortKey}
+                    sortDirection={scoreViewSortDirection}
+                    onSortChange={(key) => {
+                      if (key === scoreViewSortKey) {
+                        setScoreViewSortDirection((value) => (value === 'desc' ? 'asc' : 'desc'))
+                        return
+                      }
+                      setScoreViewSortKey(key)
+                      setScoreViewSortDirection('desc')
+                    }}
+                    onDetail={setDetailModelId}
+                  />
                 ) : (
                   <ModelListTable
                     models={filteredModels}
@@ -1175,6 +1227,182 @@ function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; co
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+const SCORE_VIEW_COLUMNS: Array<{ key: ScoreViewSortKey; label: string; description: string }> = [
+  { key: 'overallScore', label: '综合分', description: '综合模型历史收益、命中、稳定性、上限和下限后的总评分。' },
+  { key: 'perBetScore', label: '按注分', description: '按每一注历史表现计算的能力评分，更看重单注命中和回报。' },
+  { key: 'perPeriodScore', label: '按期分', description: '按每一期整体表现计算的能力评分，更看重单期是否能打出结果。' },
+  { key: 'recentScore', label: '近期分', description: '更强调最近一段历史表现的评分，用来看模型最近状态。' },
+  { key: 'longTermScore', label: '长期分', description: '基于全历史表现的评分，用来看模型长期能力。' },
+  { key: 'profit', label: '收益分', description: '反映模型历史奖金回报和盈利能力的评分。' },
+  { key: 'hit_rate', label: '命中分', description: '反映模型历史中奖频率和命中能力的评分。' },
+  { key: 'stability', label: '稳定性', description: '反映模型表现波动大小与持续稳定程度的评分。' },
+  { key: 'ceiling', label: '上限分', description: '反映模型历史最好表现有多强的评分。' },
+  { key: 'floor', label: '下限分', description: '反映模型历史较差表现是否仍然可控的评分。' },
+]
+
+function getScoreViewValue(score: ModelScore | undefined, key: ScoreViewSortKey) {
+  if (!score) return 0
+  if (key === 'overallScore') return score.overallScore
+  if (key === 'perBetScore') return score.perBetScore
+  if (key === 'perPeriodScore') return score.perPeriodScore
+  if (key === 'recentScore') return score.recentScore
+  if (key === 'longTermScore') return score.longTermScore
+  return Number(score.componentScores[key] || 0)
+}
+
+function sortModelsForScoreView(
+  models: PredictionModel[],
+  modelScores: Record<string, ModelScore>,
+  pinnedModelIds: string[],
+  sortKey: ScoreViewSortKey,
+  sortDirection: ScoreViewSortDirection,
+) {
+  const pinnedIndex = new Map(pinnedModelIds.map((id, index) => [id, index]))
+  const directionFactor = sortDirection === 'desc' ? -1 : 1
+
+  return [...models].sort((left, right) => {
+    const leftPinned = pinnedIndex.has(left.model_id)
+    const rightPinned = pinnedIndex.has(right.model_id)
+    if (leftPinned && rightPinned) {
+      const pinCompare = (pinnedIndex.get(left.model_id) || 0) - (pinnedIndex.get(right.model_id) || 0)
+      if (pinCompare !== 0) return pinCompare
+    } else if (leftPinned) {
+      return -1
+    } else if (rightPinned) {
+      return 1
+    }
+
+    const leftValue = getScoreViewValue(modelScores[left.model_id], sortKey)
+    const rightValue = getScoreViewValue(modelScores[right.model_id], sortKey)
+    if (leftValue !== rightValue) {
+      return leftValue < rightValue ? -1 * directionFactor : 1 * directionFactor
+    }
+
+    const overallDiff = (modelScores[right.model_id]?.overallScore || 0) - (modelScores[left.model_id]?.overallScore || 0)
+    if (overallDiff !== 0) return overallDiff
+    return left.model_name.localeCompare(right.model_name, 'zh-CN')
+  })
+}
+
+function ModelScoreComparisonTable({
+  models,
+  modelScores,
+  validPinnedModelIds,
+  sortKey,
+  sortDirection,
+  onSortChange,
+  onDetail,
+}: {
+  models: PredictionModel[]
+  modelScores: Record<string, ModelScore>
+  validPinnedModelIds: string[]
+  sortKey: ScoreViewSortKey
+  sortDirection: ScoreViewSortDirection
+  onSortChange: (key: ScoreViewSortKey) => void
+  onDetail: (modelId: string) => void
+}) {
+  if (!models.length) {
+    return <div className="state-shell">没有符合当前筛选条件的模型。</div>
+  }
+
+  return (
+    <div className="table-shell score-view-table-shell">
+      <table className="history-table score-view-table">
+        <thead>
+          <tr>
+            <th>模型</th>
+            {SCORE_VIEW_COLUMNS.map((column) => (
+              <th key={column.key}>
+                <div className="score-view-table__head">
+                  <button
+                    type="button"
+                    className={clsx('score-view-table__sort-button', sortKey === column.key && 'is-active')}
+                    onClick={() => onSortChange(column.key)}
+                    aria-label={`${column.label}排序`}
+                  >
+                    <span>{column.label}</span>
+                    <small>{sortKey === column.key ? (sortDirection === 'desc' ? '↓' : '↑') : '↕'}</small>
+                  </button>
+                  <ScoreInfoTooltip label={column.label} description={column.description} />
+                </div>
+              </th>
+            ))}
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {models.map((model) => {
+            const score = modelScores[model.model_id]
+            const isPinned = validPinnedModelIds.includes(model.model_id)
+            return (
+              <tr key={model.model_id}>
+                <td>
+                  <div className="score-view-table__model">
+                    <strong>{model.model_name}</strong>
+                    <span>{model.model_provider}</span>
+                  </div>
+                </td>
+                {SCORE_VIEW_COLUMNS.map((column) => (
+                  <td key={`${model.model_id}-${column.key}`}>
+                    <ScoreMetricCell label={column.label} value={getScoreViewValue(score, column.key)} />
+                  </td>
+                ))}
+                <td>{isPinned ? <span className="status-pill is-active">已置顶</span> : <span className="score-view-table__status">普通</span>}</td>
+                <td>
+                  <button
+                    className="ghost-button score-view-table__detail-button"
+                    type="button"
+                    onClick={() => onDetail(model.model_id)}
+                    aria-label={`查看详情：${model.model_name}`}
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ScoreInfoTooltip({ label, description }: { label: string; description: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div
+      className="score-info-tooltip"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onFocus={() => setIsOpen(true)}
+      onBlur={() => setIsOpen(false)}
+    >
+      <button type="button" className="score-info-tooltip__trigger" aria-label={`${label}定义`} onClick={(event) => event.preventDefault()}>
+        ?
+      </button>
+      {isOpen ? (
+        <div className="score-info-tooltip__panel" role="tooltip">
+          <strong>{label}</strong>
+          <span>{description}</span>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ScoreMetricCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="score-metric-cell" aria-label={`${label} ${value}分`}>
+      <strong>{value}</strong>
+      <div className="score-metric-cell__bar" aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      </div>
     </div>
   )
 }
