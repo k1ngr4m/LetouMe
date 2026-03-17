@@ -667,9 +667,9 @@ a {
 .model-filter-panel {
   margin-top: 0.85rem;
   padding: 0.9rem;
-  border: 1px solid var(--border-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.025);
   display: grid;
   gap: 0.9rem;
 }
@@ -701,9 +701,30 @@ a {
   font-size: 0.82rem;
 }
 
+.model-filter-panel__summary-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0.3rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+}
+
+.model-filter-panel__clear-button {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.model-filter-panel__clear-button svg {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
 .model-filter-panel__search input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 0.95rem;
   background: var(--input-bg);
   color: var(--text-1);
@@ -718,6 +739,31 @@ a {
 .model-filter-panel__group {
   display: grid;
   gap: 0.45rem;
+}
+
+.model-filter-panel .filter-chip-group {
+  gap: 0.48rem;
+}
+
+.model-filter-panel .filter-chip {
+  min-height: 1.8rem;
+  padding: 0.28rem 0.58rem;
+  border-radius: 999px;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.74rem;
+}
+
+.model-filter-panel .filter-chip:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.model-filter-panel .filter-chip.is-active {
+  color: #fff7ed;
+  background: rgba(241, 178, 76, 0.12);
+  border-color: rgba(241, 178, 76, 0.2);
 }
 
 .model-filter-panel__empty {

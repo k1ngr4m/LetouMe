@@ -81,6 +81,38 @@ class _FakePredictionRepository:
     def list_history_records(self, limit: int | None = None, offset: int = 0) -> list[dict]:
         return [self.record]
 
+    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0) -> list[dict]:
+        return [
+            {
+                "prediction_date": "2026-03-12",
+                "target_period": "2026031",
+                "actual_result": self.record["actual_result"],
+                "models": [
+                    {
+                        "model_id": "model-a",
+                        "model_name": "模型A",
+                        "model_provider": "openai",
+                        "best_group": 1,
+                        "best_hit_count": 5,
+                        "group_metrics": [
+                            {"group_id": 1, "red_hit_count": 5, "blue_hit_count": 0, "total_hits": 5},
+                            {"group_id": 2, "red_hit_count": 0, "blue_hit_count": 0, "total_hits": 0},
+                        ],
+                    },
+                    {
+                        "model_id": "model-b",
+                        "model_name": "模型B",
+                        "model_provider": "deepseek",
+                        "best_group": 1,
+                        "best_hit_count": 2,
+                        "group_metrics": [
+                            {"group_id": 1, "red_hit_count": 0, "blue_hit_count": 2, "total_hits": 2},
+                        ],
+                    },
+                ],
+            }
+        ]
+
     def count_history_records(self) -> int:
         return 1
 

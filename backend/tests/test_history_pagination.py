@@ -39,13 +39,18 @@ class PredictionHistoryPaginationTests(unittest.TestCase):
     def test_get_history_list_payload_returns_total_count_and_uses_limit_offset(self) -> None:
         repository = Mock()
         repository.list_history_record_summaries.return_value = [{"target_period": "26025", "models": []}]
+        repository.list_history_record_summaries_with_metrics.return_value = {
+            "records": [{"target_period": "26025", "models": []}],
+            "metrics": {"db_query_ms": 1.23, "batch_count": 1, "model_run_count": 0, "group_metric_count": 0},
+        }
         repository.count_history_records.return_value = 64
 
         service = PredictionService(prediction_repository=repository)
         payload = service.get_history_list_payload(limit=20, offset=20)
 
-        repository.list_history_record_summaries.assert_called_once_with(limit=20, offset=20)
-        self.assertEqual(payload["predictions_history"], [{"target_period": "26025", "models": []}])
+        repository.list_history_record_summaries_with_metrics.assert_called_once_with(limit=20, offset=20)
+        self.assertEqual(payload["predictions_history"][0]["target_period"], "26025")
+        self.assertEqual(payload["predictions_history"][0]["models"], [])
         self.assertEqual(payload["total_count"], 64)
 
 

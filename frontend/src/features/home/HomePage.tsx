@@ -99,6 +99,25 @@ function HomeScoreIcon() {
   )
 }
 
+function HomeFilterIcon() {
+  return (
+    <HomeSvgIcon>
+      <path d="M4 5.5h12" />
+      <path d="M6.8 10h6.4" />
+      <path d="M8.8 14.5h2.4" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomeResetIcon() {
+  return (
+    <HomeSvgIcon>
+      <path d="M16 10a6 6 0 1 1-1.5-4" />
+      <path d="M16 5v3.5h-3.5" />
+    </HomeSvgIcon>
+  )
+}
+
 function PinIndicatorIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -425,8 +444,14 @@ export function HomePage() {
                         onClick={() => setModelListView('score')}
                       />
                     </div>
-                    <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
-                      筛选
+                    <button
+                      className={clsx('icon-button', isModelFilterOpen && 'is-active')}
+                      onClick={() => setIsModelFilterOpen((value) => !value)}
+                      aria-label="筛选"
+                      title="筛选"
+                      type="button"
+                    >
+                      <HomeFilterIcon />
                     </button>
                   </div>
                 }
@@ -645,8 +670,14 @@ export function HomePage() {
               />
             ) : null}
             <div className="history-toolbar">
-              <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
-                筛选
+              <button
+                className={clsx('icon-button', isModelFilterOpen && 'is-active')}
+                onClick={() => setIsModelFilterOpen((value) => !value)}
+                aria-label="筛选"
+                title="筛选"
+                type="button"
+              >
+                <HomeFilterIcon />
               </button>
               <input
                 className="search-input"
@@ -1483,11 +1514,11 @@ function ModelFilterPanel({
           />
         </label>
         <div className="model-filter-panel__summary">
-          <span>
+          <span className="model-filter-panel__summary-badge">
             已显示 {filteredCount} / {totalCount} 个模型
           </span>
-          <button className="ghost-button" onClick={onClear}>
-            清空筛选
+          <button className="icon-button model-filter-panel__clear-button" onClick={onClear} aria-label="清空筛选" title="清空筛选" type="button">
+            <HomeResetIcon />
           </button>
         </div>
       </div>

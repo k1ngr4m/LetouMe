@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from statistics import pstdev
+from time import perf_counter
 from typing import Any
 
 from backend.app.cache import runtime_cache
@@ -295,16 +296,96 @@ class PredictionService:
         }
 
     def _build_history_list_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
-        records = [
-            annotated
-            for record in self.prediction_repository.list_history_records(limit=limit, offset=offset)
-            if (annotated := self._annotate_history_record(record))
-        ]
+        started_at = perf_counter()
+        db_metrics: dict[str, Any] = {}
+        if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
+            summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(limit=limit, offset=offset)
+            summary_records = summary_payload.get("records", [])
+            db_metrics = summary_payload.get("metrics", {})
+        else:
+            summary_records = self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset)
+        aggregate_started_at = perf_counter()
+        records = [self._annotate_history_summary_record(record) for record in summary_records]
         score_profiles = self._build_score_profiles(records)
-        return {
+        payload = {
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": self.prediction_repository.count_history_records(),
             "model_stats": self._build_model_stats(records, score_profiles),
+        }
+        aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
+        total_duration_ms = round((perf_counter() - started_at) * 1000, 2)
+        self.logger.info(
+            "Built prediction history list payload",
+            extra={
+                "context": {
+                    "limit": limit,
+                    "offset": offset,
+                    "db_query_ms": db_metrics.get("db_query_ms"),
+                    "service_aggregate_ms": aggregate_duration_ms,
+                    "total_duration_ms": total_duration_ms,
+                    "batch_count": db_metrics.get("batch_count", len(summary_records)),
+                    "model_run_count": db_metrics.get("model_run_count"),
+                    "group_metric_count": db_metrics.get("group_metric_count"),
+                    "returned_count": len(payload["predictions_history"]),
+                    "model_stat_count": len(payload["model_stats"]),
+                }
+            },
+        )
+        return payload
+
+    def _annotate_history_summary_record(self, payload: dict[str, Any]) -> dict[str, Any]:
+        actual_result = payload.get("actual_result")
+        if not actual_result:
+            return {**payload, "period_summary": self._empty_period_summary()}
+
+        annotated_models: list[dict[str, Any]] = []
+        total_bet_count = 0
+        total_cost_amount = 0
+        total_prize_amount = 0
+
+        for model in payload.get("models", []):
+            group_metrics = model.get("group_metrics") or []
+            winning_bet_count = 0
+            prize_amount = 0
+
+            for metric in group_metrics:
+                hit_result = {
+                    "red_hit_count": int(metric.get("red_hit_count") or 0),
+                    "blue_hit_count": int(metric.get("blue_hit_count") or 0),
+                    "total_hits": int(metric.get("total_hits") or 0),
+                }
+                prize_level = self.resolve_prize_level(hit_result)
+                prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                if prize_info["amount"] > 0:
+                    winning_bet_count += 1
+                    prize_amount += prize_info["amount"]
+
+            bet_count = len(group_metrics)
+            cost_amount = bet_count * self.BET_COST
+            annotated_models.append(
+                {
+                    **model,
+                    "bet_count": bet_count,
+                    "cost_amount": cost_amount,
+                    "winning_bet_count": winning_bet_count,
+                    "prize_amount": prize_amount,
+                    "hit_period_win": winning_bet_count > 0,
+                    "win_rate_by_period": 1.0 if winning_bet_count > 0 else 0.0,
+                    "win_rate_by_bet": (winning_bet_count / bet_count) if bet_count else 0.0,
+                }
+            )
+            total_bet_count += bet_count
+            total_cost_amount += cost_amount
+            total_prize_amount += prize_amount
+
+        return {
+            **payload,
+            "models": annotated_models,
+            "period_summary": {
+                "total_bet_count": total_bet_count,
+                "total_cost_amount": total_cost_amount,
+                "total_prize_amount": total_prize_amount,
+            },
         }
 
     def _annotate_history_record(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 from backend.app.db.connection import get_connection
@@ -207,6 +208,13 @@ class PredictionRepository:
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
+        return self.list_history_record_summaries_with_metrics(limit=limit, offset=offset)["records"]
+
+    def list_history_record_summaries_with_metrics(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> dict[str, Any]:
         sql = """
             SELECT
                 pb.id,
@@ -226,6 +234,7 @@ class PredictionRepository:
             sql += " OFFSET ?"
             params.append(offset)
 
+        started_at = perf_counter()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(sql, tuple(params))
@@ -234,16 +243,27 @@ class PredictionRepository:
                 issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
                 actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids)
                 model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
-                summaries_by_run = self._fetch_model_summaries(cursor, [int(row["id"]) for row in model_rows])
+                model_run_ids = [int(row["id"]) for row in model_rows]
+                summaries_by_run = self._fetch_model_summaries(cursor, model_run_ids)
+                group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
+        duration_ms = round((perf_counter() - started_at) * 1000, 2)
         self.logger.debug(
             "Loaded prediction history summary batches",
-            extra={"context": {"batch_count": len(batch_rows), "model_run_count": len(model_rows)}},
+            extra={
+                "context": {
+                    "batch_count": len(batch_rows),
+                    "model_run_count": len(model_rows),
+                    "group_metric_count": sum(len(items) for items in group_metrics_by_run.values()),
+                    "db_query_ms": duration_ms,
+                }
+            },
         )
 
         models_by_batch: dict[int, list[dict[str, Any]]] = {}
         for row in model_rows:
             batch_id = int(row["prediction_batch_id"])
             summary = summaries_by_run.get(int(row["id"]), {})
+            group_metrics = group_metrics_by_run.get(int(row["id"]), [])
             models_by_batch.setdefault(batch_id, []).append(
                 {
                     "model_id": row["model_id"],
@@ -253,10 +273,11 @@ class PredictionRepository:
                     "model_api_model": row.get("model_api_model"),
                     "best_group": summary.get("best_group"),
                     "best_hit_count": summary.get("best_hit_count"),
+                    "group_metrics": group_metrics,
                 }
             )
 
-        return [
+        records = [
             {
                 "prediction_date": row["prediction_date"],
                 "target_period": row["target_period"],
@@ -265,6 +286,15 @@ class PredictionRepository:
             }
             for row in batch_rows
         ]
+        return {
+            "records": records,
+            "metrics": {
+                "db_query_ms": duration_ms,
+                "batch_count": len(batch_rows),
+                "model_run_count": len(model_rows),
+                "group_metric_count": sum(len(items) for items in group_metrics_by_run.values()),
+            },
+        }
 
     def get_history_record_detail(self, target_period: str) -> dict[str, Any] | None:
         with get_connection() as connection:
@@ -832,6 +862,38 @@ class PredictionRepository:
                 }
             )
         return groups_by_run
+
+    @staticmethod
+    def _fetch_group_metrics_by_run(cursor, model_run_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+        if not model_run_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in model_run_ids)
+        cursor.execute(
+            f"""
+            SELECT
+                pg.model_run_id,
+                pg.group_no,
+                COALESCE(phs.red_hit_count, 0) AS red_hit_count,
+                COALESCE(phs.blue_hit_count, 0) AS blue_hit_count,
+                COALESCE(phs.total_hit_count, 0) AS total_hit_count
+            FROM prediction_group pg
+            LEFT JOIN prediction_hit_summary phs ON phs.prediction_group_id = pg.id
+            WHERE pg.model_run_id IN ({placeholders})
+            ORDER BY pg.model_run_id ASC, pg.group_no ASC
+            """,
+            tuple(model_run_ids),
+        )
+        result: dict[int, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            result.setdefault(int(row["model_run_id"]), []).append(
+                {
+                    "group_id": int(row["group_no"]),
+                    "red_hit_count": int(row.get("red_hit_count") or 0),
+                    "blue_hit_count": int(row.get("blue_hit_count") or 0),
+                    "total_hits": int(row.get("total_hit_count") or 0),
+                }
+            )
+        return result
 
     @staticmethod
     def _fetch_group_numbers(cursor, group_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
