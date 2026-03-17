@@ -240,11 +240,26 @@ export function HomePage() {
             当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>，下期开奖日{' '}
             <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>。
           </p>
-          <div className="hero-panel__meta">
-            <span>预测日期 {currentPredictions.data?.prediction_date || '-'}</span>
-            <span>活跃模型 {models.length}</span>
-            <span>历史窗口 {history?.total_count || 0}</span>
-          </div>
+        </div>
+        <div className="hero-panel__summary" aria-label="当前预测摘要">
+          <article className="hero-panel__summary-card">
+            <span>目标期号</span>
+            <strong>{currentPredictions.data?.target_period || '-'}</strong>
+          </article>
+          <article className="hero-panel__summary-card">
+            <span>预测日期</span>
+            <strong>{currentPredictions.data?.prediction_date || '-'}</strong>
+          </article>
+          <article className="hero-panel__summary-card">
+            <span>开奖状态</span>
+            <strong>{actualResult ? '已开奖' : '待开奖'}</strong>
+            <small>{actualResult ? '已可查看命中结果' : '等待官方开奖结果'}</small>
+          </article>
+          <article className="hero-panel__summary-card">
+            <span>模型覆盖</span>
+            <strong>{models.length}</strong>
+            <small>当前参与预测的活跃模型</small>
+          </article>
         </div>
       </section>
 

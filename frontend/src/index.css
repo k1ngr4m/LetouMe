@@ -365,6 +365,35 @@ a {
   max-width: 720px;
   position: relative;
   z-index: 1;
+  align-self: flex-start;
+}
+
+.hero-panel__summary {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 min(420px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.hero-panel__summary-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--border-1);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.hero-panel__summary-card span,
+.hero-panel__summary-card small {
+  color: var(--text-2);
+}
+
+.hero-panel__summary-card strong {
+  font-size: 1.2rem;
 }
 
 .hero-panel__title {
@@ -2274,6 +2303,11 @@ a {
   .model-filter-panel__summary {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .hero-panel__summary {
+    width: 100%;
+    grid-template-columns: 1fr;
   }
 
   .dashboard-sidebar {
