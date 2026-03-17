@@ -2284,7 +2284,7 @@ a {
 
 .settings-center-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 144px minmax(0, 1fr);
   gap: 1rem;
 }
 
