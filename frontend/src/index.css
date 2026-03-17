@@ -321,7 +321,8 @@ a {
   min-width: 0;
 }
 
-.dashboard-sidebar {
+.dashboard-sidebar,
+.settings-center-sidebar {
   position: sticky;
   top: 1.25rem;
   display: grid;
@@ -333,7 +334,8 @@ a {
   backdrop-filter: blur(10px);
 }
 
-.dashboard-sidebar__link {
+.dashboard-sidebar__link,
+.settings-center-sidebar__link {
   position: relative;
   width: 100%;
   border: none;
@@ -344,12 +346,14 @@ a {
   background: transparent;
 }
 
-.dashboard-sidebar__link:hover {
+.dashboard-sidebar__link:hover,
+.settings-center-sidebar__link:hover {
   color: var(--text-1);
   background: rgba(255, 255, 255, 0.04);
 }
 
-.dashboard-sidebar__link::before {
+.dashboard-sidebar__link::before,
+.settings-center-sidebar__link::before {
   content: '';
   position: absolute;
   left: 0.32rem;
@@ -360,12 +364,14 @@ a {
   background: transparent;
 }
 
-.dashboard-sidebar__link.is-active {
+.dashboard-sidebar__link.is-active,
+.settings-center-sidebar__link.is-active {
   color: var(--text-1);
   background: rgba(241, 178, 76, 0.1);
 }
 
-.dashboard-sidebar__link.is-active::before {
+.dashboard-sidebar__link.is-active::before,
+.settings-center-sidebar__link.is-active::before {
   background: linear-gradient(180deg, #e46c40, #f1b24c);
 }
 
@@ -2282,7 +2288,6 @@ a {
   gap: 1rem;
 }
 
-.settings-center-sidebar,
 .settings-form-card {
   border: 1px solid var(--border-1);
   border-radius: 1.35rem;
@@ -2290,38 +2295,12 @@ a {
 }
 
 .settings-center-sidebar {
-  border-color: var(--settings-sidebar-border);
-  padding: 0.75rem;
-  display: grid;
-  gap: 0.55rem;
   align-self: start;
-  position: sticky;
   top: 1rem;
-  background: var(--settings-sidebar-bg);
-  box-shadow: 0 14px 34px rgba(13, 20, 34, 0.1);
-  backdrop-filter: blur(18px);
 }
 
 .settings-center-sidebar__link {
-  border: none;
-  padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  text-align: left;
-  color: var(--text-2);
-  background: var(--settings-sidebar-link-bg);
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.settings-center-sidebar__link:hover {
-  color: var(--text-1);
-  background: var(--settings-sidebar-link-hover);
   transform: translateX(2px);
-}
-
-.settings-center-sidebar__link.is-active {
-  color: white;
-  background: linear-gradient(135deg, #e46c40, #f1b24c);
-  box-shadow: 0 10px 22px rgba(228, 108, 64, 0.22);
 }
 
 .settings-center-content,
