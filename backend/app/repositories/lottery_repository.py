@@ -163,6 +163,29 @@ class LotteryRepository:
                 red_balls=draw.get("red_balls", []),
                 blue_balls=draw.get("blue_balls", []),
             )
+            cursor.execute("DELETE FROM draw_result_prize WHERE draw_result_id = ?", (draw_result_id,))
+            for prize in draw.get("prize_breakdown", []):
+                cursor.execute(
+                    """
+                    INSERT INTO draw_result_prize (
+                        draw_result_id,
+                        prize_level,
+                        prize_type,
+                        winner_count,
+                        prize_amount,
+                        total_amount
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        draw_result_id,
+                        str(prize.get("prize_level") or ""),
+                        str(prize.get("prize_type") or "basic"),
+                        int(prize.get("winner_count") or 0),
+                        int(prize.get("prize_amount") or 0),
+                        int(prize.get("total_amount") or 0),
+                    ),
+                )
 
     @staticmethod
     def _fetch_draw_numbers(cursor, draw_result_ids: list[int]) -> dict[int, list[dict[str, Any]]]:

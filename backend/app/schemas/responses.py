@@ -21,6 +21,7 @@ class CurrentPredictionsResponse(BaseModel):
 class PredictionsHistoryResponse(BaseModel):
     predictions_history: list[dict[str, Any]]
     total_count: int = 0
+    model_stats: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PredictionGenerationTaskResponse(BaseModel):
@@ -74,3 +75,4 @@ class SettingsPredictionRecordDetailResponse(BaseModel):
     target_period: str
     actual_result: dict[str, Any] | None = None
     models: list[dict[str, Any]]
+    model_stats: list[dict[str, Any]] = Field(default_factory=list)

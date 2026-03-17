@@ -32,12 +32,7 @@ import {
   type ModelListScoreRange,
   normalizePredictionsHistory,
 } from './lib/home'
-import type {
-  LotteryDraw,
-  PredictionGroup,
-  PredictionModel,
-  PredictionsHistoryListRecord,
-} from '../../shared/types/api'
+import type { LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord } from '../../shared/types/api'
 
 type HomeTab = 'prediction' | 'analysis' | 'history'
 type HomeModelView = 'card' | 'list'
@@ -102,6 +97,66 @@ function HomeIconButton({
       {icon}
     </button>
   )
+}
+
+type HistoryModelStatView = {
+  model_id: string
+  model_name: string
+  periods: number
+  winning_periods: number
+  bet_count: number
+  winning_bet_count: number
+  cost_amount: number
+  prize_amount: number
+  win_rate_by_period: number
+  win_rate_by_bet: number
+}
+
+function formatCurrency(value: number | undefined) {
+  return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
+}
+
+function formatPercent(value: number | undefined) {
+  return `${Math.round((value || 0) * 100)}%`
+}
+
+function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models: PredictionModel[]): HistoryModelStatView[] {
+  const stats = new Map<string, HistoryModelStatView>()
+
+  for (const record of records) {
+    for (const model of record.models || []) {
+      const existing = stats.get(model.model_id) || {
+        model_id: model.model_id,
+        model_name: model.model_name,
+        periods: 0,
+        winning_periods: 0,
+        bet_count: 0,
+        winning_bet_count: 0,
+        cost_amount: 0,
+        prize_amount: 0,
+        win_rate_by_period: 0,
+        win_rate_by_bet: 0,
+      }
+
+      existing.periods += 1
+      existing.winning_periods += model.hit_period_win ? 1 : 0
+      existing.bet_count += model.bet_count || 0
+      existing.winning_bet_count += model.winning_bet_count || 0
+      existing.cost_amount += model.cost_amount || 0
+      existing.prize_amount += model.prize_amount || 0
+      stats.set(model.model_id, existing)
+    }
+  }
+
+  return models
+    .map((model) => stats.get(model.model_id))
+    .filter((item): item is HistoryModelStatView => Boolean(item))
+    .map((item) => ({
+      ...item,
+      win_rate_by_period: item.periods ? item.winning_periods / item.periods : 0,
+      win_rate_by_bet: item.bet_count ? item.winning_bet_count / item.bet_count : 0,
+    }))
+    .sort((left, right) => right.prize_amount - left.prize_amount || right.win_rate_by_period - left.win_rate_by_period)
 }
 
 export function HomePage() {
@@ -189,6 +244,7 @@ export function HomePage() {
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(historyPeriodQuery, commonOnly, weightedSummary)
   const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
+  const historyModelStats = buildHistoryModelStats(filteredHistory, filteredModels)
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
   const redChart = buildRedFrequencyChart(chartDraws)
   const blueChart = buildBlueFrequencyChart(chartDraws)
@@ -528,6 +584,24 @@ export function HomePage() {
             </div>
 
             <div className="history-card-list">
+              {historyModelStats.length ? (
+                <div className="history-stats-grid">
+                  {historyModelStats.map((item) => (
+                    <article key={item.model_id} className="history-stat-card">
+                      <div className="history-stat-card__header">
+                        <strong>{item.model_name}</strong>
+                        <span>{item.periods} 期</span>
+                      </div>
+                      <div className="history-stat-card__metrics">
+                        <span>按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
+                        <span>按注中奖率 {formatPercent(item.win_rate_by_bet)}</span>
+                        <span>成本 {formatCurrency(item.cost_amount)}</span>
+                        <span>奖金 {formatCurrency(item.prize_amount)}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
               {!filteredModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
               {filteredModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
               {filteredHistory.map((record) => (
@@ -853,6 +927,14 @@ function PredictionGroupCard({
         {hit ? <strong className="prediction-group-card__hit">{hit.totalHits} 中</strong> : null}
       </div>
       <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} compact={compact} />
+      {group.prize_level ? (
+        <div className="prediction-group-card__prize">
+          <strong>{group.prize_level}</strong>
+          <span>{formatCurrency(group.prize_amount)}</span>
+          {group.prize_source === 'fallback' ? <small>固定奖兜底</small> : null}
+          {group.prize_source === 'missing' ? <small>浮动奖待补全</small> : null}
+        </div>
+      ) : null}
       {compact ? null : <p className="prediction-group-card__desc">{group.description || '暂无说明'}</p>}
     </article>
   )
@@ -1131,6 +1213,15 @@ function HistoryRecordCard({
           : detailQuery.data.predictions_history[0].models,
       }
     : null
+  const summaryModels = detailRecord?.models || record.models
+  const periodSummary = summaryModels.reduce(
+    (accumulator, model) => ({
+      total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
+      total_cost_amount: accumulator.total_cost_amount + (model.cost_amount || 0),
+      total_prize_amount: accumulator.total_prize_amount + (model.prize_amount || 0),
+    }),
+    { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
+  )
 
   return (
     <article className="history-record-card">
@@ -1157,11 +1248,18 @@ function HistoryRecordCard({
           ))}
         </div>
       ) : null}
+      <div className="history-record-card__summary">
+        <span>{periodSummary.total_bet_count} 注</span>
+        <span>成本 {formatCurrency(periodSummary.total_cost_amount)}</span>
+        <span>奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
+      </div>
       <div className="history-record-card__models">
         {record.models.map((model) => (
           <div key={`${record.target_period}-${model.model_id}`} className="history-record-card__model">
             <strong>{model.model_name}</strong>
-            <span>最佳命中 {model.best_hit_count || 0}</span>
+            <span>
+              {model.bet_count || 0} 注 / {formatCurrency(model.cost_amount)} / {formatCurrency(model.prize_amount)}
+            </span>
           </div>
         ))}
       </div>
@@ -1180,7 +1278,14 @@ function HistoryRecordCard({
                       <strong>{model.model_name}</strong>
                       <p>{model.model_provider}</p>
                     </div>
-                    <span>最佳命中 {model.best_hit_count || 0}</span>
+                    <span>
+                      中奖率 {formatPercent(model.win_rate_by_period)} / {formatPercent(model.win_rate_by_bet)}
+                    </span>
+                  </div>
+                  <div className="history-record-card__detail-summary">
+                    <span>{model.bet_count || 0} 注</span>
+                    <span>成本 {formatCurrency(model.cost_amount)}</span>
+                    <span>奖金 {formatCurrency(model.prize_amount)}</span>
                   </div>
                   <div className="detail-group-list">
                     {model.predictions.map((group) => (

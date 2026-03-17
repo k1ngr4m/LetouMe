@@ -2,6 +2,7 @@ import type {
   CurrentPredictionsResponse,
   LotteryDraw,
   PredictionHistorySummaryModel,
+  PredictionHistoryPeriodSummary,
   PredictionsHistoryListResponse,
   PredictionsHistoryResponse,
   PredictionGroup,
@@ -44,6 +45,12 @@ export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
     red_balls: (draw.red_balls || []).map(padBall).sort(),
     blue_balls: (draw.blue_balls || []).map(padBall).sort(),
     blue_ball: (draw.blue_balls || [])[0] || null,
+    prize_breakdown: (draw.prize_breakdown || []).map((item) => ({
+      ...item,
+      prize_amount: Number(item.prize_amount || 0),
+      total_amount: Number(item.total_amount || 0),
+      winner_count: Number(item.winner_count || 0),
+    })),
   }
 }
 
@@ -53,6 +60,7 @@ export function normalizeGroup(group: PredictionGroup): PredictionGroup {
     red_balls: (group.red_balls || []).map(padBall).sort(),
     blue_balls: (group.blue_balls || []).map(padBall).sort(),
     blue_ball: (group.blue_balls || [])[0] || null,
+    prize_amount: Number(group.prize_amount || 0),
     hit_result: group.hit_result
       ? {
           ...group.hit_result,
@@ -76,11 +84,28 @@ export function normalizeCurrentPredictions(data: CurrentPredictionsResponse): C
 export function normalizePredictionsHistory(data: PredictionsHistoryResponse): PredictionsHistoryResponse {
   return {
     ...data,
+    model_stats: (data.model_stats || []).map((item) => ({
+      ...item,
+      periods: Number(item.periods || 0),
+      winning_periods: Number(item.winning_periods || 0),
+      bet_count: Number(item.bet_count || 0),
+      winning_bet_count: Number(item.winning_bet_count || 0),
+      cost_amount: Number(item.cost_amount || 0),
+      prize_amount: Number(item.prize_amount || 0),
+      win_rate_by_period: Number(item.win_rate_by_period || 0),
+      win_rate_by_bet: Number(item.win_rate_by_bet || 0),
+    })),
     predictions_history: (data.predictions_history || []).map((record) => ({
       ...record,
       actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
       models: (record.models || []).map((model) => ({
         ...model,
+        bet_count: Number(model.bet_count || 0),
+        cost_amount: Number(model.cost_amount || 0),
+        winning_bet_count: Number(model.winning_bet_count || 0),
+        prize_amount: Number(model.prize_amount || 0),
+        win_rate_by_period: Number(model.win_rate_by_period || 0),
+        win_rate_by_bet: Number(model.win_rate_by_bet || 0),
         predictions: (model.predictions || []).map(normalizeGroup),
       })),
     })),
@@ -90,11 +115,39 @@ export function normalizePredictionsHistory(data: PredictionsHistoryResponse): P
 export function normalizePredictionsHistoryList(data: PredictionsHistoryListResponse): PredictionsHistoryListResponse {
   return {
     ...data,
+    model_stats: (data.model_stats || []).map((item) => ({
+      ...item,
+      periods: Number(item.periods || 0),
+      winning_periods: Number(item.winning_periods || 0),
+      bet_count: Number(item.bet_count || 0),
+      winning_bet_count: Number(item.winning_bet_count || 0),
+      cost_amount: Number(item.cost_amount || 0),
+      prize_amount: Number(item.prize_amount || 0),
+      win_rate_by_period: Number(item.win_rate_by_period || 0),
+      win_rate_by_bet: Number(item.win_rate_by_bet || 0),
+    })),
     predictions_history: (data.predictions_history || []).map((record) => ({
       ...record,
       actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
-      models: record.models || [],
+      period_summary: normalizePeriodSummary(record.period_summary),
+      models: (record.models || []).map((model) => ({
+        ...model,
+        bet_count: Number(model.bet_count || 0),
+        cost_amount: Number(model.cost_amount || 0),
+        winning_bet_count: Number(model.winning_bet_count || 0),
+        prize_amount: Number(model.prize_amount || 0),
+        win_rate_by_period: Number(model.win_rate_by_period || 0),
+        win_rate_by_bet: Number(model.win_rate_by_bet || 0),
+      })),
     })),
+  }
+}
+
+function normalizePeriodSummary(summary?: PredictionHistoryPeriodSummary): PredictionHistoryPeriodSummary {
+  return {
+    total_bet_count: Number(summary?.total_bet_count || 0),
+    total_cost_amount: Number(summary?.total_cost_amount || 0),
+    total_prize_amount: Number(summary?.total_prize_amount || 0),
   }
 }
 

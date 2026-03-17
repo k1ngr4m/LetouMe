@@ -72,18 +72,33 @@ vi.mock('./hooks/useHomeData', () => ({
               red_balls: ['01', '08', '12', '19', '25'],
               blue_balls: ['06', '11'],
             },
+            period_summary: {
+              total_bet_count: 10,
+              total_cost_amount: 20,
+              total_prize_amount: 305,
+            },
             models: [
               {
                 model_id: 'model-a',
                 model_name: '模型A',
                 model_provider: 'openai_compatible',
                 best_hit_count: 3,
+                bet_count: 5,
+                cost_amount: 10,
+                winning_bet_count: 1,
+                prize_amount: 300,
+                hit_period_win: true,
               },
               {
                 model_id: 'model-b',
                 model_name: '模型B',
                 model_provider: 'deepseek',
                 best_hit_count: 1,
+                bet_count: 5,
+                cost_amount: 10,
+                winning_bet_count: 1,
+                prize_amount: 5,
+                hit_period_win: true,
               },
             ],
           },
@@ -96,12 +111,22 @@ vi.mock('./hooks/useHomeData', () => ({
               red_balls: ['03', '04', '05', '06', '07'],
               blue_balls: ['08', '09'],
             },
+            period_summary: {
+              total_bet_count: 5,
+              total_cost_amount: 10,
+              total_prize_amount: 15,
+            },
             models: [
               {
                 model_id: 'model-b',
                 model_name: '模型B',
                 model_provider: 'deepseek',
                 best_hit_count: 2,
+                bet_count: 5,
+                cost_amount: 10,
+                winning_bet_count: 1,
+                prize_amount: 15,
+                hit_period_win: true,
               },
             ],
           },
@@ -217,6 +242,19 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(modelA).toHaveClass('is-hit')
     expect(modelB).not.toHaveClass('is-hit')
+  })
+
+  it('shows history win rates and period cost summary', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+
+    expect(screen.getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('成本 10 元').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('奖金 300 元').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('成本 20 元').length).toBeGreaterThan(0)
+    expect(screen.getByText('奖金 305 元')).toBeInTheDocument()
   })
 
   it('hides local sidebar navigation outside prediction tab', async () => {
@@ -409,7 +447,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
     expect(screen.getByText('已显示 1 / 2 个模型')).toBeInTheDocument()
-    expect(screen.getByText('模型A')).toBeInTheDocument()
+    expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
 

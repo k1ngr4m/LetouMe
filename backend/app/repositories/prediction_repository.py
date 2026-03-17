@@ -453,6 +453,30 @@ class PredictionRepository:
                 red_balls=actual_result.get("red_balls", []),
                 blue_balls=actual_result.get("blue_balls", []),
             )
+            if actual_result.get("prize_breakdown"):
+                cursor.execute("DELETE FROM draw_result_prize WHERE draw_result_id = ?", (draw_result_id,))
+                for prize in actual_result.get("prize_breakdown", []):
+                    cursor.execute(
+                        """
+                        INSERT INTO draw_result_prize (
+                            draw_result_id,
+                            prize_level,
+                            prize_type,
+                            winner_count,
+                            prize_amount,
+                            total_amount
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            draw_result_id,
+                            str(prize.get("prize_level") or ""),
+                            str(prize.get("prize_type") or "basic"),
+                            int(prize.get("winner_count") or 0),
+                            int(prize.get("prize_amount") or 0),
+                            int(prize.get("total_amount") or 0),
+                        ),
+                    )
         return draw_result_id
 
     def _save_model_runs(
@@ -933,6 +957,28 @@ class PredictionRepository:
         for row in cursor.fetchall():
             numbers_by_result.setdefault(int(row["draw_result_id"]), []).append(row)
 
+        placeholders = ", ".join("?" for _ in draw_result_ids)
+        cursor.execute(
+            f"""
+            SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
+            FROM draw_result_prize
+            WHERE draw_result_id IN ({placeholders})
+            ORDER BY draw_result_id ASC, id ASC
+            """,
+            tuple(draw_result_ids),
+        )
+        prizes_by_result: dict[int, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            prizes_by_result.setdefault(int(row["draw_result_id"]), []).append(
+                {
+                    "prize_level": row["prize_level"],
+                    "prize_type": row["prize_type"],
+                    "winner_count": int(row.get("winner_count") or 0),
+                    "prize_amount": int(row.get("prize_amount") or 0),
+                    "total_amount": int(row.get("total_amount") or 0),
+                }
+            )
+
         result: dict[int, dict[str, Any]] = {}
         for row in rows:
             numbers = numbers_by_result.get(int(row["draw_result_id"]), [])
@@ -944,6 +990,7 @@ class PredictionRepository:
                 "red_balls": red_balls,
                 "blue_balls": blue_balls,
                 "blue_ball": blue_balls[0] if blue_balls else None,
+                "prize_breakdown": prizes_by_result.get(int(row["draw_result_id"]), []),
             }
         return result
 

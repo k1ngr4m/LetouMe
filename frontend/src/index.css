@@ -1543,6 +1543,53 @@ a {
   gap: 0.55rem;
 }
 
+.history-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.history-stat-card,
+.history-record-card__summary,
+.history-record-card__detail-summary {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.history-stat-card {
+  padding: 0.9rem 1rem;
+}
+
+.history-stat-card__header,
+.history-record-card__summary,
+.history-record-card__detail-summary,
+.history-stat-card__metrics,
+.prediction-group-card__prize {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.history-stat-card__header {
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.history-stat-card__metrics,
+.history-record-card__summary,
+.history-record-card__detail-summary {
+  color: var(--text-2);
+  font-size: 0.92rem;
+}
+
+.history-record-card__summary,
+.history-record-card__detail-summary {
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.9rem;
+}
+
 .history-record-card__model {
   display: flex;
   justify-content: space-between;
@@ -1587,6 +1634,20 @@ a {
   margin: 0.3rem 0 0;
   color: var(--text-2);
   font-size: 0.92rem;
+}
+
+.prediction-group-card__prize {
+  margin-top: 0.7rem;
+  color: var(--text-2);
+  align-items: center;
+}
+
+.prediction-group-card__prize strong {
+  color: var(--text-1);
+}
+
+.prediction-group-card__prize small {
+  color: var(--amber-400);
 }
 
 .modal-shell {

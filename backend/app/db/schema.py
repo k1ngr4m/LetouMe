@@ -167,6 +167,21 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS draw_result_prize (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        draw_result_id BIGINT NOT NULL,
+        prize_level VARCHAR(32) NOT NULL,
+        prize_type VARCHAR(32) NOT NULL DEFAULT 'basic',
+        winner_count BIGINT NOT NULL DEFAULT 0,
+        prize_amount BIGINT NOT NULL DEFAULT 0,
+        total_amount BIGINT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_draw_result_prize_result FOREIGN KEY (draw_result_id) REFERENCES draw_result(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_draw_result_prize_level_type (draw_result_id, prize_level, prize_type),
+        INDEX idx_draw_result_prize_result (draw_result_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS model_batch_summary (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         model_run_id BIGINT NOT NULL UNIQUE,

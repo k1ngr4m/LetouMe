@@ -4,6 +4,15 @@ export type LotteryDraw = {
   red_balls: string[]
   blue_balls: string[]
   blue_ball?: string | null
+  prize_breakdown?: PrizeBreakdownItem[]
+}
+
+export type PrizeBreakdownItem = {
+  prize_level: string
+  prize_type: 'basic' | 'additional'
+  winner_count: number
+  prize_amount: number
+  total_amount: number
 }
 
 export type NextDraw = {
@@ -35,6 +44,9 @@ export type PredictionGroup = {
   blue_balls: string[]
   blue_ball?: string | null
   hit_result?: PredictionHitResult
+  prize_level?: string | null
+  prize_amount?: number
+  prize_source?: 'official' | 'fallback' | 'missing' | 'none'
 }
 
 export type PredictionModel = {
@@ -47,6 +59,13 @@ export type PredictionModel = {
   predictions: PredictionGroup[]
   best_group?: number | null
   best_hit_count?: number | null
+  bet_count?: number
+  cost_amount?: number
+  winning_bet_count?: number
+  prize_amount?: number
+  hit_period_win?: boolean
+  win_rate_by_period?: number
+  win_rate_by_bet?: number
 }
 
 export type PredictionHistorySummaryModel = {
@@ -57,6 +76,32 @@ export type PredictionHistorySummaryModel = {
   model_api_model?: string | null
   best_group?: number | null
   best_hit_count?: number | null
+  bet_count?: number
+  cost_amount?: number
+  winning_bet_count?: number
+  prize_amount?: number
+  hit_period_win?: boolean
+  win_rate_by_period?: number
+  win_rate_by_bet?: number
+}
+
+export type PredictionHistoryPeriodSummary = {
+  total_bet_count: number
+  total_cost_amount: number
+  total_prize_amount: number
+}
+
+export type PredictionHistoryModelStat = {
+  model_id: string
+  model_name: string
+  periods: number
+  winning_periods: number
+  bet_count: number
+  winning_bet_count: number
+  cost_amount: number
+  prize_amount: number
+  win_rate_by_period: number
+  win_rate_by_bet: number
 }
 
 export type CurrentPredictionsResponse = {
@@ -70,11 +115,13 @@ export type PredictionsHistoryListRecord = {
   target_period: string
   actual_result: LotteryDraw | null
   models: PredictionHistorySummaryModel[]
+  period_summary?: PredictionHistoryPeriodSummary
 }
 
 export type PredictionsHistoryListResponse = {
   predictions_history: PredictionsHistoryListRecord[]
   total_count: number
+  model_stats?: PredictionHistoryModelStat[]
 }
 
 export type PredictionsHistoryRecord = {
@@ -87,6 +134,7 @@ export type PredictionsHistoryRecord = {
 export type PredictionsHistoryResponse = {
   predictions_history: PredictionsHistoryRecord[]
   total_count: number
+  model_stats?: PredictionHistoryModelStat[]
 }
 
 export type SettingsModel = {
@@ -237,6 +285,7 @@ export type SettingsPredictionRecordDetail = {
   target_period: string
   actual_result: LotteryDraw | null
   models: PredictionModel[]
+  model_stats?: PredictionHistoryModelStat[]
 }
 
 export type AuthUser = {

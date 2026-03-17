@@ -153,7 +153,7 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
     record = prediction_service.get_history_detail_payload(payload.target_period)
     if not record:
         raise HTTPException(status_code=404, detail="历史记录不存在")
-    return {"predictions_history": [record], "total_count": 1}
+    return {"predictions_history": [record], "total_count": 1, "model_stats": prediction_service._build_model_stats([record])}
 
 
 @router.post("/settings/profile/update", response_model=CurrentUserResponse)

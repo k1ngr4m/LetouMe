@@ -12,6 +12,17 @@ from backend.app.services.lottery_service import LotteryService
 
 
 class LotteryFetchService:
+    DETAIL_URL_TEMPLATE = "https://kaijiang.500.com/shtml/dlt/{period}.shtml"
+    FIXED_PRIZE_RULES = {
+        "三等奖": 10000,
+        "四等奖": 3000,
+        "五等奖": 300,
+        "六等奖": 200,
+        "七等奖": 100,
+        "八等奖": 15,
+        "九等奖": 5,
+    }
+
     def __init__(self, lottery_service: LotteryService | None = None) -> None:
         self.base_url = "https://datachart.500.com/dlt/history/newinc/history.php"
         self.headers = {
@@ -95,12 +106,14 @@ class LotteryFetchService:
             if len(cols) < 9:
                 continue
             try:
+                period = cols[0].text.strip()
                 data_list.append(
                     {
-                        "period": cols[0].text.strip(),
+                        "period": period,
                         "red_balls": [cols[i].text.strip() for i in range(1, 6)],
                         "blue_balls": [cols[i].text.strip() for i in range(6, 8)],
                         "date": cols[-1].text.strip() if len(cols) > 8 else "",
+                        "prize_breakdown": self.fetch_prize_breakdown(period),
                     }
                 )
             except Exception as exc:
@@ -108,3 +121,73 @@ class LotteryFetchService:
 
         self.logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list)}})
         return data_list
+
+    def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
+        detail_url = self.DETAIL_URL_TEMPLATE.format(period=period)
+        soup = self.fetch_page(detail_url, retry=2)
+        if not soup:
+            return self.build_fallback_prize_breakdown()
+        parsed = self.parse_prize_breakdown(soup)
+        return parsed or self.build_fallback_prize_breakdown()
+
+    def parse_prize_breakdown(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        for table in soup.find_all("table"):
+            headers = [cell.get_text(strip=True) for cell in table.find_all("th")]
+            if "奖项" not in headers or "每注奖金(元)" not in headers:
+                continue
+
+            breakdown: list[dict[str, Any]] = []
+            current_prize_level = ""
+            for row in table.find_all("tr"):
+                cells = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
+                if not cells or cells[0] == "合计":
+                    continue
+                if len(cells) >= 5:
+                    prize_level, prize_type, winner_count, prize_amount, total_amount = cells[:5]
+                    current_prize_level = prize_level
+                elif len(cells) == 4 and current_prize_level:
+                    prize_level = current_prize_level
+                    prize_type, winner_count, prize_amount, total_amount = cells[:4]
+                else:
+                    continue
+                breakdown.append(
+                    {
+                        "prize_level": prize_level,
+                        "prize_type": "additional" if "追加" in prize_type else "basic",
+                        "winner_count": self.parse_money_value(winner_count),
+                        "prize_amount": self.parse_money_value(prize_amount),
+                        "total_amount": self.parse_money_value(total_amount),
+                    }
+                )
+            if breakdown:
+                return breakdown
+        return []
+
+    def build_fallback_prize_breakdown(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "prize_level": prize_level,
+                "prize_type": "basic",
+                "winner_count": 0,
+                "prize_amount": prize_amount,
+                "total_amount": 0,
+            }
+            for prize_level, prize_amount in self.FIXED_PRIZE_RULES.items()
+        ]
+
+    @staticmethod
+    def parse_money_value(value: str) -> int:
+        text = str(value or "").strip().replace(",", "")
+        if not text or text == "---":
+            return 0
+        unit = 1
+        if text.endswith("亿"):
+            unit = 100000000
+            text = text[:-1]
+        elif text.endswith("万"):
+            unit = 10000
+            text = text[:-1]
+        try:
+            return int(float(text) * unit)
+        except ValueError:
+            return 0
