@@ -72,8 +72,8 @@ describe('buildSummary', () => {
         },
       ],
       {
-        m1: { score100: 80, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
-        m2: { score100: 20, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
+        m1: { overallScore: 80, perBetScore: 0, perPeriodScore: 0, recentScore: 0, longTermScore: 0, componentScores: {}, recentWindow: {} as never, longTermWindow: {} as never, bestPeriod: {} as never, worstPeriod: {} as never, sampleSize: 1, betSampleSize: 1 },
+        m2: { overallScore: 20, perBetScore: 0, perPeriodScore: 0, recentScore: 0, longTermScore: 0, componentScores: {}, recentWindow: {} as never, longTermWindow: {} as never, bestPeriod: {} as never, worstPeriod: {} as never, sampleSize: 1, betSampleSize: 1 },
       },
       ['m1', 'm2'],
       true,
@@ -140,9 +140,9 @@ describe('filterModels', () => {
   ]
 
   const scores = {
-    'deepseek-chat': { score100: 85, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
-    'gemini-pro': { score100: 58, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
-    'gpt-4o': { score100: 28, bestComponent: 0, avgComponent: 0, sampleSize: 1 },
+    'deepseek-chat': { overallScore: 85, perBetScore: 0, perPeriodScore: 0, recentScore: 0, longTermScore: 0, componentScores: {}, recentWindow: {} as never, longTermWindow: {} as never, bestPeriod: {} as never, worstPeriod: {} as never, sampleSize: 1, betSampleSize: 1 },
+    'gemini-pro': { overallScore: 58, perBetScore: 0, perPeriodScore: 0, recentScore: 0, longTermScore: 0, componentScores: {}, recentWindow: {} as never, longTermWindow: {} as never, bestPeriod: {} as never, worstPeriod: {} as never, sampleSize: 1, betSampleSize: 1 },
+    'gpt-4o': { overallScore: 28, perBetScore: 0, perPeriodScore: 0, recentScore: 0, longTermScore: 0, componentScores: {}, recentWindow: {} as never, longTermWindow: {} as never, bestPeriod: {} as never, worstPeriod: {} as never, sampleSize: 1, betSampleSize: 1 },
   }
 
   it('applies all filter conditions together', () => {

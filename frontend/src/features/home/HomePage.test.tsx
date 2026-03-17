@@ -201,7 +201,8 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('is-active')
     expect(screen.getByRole('columnheader', { name: '模型' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: '预测摘要' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '预测号码' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '评分摘要' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /查看详情：/ }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
 
@@ -209,6 +210,23 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByRole('button', { name: '卡片视图' })).toHaveClass('is-active')
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
+    expect(screen.getAllByText('本期预测号码').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/综合 \d+/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps full ability portrait in model detail dialog', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /查看详情：/ })[0])
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogScope = within(dialog)
+    expect(dialog).toBeInTheDocument()
+    expect(dialogScope.getByText('能力画像')).toBeInTheDocument()
+    expect(dialogScope.getByText('综合分')).toBeInTheDocument()
+    expect(dialogScope.getByText('能力上限')).toBeInTheDocument()
+    expect(dialogScope.getByText('能力下限')).toBeInTheDocument()
+    expect(dialogScope.getByText('近期 20 期')).toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {
@@ -252,7 +270,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(screen.getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
     expect(screen.getAllByText('成本 10 元').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('奖金 300 元').length).toBeGreaterThan(0)
+    expect(screen.getByText('5 注 / 10 元 / 300 元')).toBeInTheDocument()
     expect(screen.getAllByText('成本 20 元').length).toBeGreaterThan(0)
     expect(screen.getByText('奖金 305 元')).toBeInTheDocument()
   })

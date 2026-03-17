@@ -49,6 +49,52 @@ export type PredictionGroup = {
   prize_source?: 'official' | 'fallback' | 'missing' | 'none'
 }
 
+export type ScoreSnapshot = {
+  target_period: string
+  prediction_date: string
+  bet_count: number
+  winning_bet_count: number
+  cost_amount: number
+  prize_amount: number
+  net_profit: number
+  roi: number
+  best_hit_count: number
+}
+
+export type ScoreWindowProfile = {
+  overall_score: number
+  per_bet_score: number
+  per_period_score: number
+  profit_score: number
+  hit_score: number
+  stability_score: number
+  ceiling_score: number
+  floor_score: number
+  periods: number
+  bets: number
+  hit_rate_by_period: number
+  hit_rate_by_bet: number
+  roi: number
+  avg_period_roi: number
+  best_period: ScoreSnapshot
+  worst_period: ScoreSnapshot
+}
+
+export type ScoreProfile = {
+  overall_score: number
+  per_bet_score: number
+  per_period_score: number
+  recent_score: number
+  long_term_score: number
+  component_scores: Record<string, number>
+  recent_window: ScoreWindowProfile
+  long_term_window: ScoreWindowProfile
+  best_period_snapshot: ScoreSnapshot
+  worst_period_snapshot: ScoreSnapshot
+  sample_size_periods: number
+  sample_size_bets: number
+}
+
 export type PredictionModel = {
   model_id: string
   model_name: string
@@ -66,6 +112,7 @@ export type PredictionModel = {
   hit_period_win?: boolean
   win_rate_by_period?: number
   win_rate_by_bet?: number
+  score_profile?: ScoreProfile
 }
 
 export type PredictionHistorySummaryModel = {
@@ -83,6 +130,7 @@ export type PredictionHistorySummaryModel = {
   hit_period_win?: boolean
   win_rate_by_period?: number
   win_rate_by_bet?: number
+  score_profile?: ScoreProfile
 }
 
 export type PredictionHistoryPeriodSummary = {
@@ -102,6 +150,7 @@ export type PredictionHistoryModelStat = {
   prize_amount: number
   win_rate_by_period: number
   win_rate_by_bet: number
+  score_profile?: ScoreProfile
 }
 
 export type CurrentPredictionsResponse = {

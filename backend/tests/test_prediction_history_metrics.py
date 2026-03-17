@@ -107,11 +107,15 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(model_a["prize_amount"], 10000)
         self.assertAlmostEqual(model_a["win_rate_by_bet"], 0.5)
         self.assertTrue(model_a["hit_period_win"])
+        self.assertGreater(model_a["score_profile"]["overall_score"], 0)
+        self.assertEqual(model_a["score_profile"]["best_period_snapshot"]["target_period"], "2026031")
 
         model_stats = next(item for item in payload["model_stats"] if item["model_id"] == "model-b")
         self.assertEqual(model_stats["winning_bet_count"], 1)
         self.assertAlmostEqual(model_stats["win_rate_by_period"], 1.0)
         self.assertAlmostEqual(model_stats["win_rate_by_bet"], 1.0)
+        self.assertIn("component_scores", model_stats["score_profile"])
+        self.assertGreaterEqual(model_stats["score_profile"]["per_period_score"], 0)
 
     def test_detail_payload_marks_fixed_prize_sources(self) -> None:
         payload = self.service.get_history_detail_payload("2026031")

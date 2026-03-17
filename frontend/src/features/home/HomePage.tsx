@@ -29,6 +29,7 @@ import {
   buildSumTrendChart,
   compareNumbers,
   getActualResult,
+  type ModelScore,
   type ModelListScoreRange,
   normalizePredictionsHistory,
 } from './lib/home'
@@ -110,6 +111,7 @@ type HistoryModelStatView = {
   prize_amount: number
   win_rate_by_period: number
   win_rate_by_bet: number
+  score_profile?: PredictionModel['score_profile']
 }
 
 function formatCurrency(value: number | undefined) {
@@ -136,6 +138,7 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
         prize_amount: 0,
         win_rate_by_period: 0,
         win_rate_by_bet: 0,
+        score_profile: model.score_profile,
       }
 
       existing.periods += 1
@@ -144,6 +147,7 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
       existing.winning_bet_count += model.winning_bet_count || 0
       existing.cost_amount += model.cost_amount || 0
       existing.prize_amount += model.prize_amount || 0
+      existing.score_profile = model.score_profile || existing.score_profile
       stats.set(model.model_id, existing)
     }
   }
@@ -156,7 +160,12 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
       win_rate_by_period: item.periods ? item.winning_periods / item.periods : 0,
       win_rate_by_bet: item.bet_count ? item.winning_bet_count / item.bet_count : 0,
     }))
-    .sort((left, right) => right.prize_amount - left.prize_amount || right.win_rate_by_period - left.win_rate_by_period)
+    .sort(
+      (left, right) =>
+        (right.score_profile?.overall_score || 0) - (left.score_profile?.overall_score || 0) ||
+        right.prize_amount - left.prize_amount ||
+        right.win_rate_by_period - left.win_rate_by_period,
+    )
 }
 
 export function HomePage() {
@@ -251,6 +260,7 @@ export function HomePage() {
   const oddEvenChart = buildOddEvenChart(chartDraws)
   const sumTrendChart = buildSumTrendChart(chartDraws)
   const selectedDetailModel = orderedModels.find((model) => model.model_id === detailModelId) || null
+  const selectedDetailScore = selectedDetailModel ? modelScores[selectedDetailModel.model_id] : null
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || predictionsHistory.isLoading
   const error =
@@ -352,7 +362,7 @@ export function HomePage() {
             <section ref={modelSectionRef} data-section="models">
               <StatusCard
                 title="模型列表"
-                subtitle="统一查看所有模型的历史评分、本期 5 组预测号码和更多操作。"
+                subtitle="列表页先看本期预测号码与轻量评分，点进详情再看完整能力画像。"
                 actions={
                   <div className="toolbar-inline">
                     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
@@ -400,7 +410,7 @@ export function HomePage() {
                         <ModelListCard
                           key={model.model_id}
                           model={model}
-                          score={modelScores[model.model_id]?.score100 || 0}
+                          score={modelScores[model.model_id]}
                           isPinned={validPinnedModelIds.includes(model.model_id)}
                           actualResult={actualResult}
                           isActionMenuOpen={activeActionMenuId === model.model_id}
@@ -590,13 +600,14 @@ export function HomePage() {
                     <article key={item.model_id} className="history-stat-card">
                       <div className="history-stat-card__header">
                         <strong>{item.model_name}</strong>
-                        <span>{item.periods} 期</span>
+                        <span>综合分 {item.score_profile?.overall_score || 0}</span>
                       </div>
                       <div className="history-stat-card__metrics">
+                        <span>按注 {item.score_profile?.per_bet_score || 0}</span>
+                        <span>按期 {item.score_profile?.per_period_score || 0}</span>
                         <span>按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
                         <span>按注中奖率 {formatPercent(item.win_rate_by_bet)}</span>
-                        <span>成本 {formatCurrency(item.cost_amount)}</span>
-                        <span>奖金 {formatCurrency(item.prize_amount)}</span>
+                        <span>近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
                       </div>
                     </article>
                   ))}
@@ -684,6 +695,15 @@ export function HomePage() {
                 <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} />
               ))}
             </div>
+            {selectedDetailScore ? (
+              <section className="detail-score-section" aria-label="能力画像">
+                <div className="detail-score-section__header">
+                  <span>能力画像</span>
+                  <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
+                </div>
+                <ModelScoreShowcase score={selectedDetailScore} compact={false} />
+              </section>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -702,7 +722,7 @@ function ModelListCard({
   onDetail,
 }: {
   model: PredictionModel
-  score: number
+  score?: ModelScore
   isPinned: boolean
   actualResult: LotteryDraw | null
   isActionMenuOpen: boolean
@@ -743,8 +763,8 @@ function ModelListCard({
           <strong>{model.model_name}</strong>
         </div>
         <div className="model-list-card__field">
-          <span>历史评分</span>
-          <strong>{score}</strong>
+          <span>综合分</span>
+          <strong>{score?.overallScore || 0}</strong>
         </div>
         <div className="model-list-card__field">
           <span>接口模型</span>
@@ -756,10 +776,11 @@ function ModelListCard({
           <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
         ))}
       </div>
+      {score ? <ModelScoreInline score={score} /> : null}
       <div className="model-list-card__footer">
         <span>本期预测号码</span>
         <button className="ghost-button" onClick={onDetail}>
-          查看详情
+          查看号码详情与能力画像
         </button>
       </div>
     </article>
@@ -777,7 +798,7 @@ function ModelListTable({
   onDetail,
 }: {
   models: PredictionModel[]
-  modelScores: Record<string, { score100: number }>
+  modelScores: Record<string, ModelScore>
   validPinnedModelIds: string[]
   actualResult: LotteryDraw | null
   activeActionMenuId: string | null
@@ -795,9 +816,10 @@ function ModelListTable({
         <thead>
           <tr>
             <th>模型</th>
-            <th>评分</th>
+            <th>综合分</th>
             <th>接口模型</th>
-            <th>预测摘要</th>
+            <th>预测号码</th>
+            <th>评分摘要</th>
             <th>状态</th>
             <th>操作</th>
           </tr>
@@ -814,7 +836,7 @@ function ModelListTable({
                   </div>
                 </td>
                 <td>
-                  <span className="home-model-list-table__score">{modelScores[model.model_id]?.score100 || 0}</span>
+                  <span className="home-model-list-table__score">{modelScores[model.model_id]?.overallScore || 0}</span>
                 </td>
                 <td>
                   <span className="home-model-list-table__api" title={model.model_api_model || model.model_id}>
@@ -824,9 +846,12 @@ function ModelListTable({
                 <td>
                   <div className="home-model-list-table__groups">
                     {model.predictions.map((group) => (
-                      <PredictionGroupCard key={`${model.model_id}-${group.group_id}`} group={group} actualResult={actualResult} compact />
+                      <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
                     ))}
                   </div>
+                </td>
+                <td>
+                  <ModelScoreInline score={modelScores[model.model_id]} />
                 </td>
                 <td>
                   {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
@@ -1087,6 +1112,86 @@ function getModelTrendColor(index: number) {
   return palette[index % palette.length]
 }
 
+function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; compact?: boolean }) {
+  if (!score) return null
+
+  const components = [
+    { label: '收益', value: score.componentScores.profit || 0 },
+    { label: '命中', value: score.componentScores.hit_rate || 0 },
+    { label: '稳定', value: score.componentScores.stability || 0 },
+    { label: '上限', value: score.componentScores.ceiling || 0 },
+    { label: '下限', value: score.componentScores.floor || 0 },
+  ]
+
+  return (
+    <div className={clsx('score-showcase', compact && 'is-compact')}>
+      <div className="score-showcase__hero">
+        <div className="score-showcase__headline">
+          <span>综合分</span>
+          <strong>{score.overallScore}</strong>
+        </div>
+        <div className="score-showcase__triplet">
+          <span>按注 {score.perBetScore}</span>
+          <span>按期 {score.perPeriodScore}</span>
+          <span>近期/长期 {score.recentScore}/{score.longTermScore}</span>
+        </div>
+      </div>
+      <div className="score-showcase__components">
+        {components.map((item) => (
+          <div key={item.label} className="score-showcase__component">
+            <div className="score-showcase__component-label">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+            <div className="score-showcase__bar">
+              <span style={{ width: `${item.value}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="score-showcase__windows">
+        <div className="score-showcase__window">
+          <span>近期 20 期</span>
+          <strong>ROI {Math.round((score.recentWindow.roi || 0) * 100)}%</strong>
+          <small>{score.recentWindow.periods} 期 / {score.recentWindow.bets} 注</small>
+        </div>
+        <div className="score-showcase__window">
+          <span>长期全量</span>
+          <strong>ROI {Math.round((score.longTermWindow.roi || 0) * 100)}%</strong>
+          <small>{score.sampleSize} 期 / {score.betSampleSize} 注</small>
+        </div>
+      </div>
+      {!compact ? (
+        <div className="score-showcase__limits">
+          <div className="score-showcase__limit-card">
+            <span>能力上限</span>
+            <strong>第 {score.bestPeriod.target_period || '-'} 期</strong>
+            <small>净收益 {formatCurrency(score.bestPeriod.net_profit)} / 最佳命中 {score.bestPeriod.best_hit_count}</small>
+          </div>
+          <div className="score-showcase__limit-card is-floor">
+            <span>能力下限</span>
+            <strong>第 {score.worstPeriod.target_period || '-'} 期</strong>
+            <small>净收益 {formatCurrency(score.worstPeriod.net_profit)} / 最佳命中 {score.worstPeriod.best_hit_count}</small>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ModelScoreInline({ score }: { score?: ModelScore }) {
+  if (!score) return null
+
+  return (
+    <div className="score-inline" aria-label="评分摘要">
+      <span className="score-inline__pill is-primary">综合 {score.overallScore}</span>
+      <span className="score-inline__pill">按注 {score.perBetScore}</span>
+      <span className="score-inline__pill">按期 {score.perPeriodScore}</span>
+      <span className="score-inline__pill">近期/长期 {score.recentScore}/{score.longTermScore}</span>
+    </div>
+  )
+}
+
 function ModelFilterPanel({
   modelNameQuery,
   onModelNameQueryChange,
@@ -1174,7 +1279,7 @@ function ModelFilterPanel({
         </div>
 
         <div className="model-filter-panel__group">
-          <strong>近期评分</strong>
+          <strong>综合评分</strong>
           <div className="filter-chip-group">
             {MODEL_SCORE_FILTERS.map((option) => (
               <button

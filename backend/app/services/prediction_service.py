@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+from statistics import pstdev
 from typing import Any
 
 from backend.app.cache import runtime_cache
@@ -10,6 +12,7 @@ from backend.app.services.lottery_service import LotteryService
 
 class PredictionService:
     BET_COST = 2
+    RECENT_SCORE_WINDOW = 20
     FIXED_PRIZE_RULES = {
         "三等奖": 10000,
         "四等奖": 3000,
@@ -108,6 +111,18 @@ class PredictionService:
             loader=lambda: self.prediction_repository.get_history_record_detail(target_period),
         )
         payload = self._annotate_history_record(raw_payload) if raw_payload else None
+        if payload:
+            score_profiles = self._build_score_profiles([payload])
+            payload = {
+                **payload,
+                "models": [
+                    {
+                        **model,
+                        "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
+                    }
+                    for model in payload.get("models", [])
+                ],
+            }
         self.logger.info(
             "Loaded prediction history detail",
             extra={"context": {"target_period": target_period, "found": bool(payload)}},
@@ -169,13 +184,14 @@ class PredictionService:
 
         if not payload:
             return None
+        score_profiles = self._build_score_profiles([payload]) if normalized_type == "history" else {}
         return {
             "record_type": normalized_type,
             "prediction_date": payload.get("prediction_date", ""),
             "target_period": payload.get("target_period", ""),
             "actual_result": payload.get("actual_result"),
             "models": payload.get("models", []),
-            "model_stats": self._build_model_stats([payload]) if normalized_type == "history" else [],
+            "model_stats": self._build_model_stats([payload], score_profiles) if normalized_type == "history" else [],
         }
 
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -284,10 +300,11 @@ class PredictionService:
             for record in self.prediction_repository.list_history_records(limit=limit, offset=offset)
             if (annotated := self._annotate_history_record(record))
         ]
+        score_profiles = self._build_score_profiles(records)
         return {
-            "predictions_history": [self._build_history_summary(record) for record in records],
+            "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": self.prediction_repository.count_history_records(),
-            "model_stats": self._build_model_stats(records),
+            "model_stats": self._build_model_stats(records, score_profiles),
         }
 
     def _annotate_history_record(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -352,7 +369,7 @@ class PredictionService:
             },
         }
 
-    def _build_history_summary(self, record: dict[str, Any]) -> dict[str, Any]:
+    def _build_history_summary(self, record: dict[str, Any], score_profiles: dict[str, dict[str, Any]]) -> dict[str, Any]:
         return {
             "prediction_date": record.get("prediction_date", ""),
             "target_period": record.get("target_period", ""),
@@ -374,12 +391,13 @@ class PredictionService:
                     "hit_period_win": bool(model.get("hit_period_win")),
                     "win_rate_by_period": float(model.get("win_rate_by_period") or 0),
                     "win_rate_by_bet": float(model.get("win_rate_by_bet") or 0),
+                    "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
                 }
                 for model in record.get("models", [])
             ],
         }
 
-    def _build_model_stats(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _build_model_stats(self, records: list[dict[str, Any]], score_profiles: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         stats: dict[str, dict[str, Any]] = {}
         for record in records:
             for model in record.get("models", []):
@@ -415,10 +433,229 @@ class PredictionService:
                     **entry,
                     "win_rate_by_period": (entry["winning_periods"] / periods) if periods else 0,
                     "win_rate_by_bet": (entry["winning_bet_count"] / bet_count) if bet_count else 0,
+                    "score_profile": (score_profiles or {}).get(str(entry["model_id"]), self._empty_score_profile()),
                 }
             )
-        result.sort(key=lambda item: (item["prize_amount"], item["win_rate_by_period"], item["model_name"]), reverse=True)
+        result.sort(
+            key=lambda item: (
+                int(item.get("score_profile", {}).get("overall_score", 0)),
+                item["prize_amount"],
+                item["win_rate_by_period"],
+                item["model_name"],
+            ),
+            reverse=True,
+        )
         return result
+
+    def _build_score_profiles(self, records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        model_names: dict[str, str] = {}
+        for record in records:
+            for model in record.get("models", []):
+                model_id = str(model.get("model_id") or "")
+                if not model_id:
+                    continue
+                model_names[model_id] = str(model.get("model_name") or model_id)
+                grouped.setdefault(model_id, []).append(
+                    self._build_record_performance(record, model)
+                )
+
+        result: dict[str, dict[str, Any]] = {}
+        for model_id, performance_records in grouped.items():
+            recent_records = performance_records[: self.RECENT_SCORE_WINDOW]
+            recent_window = self._build_score_window(recent_records)
+            long_term_window = self._build_score_window(performance_records)
+            component_scores = {
+                "profit": self._merge_window_score(recent_window["profit_score"], long_term_window["profit_score"]),
+                "hit_rate": self._merge_window_score(recent_window["hit_score"], long_term_window["hit_score"]),
+                "stability": self._merge_window_score(recent_window["stability_score"], long_term_window["stability_score"]),
+                "ceiling": self._merge_window_score(recent_window["ceiling_score"], long_term_window["ceiling_score"]),
+                "floor": self._merge_window_score(recent_window["floor_score"], long_term_window["floor_score"]),
+            }
+            result[model_id] = {
+                "overall_score": self._merge_window_score(recent_window["overall_score"], long_term_window["overall_score"]),
+                "per_bet_score": self._merge_window_score(recent_window["per_bet_score"], long_term_window["per_bet_score"]),
+                "per_period_score": self._merge_window_score(recent_window["per_period_score"], long_term_window["per_period_score"]),
+                "recent_score": int(recent_window["overall_score"]),
+                "long_term_score": int(long_term_window["overall_score"]),
+                "component_scores": component_scores,
+                "recent_window": recent_window,
+                "long_term_window": long_term_window,
+                "best_period_snapshot": recent_window["best_period"] if recent_window["best_period"].get("net_profit", 0) >= long_term_window["best_period"].get("net_profit", 0) else long_term_window["best_period"],
+                "worst_period_snapshot": recent_window["worst_period"] if recent_window["worst_period"].get("net_profit", 0) <= long_term_window["worst_period"].get("net_profit", 0) else long_term_window["worst_period"],
+                "sample_size_periods": len(performance_records),
+                "sample_size_bets": sum(int(item.get("bet_count") or 0) for item in performance_records),
+                "model_name": model_names.get(model_id, model_id),
+            }
+        return result
+
+    def _build_record_performance(self, record: dict[str, Any], model: dict[str, Any]) -> dict[str, Any]:
+        cost_amount = int(model.get("cost_amount") or 0)
+        prize_amount = int(model.get("prize_amount") or 0)
+        net_profit = prize_amount - cost_amount
+        bet_count = int(model.get("bet_count") or 0)
+        winning_bet_count = int(model.get("winning_bet_count") or 0)
+        return {
+            "target_period": str(record.get("target_period") or ""),
+            "prediction_date": str(record.get("prediction_date") or ""),
+            "bet_count": bet_count,
+            "winning_bet_count": winning_bet_count,
+            "cost_amount": cost_amount,
+            "prize_amount": prize_amount,
+            "net_profit": net_profit,
+            "roi": (net_profit / cost_amount) if cost_amount else 0,
+            "best_hit_count": int(model.get("best_hit_count") or 0),
+            "hit_rate_by_period": 1.0 if model.get("hit_period_win") else 0.0,
+            "hit_rate_by_bet": (winning_bet_count / bet_count) if bet_count else 0.0,
+        }
+
+    def _build_score_window(self, records: list[dict[str, Any]]) -> dict[str, Any]:
+        if not records:
+            empty = self._empty_score_window()
+            return empty
+
+        periods = len(records)
+        bets = sum(int(item.get("bet_count") or 0) for item in records)
+        total_cost = sum(int(item.get("cost_amount") or 0) for item in records)
+        total_prize = sum(int(item.get("prize_amount") or 0) for item in records)
+        total_net = total_prize - total_cost
+        period_hit_rate = sum(float(item.get("hit_rate_by_period") or 0) for item in records) / periods
+        bet_hit_rate = (
+            sum(int(item.get("winning_bet_count") or 0) for item in records) / bets if bets else 0
+        )
+        avg_best_hit_rate = sum((int(item.get("best_hit_count") or 0) / 7) for item in records) / periods
+        roi = (total_net / total_cost) if total_cost else 0
+        period_rois = [float(item.get("roi") or 0) for item in records]
+        avg_period_roi = sum(period_rois) / periods
+        period_roi_std = pstdev(period_rois) if len(period_rois) > 1 else 0
+        losing_period_ratio = sum(1 for item in records if int(item.get("net_profit") or 0) < 0) / periods
+        best_period = max(records, key=lambda item: (int(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
+        worst_period = min(records, key=lambda item: (int(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
+
+        profit_score = self._bounded_center_score(roi * 0.65 + avg_period_roi * 0.35, scale=1.5)
+        hit_score = self._clamp_score((period_hit_rate * 0.55 + bet_hit_rate * 0.25 + avg_best_hit_rate * 0.20) * 100)
+        stability_score = self._clamp_score(
+            (
+                1
+                - min(1.0, period_roi_std / 2.0) * 0.45
+                - losing_period_ratio * 0.35
+                - min(1.0, max(0.0, -float(worst_period.get("roi") or 0)) / 1.5) * 0.20
+            )
+            * 100
+        )
+        ceiling_score = self._clamp_score(
+            self._positive_score(float(best_period.get("roi") or 0), scale=2.0) * 0.55
+            + float(best_period.get("hit_rate_by_bet") or 0) * 100 * 0.20
+            + (int(best_period.get("best_hit_count") or 0) / 7) * 100 * 0.25
+        )
+        floor_score = self._clamp_score(
+            self._inverse_negative_score(float(worst_period.get("roi") or 0), scale=1.5) * 0.70
+            + float(worst_period.get("hit_rate_by_bet") or 0) * 100 * 0.30
+        )
+        per_bet_score = self._clamp_score(bet_hit_rate * 100 * 0.45 + profit_score * 0.35 + stability_score * 0.20)
+        per_period_score = self._clamp_score(period_hit_rate * 100 * 0.40 + profit_score * 0.25 + stability_score * 0.20 + floor_score * 0.15)
+        overall_score = self._clamp_score(
+            profit_score * 0.28
+            + hit_score * 0.22
+            + stability_score * 0.22
+            + ceiling_score * 0.16
+            + floor_score * 0.12
+        )
+
+        return {
+            "overall_score": overall_score,
+            "per_bet_score": per_bet_score,
+            "per_period_score": per_period_score,
+            "profit_score": profit_score,
+            "hit_score": hit_score,
+            "stability_score": stability_score,
+            "ceiling_score": ceiling_score,
+            "floor_score": floor_score,
+            "periods": periods,
+            "bets": bets,
+            "hit_rate_by_period": round(period_hit_rate, 4),
+            "hit_rate_by_bet": round(bet_hit_rate, 4),
+            "roi": round(roi, 4),
+            "avg_period_roi": round(avg_period_roi, 4),
+            "best_period": self._serialize_snapshot(best_period),
+            "worst_period": self._serialize_snapshot(worst_period),
+        }
+
+    @staticmethod
+    def _serialize_snapshot(record: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "target_period": str(record.get("target_period") or ""),
+            "prediction_date": str(record.get("prediction_date") or ""),
+            "bet_count": int(record.get("bet_count") or 0),
+            "winning_bet_count": int(record.get("winning_bet_count") or 0),
+            "cost_amount": int(record.get("cost_amount") or 0),
+            "prize_amount": int(record.get("prize_amount") or 0),
+            "net_profit": int(record.get("net_profit") or 0),
+            "roi": round(float(record.get("roi") or 0), 4),
+            "best_hit_count": int(record.get("best_hit_count") or 0),
+        }
+
+    @staticmethod
+    def _bounded_center_score(value: float, *, scale: float) -> int:
+        return PredictionService._clamp_score((math.tanh(value / scale) + 1) * 50)
+
+    @staticmethod
+    def _positive_score(value: float, *, scale: float) -> float:
+        return math.tanh(max(0.0, value) / scale) * 100
+
+    @staticmethod
+    def _inverse_negative_score(value: float, *, scale: float) -> float:
+        return (1 - math.tanh(max(0.0, -value) / scale)) * 100
+
+    @staticmethod
+    def _merge_window_score(recent: int | float, long_term: int | float) -> int:
+        return PredictionService._clamp_score(float(recent) * 0.6 + float(long_term) * 0.4)
+
+    @staticmethod
+    def _clamp_score(value: float) -> int:
+        return max(0, min(100, int(round(value))))
+
+    def _empty_score_window(self) -> dict[str, Any]:
+        return {
+            "overall_score": 0,
+            "per_bet_score": 0,
+            "per_period_score": 0,
+            "profit_score": 0,
+            "hit_score": 0,
+            "stability_score": 0,
+            "ceiling_score": 0,
+            "floor_score": 0,
+            "periods": 0,
+            "bets": 0,
+            "hit_rate_by_period": 0,
+            "hit_rate_by_bet": 0,
+            "roi": 0,
+            "avg_period_roi": 0,
+            "best_period": self._serialize_snapshot({}),
+            "worst_period": self._serialize_snapshot({}),
+        }
+
+    def _empty_score_profile(self) -> dict[str, Any]:
+        return {
+            "overall_score": 0,
+            "per_bet_score": 0,
+            "per_period_score": 0,
+            "recent_score": 0,
+            "long_term_score": 0,
+            "component_scores": {
+                "profit": 0,
+                "hit_rate": 0,
+                "stability": 0,
+                "ceiling": 0,
+                "floor": 0,
+            },
+            "recent_window": self._empty_score_window(),
+            "long_term_window": self._empty_score_window(),
+            "best_period_snapshot": self._serialize_snapshot({}),
+            "worst_period_snapshot": self._serialize_snapshot({}),
+            "sample_size_periods": 0,
+            "sample_size_bets": 0,
+        }
 
     @classmethod
     def resolve_prize_level(cls, hit_result: dict[str, Any]) -> str | None:

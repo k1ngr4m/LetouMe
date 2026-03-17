@@ -1,22 +1,33 @@
 import type {
   CurrentPredictionsResponse,
   LotteryDraw,
-  PredictionHistorySummaryModel,
   PredictionHistoryPeriodSummary,
+  PredictionHistoryModelStat,
   PredictionsHistoryListResponse,
   PredictionsHistoryResponse,
   PredictionGroup,
   PredictionModel,
+  ScoreProfile,
+  ScoreSnapshot,
+  ScoreWindowProfile,
 } from '../../../shared/types/api'
-import { average, byFrequencyDescending, padBall } from '../../../shared/lib/format'
+import { byFrequencyDescending, padBall } from '../../../shared/lib/format'
 
 export const SCORE_WINDOW = 20
 
 export type ModelScore = {
-  score100: number
-  bestComponent: number
-  avgComponent: number
+  overallScore: number
+  perBetScore: number
+  perPeriodScore: number
+  recentScore: number
+  longTermScore: number
+  componentScores: Record<string, number>
+  recentWindow: ScoreWindowProfile
+  longTermWindow: ScoreWindowProfile
+  bestPeriod: ScoreSnapshot
+  worstPeriod: ScoreSnapshot
   sampleSize: number
+  betSampleSize: number
 }
 
 export type BallStatItem = {
@@ -84,17 +95,7 @@ export function normalizeCurrentPredictions(data: CurrentPredictionsResponse): C
 export function normalizePredictionsHistory(data: PredictionsHistoryResponse): PredictionsHistoryResponse {
   return {
     ...data,
-    model_stats: (data.model_stats || []).map((item) => ({
-      ...item,
-      periods: Number(item.periods || 0),
-      winning_periods: Number(item.winning_periods || 0),
-      bet_count: Number(item.bet_count || 0),
-      winning_bet_count: Number(item.winning_bet_count || 0),
-      cost_amount: Number(item.cost_amount || 0),
-      prize_amount: Number(item.prize_amount || 0),
-      win_rate_by_period: Number(item.win_rate_by_period || 0),
-      win_rate_by_bet: Number(item.win_rate_by_bet || 0),
-    })),
+    model_stats: (data.model_stats || []).map(normalizeModelStat),
     predictions_history: (data.predictions_history || []).map((record) => ({
       ...record,
       actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
@@ -106,6 +107,7 @@ export function normalizePredictionsHistory(data: PredictionsHistoryResponse): P
         prize_amount: Number(model.prize_amount || 0),
         win_rate_by_period: Number(model.win_rate_by_period || 0),
         win_rate_by_bet: Number(model.win_rate_by_bet || 0),
+        score_profile: normalizeScoreProfile(model.score_profile),
         predictions: (model.predictions || []).map(normalizeGroup),
       })),
     })),
@@ -115,17 +117,7 @@ export function normalizePredictionsHistory(data: PredictionsHistoryResponse): P
 export function normalizePredictionsHistoryList(data: PredictionsHistoryListResponse): PredictionsHistoryListResponse {
   return {
     ...data,
-    model_stats: (data.model_stats || []).map((item) => ({
-      ...item,
-      periods: Number(item.periods || 0),
-      winning_periods: Number(item.winning_periods || 0),
-      bet_count: Number(item.bet_count || 0),
-      winning_bet_count: Number(item.winning_bet_count || 0),
-      cost_amount: Number(item.cost_amount || 0),
-      prize_amount: Number(item.prize_amount || 0),
-      win_rate_by_period: Number(item.win_rate_by_period || 0),
-      win_rate_by_bet: Number(item.win_rate_by_bet || 0),
-    })),
+    model_stats: (data.model_stats || []).map(normalizeModelStat),
     predictions_history: (data.predictions_history || []).map((record) => ({
       ...record,
       actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
@@ -138,6 +130,7 @@ export function normalizePredictionsHistoryList(data: PredictionsHistoryListResp
         prize_amount: Number(model.prize_amount || 0),
         win_rate_by_period: Number(model.win_rate_by_period || 0),
         win_rate_by_bet: Number(model.win_rate_by_bet || 0),
+        score_profile: normalizeScoreProfile(model.score_profile),
       })),
     })),
   }
@@ -148,6 +141,79 @@ function normalizePeriodSummary(summary?: PredictionHistoryPeriodSummary): Predi
     total_bet_count: Number(summary?.total_bet_count || 0),
     total_cost_amount: Number(summary?.total_cost_amount || 0),
     total_prize_amount: Number(summary?.total_prize_amount || 0),
+  }
+}
+
+function normalizeScoreSnapshot(snapshot?: ScoreSnapshot): ScoreSnapshot {
+  return {
+    target_period: snapshot?.target_period || '',
+    prediction_date: snapshot?.prediction_date || '',
+    bet_count: Number(snapshot?.bet_count || 0),
+    winning_bet_count: Number(snapshot?.winning_bet_count || 0),
+    cost_amount: Number(snapshot?.cost_amount || 0),
+    prize_amount: Number(snapshot?.prize_amount || 0),
+    net_profit: Number(snapshot?.net_profit || 0),
+    roi: Number(snapshot?.roi || 0),
+    best_hit_count: Number(snapshot?.best_hit_count || 0),
+  }
+}
+
+function normalizeScoreWindow(window?: ScoreWindowProfile): ScoreWindowProfile {
+  return {
+    overall_score: Number(window?.overall_score || 0),
+    per_bet_score: Number(window?.per_bet_score || 0),
+    per_period_score: Number(window?.per_period_score || 0),
+    profit_score: Number(window?.profit_score || 0),
+    hit_score: Number(window?.hit_score || 0),
+    stability_score: Number(window?.stability_score || 0),
+    ceiling_score: Number(window?.ceiling_score || 0),
+    floor_score: Number(window?.floor_score || 0),
+    periods: Number(window?.periods || 0),
+    bets: Number(window?.bets || 0),
+    hit_rate_by_period: Number(window?.hit_rate_by_period || 0),
+    hit_rate_by_bet: Number(window?.hit_rate_by_bet || 0),
+    roi: Number(window?.roi || 0),
+    avg_period_roi: Number(window?.avg_period_roi || 0),
+    best_period: normalizeScoreSnapshot(window?.best_period),
+    worst_period: normalizeScoreSnapshot(window?.worst_period),
+  }
+}
+
+function normalizeScoreProfile(profile?: ScoreProfile): ScoreProfile {
+  return {
+    overall_score: Number(profile?.overall_score || 0),
+    per_bet_score: Number(profile?.per_bet_score || 0),
+    per_period_score: Number(profile?.per_period_score || 0),
+    recent_score: Number(profile?.recent_score || 0),
+    long_term_score: Number(profile?.long_term_score || 0),
+    component_scores: {
+      profit: Number(profile?.component_scores?.profit || 0),
+      hit_rate: Number(profile?.component_scores?.hit_rate || 0),
+      stability: Number(profile?.component_scores?.stability || 0),
+      ceiling: Number(profile?.component_scores?.ceiling || 0),
+      floor: Number(profile?.component_scores?.floor || 0),
+    },
+    recent_window: normalizeScoreWindow(profile?.recent_window),
+    long_term_window: normalizeScoreWindow(profile?.long_term_window),
+    best_period_snapshot: normalizeScoreSnapshot(profile?.best_period_snapshot),
+    worst_period_snapshot: normalizeScoreSnapshot(profile?.worst_period_snapshot),
+    sample_size_periods: Number(profile?.sample_size_periods || 0),
+    sample_size_bets: Number(profile?.sample_size_bets || 0),
+  }
+}
+
+function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistoryModelStat {
+  return {
+    ...item,
+    periods: Number(item.periods || 0),
+    winning_periods: Number(item.winning_periods || 0),
+    bet_count: Number(item.bet_count || 0),
+    winning_bet_count: Number(item.winning_bet_count || 0),
+    cost_amount: Number(item.cost_amount || 0),
+    prize_amount: Number(item.prize_amount || 0),
+    win_rate_by_period: Number(item.win_rate_by_period || 0),
+    win_rate_by_bet: Number(item.win_rate_by_bet || 0),
+    score_profile: normalizeScoreProfile(item.score_profile),
   }
 }
 
@@ -165,28 +231,25 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
 }
 
 export function buildModelScores(history: PredictionsHistoryListResponse, models: PredictionModel[]): Record<string, ModelScore> {
-  const records = (history.predictions_history || []).slice(0, SCORE_WINDOW)
   const result: Record<string, ModelScore> = {}
+  const statsMap = new Map((history.model_stats || []).map((item) => [item.model_id, item]))
 
   for (const model of models) {
-    const periods = records
-      .map((record) => record.models.find((item) => item.model_id === model.model_id))
-      .filter((item): item is PredictionHistorySummaryModel => Boolean(item))
-      .map((historyModel) => {
-        const bestScore = Number(historyModel.best_hit_count || 0) / 7
-        const avgScore = bestScore
-        return {
-          bestScore,
-          avgScore,
-          periodScore: bestScore * 0.6 + avgScore * 0.4,
-        }
-      })
-
+    const stat = statsMap.get(model.model_id)
+    const profile = normalizeScoreProfile(stat?.score_profile)
     result[model.model_id] = {
-      score100: periods.length ? Math.round(average(periods.map((item) => item.periodScore)) * 100) : 0,
-      bestComponent: periods.length ? Math.round(average(periods.map((item) => item.bestScore)) * 100) : 0,
-      avgComponent: periods.length ? Math.round(average(periods.map((item) => item.avgScore)) * 100) : 0,
-      sampleSize: periods.length,
+      overallScore: profile.overall_score,
+      perBetScore: profile.per_bet_score,
+      perPeriodScore: profile.per_period_score,
+      recentScore: profile.recent_score,
+      longTermScore: profile.long_term_score,
+      componentScores: profile.component_scores,
+      recentWindow: profile.recent_window,
+      longTermWindow: profile.long_term_window,
+      bestPeriod: profile.best_period_snapshot,
+      worstPeriod: profile.worst_period_snapshot,
+      sampleSize: profile.sample_size_periods,
+      betSampleSize: profile.sample_size_bets,
     }
   }
 
@@ -205,7 +268,7 @@ export function sortModels(models: PredictionModel[], scores: Record<string, Mod
     if (leftPinned && rightPinned) return (pinnedIndex.get(left.model_id) || 0) - (pinnedIndex.get(right.model_id) || 0)
     if (leftPinned) return -1
     if (rightPinned) return 1
-    return (scores[right.model_id]?.score100 || 0) - (scores[left.model_id]?.score100 || 0)
+    return (scores[right.model_id]?.overallScore || 0) - (scores[left.model_id]?.overallScore || 0)
   })
 }
 
@@ -224,7 +287,7 @@ export function filterModels(
 ) {
   const normalizedQuery = filters.nameQuery.trim().toLowerCase()
   return models.filter((model) => {
-    const score = scores[model.model_id]?.score100 || 0
+    const score = scores[model.model_id]?.overallScore || 0
     const modelName = (model.model_name || '').toLowerCase()
     const modelId = (model.model_id || '').toLowerCase()
     const provider = model.model_provider || ''
@@ -257,7 +320,7 @@ export function buildSummary(models: PredictionModel[], scores: Record<string, M
   const totalGroupCount = selectedModels.reduce((sum, model) => sum + model.predictions.length, 0)
 
   for (const model of selectedModels) {
-    const weight = weighted ? (scores[model.model_id]?.score100 || 0) / 100 || 1 : 1
+    const weight = weighted ? (scores[model.model_id]?.overallScore || 0) / 100 || 1 : 1
     const redSeen = new Set<string>()
     const blueSeen = new Set<string>()
     for (const group of model.predictions) {
