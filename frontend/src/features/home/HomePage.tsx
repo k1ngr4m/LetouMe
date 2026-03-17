@@ -99,6 +99,17 @@ function HomeScoreIcon() {
   )
 }
 
+function PinIndicatorIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.2 4.2h5.6" />
+      <path d="M8 4.2v4l-2.1 2.2h8.2L12 8.2v-4" />
+      <path d="M10 10.4v5.4" />
+      <path d="M10 15.8 8.6 17.2" />
+    </svg>
+  )
+}
+
 function HomeIconButton({
   label,
   icon,
@@ -383,7 +394,7 @@ export function HomePage() {
               className={clsx('dashboard-sidebar__link', activeSection === 'weights' && 'is-active')}
               onClick={() => scrollToSection('weights')}
             >
-              号码预测统计
+              预测统计
             </button>
           </aside>
 
@@ -415,7 +426,7 @@ export function HomePage() {
                       />
                     </div>
                     <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
-                      {isModelFilterOpen ? '收起筛选' : '展开筛选'}
+                      筛选
                     </button>
                   </div>
                 }
@@ -496,7 +507,7 @@ export function HomePage() {
 
             <section ref={weightsSectionRef} data-section="weights">
               <StatusCard
-                title="号码预测统计"
+                title="预测统计"
                 subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
                   <div className="toolbar-inline">
@@ -635,7 +646,7 @@ export function HomePage() {
             ) : null}
             <div className="history-toolbar">
               <button className={clsx('ghost-button', isModelFilterOpen && 'is-active')} onClick={() => setIsModelFilterOpen((value) => !value)}>
-                {isModelFilterOpen ? '收起筛选' : '展开筛选'}
+                筛选
               </button>
               <input
                 className="search-input"
@@ -790,17 +801,33 @@ function ModelListCard({
           <h3>{model.model_name}</h3>
         </div>
         <div className="model-list-card__actions">
-          {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
+          {isPinned ? (
+            <span className="model-list-card__pin-indicator" aria-label="已置顶" title="已置顶">
+              <PinIndicatorIcon />
+            </span>
+          ) : null}
+          <button
+            className="icon-button model-list-card__detail-button"
+            onClick={onDetail}
+            aria-label={`查看详情：${model.model_name}`}
+            title="查看详情"
+            type="button"
+          >
+            <DetailIcon />
+          </button>
           <div className="action-menu">
-            <button className="ghost-button" onClick={onToggleActionMenu} aria-expanded={isActionMenuOpen}>
-              更多操作
+            <button
+              className="icon-button"
+              onClick={onToggleActionMenu}
+              aria-expanded={isActionMenuOpen}
+              aria-label={`更多操作：${model.model_name}`}
+              title="更多操作"
+              type="button"
+            >
+              <MoreMenuIcon />
             </button>
             {isActionMenuOpen ? (
               <div className="action-menu__panel">
-                <button className="action-menu__item action-menu__item--disabled" type="button" disabled title="暂未开放">
-                  收藏
-                  <span>暂未开放</span>
-                </button>
                 <button className="action-menu__item" type="button" onClick={onPin}>
                   {isPinned ? '取消置顶' : '置顶'}
                 </button>
@@ -831,9 +858,6 @@ function ModelListCard({
       {score ? <ModelScoreInline score={score} /> : null}
       <div className="model-list-card__footer">
         <span>本期预测号码</span>
-        <button className="ghost-button" onClick={onDetail}>
-          查看号码详情与能力画像
-        </button>
       </div>
     </article>
   )
@@ -932,10 +956,6 @@ function ModelListTable({
                       </button>
                       {activeActionMenuId === model.model_id ? (
                         <div className="action-menu__panel">
-                          <button className="action-menu__item action-menu__item--disabled" type="button" disabled title="暂未开放">
-                            收藏
-                            <span>暂未开放</span>
-                          </button>
                           <button className="action-menu__item" type="button" onClick={() => onPin(model.model_id)}>
                             {isPinned ? '取消置顶' : '置顶'}
                           </button>
@@ -1355,12 +1375,13 @@ function ModelScoreComparisonTable({
                 <td>{isPinned ? <span className="status-pill is-active">已置顶</span> : <span className="score-view-table__status">普通</span>}</td>
                 <td>
                   <button
-                    className="ghost-button score-view-table__detail-button"
+                    className="icon-button score-view-table__detail-button"
                     type="button"
                     onClick={() => onDetail(model.model_id)}
                     aria-label={`查看详情：${model.model_name}`}
+                    title="查看详情"
                   >
-                    查看详情
+                    <DetailIcon />
                   </button>
                 </td>
               </tr>

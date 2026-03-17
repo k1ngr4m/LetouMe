@@ -226,15 +226,15 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     expect(screen.getByRole('button', { name: '模型列表' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '号码预测统计' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '号码预测统计' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '预测统计' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '预测统计' })).toBeInTheDocument()
     expect(screen.queryByText('评分加权')).not.toBeInTheDocument()
   })
 
   it('filters model list with model provider, tag and score range', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: '筛选' }))
     await userEvent.click(screen.getByRole('button', { name: 'deepseek' }))
     await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
 
@@ -328,10 +328,10 @@ describe('HomePage dashboard sidebar', () => {
   it('applies model list filters to number summary candidates', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: '筛选' }))
     await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
 
-    const summarySection = screen.getByRole('heading', { name: '号码预测统计' }).closest('section')
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
     expect(summarySection).not.toBeNull()
 
     expect(within(summarySection as HTMLElement).getByRole('button', { name: '模型A' })).toBeInTheDocument()
@@ -344,7 +344,7 @@ describe('HomePage dashboard sidebar', () => {
   it('shows matched and unmatched models in summary tooltip', async () => {
     renderPage()
 
-    const summarySection = screen.getByRole('heading', { name: '号码预测统计' }).closest('section')
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
     expect(summarySection).not.toBeNull()
 
     const badge = within(summarySection as HTMLElement).getAllByRole('button', { name: '命中 1 个模型' })[0]
@@ -377,8 +377,8 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '图表分析' }))
 
     expect(screen.queryByRole('button', { name: '模型列表' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '号码预测统计' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '号码预测统计' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '预测统计' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '预测统计' })).not.toBeInTheDocument()
   })
 
   it('loads history detail on expand and highlights hit numbers', async () => {
@@ -556,7 +556,7 @@ describe('HomePage dashboard sidebar', () => {
 
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '展开筛选' }))
+    await userEvent.click(screen.getByRole('button', { name: '筛选' }))
     await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
