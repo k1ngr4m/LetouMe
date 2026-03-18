@@ -18,7 +18,7 @@ export function HomeModelDetailPage() {
   const routeState = location.state as HomeDetailRouteState | null
   const restoredState = routeState?.dashboardState
 
-  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, 1, LOTTERY_PAGE_SIZE)
+  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, [], 1, LOTTERY_PAGE_SIZE)
   const models = currentPredictions.data?.models || []
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []
