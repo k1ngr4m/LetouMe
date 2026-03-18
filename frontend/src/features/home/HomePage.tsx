@@ -502,18 +502,12 @@ export function HomePage() {
   }
 
   function handleHistoryPageSizeChange(nextPageSize: number) {
-    setHistoryPage((currentPage) => {
-      const currentOffset = (currentPage - 1) * historyPageSize
-      return Math.floor(currentOffset / nextPageSize) + 1
-    })
+    setHistoryPage((currentPage) => calculatePageForPageSize(currentPage, historyPageSize, nextPageSize))
     setHistoryPageSize(nextPageSize)
   }
 
   function handleLotteryPageSizeChange(nextPageSize: number) {
-    setLotteryPage((currentPage) => {
-      const currentOffset = (currentPage - 1) * lotteryPageSize
-      return Math.floor(currentOffset / nextPageSize) + 1
-    })
+    setLotteryPage((currentPage) => calculatePageForPageSize(currentPage, lotteryPageSize, nextPageSize))
     setLotteryPageSize(nextPageSize)
   }
 
@@ -910,36 +904,17 @@ export function HomePage() {
               ) : null}
             </div>
 
-            {(history?.total_count || 0) > 0 ? (
-              <div className="pagination-row history-pagination-row">
-                <div className="history-pagination-row__meta">
-                  <span>第 {historyPage} / {totalHistoryPages} 页</span>
-                  <span>共 {history?.total_count || 0} 条记录</span>
-                </div>
-                <div className="history-pagination-row__actions">
-                  <label className="history-pagination-row__size">
-                    <span>每页</span>
-                    <select value={historyPageSize} onChange={(event) => handleHistoryPageSizeChange(Number(event.target.value))}>
-                      {HISTORY_PAGE_SIZE_OPTIONS.map((size) => (
-                        <option key={size} value={size}>
-                          {size} 期
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button className="ghost-button" disabled={historyPage <= 1} onClick={() => setHistoryPage((value) => Math.max(1, value - 1))}>
-                    上一页
-                  </button>
-                  <button
-                    className="ghost-button"
-                    disabled={historyPage >= totalHistoryPages}
-                    onClick={() => setHistoryPage((value) => Math.min(totalHistoryPages, value + 1))}
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <PagerControls
+              page={historyPage}
+              totalPages={totalHistoryPages}
+              totalCount={history?.total_count || 0}
+              pageSize={historyPageSize}
+              pageSizeOptions={HISTORY_PAGE_SIZE_OPTIONS}
+              unitLabel="期"
+              onPageSizeChange={handleHistoryPageSizeChange}
+              onPrevious={() => setHistoryPage((value) => Math.max(1, value - 1))}
+              onNext={() => setHistoryPage((value) => Math.min(totalHistoryPages, value + 1))}
+            />
           </StatusCard>
 
           <StatusCard title="开奖历史" subtitle="分页查看历史开奖号码。">
@@ -979,36 +954,17 @@ export function HomePage() {
               </table>
             </div>
 
-            {(pagedLotteryHistory.data?.total_count || 0) > 0 ? (
-              <div className="pagination-row history-pagination-row">
-                <div className="history-pagination-row__meta">
-                  <span>第 {lotteryPage} / {totalLotteryPages} 页</span>
-                  <span>共 {pagedLotteryHistory.data?.total_count || 0} 条记录</span>
-                </div>
-                <div className="history-pagination-row__actions">
-                  <label className="history-pagination-row__size">
-                    <span>每页</span>
-                    <select value={lotteryPageSize} onChange={(event) => handleLotteryPageSizeChange(Number(event.target.value))}>
-                      {HISTORY_PAGE_SIZE_OPTIONS.map((size) => (
-                        <option key={size} value={size}>
-                          {size} 期
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button className="ghost-button" disabled={lotteryPage <= 1} onClick={() => setLotteryPage((value) => Math.max(1, value - 1))}>
-                    上一页
-                  </button>
-                  <button
-                    className="ghost-button"
-                    disabled={lotteryPage >= totalLotteryPages}
-                    onClick={() => setLotteryPage((value) => Math.min(totalLotteryPages, value + 1))}
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <PagerControls
+              page={lotteryPage}
+              totalPages={totalLotteryPages}
+              totalCount={pagedLotteryHistory.data?.total_count || 0}
+              pageSize={lotteryPageSize}
+              pageSizeOptions={HISTORY_PAGE_SIZE_OPTIONS}
+              unitLabel="期"
+              onPageSizeChange={handleLotteryPageSizeChange}
+              onPrevious={() => setLotteryPage((value) => Math.max(1, value - 1))}
+              onNext={() => setLotteryPage((value) => Math.min(totalLotteryPages, value + 1))}
+            />
           </StatusCard>
         </div>
       ) : null}
@@ -1940,6 +1896,62 @@ function ChartCard({ title, children }: { title: string; children: ReactNode }) 
       </div>
       {children}
     </section>
+  )
+}
+
+function calculatePageForPageSize(currentPage: number, currentPageSize: number, nextPageSize: number) {
+  const currentOffset = (currentPage - 1) * currentPageSize
+  return Math.floor(currentOffset / nextPageSize) + 1
+}
+
+function PagerControls({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  pageSizeOptions,
+  unitLabel,
+  onPageSizeChange,
+  onPrevious,
+  onNext,
+}: {
+  page: number
+  totalPages: number
+  totalCount: number
+  pageSize: number
+  pageSizeOptions: readonly number[]
+  unitLabel: string
+  onPageSizeChange: (nextPageSize: number) => void
+  onPrevious: () => void
+  onNext: () => void
+}) {
+  if (totalCount <= 0) return null
+
+  return (
+    <div className="pagination-row history-pagination-row">
+      <div className="history-pagination-row__meta">
+        <span>第 {page} / {totalPages} 页</span>
+        <span>共 {totalCount} 条记录</span>
+      </div>
+      <div className="history-pagination-row__actions">
+        <label className="history-pagination-row__size">
+          <span>每页</span>
+          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size} {unitLabel}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="ghost-button" disabled={page <= 1} onClick={onPrevious}>
+          上一页
+        </button>
+        <button className="ghost-button" disabled={page >= totalPages} onClick={onNext}>
+          下一页
+        </button>
+      </div>
+    </div>
   )
 }
 
