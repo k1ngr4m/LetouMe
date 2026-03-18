@@ -1,3 +1,6 @@
+import re
+
+from backend.app.db.lottery_tables import LOTTERY_SCOPED_TABLES
 from backend.app.lotteries import SUPPORTED_LOTTERY_CODES
 
 
@@ -562,3 +565,40 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         "permission_description": "ALTER TABLE app_permission ADD COLUMN permission_description TEXT NULL AFTER permission_name",
     }
 }
+
+_CREATE_TABLE_PATTERN = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?([a-zA-Z0-9_]+)`?", re.IGNORECASE)
+
+
+def _extract_table_name(statement: str) -> str | None:
+    match = _CREATE_TABLE_PATTERN.search(statement)
+    return str(match.group(1)) if match else None
+
+
+def get_schema_statements(*, split_enabled: bool) -> list[str]:
+    if not split_enabled:
+        return list(SCHEMA_STATEMENTS)
+    return [
+        statement
+        for statement in SCHEMA_STATEMENTS
+        if (_extract_table_name(statement) not in LOTTERY_SCOPED_TABLES)
+    ]
+
+
+def get_schema_migrations(*, split_enabled: bool) -> dict[str, dict[str, str]]:
+    if not split_enabled:
+        return SCHEMA_MIGRATIONS
+    return {
+        table_name: migrations
+        for table_name, migrations in SCHEMA_MIGRATIONS.items()
+        if table_name not in LOTTERY_SCOPED_TABLES
+    }
+
+
+def get_schema_index_migrations(*, split_enabled: bool) -> dict[str, dict[str, dict[str, str]]]:
+    if not split_enabled:
+        return SCHEMA_INDEX_MIGRATIONS
+    return {
+        table_name: migrations
+        for table_name, migrations in SCHEMA_INDEX_MIGRATIONS.items()
+        if table_name not in LOTTERY_SCOPED_TABLES
+    }

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from backend.app.config import Settings, load_settings
 from backend.app.db.lottery_tables import rewrite_lottery_tables
-from backend.app.db.schema import SCHEMA_INDEX_MIGRATIONS, SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS
+from backend.app.db.schema import get_schema_index_migrations, get_schema_migrations, get_schema_statements
 from backend.app.logging_utils import get_logger
 
 if TYPE_CHECKING:
@@ -291,10 +291,14 @@ def ensure_schema() -> None:
             return
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                for statement in SCHEMA_STATEMENTS:
+                schema_statements = get_schema_statements(split_enabled=settings.lottery_split_tables_enabled)
+                schema_migrations = get_schema_migrations(split_enabled=settings.lottery_split_tables_enabled)
+                schema_index_migrations = get_schema_index_migrations(split_enabled=settings.lottery_split_tables_enabled)
+
+                for statement in schema_statements:
                     cursor.execute(statement)
 
-                for table_name, migrations in SCHEMA_MIGRATIONS.items():
+                for table_name, migrations in schema_migrations.items():
                     cursor.execute(
                         """
                         SELECT COLUMN_NAME
@@ -308,7 +312,7 @@ def ensure_schema() -> None:
                         if column_name not in existing_columns:
                             cursor.execute(statement)
 
-                for table_name, index_migrations in SCHEMA_INDEX_MIGRATIONS.items():
+                for table_name, index_migrations in schema_index_migrations.items():
                     cursor.execute(
                         """
                         SELECT INDEX_NAME

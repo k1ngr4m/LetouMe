@@ -17,6 +17,7 @@ class DatabaseConfigTests(unittest.TestCase):
         self.assertEqual(settings.mysql_user, "root")
         self.assertEqual(settings.mysql_database, "letoume")
         self.assertIn("mysql+pymysql://root:@127.0.0.1:3306/letoume", settings.database_url)
+        self.assertTrue(settings.lottery_split_tables_enabled)
 
     def test_database_url_overrides_split_mysql_fields(self) -> None:
         with patch.dict(
@@ -31,6 +32,12 @@ class DatabaseConfigTests(unittest.TestCase):
         self.assertEqual(settings.mysql_user, "demo")
         self.assertEqual(settings.mysql_password, "secret")
         self.assertEqual(settings.mysql_database, "sample")
+
+    def test_split_table_flag_can_be_disabled_via_env(self) -> None:
+        with patch.dict(os.environ, {"LOTTERY_SPLIT_TABLES_ENABLED": "false"}, clear=True):
+            settings = load_settings()
+
+        self.assertFalse(settings.lottery_split_tables_enabled)
 
 
 if __name__ == "__main__":
