@@ -177,6 +177,12 @@ python -m backend.scripts.backup_mysql_database --output-dir backups
 python -m backend.scripts.migrate_lottery_split_tables --lottery-codes dlt,pl3 --truncate-target
 ```
 
+### 批量补齐模型彩种适配
+
+```bash
+python -m backend.scripts.backfill_model_lottery_codes
+```
+
 ## 生产部署
 
 推荐生产架构：

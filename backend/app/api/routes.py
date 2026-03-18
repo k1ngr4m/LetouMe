@@ -68,6 +68,7 @@ from backend.app.schemas.responses import (
     SimulationTicketListResponse,
     SuccessResponse,
 )
+from backend.app.lotteries import normalize_lottery_code
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.model_service import ModelService
@@ -218,8 +219,6 @@ def change_profile_password(
 @router.post("/settings/models/list", response_model=ModelListResponse)
 def get_settings_models(payload: ModelListPayload, _: dict = Depends(require_model_management_permission)) -> dict:
     models = model_service.list_models(include_deleted=payload.include_deleted)
-    if payload.lottery_code:
-        models = [model for model in models if payload.lottery_code in (model.get("lottery_codes") or ["dlt"])]
     return {"models": models}
 
 
@@ -299,6 +298,10 @@ def generate_model_predictions(
     payload: GenerateModelPredictionsPayload,
     _: dict = Depends(require_model_management_permission),
 ) -> dict:
+    try:
+        lottery_code = normalize_lottery_code(payload.lottery_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     mode = payload.mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
@@ -306,20 +309,20 @@ def generate_model_predictions(
         raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号")
 
     try:
-        prediction_generation_service.validate_model(payload.model_code, lottery_code=payload.lottery_code)
+        prediction_generation_service.validate_model(payload.model_code, lottery_code=lottery_code)
         task = prediction_generation_task_service.create_task(
-            lottery_code=payload.lottery_code,
+            lottery_code=lottery_code,
             mode=mode,
             model_code=payload.model_code,
             worker=lambda progress_callback: prediction_generation_service.generate_current_for_model(
-                lottery_code=payload.lottery_code,
+                lottery_code=lottery_code,
                 model_code=payload.model_code,
                 overwrite=payload.overwrite,
                 progress_callback=progress_callback,
             )
             if mode == "current"
             else prediction_generation_service.recalculate_history_for_model(
-                lottery_code=payload.lottery_code,
+                lottery_code=lottery_code,
                 model_code=payload.model_code,
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
@@ -350,6 +353,10 @@ def bulk_generate_model_predictions(
     payload: BulkGenerateModelPredictionsPayload,
     _: dict = Depends(require_model_management_permission),
 ) -> dict:
+    try:
+        lottery_code = normalize_lottery_code(payload.lottery_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     mode = payload.mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
@@ -358,11 +365,11 @@ def bulk_generate_model_predictions(
 
     try:
         return prediction_generation_task_service.create_task(
-            lottery_code=payload.lottery_code,
+            lottery_code=lottery_code,
             mode=mode,
             model_code="__bulk__",
             worker=lambda progress_callback: prediction_generation_service.generate_for_models(
-                lottery_code=payload.lottery_code,
+                lottery_code=lottery_code,
                 model_codes=payload.model_codes,
                 mode=mode,
                 overwrite=payload.overwrite,

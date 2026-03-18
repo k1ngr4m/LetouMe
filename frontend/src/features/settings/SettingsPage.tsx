@@ -75,6 +75,7 @@ const EMPTY_ROLE_FORM: RolePayload = {
 }
 
 const EMPTY_GENERATION_FORM = {
+  lotteryCode: 'dlt' as LotteryCode,
   modelCodes: [] as string[],
   displayName: '',
   mode: 'current' as ModelPredictionMode,
@@ -606,7 +607,7 @@ export function SettingsPage() {
     mutationFn: () =>
       generationForm.modelCodes.length > 1
         ? apiClient.bulkGenerateSettingsModelPredictions({
-            lottery_code: selectedLottery,
+            lottery_code: generationForm.lotteryCode,
             model_codes: generationForm.modelCodes,
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
@@ -614,7 +615,7 @@ export function SettingsPage() {
             end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
           })
         : apiClient.generateSettingsModelPredictions({
-            lottery_code: selectedLottery,
+            lottery_code: generationForm.lotteryCode,
             model_code: generationForm.modelCodes[0] || '',
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
@@ -763,6 +764,7 @@ export function SettingsPage() {
   function openGenerateModel(modelCode: string, displayName: string) {
     setGenerationTask(null)
     setGenerationForm({
+      lotteryCode: selectedLottery,
       modelCodes: [modelCode],
       displayName,
       mode: 'current',
@@ -776,6 +778,7 @@ export function SettingsPage() {
   function openBulkGenerateModels() {
     setGenerationTask(null)
     setGenerationForm({
+      lotteryCode: selectedLottery,
       modelCodes: selectedModelCodes,
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
@@ -1914,6 +1917,9 @@ export function SettingsPage() {
                 <div>
                   <p className="modal-card__eyebrow">预测生成</p>
                   <h3>{generationForm.displayName || generationForm.modelCodes.join(', ')}</h3>
+                  <p className="settings-inline-hint">
+                    当前生成彩种：{generationForm.lotteryCode === 'pl3' ? '排列3' : '大乐透'}
+                  </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
               </div>
