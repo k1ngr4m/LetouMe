@@ -9,7 +9,7 @@ import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
 import type { HomeDetailRouteState } from './navigation'
 
 const HISTORY_PAGE_SIZE = 10
-const LOTTERY_PAGE_SIZE = 20
+const LOTTERY_PAGE_SIZE = 10
 
 export function HomeModelDetailPage() {
   const navigate = useNavigate()

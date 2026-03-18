@@ -22,6 +22,7 @@ export type HomeDashboardState = {
   historyPage: number
   historyPageSize: number
   lotteryPage: number
+  lotteryPageSize: number
   historyPeriodQuery: string
   commonOnly: boolean
   isModelFilterOpen: boolean

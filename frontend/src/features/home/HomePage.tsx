@@ -52,7 +52,7 @@ import type { HomeDashboardState, HomeDetailRouteState, HomeModelView, HomeTab, 
 
 const HISTORY_DEFAULT_PAGE_SIZE = 10
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
-const LOTTERY_PAGE_SIZE = 20
+const LOTTERY_DEFAULT_PAGE_SIZE = 10
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
   { value: 'all', label: '全部评分' },
   { value: '0-30', label: '0-30 分' },
@@ -248,6 +248,7 @@ export function HomePage() {
   const [historyPage, setHistoryPage] = useState(restoredState?.historyPage || 1)
   const [historyPageSize, setHistoryPageSize] = useState(restoredState?.historyPageSize || HISTORY_DEFAULT_PAGE_SIZE)
   const [lotteryPage, setLotteryPage] = useState(restoredState?.lotteryPage || 1)
+  const [lotteryPageSize, setLotteryPageSize] = useState(restoredState?.lotteryPageSize || LOTTERY_DEFAULT_PAGE_SIZE)
   const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
@@ -264,7 +265,7 @@ export function HomePage() {
     historyPage,
     historyPageSize,
     lotteryPage,
-    LOTTERY_PAGE_SIZE,
+    lotteryPageSize,
   )
   const lotteryLabel = selectedLottery === 'pl3' ? '排列3' : '大乐透'
 
@@ -314,6 +315,7 @@ export function HomePage() {
   useEffect(() => {
     setHistoryFallbackSignature(null)
     setHistoryPage(1)
+    setLotteryPage(1)
   }, [selectedLottery])
 
   useEffect(() => {
@@ -419,7 +421,7 @@ export function HomePage() {
   const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
-  const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
+  const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
   const redChart = buildRedFrequencyChart(chartDraws)
   const blueChart = buildBlueFrequencyChart(chartDraws)
   const oddEvenChart = buildOddEvenChart(chartDraws)
@@ -442,6 +444,10 @@ export function HomePage() {
   useEffect(() => {
     setHistoryPage((currentPage) => Math.min(currentPage, totalHistoryPages))
   }, [totalHistoryPages])
+
+  useEffect(() => {
+    setLotteryPage((currentPage) => Math.min(currentPage, totalLotteryPages))
+  }, [totalLotteryPages])
 
   function togglePinned(modelId: string) {
     setPinnedModelIds((previous) => {
@@ -477,6 +483,7 @@ export function HomePage() {
       historyPage,
       historyPageSize,
       lotteryPage,
+      lotteryPageSize,
       historyPeriodQuery,
       commonOnly,
       isModelFilterOpen,
@@ -500,6 +507,14 @@ export function HomePage() {
       return Math.floor(currentOffset / nextPageSize) + 1
     })
     setHistoryPageSize(nextPageSize)
+  }
+
+  function handleLotteryPageSizeChange(nextPageSize: number) {
+    setLotteryPage((currentPage) => {
+      const currentOffset = (currentPage - 1) * lotteryPageSize
+      return Math.floor(currentOffset / nextPageSize) + 1
+    })
+    setLotteryPageSize(nextPageSize)
   }
 
   return (
@@ -927,7 +942,7 @@ export function HomePage() {
             ) : null}
           </StatusCard>
 
-          <StatusCard title="开奖历史" subtitle={`第 ${lotteryPage} / ${totalLotteryPages} 页`}>
+          <StatusCard title="开奖历史" subtitle="分页查看历史开奖号码。">
             <div className="table-shell">
               <table className="history-table">
                 <thead>
@@ -964,19 +979,36 @@ export function HomePage() {
               </table>
             </div>
 
-            <div className="pagination-row">
-              <button className="ghost-button" disabled={lotteryPage <= 1} onClick={() => setLotteryPage((value) => Math.max(1, value - 1))}>
-                上一页
-              </button>
-              <span>共 {pagedLotteryHistory.data?.total_count || 0} 条记录</span>
-              <button
-                className="ghost-button"
-                disabled={lotteryPage >= totalLotteryPages}
-                onClick={() => setLotteryPage((value) => Math.min(totalLotteryPages, value + 1))}
-              >
-                下一页
-              </button>
-            </div>
+            {(pagedLotteryHistory.data?.total_count || 0) > 0 ? (
+              <div className="pagination-row history-pagination-row">
+                <div className="history-pagination-row__meta">
+                  <span>第 {lotteryPage} / {totalLotteryPages} 页</span>
+                  <span>共 {pagedLotteryHistory.data?.total_count || 0} 条记录</span>
+                </div>
+                <div className="history-pagination-row__actions">
+                  <label className="history-pagination-row__size">
+                    <span>每页</span>
+                    <select value={lotteryPageSize} onChange={(event) => handleLotteryPageSizeChange(Number(event.target.value))}>
+                      {HISTORY_PAGE_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>
+                          {size} 期
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="ghost-button" disabled={lotteryPage <= 1} onClick={() => setLotteryPage((value) => Math.max(1, value - 1))}>
+                    上一页
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={lotteryPage >= totalLotteryPages}
+                    onClick={() => setLotteryPage((value) => Math.min(totalLotteryPages, value + 1))}
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </StatusCard>
         </div>
       ) : null}

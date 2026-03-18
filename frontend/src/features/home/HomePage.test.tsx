@@ -96,7 +96,7 @@ vi.mock('../../shared/api/client', () => ({
 }))
 
 vi.mock('./hooks/useHomeData', () => ({
-  useHomeData: (_lotteryCode: string, historyPage = 1, historyPageSize = 10) => {
+  useHomeData: (_lotteryCode: string, historyPage = 1, historyPageSize = 10, lotteryPage = 1, lotteryPageSize = 10) => {
     const historyRecords = [
       buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
       SECOND_HISTORY_RECORD,
@@ -113,6 +113,14 @@ vi.mock('./hooks/useHomeData', () => ({
     ]
     const offset = (historyPage - 1) * historyPageSize
     const pagedHistoryRecords = historyRecords.slice(offset, offset + historyPageSize)
+    const lotteryRecords = Array.from({ length: 12 }, (_, index) => ({
+      period: `${2026031 - index}`,
+      date: `2026-03-${String(10 - index).padStart(2, '0')}`,
+      red_balls: ['01', '02', '03', '04', '05'],
+      blue_balls: ['06', '07'],
+    }))
+    const lotteryOffset = (lotteryPage - 1) * lotteryPageSize
+    const pagedLotteryRecords = lotteryRecords.slice(lotteryOffset, lotteryOffset + lotteryPageSize)
 
     return {
       currentPredictions: {
@@ -236,8 +244,8 @@ vi.mock('./hooks/useHomeData', () => ({
       },
       pagedLotteryHistory: {
         data: {
-          data: [],
-          total_count: 0,
+          data: pagedLotteryRecords,
+          total_count: lotteryRecords.length,
         },
         isLoading: false,
         error: null,
@@ -483,6 +491,30 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(historySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
     expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
     expect(screen.getByText('第 2026021 期')).toBeInTheDocument()
+  })
+
+  it('reuses pager selector in lottery history', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const lotterySection = screen.getByRole('heading', { name: '开奖历史' }).closest('section')
+    expect(lotterySection).not.toBeNull()
+
+    expect(within(lotterySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).getByText('2026031')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).queryByText('2026021')).not.toBeInTheDocument()
+
+    await userEvent.click(within(lotterySection as HTMLElement).getByRole('button', { name: '下一页' }))
+
+    expect(within(lotterySection as HTMLElement).getByText('第 2 / 2 页')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).getByText('2026021')).toBeInTheDocument()
+
+    await userEvent.selectOptions(within(lotterySection as HTMLElement).getByRole('combobox'), '20')
+
+    expect(within(lotterySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).getByText('2026031')).toBeInTheDocument()
+    expect(within(lotterySection as HTMLElement).getByText('2026021')).toBeInTheDocument()
   })
 
   it('hides local sidebar navigation outside prediction tab', async () => {
