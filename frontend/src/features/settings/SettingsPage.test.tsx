@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from './SettingsPage'
 
@@ -64,17 +64,23 @@ vi.mock('../../shared/auth/AuthProvider', () => ({
   }),
 }))
 
-function renderPage() {
+function renderPage(initialEntry = '/settings/profile') {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
     },
   })
 
+  function LocationDisplay() {
+    const location = useLocation()
+    return <div data-testid="location-display">{location.pathname}</div>
+  }
+
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <SettingsPage />
+        <LocationDisplay />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -166,6 +172,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/models')
     expect(screen.queryByRole('button', { name: '批量操作' })).not.toBeInTheDocument()
     expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: '列表视图' })).toHaveClass('is-active')
@@ -186,6 +193,20 @@ describe('SettingsPage model management view switch', () => {
 
     expect(screen.getByRole('button', { name: '卡片视图' })).toHaveClass('is-active')
     expect(screen.getByText('https://api.deepseek.com')).toBeInTheDocument()
+  })
+
+  it('renders profile route by default', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage()
+
+    await screen.findByRole('button', { name: '基础信息' })
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
   })
 
   it('opens generate prediction modal from list view', async () => {

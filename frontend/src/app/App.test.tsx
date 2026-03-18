@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -43,10 +43,16 @@ vi.mock('../shared/auth/ProtectedRoute', () => ({
 
 function renderApp(initialEntries: string[]) {
   const client = new QueryClient()
+  function LocationDisplay() {
+    const location = useLocation()
+    return <div data-testid="location-display">{location.pathname}</div>
+  }
+
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={initialEntries}>
         <App />
+        <LocationDisplay />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -58,9 +64,10 @@ describe('App routing', () => {
     expect(screen.getByText('Landing Page Mock')).toBeInTheDocument()
   })
 
-  it('renders dashboard route', () => {
+  it('redirects dashboard route to prediction route', () => {
     renderApp(['/dashboard'])
     expect(screen.getByText('Home Page Mock')).toBeInTheDocument()
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
   })
 
   it('renders dashboard model detail route', () => {
@@ -68,9 +75,10 @@ describe('App routing', () => {
     expect(screen.getByText('Home Model Detail Page Mock')).toBeInTheDocument()
   })
 
-  it('renders settings route', () => {
+  it('redirects settings route to profile route', () => {
     renderApp(['/settings'])
     expect(screen.getByText('Settings Page Mock')).toBeInTheDocument()
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
   })
 
   it('renders login route', () => {

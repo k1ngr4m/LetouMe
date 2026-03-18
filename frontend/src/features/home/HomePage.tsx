@@ -49,7 +49,7 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketRecord } from '../../shared/types/api'
-import type { HomeDashboardState, HomeDetailRouteState, HomeModelView, HomeTab, ScoreViewSortDirection, ScoreViewSortKey } from './navigation'
+import { getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 10
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -248,21 +248,21 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
 export function HomePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const restoredState = (location.state as HomeDetailRouteState | null)?.dashboardState
-  const [activeTab, setActiveTab] = useState<HomeTab>(restoredState?.activeTab || 'prediction')
-  const [activeSection, setActiveSection] = useState<'models' | 'weights'>(restoredState?.activeSection || 'models')
-  const [modelListView, setModelListView] = useState<HomeModelView>(restoredState?.modelListView || 'list')
-  const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>(restoredState?.scoreViewSortKey || 'overallScore')
-  const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>(restoredState?.scoreViewSortDirection || 'desc')
-  const [historyPage, setHistoryPage] = useState(restoredState?.historyPage || 1)
-  const [historyPageSize, setHistoryPageSize] = useState(restoredState?.historyPageSize || HISTORY_DEFAULT_PAGE_SIZE)
-  const [lotteryPage, setLotteryPage] = useState(restoredState?.lotteryPage || 1)
-  const [lotteryPageSize, setLotteryPageSize] = useState(restoredState?.lotteryPageSize || LOTTERY_DEFAULT_PAGE_SIZE)
+  const activeTab = getHomeTabFromPath(location.pathname)
+  const navigationState = location.state as HomeDetailRouteState | null
+  const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
+  const [modelListView, setModelListView] = useState<HomeModelView>('list')
+  const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>('overallScore')
+  const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
+  const [lotteryPage, setLotteryPage] = useState(1)
+  const [lotteryPageSize, setLotteryPageSize] = useState(LOTTERY_DEFAULT_PAGE_SIZE)
   const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
-  const [historyPeriodQuery, setHistoryPeriodQuery] = useState(restoredState?.historyPeriodQuery || '')
-  const [commonOnly, setCommonOnly] = useState(Boolean(restoredState?.commonOnly))
+  const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
+  const [commonOnly, setCommonOnly] = useState(false)
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
@@ -270,6 +270,7 @@ export function HomePage() {
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
   const hasRestoredScrollRef = useRef(false)
+  const hasInitializedLotteryRef = useRef(false)
 
   const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
     selectedLottery,
@@ -307,11 +308,11 @@ export function HomePage() {
     toggleSummaryModel,
     buildHistoryState,
   } = useHomeModelFilters(models, history, validPinnedModelIds, {
-    isModelFilterOpen: restoredState?.isModelFilterOpen,
-    modelNameQuery: restoredState?.modelNameQuery,
-    selectedProviders: restoredState?.selectedProviders,
-    selectedTags: restoredState?.selectedTags,
-    selectedScoreRange: restoredState?.selectedScoreRange,
+    isModelFilterOpen: false,
+    modelNameQuery: '',
+    selectedProviders: [],
+    selectedTags: [],
+    selectedScoreRange: 'all',
   })
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
@@ -325,6 +326,10 @@ export function HomePage() {
   }, [selectedLottery])
 
   useEffect(() => {
+    if (!hasInitializedLotteryRef.current) {
+      hasInitializedLotteryRef.current = true
+      return
+    }
     setHistoryFallbackSignature(null)
     setHistoryPage(1)
     setLotteryPage(1)
@@ -333,11 +338,11 @@ export function HomePage() {
   }, [selectedLottery])
 
   useEffect(() => {
-    if (hasRestoredScrollRef.current || typeof restoredState?.scrollY !== 'number') return
+    if (hasRestoredScrollRef.current || typeof navigationState?.scrollY !== 'number') return
     hasRestoredScrollRef.current = true
-    const frameId = requestAnimationFrame(() => window.scrollTo({ top: restoredState.scrollY }))
+    const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
     return () => cancelAnimationFrame(frameId)
-  }, [restoredState?.scrollY])
+  }, [navigationState?.scrollY])
 
   useEffect(() => {
     if (activeTab !== 'prediction') return
@@ -515,31 +520,7 @@ export function HomePage() {
   }
 
   function openModelDetail(modelId: string) {
-    const dashboardState: HomeDashboardState = {
-      activeTab,
-      activeSection,
-      modelListView,
-      scoreViewSortKey,
-      scoreViewSortDirection,
-      historyPage,
-      historyPageSize,
-      lotteryPage,
-      lotteryPageSize,
-      historyPeriodQuery,
-      commonOnly,
-      isModelFilterOpen,
-      modelNameQuery,
-      selectedProviders,
-      selectedTags,
-      selectedScoreRange,
-      scrollY: window.scrollY,
-    }
-
-    navigate(`/dashboard/models/${modelId}`, {
-      state: {
-        dashboardState,
-      } satisfies HomeDetailRouteState,
-    })
+    navigate(`/dashboard/models/${modelId}`, { state: { scrollY: window.scrollY } satisfies HomeDetailRouteState })
   }
 
   function handleHistoryPageSizeChange(nextPageSize: number) {
@@ -617,16 +598,28 @@ export function HomePage() {
       </section>
 
       <section className="tab-strip">
-        <button className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')} onClick={() => setActiveTab('prediction')}>
+        <button
+          className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')}
+          onClick={() => navigate(getDashboardPath('prediction'))}
+        >
           预测总览
         </button>
-        <button className={clsx('tab-strip__item', activeTab === 'simulation' && 'is-active')} onClick={() => setActiveTab('simulation')}>
+        <button
+          className={clsx('tab-strip__item', activeTab === 'simulation' && 'is-active')}
+          onClick={() => navigate(getDashboardPath('simulation'))}
+        >
           模拟试玩
         </button>
-        <button className={clsx('tab-strip__item', activeTab === 'analysis' && 'is-active')} onClick={() => setActiveTab('analysis')}>
+        <button
+          className={clsx('tab-strip__item', activeTab === 'analysis' && 'is-active')}
+          onClick={() => navigate(getDashboardPath('analysis'))}
+        >
           图表分析
         </button>
-        <button className={clsx('tab-strip__item', activeTab === 'history' && 'is-active')} onClick={() => setActiveTab('history')}>
+        <button
+          className={clsx('tab-strip__item', activeTab === 'history' && 'is-active')}
+          onClick={() => navigate(getDashboardPath('history'))}
+        >
           历史回溯
         </button>
       </section>
@@ -785,30 +778,32 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
-                <div className="history-strategy-filter">
-                  <span className="history-strategy-filter__label">方案筛选</span>
-                  {summaryStrategyOptions.length ? (
-                    <div className="filter-chip-group">
-                      {summaryStrategyOptions.map((strategy) => (
-                        <button
-                          key={`summary-strategy-${strategy}`}
-                          className={clsx('filter-chip', summaryStrategyFilters.includes(strategy) && 'is-active')}
-                          onClick={() => toggleSummaryStrategyFilter(strategy)}
-                          type="button"
-                        >
-                          {strategy}
-                        </button>
-                      ))}
-                      {summaryStrategyFilters.length ? (
-                        <button className="ghost-button ghost-button--compact" type="button" onClick={() => setSummaryStrategyFilters([])}>
-                          清空方案
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="model-filter-panel__empty">当前暂无可选方案</span>
-                  )}
-                </div>
+                {selectedLottery !== 'pl3' ? (
+                  <div className="history-strategy-filter">
+                    <span className="history-strategy-filter__label">方案筛选</span>
+                    {summaryStrategyOptions.length ? (
+                      <div className="filter-chip-group">
+                        {summaryStrategyOptions.map((strategy) => (
+                          <button
+                            key={`summary-strategy-${strategy}`}
+                            className={clsx('filter-chip', summaryStrategyFilters.includes(strategy) && 'is-active')}
+                            onClick={() => toggleSummaryStrategyFilter(strategy)}
+                            type="button"
+                          >
+                            {strategy}
+                          </button>
+                        ))}
+                        {summaryStrategyFilters.length ? (
+                          <button className="ghost-button ghost-button--compact" type="button" onClick={() => setSummaryStrategyFilters([])}>
+                            清空方案
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="model-filter-panel__empty">当前暂无可选方案</span>
+                    )}
+                  </div>
+                ) : null}
                 {!filteredModels.length ? (
                   <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
                 ) : !selectedSummaryIds.length ? (
@@ -943,31 +938,33 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
-            <div className="history-strategy-filter">
-              <span className="history-strategy-filter__label">开奖方案筛选</span>
-              {historyStrategyOptions.length ? (
-                <div className="filter-chip-group">
-                  {historyStrategyOptions.map((strategy) => (
-                    <button
-                      key={`history-strategy-${strategy}`}
-                      className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
-                      onClick={() => toggleHistoryStrategyFilter(strategy)}
-                      type="button"
-                    >
-                      {strategy}
-                    </button>
-                  ))}
-                  {historyStrategyFilters.length ? (
-                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
-                      清空方案
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                <span className="model-filter-panel__empty">当前暂无可选方案</span>
-              )}
-            </div>
-            {predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
+            {selectedLottery !== 'pl3' ? (
+              <div className="history-strategy-filter">
+                <span className="history-strategy-filter__label">开奖方案筛选</span>
+                {historyStrategyOptions.length ? (
+                  <div className="filter-chip-group">
+                    {historyStrategyOptions.map((strategy) => (
+                      <button
+                        key={`history-strategy-${strategy}`}
+                        className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
+                        onClick={() => toggleHistoryStrategyFilter(strategy)}
+                        type="button"
+                      >
+                        {strategy}
+                      </button>
+                    ))}
+                    {historyStrategyFilters.length ? (
+                      <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
+                        清空方案
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span className="model-filter-panel__empty">当前暂无可选方案</span>
+                )}
+              </div>
+            ) : null}
+            {selectedLottery !== 'pl3' && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。

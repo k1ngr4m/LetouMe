@@ -43,7 +43,7 @@ export function LoginPage() {
       setIsSubmitting(true)
       setError(null)
       await login({ username, password })
-      navigate((location.state as { from?: string } | null)?.from || '/dashboard', { replace: true })
+      navigate((location.state as { from?: string } | null)?.from || '/dashboard/prediction', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '登录失败')
     } finally {

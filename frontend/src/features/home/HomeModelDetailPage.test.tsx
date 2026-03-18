@@ -203,7 +203,7 @@ function renderPage(initialPath = '/dashboard/models/model-a') {
 
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[{ pathname: initialPath, state: { dashboardState: { activeTab: 'prediction', activeSection: 'models' } } }]}>
+      <MemoryRouter initialEntries={[{ pathname: initialPath, state: { scrollY: 320 } }]}>
         <Routes>
           <Route
             path="/dashboard/models/:modelId"
@@ -214,7 +214,7 @@ function renderPage(initialPath = '/dashboard/models/model-a') {
               </>
             }
           />
-          <Route path="/dashboard" element={<LocationDisplay />} />
+          <Route path="/dashboard/prediction" element={<LocationDisplay />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -239,7 +239,7 @@ describe('HomeModelDetailPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '返回总览' }))
 
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
   })
 
   it('shows empty state for unknown models', () => {

@@ -1,22 +1,18 @@
 import { useMemo } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
 import { getActualResult } from './lib/home'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
-import type { HomeDetailRouteState } from './navigation'
 
 const HISTORY_PAGE_SIZE = 10
 const LOTTERY_PAGE_SIZE = 10
 
 export function HomeModelDetailPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { modelId = '' } = useParams()
-  const routeState = location.state as HomeDetailRouteState | null
-  const restoredState = routeState?.dashboardState
 
   const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, [], 1, LOTTERY_PAGE_SIZE)
   const models = currentPredictions.data?.models || []
@@ -29,11 +25,7 @@ export function HomeModelDetailPage() {
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   function handleBack() {
-    if (restoredState) {
-      navigate('/dashboard', { state: { dashboardState: restoredState } satisfies HomeDetailRouteState })
-      return
-    }
-    navigate('/dashboard')
+    navigate('/dashboard/prediction')
   }
 
   if (currentPredictions.isLoading || lotteryCharts.isLoading || predictionsHistory.isLoading) {

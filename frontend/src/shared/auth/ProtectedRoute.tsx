@@ -18,7 +18,7 @@ export function ProtectedRoute({
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/dashboard/prediction" replace />
   }
   return <>{children}</>
 }

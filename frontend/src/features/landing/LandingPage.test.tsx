@@ -55,7 +55,7 @@ describe('LandingPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '获取大乐透预测' }))
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/dashboard')
+      expect(navigateMock).toHaveBeenCalledWith('/dashboard/prediction')
     })
   })
 

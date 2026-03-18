@@ -320,7 +320,7 @@ vi.mock('./hooks/useHomeData', () => ({
   },
 }))
 
-function renderPage() {
+function renderPage(initialEntry = '/dashboard/prediction') {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -336,10 +336,10 @@ function renderPage() {
 
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
-            path="/dashboard"
+            path="/dashboard/:tab"
             element={
               <>
                 <HomePage />
@@ -478,6 +478,24 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('updates url when switching dashboard tabs', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
+  })
+
+  it('shows strategy filters for dlt views', async () => {
+    renderPage()
+
+    expect(screen.getByText('方案筛选')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+
+    expect(screen.getByText('开奖方案筛选')).toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {
@@ -991,7 +1009,10 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
+    expect(screen.queryByText('正在更新开奖方案筛选结果...')).not.toBeInTheDocument()
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))

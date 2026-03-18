@@ -15,7 +15,7 @@ export function LandingPage() {
       setIsLoading(true)
       setError(null)
       await queryClient.fetchQuery(currentPredictionsQueryOptions())
-      navigate('/dashboard')
+      navigate('/dashboard/prediction')
     } catch (requestError) {
       appLogger.error('Landing page failed to load predictions', {
         error: requestError instanceof Error ? requestError.message : 'unknown',

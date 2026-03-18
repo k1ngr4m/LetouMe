@@ -52,7 +52,7 @@ export function RegisterPage() {
       setIsSubmitting(true)
       setError(null)
       await register({ username, password })
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard/prediction', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '注册失败')
     } finally {

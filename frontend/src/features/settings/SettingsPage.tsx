@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -53,6 +53,19 @@ type BulkEditForm = {
   is_active: boolean
 }
 type ScheduleForm = ScheduleTaskPayload
+
+const SETTINGS_TAB_PATHS: Record<SettingsTab, string> = {
+  profile: '/settings/profile',
+  models: '/settings/models',
+  schedules: '/settings/schedules',
+  users: '/settings/users',
+  roles: '/settings/roles',
+}
+
+function getSettingsTabFromPath(pathname: string): SettingsTab {
+  const matchedTab = (Object.entries(SETTINGS_TAB_PATHS) as Array<[SettingsTab, string]>).find(([, path]) => path === pathname)
+  return matchedTab?.[0] || 'profile'
+}
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -367,8 +380,9 @@ function getGenerationTaskCompleted(task: PredictionGenerationTask | null) {
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, hasPermission, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
+  const activeTab = getSettingsTabFromPath(location.pathname)
   const [modelManagementTab, setModelManagementTab] = useState<ModelManagementTab>('catalog')
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
@@ -483,9 +497,9 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!availableTabs.some((item) => item.id === activeTab)) {
-      setActiveTab(availableTabs[0]?.id || 'profile')
+      navigate(SETTINGS_TAB_PATHS[availableTabs[0]?.id || 'profile'], { replace: true })
     }
-  }, [activeTab, availableTabs])
+  }, [activeTab, availableTabs, navigate])
 
   useEffect(() => {
     setProfileNickname(user?.nickname || '')
@@ -1164,13 +1178,13 @@ export function SettingsPage() {
       <section className="settings-center-layout">
         <aside className="settings-center-sidebar" aria-label="设置导航">
           {availableTabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={clsx('settings-center-sidebar__link', activeTab === tab.id && 'is-active')}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
+              <button
+                key={tab.id}
+                className={clsx('settings-center-sidebar__link', activeTab === tab.id && 'is-active')}
+                onClick={() => navigate(SETTINGS_TAB_PATHS[tab.id])}
+              >
+                {tab.label}
+              </button>
           ))}
         </aside>
 
