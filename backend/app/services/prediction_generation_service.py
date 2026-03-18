@@ -395,11 +395,151 @@ class PredictionGenerationService:
             model_id=model_def.model_id,
             model_name=model_def.name,
         )
-        raw_prediction = model.predict(prompt)
-        prediction = self._finalize_prediction(raw_prediction, model_def, prediction_date, target_period, lottery_code=lottery_code)
+        self.logger.info(
+            "Prediction generation started",
+            extra={
+                "context": {
+                    "lottery_code": lottery_code,
+                    "target_period": target_period,
+                    "model_code": model_def.model_id,
+                    "model_provider": model_def.provider,
+                    "history_context_count": len(history_context),
+                    "prompt_length": len(prompt),
+                }
+            },
+        )
+        try:
+            raw_prediction = model.predict(prompt)
+        except Exception:
+            self.logger.exception(
+                "Model prediction request failed",
+                extra={
+                    "context": {
+                        "lottery_code": lottery_code,
+                        "target_period": target_period,
+                        "model_code": model_def.model_id,
+                        "model_provider": model_def.provider,
+                    }
+                },
+            )
+            raise
+        raw_summary = self._build_prediction_payload_summary(raw_prediction)
+        raw_preview = self._build_payload_preview(raw_prediction)
+        self.logger.info(
+            "Model returned prediction payload",
+            extra={
+                "context": {
+                    "lottery_code": lottery_code,
+                    "target_period": target_period,
+                    "model_code": model_def.model_id,
+                    "response_group_count": raw_summary["group_count"],
+                    "response_description_count": raw_summary["description_count"],
+                    "response_strategy_count": raw_summary["strategy_count"],
+                    "response_play_types": raw_summary["play_types"],
+                    "response_preview": raw_preview,
+                }
+            },
+        )
+        try:
+            prediction = self._finalize_prediction(raw_prediction, model_def, prediction_date, target_period, lottery_code=lottery_code)
+        except Exception:
+            self.logger.exception(
+                "Model prediction normalization failed",
+                extra={
+                    "context": {
+                        "lottery_code": lottery_code,
+                        "target_period": target_period,
+                        "model_code": model_def.model_id,
+                        "response_preview": raw_preview,
+                    }
+                },
+            )
+            raise
         if not self._validate_prediction(prediction, lottery_code=lottery_code):
+            normalized_summary = self._build_prediction_payload_summary(prediction)
+            normalized_preview = self._build_payload_preview(prediction)
+            self.logger.warning(
+                "Model prediction validation failed",
+                extra={
+                    "context": {
+                        "lottery_code": lottery_code,
+                        "target_period": target_period,
+                        "model_code": model_def.model_id,
+                        "response_group_count": normalized_summary["group_count"],
+                        "response_play_types": normalized_summary["play_types"],
+                        "response_preview": normalized_preview,
+                    }
+                },
+            )
             raise ValueError(f"模型返回的预测结构无效: {model_def.model_id}")
+        normalized_summary = self._build_prediction_payload_summary(prediction)
+        self.logger.info(
+            "Prediction generation completed",
+            extra={
+                "context": {
+                    "lottery_code": lottery_code,
+                    "target_period": target_period,
+                    "model_code": model_def.model_id,
+                    "normalized_group_count": normalized_summary["group_count"],
+                    "normalized_description_count": normalized_summary["description_count"],
+                    "normalized_strategy_count": normalized_summary["strategy_count"],
+                    "normalized_play_types": normalized_summary["play_types"],
+                }
+            },
+        )
         return prediction
+
+    @staticmethod
+    def _build_payload_preview(payload: Any, limit: int = 1200) -> str:
+        if isinstance(payload, (dict, list)):
+            text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        else:
+            text = str(payload)
+        compact = " ".join(text.split())
+        if len(compact) <= limit:
+            return compact
+        return f"{compact[:limit]}...(truncated,{len(compact)} chars)"
+
+    @staticmethod
+    def _build_prediction_payload_summary(payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {
+                "group_count": 0,
+                "description_count": 0,
+                "strategy_count": 0,
+                "play_types": "-",
+            }
+        groups = payload.get("predictions")
+        if not isinstance(groups, list):
+            return {
+                "group_count": 0,
+                "description_count": 0,
+                "strategy_count": 0,
+                "play_types": "-",
+            }
+        description_count = sum(
+            1
+            for group in groups
+            if isinstance(group, dict) and str(group.get("description") or "").strip()
+        )
+        strategy_count = sum(
+            1
+            for group in groups
+            if isinstance(group, dict) and str(group.get("strategy") or "").strip()
+        )
+        play_types = sorted(
+            {
+                str(group.get("play_type") or "").strip().lower()
+                for group in groups
+                if isinstance(group, dict) and str(group.get("play_type") or "").strip()
+            }
+        )
+        return {
+            "group_count": len(groups),
+            "description_count": description_count,
+            "strategy_count": strategy_count,
+            "play_types": ",".join(play_types) if play_types else "-",
+        }
 
     def _finalize_prediction(
         self,

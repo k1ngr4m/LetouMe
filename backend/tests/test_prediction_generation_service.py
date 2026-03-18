@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.app.services.prediction_generation_service import PredictionGenerationService
+from backend.core.model_config import ModelDefinition
 
 
 class PredictionGenerationServiceTests(unittest.TestCase):
@@ -76,6 +77,102 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
+
+    def test_generate_prediction_logs_response_summary(self) -> None:
+        service = PredictionGenerationService()
+        model = Mock()
+        model.predict.return_value = {
+            "predictions": [
+                {
+                    "group_id": index + 1,
+                    "red_balls": ["01", "02", "03", "04", "05"],
+                    "blue_balls": ["06", "07"],
+                    "strategy": "稳健组合",
+                    "description": "测试说明",
+                }
+                for index in range(5)
+            ]
+        }
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+        prompt_template = "{target_period}|{target_date}|{lottery_history}|{prediction_date}|{model_id}|{model_name}"
+
+        with self.assertLogs("letoume.services.prediction_generation", level="INFO") as logs:
+            prediction = service._generate_prediction(
+                model=model,
+                model_def=model_def,
+                lottery_code="dlt",
+                prompt_template=prompt_template,
+                target_period="2026032",
+                prediction_date="2026-03-18",
+                history_context=[{"period": "2026031"}],
+                target_date="2026-03-19",
+            )
+
+        self.assertEqual(len(prediction["predictions"]), 5)
+        joined = "\n".join(logs.output)
+        self.assertIn("Prediction generation started", joined)
+        self.assertIn("Model returned prediction payload", joined)
+        self.assertIn("Prediction generation completed", joined)
+
+    def test_generate_prediction_logs_warning_when_validation_fails(self) -> None:
+        service = PredictionGenerationService()
+        model = Mock()
+        model.predict.return_value = {"predictions": []}
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+        prompt_template = "{target_period}|{target_date}|{lottery_history}|{prediction_date}|{model_id}|{model_name}"
+
+        with patch.object(service, "_validate_prediction", return_value=False):
+            with self.assertLogs("letoume.services.prediction_generation", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    service._generate_prediction(
+                        model=model,
+                        model_def=model_def,
+                        lottery_code="dlt",
+                        prompt_template=prompt_template,
+                        target_period="2026032",
+                        prediction_date="2026-03-18",
+                        history_context=[{"period": "2026031"}],
+                        target_date="2026-03-19",
+                    )
+
+        joined = "\n".join(logs.output)
+        self.assertIn("Model prediction validation failed", joined)
+
+    def test_payload_preview_truncates_long_response(self) -> None:
+        preview = PredictionGenerationService._build_payload_preview(
+            {"text": "x" * 2000},
+            limit=120,
+        )
+
+        self.assertIn("...(truncated,", preview)
+
+    def test_prediction_payload_summary_counts_group_fields(self) -> None:
+        summary = PredictionGenerationService._build_prediction_payload_summary(
+            {
+                "predictions": [
+                    {"group_id": 1, "description": "说明1", "strategy": "策略1", "play_type": "direct"},
+                    {"group_id": 2, "description": "", "strategy": "策略2", "play_type": "group3"},
+                    {"group_id": 3, "play_type": "group6"},
+                ]
+            }
+        )
+
+        self.assertEqual(summary["group_count"], 3)
+        self.assertEqual(summary["description_count"], 1)
+        self.assertEqual(summary["strategy_count"], 2)
+        self.assertEqual(summary["play_types"], "direct,group3,group6")
 
 
 if __name__ == "__main__":

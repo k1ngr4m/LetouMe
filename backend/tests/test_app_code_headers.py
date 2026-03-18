@@ -77,6 +77,20 @@ class AppCodeHeaderTests(unittest.TestCase):
         kwargs = client.chat.completions.create.call_args.kwargs
         self.assertNotIn("extra_headers", kwargs)
 
+    def test_predict_wraps_json_parse_error_with_response_preview(self) -> None:
+        client = Mock()
+        client.chat.completions.create.return_value = Mock(
+            choices=[Mock(message=Mock(content="not-a-json-response"))]
+        )
+
+        model = DummyModel(self.definition, client)
+
+        with self.assertRaises(ValueError) as exc:
+            model.predict("预测输入")
+
+        self.assertIn("模型响应 JSON 解析失败", str(exc.exception))
+        self.assertIn("not-a-json-response", str(exc.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

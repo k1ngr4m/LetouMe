@@ -64,9 +64,21 @@ class BaseModel(ABC):
         )
         return (response.choices[0].message.content or "").strip()
 
+    @staticmethod
+    def _preview_text(text: str, limit: int = 800) -> str:
+        compact = " ".join(str(text).split())
+        if len(compact) <= limit:
+            return compact
+        return f"{compact[:limit]}...(truncated,{len(compact)} chars)"
+
     def predict(self, prompt: str) -> dict[str, Any]:
         response_text = self._chat_completion(prompt)
-        return json.loads(self._extract_json(response_text))
+        extracted = self._extract_json(response_text)
+        try:
+            return json.loads(extracted)
+        except Exception as exc:
+            preview = self._preview_text(extracted)
+            raise ValueError(f"模型响应 JSON 解析失败: {preview}") from exc
 
     def health_check(self) -> tuple[bool, str]:
         try:
