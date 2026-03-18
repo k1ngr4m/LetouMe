@@ -437,6 +437,7 @@ def bulk_generate_model_predictions(
                 model_codes=payload.model_codes,
                 mode=mode,
                 overwrite=payload.overwrite,
+                parallelism=payload.parallelism,
                 start_period=payload.start_period,
                 end_period=payload.end_period,
                 progress_callback=progress_callback,

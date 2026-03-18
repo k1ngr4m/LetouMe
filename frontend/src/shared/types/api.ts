@@ -310,6 +310,7 @@ export type BulkGenerateSettingsModelPredictionsPayload = {
   model_codes: string[]
   mode: 'current' | 'history'
   overwrite: boolean
+  parallelism?: number
   start_period?: string
   end_period?: string
 }

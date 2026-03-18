@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from backend.app.db.connection import ensure_schema
@@ -20,6 +22,8 @@ from backend.core.model_factory import ModelFactory
 DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2.0.md"
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
+DEFAULT_BULK_PARALLELISM = 3
+MAX_BULK_RETRIES_PER_MODEL = 1
 
 
 @dataclass
@@ -242,6 +246,7 @@ class PredictionGenerationService:
         model_codes: list[str],
         mode: str,
         overwrite: bool,
+        parallelism: int | None = None,
         start_period: str | None = None,
         end_period: str | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
@@ -254,6 +259,7 @@ class PredictionGenerationService:
             raise ValueError("不支持的生成模式")
         if mode == "history" and (not start_period or not end_period):
             raise ValueError("历史重算必须提供开始期号和结束期号")
+        max_workers = self._normalize_bulk_parallelism(parallelism, selected_count=len(unique_codes))
 
         summary = {
             "mode": mode,
@@ -263,47 +269,98 @@ class PredictionGenerationService:
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
+            "parallelism": max_workers,
+            "retry_per_model": MAX_BULK_RETRIES_PER_MODEL,
             "processed_models": [],
             "skipped_models": [],
             "failed_models": [],
             "failed_details": [],
         }
+        outcomes: dict[str, dict[str, str]] = {}
+        outcomes_lock = Lock()
 
-        for model_code in unique_codes:
-            try:
-                result = (
-                    self.generate_current_for_model(
-                        lottery_code=lottery_code,
-                        model_code=model_code,
-                        overwrite=overwrite,
+        def rebuild_summary_snapshot() -> dict[str, Any]:
+            processed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "processed"]
+            skipped_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "skipped"]
+            failed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "failed"]
+            failed_details = [
+                self._build_failed_detail(code, outcomes.get(code, {}).get("reason") or "未知错误")
+                for code in failed_models
+            ]
+            summary["processed_models"] = processed_models
+            summary["skipped_models"] = skipped_models
+            summary["failed_models"] = failed_models
+            summary["failed_details"] = failed_details
+            summary["processed_count"] = len(processed_models)
+            summary["skipped_count"] = len(skipped_models)
+            summary["failed_count"] = len(failed_models)
+            summary["completed_count"] = len(outcomes)
+            return dict(summary)
+
+        def run_single_model(model_code: str) -> tuple[str, str]:
+            attempts = MAX_BULK_RETRIES_PER_MODEL + 1
+            last_reason = "模型未生成结果"
+            for attempt in range(1, attempts + 1):
+                try:
+                    result = (
+                        self.generate_current_for_model(
+                            lottery_code=lottery_code,
+                            model_code=model_code,
+                            overwrite=overwrite,
+                        )
+                        if mode == "current"
+                        else self.recalculate_history_for_model(
+                            lottery_code=lottery_code,
+                            model_code=model_code,
+                            start_period=str(start_period or ""),
+                            end_period=str(end_period or ""),
+                            overwrite=overwrite,
+                        )
                     )
-                    if mode == "current"
-                    else self.recalculate_history_for_model(
-                        lottery_code=lottery_code,
-                        model_code=model_code,
-                        start_period=str(start_period or ""),
-                        end_period=str(end_period or ""),
-                        overwrite=overwrite,
+                    status, reason = self._classify_bulk_model_result(result)
+                    if status in {"processed", "skipped"}:
+                        return status, reason
+                    last_reason = reason
+                except Exception as exc:
+                    last_reason = str(exc) or "未知错误"
+                    self.logger.exception(
+                        "Bulk prediction generation failed",
+                        extra={"context": {"model_code": model_code, "mode": mode, "attempt": attempt}},
                     )
-                )
-                if result.get("processed_count", 0) > 0:
-                    summary["processed_count"] += 1
-                    summary["processed_models"].append(model_code)
-                elif result.get("skipped_count", 0) > 0:
-                    summary["skipped_count"] += 1
-                    summary["skipped_models"].append(model_code)
-                else:
-                    summary["failed_count"] += 1
-                    summary["failed_models"].append(model_code)
-                    summary["failed_details"].append(self._build_failed_detail(model_code, "模型未生成结果"))
-            except Exception as exc:
-                self.logger.exception("Bulk prediction generation failed", extra={"context": {"model_code": model_code, "mode": mode}})
-                summary["failed_count"] += 1
-                summary["failed_models"].append(model_code)
-                summary["failed_details"].append(self._build_failed_detail(model_code, str(exc)))
-            summary["completed_count"] += 1
-            if progress_callback:
-                progress_callback(dict(summary))
+                if attempt < attempts:
+                    self.logger.warning(
+                        "Bulk prediction generation retrying model",
+                        extra={
+                            "context": {
+                                "model_code": model_code,
+                                "mode": mode,
+                                "next_attempt": attempt + 1,
+                                "reason": last_reason,
+                            }
+                        },
+                    )
+            return "failed", last_reason
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(run_single_model, model_code): model_code
+                for model_code in unique_codes
+            }
+            for future in as_completed(futures):
+                model_code = futures[future]
+                try:
+                    status, reason = future.result()
+                except Exception as exc:
+                    status, reason = "failed", str(exc) or "未知错误"
+                    self.logger.exception(
+                        "Bulk prediction generation worker crashed",
+                        extra={"context": {"model_code": model_code, "mode": mode}},
+                    )
+                with outcomes_lock:
+                    outcomes[model_code] = {"status": status, "reason": reason}
+                    snapshot = rebuild_summary_snapshot()
+                if progress_callback:
+                    progress_callback(snapshot)
 
         return summary
 
@@ -313,6 +370,26 @@ class PredictionGenerationService:
             "model_code": model_code,
             "reason": reason or "未知错误",
         }
+
+    @staticmethod
+    def _classify_bulk_model_result(result: dict[str, Any]) -> tuple[str, str]:
+        if result.get("processed_count", 0) > 0:
+            return "processed", ""
+        if result.get("skipped_count", 0) > 0:
+            return "skipped", ""
+        return "failed", "模型未生成结果"
+
+    @staticmethod
+    def _normalize_bulk_parallelism(parallelism: int | None, *, selected_count: int) -> int:
+        if selected_count <= 0:
+            return 1
+        if parallelism is None:
+            requested = DEFAULT_BULK_PARALLELISM
+        else:
+            requested = int(parallelism)
+            if requested < 1:
+                raise ValueError("并发数必须大于 0")
+        return max(1, min(requested, selected_count))
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         model = ModelFactory().create(model_def)

@@ -9,39 +9,45 @@ from backend.core.model_config import ModelDefinition
 
 
 class PredictionGenerationServiceTests(unittest.TestCase):
-    def test_generate_for_models_tracks_completed_count_and_failure_reasons(self) -> None:
+    def test_generate_for_models_tracks_completed_count_and_retry_failure_reasons(self) -> None:
         service = PredictionGenerationService()
         progress_updates: list[dict] = []
+        attempts: dict[str, int] = {}
 
-        with (
-            patch.object(
-                service,
-                "generate_current_for_model",
-                side_effect=[
-                    {"processed_count": 1, "skipped_count": 0, "failed_count": 0},
-                    ValueError("模型健康检查失败: 缺少 API Key"),
-                    {"processed_count": 0, "skipped_count": 0, "failed_count": 0},
-                ],
-            ),
-        ):
+        def fake_generate_current_for_model(*, model_code: str, **_: object) -> dict[str, int]:
+            attempts[model_code] = attempts.get(model_code, 0) + 1
+            if model_code == "model-a":
+                return {"processed_count": 1, "skipped_count": 0, "failed_count": 0}
+            if model_code == "model-b":
+                raise ValueError("模型健康检查失败: 缺少 API Key")
+            if attempts[model_code] == 1:
+                return {"processed_count": 0, "skipped_count": 0, "failed_count": 0}
+            return {"processed_count": 1, "skipped_count": 0, "failed_count": 0}
+
+        with patch.object(service, "generate_current_for_model", side_effect=fake_generate_current_for_model):
             summary = service.generate_for_models(
                 model_codes=["model-a", "model-b", "model-c"],
                 mode="current",
                 overwrite=False,
+                parallelism=1,
                 progress_callback=progress_updates.append,
             )
 
         self.assertEqual(summary["selected_count"], 3)
         self.assertEqual(summary["completed_count"], 3)
-        self.assertEqual(summary["processed_models"], ["model-a"])
-        self.assertEqual(summary["failed_models"], ["model-b", "model-c"])
+        self.assertEqual(summary["parallelism"], 1)
+        self.assertEqual(summary["retry_per_model"], 1)
+        self.assertEqual(summary["processed_models"], ["model-a", "model-c"])
+        self.assertEqual(summary["failed_models"], ["model-b"])
         self.assertEqual(
             summary["failed_details"],
             [
                 {"model_code": "model-b", "reason": "模型健康检查失败: 缺少 API Key"},
-                {"model_code": "model-c", "reason": "模型未生成结果"},
             ],
         )
+        self.assertEqual(attempts["model-a"], 1)
+        self.assertEqual(attempts["model-b"], 2)
+        self.assertEqual(attempts["model-c"], 2)
         self.assertEqual([update["completed_count"] for update in progress_updates], [1, 2, 3])
 
     def test_pl3_prompt_template_can_be_formatted(self) -> None:
@@ -173,6 +179,10 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(summary["description_count"], 1)
         self.assertEqual(summary["strategy_count"], 2)
         self.assertEqual(summary["play_types"], "direct,group3,group6")
+
+    def test_normalize_bulk_parallelism_uses_default_and_clamp(self) -> None:
+        self.assertEqual(PredictionGenerationService._normalize_bulk_parallelism(None, selected_count=10), 3)
+        self.assertEqual(PredictionGenerationService._normalize_bulk_parallelism(6, selected_count=2), 2)
 
 
 if __name__ == "__main__":
