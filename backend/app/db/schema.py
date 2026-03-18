@@ -250,6 +250,20 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS simulation_ticket (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_simulation_ticket_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_simulation_ticket_user_created (user_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS app_role (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         role_code VARCHAR(64) NOT NULL UNIQUE,

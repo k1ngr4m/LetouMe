@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Area,
   AreaChart,
@@ -19,6 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
+import { formatDateTimeLocal } from '../../shared/lib/format'
 import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
@@ -34,7 +35,15 @@ import {
   type ModelListScoreRange,
   normalizePredictionsHistory,
 } from './lib/home'
-import type { LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord } from '../../shared/types/api'
+import {
+  buildBallRange,
+  buildSimulationMatches,
+  calculateAmount,
+  calculateBetCount,
+  createRandomSelection,
+  normalizeSimulationTicket,
+} from './lib/simulation'
+import type { LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketRecord } from '../../shared/types/api'
 import type { HomeDashboardState, HomeDetailRouteState, HomeModelView, HomeTab, ScoreViewSortDirection, ScoreViewSortKey } from './navigation'
 
 const HISTORY_BATCH_SIZE = 20
@@ -101,6 +110,15 @@ function HomeResetIcon() {
     <HomeSvgIcon>
       <path d="M16 10a6 6 0 1 1-1.5-4" />
       <path d="M16 5v3.5h-3.5" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomePlayIcon() {
+  return (
+    <HomeSvgIcon>
+      <path d="M7 5.5v9l7-4.5-7-4.5Z" />
+      <path d="M4 17h12" />
     </HomeSvgIcon>
   )
 }
@@ -419,6 +437,9 @@ export function HomePage() {
         <button className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')} onClick={() => setActiveTab('prediction')}>
           预测总览
         </button>
+        <button className={clsx('tab-strip__item', activeTab === 'simulation' && 'is-active')} onClick={() => setActiveTab('simulation')}>
+          模拟试玩
+        </button>
         <button className={clsx('tab-strip__item', activeTab === 'analysis' && 'is-active')} onClick={() => setActiveTab('analysis')}>
           图表分析
         </button>
@@ -648,6 +669,8 @@ export function HomePage() {
         </div>
       ) : null}
 
+      {activeTab === 'simulation' ? <SimulationPlayground draws={chartDraws} targetPeriod={currentPredictions.data?.target_period || ''} /> : null}
+
       {activeTab === 'history' ? (
         <div className="page-section">
           <ChartCard title="模型历史命中趋势">
@@ -799,6 +822,282 @@ export function HomePage() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function SimulationPlayground({ draws, targetPeriod }: { draws: LotteryDraw[]; targetPeriod: string }) {
+  const queryClient = useQueryClient()
+  const [selectedFront, setSelectedFront] = useState<string[]>([])
+  const [selectedBack, setSelectedBack] = useState<string[]>([])
+  const [matchWindow, setMatchWindow] = useState<30 | 50>(30)
+  const [showMatches, setShowMatches] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const frontOptions = useMemo(() => buildBallRange(35), [])
+  const backOptions = useMemo(() => buildBallRange(12), [])
+  const betCount = useMemo(() => calculateBetCount(selectedFront.length, selectedBack.length), [selectedBack.length, selectedFront.length])
+  const amount = useMemo(() => calculateAmount(selectedFront.length, selectedBack.length), [selectedBack.length, selectedFront.length])
+  const canSubmit = selectedFront.length >= 5 && selectedBack.length >= 2
+  const matches = useMemo(
+    () => (showMatches && canSubmit ? buildSimulationMatches(selectedFront, selectedBack, draws, matchWindow) : []),
+    [canSubmit, draws, matchWindow, selectedBack, selectedFront, showMatches],
+  )
+  const ticketsQuery = useQuery({
+    queryKey: ['simulation-tickets'],
+    queryFn: async () => (await apiClient.getSimulationTickets()).tickets.map(normalizeSimulationTicket),
+  })
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.createSimulationTicket({ front_numbers: selectedFront, back_numbers: selectedBack })
+      return normalizeSimulationTicket(response.ticket)
+    },
+    onSuccess: async () => {
+      setMessage('投注方案已保存。')
+      await queryClient.invalidateQueries({ queryKey: ['simulation-tickets'] })
+    },
+  })
+  const deleteMutation = useMutation({
+    mutationFn: async (ticketId: number) => apiClient.deleteSimulationTicket(ticketId),
+    onSuccess: async () => {
+      setMessage('已删除保存方案。')
+      await queryClient.invalidateQueries({ queryKey: ['simulation-tickets'] })
+    },
+  })
+
+  useEffect(() => {
+    setShowMatches(false)
+    setMessage(null)
+  }, [selectedFront, selectedBack])
+
+  function toggleSelection(value: string, zone: 'front' | 'back') {
+    const updater = zone === 'front' ? setSelectedFront : setSelectedBack
+    updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
+  }
+
+  function handleRandomPick() {
+    const randomSelection = createRandomSelection()
+    setSelectedFront(randomSelection.front)
+    setSelectedBack(randomSelection.back)
+    setMessage('已为你生成一组随机机选号码。')
+  }
+
+  function handleClear() {
+    setSelectedFront([])
+    setSelectedBack([])
+    setMessage('已清空当前选号。')
+  }
+
+  function handleCompare() {
+    if (!canSubmit) return
+    setShowMatches(true)
+    setMessage(`已按近 ${matchWindow} 期历史开奖完成匹配。`)
+  }
+
+  function handleSave() {
+    if (!canSubmit) return
+    setMessage(null)
+    saveMutation.mutate()
+  }
+
+  return (
+    <div className="page-section simulation-page">
+      <StatusCard
+        title="模拟试玩"
+        subtitle={`当前按目标期 ${targetPeriod || '-'} 的选号策略模拟投注，支持普通投注与复式组合。`}
+        actions={
+          <div className="toolbar-inline">
+            <button className="ghost-button" type="button" onClick={handleRandomPick}>
+              <HomePlayIcon />
+              随机机选
+            </button>
+            <button className="ghost-button" type="button" onClick={handleClear}>
+              <HomeResetIcon />
+              清空
+            </button>
+          </div>
+        }
+      >
+        <div className="simulation-layout">
+          <section className="simulation-section">
+            <div className="simulation-section__header">
+              <div>
+                <p className="hero-panel__eyebrow">Front Zone</p>
+                <h3>前区选号</h3>
+              </div>
+              <span>至少 5 个，可复式</span>
+            </div>
+            <div className="simulation-ball-grid" aria-label="前区选号">
+              {frontOptions.map((ball) => (
+                <button
+                  key={`front-${ball}`}
+                  type="button"
+                  className={clsx('simulation-ball', 'is-front', selectedFront.includes(ball) && 'is-selected')}
+                  onClick={() => toggleSelection(ball, 'front')}
+                  aria-label={`前区 ${ball}`}
+                >
+                  {ball}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="simulation-section">
+            <div className="simulation-section__header">
+              <div>
+                <p className="hero-panel__eyebrow">Back Zone</p>
+                <h3>后区选号</h3>
+              </div>
+              <span>至少 2 个，可复式</span>
+            </div>
+            <div className="simulation-ball-grid" aria-label="后区选号">
+              {backOptions.map((ball) => (
+                <button
+                  key={`back-${ball}`}
+                  type="button"
+                  className={clsx('simulation-ball', 'is-back', selectedBack.includes(ball) && 'is-selected')}
+                  onClick={() => toggleSelection(ball, 'back')}
+                  aria-label={`后区 ${ball}`}
+                >
+                  {ball}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="simulation-summary-bar">
+          <div className="simulation-summary-bar__numbers">
+            <span>已选前区 {selectedFront.length} 个 / 后区 {selectedBack.length} 个</span>
+            <div className="number-row number-row--tight">
+              {selectedFront.map((ball) => (
+                <NumberBall key={`selected-front-${ball}`} value={ball} color="red" size="sm" />
+              ))}
+              {selectedBack.length ? <span className="number-row__divider" /> : null}
+              {selectedBack.map((ball) => (
+                <NumberBall key={`selected-back-${ball}`} value={ball} color="blue" size="sm" />
+              ))}
+            </div>
+          </div>
+          <div className="simulation-summary-bar__meta">
+            <strong>{`已选 ${betCount} 注，共 ${amount} 元`}</strong>
+            {!canSubmit ? <span>前区至少 5 个号码，后区至少 2 个号码后可投注。</span> : <span>已满足投注条件，可进行历史匹配或保存方案。</span>}
+          </div>
+          <div className="simulation-summary-bar__actions">
+            <div className="tab-strip" role="tablist" aria-label="历史匹配期数切换">
+              <button className={clsx('tab-strip__item', matchWindow === 30 && 'is-active')} type="button" onClick={() => setMatchWindow(30)}>
+                近30期
+              </button>
+              <button className={clsx('tab-strip__item', matchWindow === 50 && 'is-active')} type="button" onClick={() => setMatchWindow(50)}>
+                近50期
+              </button>
+            </div>
+            <button className="ghost-button" type="button" disabled={!canSubmit} onClick={handleCompare}>
+              历史中奖匹配
+            </button>
+            <button className="primary-button" type="button" disabled={!canSubmit || saveMutation.isPending} onClick={handleSave}>
+              {saveMutation.isPending ? '保存中...' : '保存方案'}
+            </button>
+          </div>
+        </div>
+
+        {message ? <div className="simulation-inline-message">{message}</div> : null}
+      </StatusCard>
+
+      <StatusCard title="历史匹配结果" subtitle={`将当前选号与近 ${matchWindow} 期开奖数据进行对比，展示命中号码和最高奖级。`}>
+        {!showMatches ? (
+          <div className="state-shell">点击“历史中奖匹配”后展示对比结果。</div>
+        ) : matches.length ? (
+          <div className="simulation-match-list">
+            {matches.map((match) => (
+              <article key={match.period} className="simulation-match-card">
+                <div className="simulation-match-card__header">
+                  <div>
+                    <p className="history-record-card__eyebrow">第 {match.period} 期</p>
+                    <strong>{match.topPrizeLevel}</strong>
+                  </div>
+                  <div className="simulation-match-card__meta">
+                    <span>{match.date}</span>
+                    <span>{match.totalWinningBets ? `中奖 ${match.totalWinningBets} 注` : '未中奖'}</span>
+                  </div>
+                </div>
+                <div className="simulation-match-card__section">
+                  <span>开奖号码</span>
+                  <div className="number-row number-row--tight">
+                    {match.actualResult.red_balls.map((ball) => (
+                      <NumberBall key={`${match.period}-actual-red-${ball}`} value={ball} color="red" size="sm" isHit={match.redHits.includes(ball)} />
+                    ))}
+                    <span className="number-row__divider" />
+                    {match.actualResult.blue_balls.map((ball) => (
+                      <NumberBall key={`${match.period}-actual-blue-${ball}`} value={ball} color="blue" size="sm" isHit={match.blueHits.includes(ball)} />
+                    ))}
+                  </div>
+                </div>
+                <div className="simulation-match-card__section">
+                  <span>{`命中前区 ${match.redHits.length} 个 / 后区 ${match.blueHits.length} 个`}</span>
+                  <div className="simulation-prize-list">
+                    {match.prizes.length ? match.prizes.map((prize) => <span key={`${match.period}-${prize.level}`}>{`${prize.level} × ${prize.count}`}</span>) : <span>未形成中奖注数</span>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="state-shell">当前历史数据不足以生成匹配结果。</div>
+        )}
+      </StatusCard>
+
+      <StatusCard title="已保存方案" subtitle="保存后的投注方案会同步到当前账号，可在此查看和删除。">
+        {ticketsQuery.isLoading ? (
+          <div className="state-shell">正在读取已保存方案...</div>
+        ) : ticketsQuery.data?.length ? (
+          <div className="simulation-saved-list">
+            {ticketsQuery.data.map((ticket) => (
+              <SavedSimulationTicketCard key={ticket.id} ticket={ticket} onDelete={(ticketId) => deleteMutation.mutate(ticketId)} isDeleting={deleteMutation.isPending} />
+            ))}
+          </div>
+        ) : (
+          <div className="state-shell">暂时还没有已保存方案。</div>
+        )}
+      </StatusCard>
+    </div>
+  )
+}
+
+function SavedSimulationTicketCard({
+  ticket,
+  onDelete,
+  isDeleting,
+}: {
+  ticket: SimulationTicketRecord
+  onDelete: (ticketId: number) => void
+  isDeleting: boolean
+}) {
+  return (
+    <article className="simulation-saved-card">
+      <div className="simulation-saved-card__header">
+        <div>
+          <strong>{`方案 #${ticket.id}`}</strong>
+          <span>{formatDateTimeLocal(ticket.created_at)}</span>
+        </div>
+        <button className="ghost-button" type="button" disabled={isDeleting} onClick={() => onDelete(ticket.id)}>
+          删除
+        </button>
+      </div>
+      <div className="simulation-saved-card__numbers">
+        <div className="number-row number-row--tight">
+          {ticket.front_numbers.map((ball) => (
+            <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="red" size="sm" />
+          ))}
+          <span className="number-row__divider" />
+          {ticket.back_numbers.map((ball) => (
+            <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="blue" size="sm" />
+          ))}
+        </div>
+      </div>
+      <div className="simulation-saved-card__footer">
+        <span>{`${ticket.bet_count} 注`}</span>
+        <span>{formatCurrency(ticket.amount)}</span>
+      </div>
+    </article>
   )
 }
 

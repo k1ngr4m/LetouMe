@@ -76,3 +76,24 @@ class SettingsPredictionRecordDetailResponse(BaseModel):
     actual_result: dict[str, Any] | None = None
     models: list[dict[str, Any]]
     model_stats: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SimulationTicketRecordResponse(BaseModel):
+    id: int
+    front_numbers: list[str] = Field(default_factory=list)
+    back_numbers: list[str] = Field(default_factory=list)
+    bet_count: int = 0
+    amount: int = 0
+    created_at: str
+
+
+class SimulationTicketListResponse(BaseModel):
+    tickets: list[SimulationTicketRecordResponse] = Field(default_factory=list)
+
+
+class SimulationTicketCreateResponse(BaseModel):
+    ticket: SimulationTicketRecordResponse
+
+
+class SuccessResponse(BaseModel):
+    success: bool = True

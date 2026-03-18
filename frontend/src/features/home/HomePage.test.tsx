@@ -5,13 +5,19 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
-const { getPredictionsHistoryDetail } = vi.hoisted(() => ({
+const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets } = vi.hoisted(() => ({
+  createSimulationTicket: vi.fn(),
+  deleteSimulationTicket: vi.fn(),
   getPredictionsHistoryDetail: vi.fn(),
+  getSimulationTickets: vi.fn(),
 }))
 
 vi.mock('../../shared/api/client', () => ({
   apiClient: {
+    createSimulationTicket,
+    deleteSimulationTicket,
     getPredictionsHistoryDetail,
+    getSimulationTickets,
   },
 }))
 
@@ -53,7 +59,20 @@ vi.mock('./hooks/useHomeData', () => ({
     },
     lotteryCharts: {
       data: {
-        data: [],
+        data: [
+          {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '02', '03', '04', '05'],
+            blue_balls: ['06', '07'],
+          },
+          {
+            period: '2026030',
+            date: '2026-03-08',
+            red_balls: ['08', '09', '10', '11', '12'],
+            blue_balls: ['01', '02'],
+          },
+        ],
         next_draw: {
           next_date_display: '2026-03-15',
         },
@@ -237,7 +256,22 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  createSimulationTicket.mockReset()
+  createSimulationTicket.mockResolvedValue({
+    ticket: {
+      id: 1,
+      front_numbers: ['01', '02', '03', '04', '05'],
+      back_numbers: ['06', '07'],
+      bet_count: 1,
+      amount: 2,
+      created_at: '2026-03-18T00:00:00Z',
+    },
+  })
+  deleteSimulationTicket.mockReset()
+  deleteSimulationTicket.mockResolvedValue({ success: true })
   getPredictionsHistoryDetail.mockReset()
+  getSimulationTickets.mockReset()
+  getSimulationTickets.mockResolvedValue({ tickets: [] })
 })
 
 describe('HomePage dashboard sidebar', () => {
@@ -400,6 +434,68 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('button', { name: '模型列表' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '预测统计' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '预测统计' })).not.toBeInTheDocument()
+  })
+
+  it('supports simulation pick, matching, save and delete flows', async () => {
+    getSimulationTickets
+      .mockResolvedValueOnce({ tickets: [] })
+      .mockResolvedValueOnce({
+        tickets: [
+          {
+            id: 11,
+            front_numbers: ['01', '02', '03', '04', '05'],
+            back_numbers: ['06', '07'],
+            bet_count: 1,
+            amount: 2,
+            created_at: '2026-03-18T00:00:00Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ tickets: [] })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 01' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 02' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 03' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 04' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 05' }))
+    await userEvent.click(screen.getByRole('button', { name: '后区 06' }))
+    await userEvent.click(screen.getByRole('button', { name: '后区 07' }))
+
+    expect(screen.getByText('已选 1 注，共 2 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
+    expect(await screen.findByText('一等奖')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
+
+    await waitFor(() => {
+      expect(createSimulationTicket).toHaveBeenCalledWith({
+        front_numbers: ['01', '02', '03', '04', '05'],
+        back_numbers: ['06', '07'],
+      })
+    })
+
+    expect(await screen.findByText('方案 #11')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    await waitFor(() => expect(deleteSimulationTicket).toHaveBeenCalledWith(11))
+  })
+
+  it('calculates multiple bet count in simulation tab', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    for (const ball of ['01', '02', '03', '04', '05', '06']) {
+      await userEvent.click(screen.getByRole('button', { name: `前区 ${ball}` }))
+    }
+    for (const ball of ['07', '08', '09']) {
+      await userEvent.click(screen.getByRole('button', { name: `后区 ${ball}` }))
+    }
+
+    expect(screen.getByText('已选 18 注，共 36 元')).toBeInTheDocument()
   })
 
   it('loads history detail on expand and highlights hit numbers', async () => {

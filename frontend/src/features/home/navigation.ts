@@ -1,4 +1,4 @@
-export type HomeTab = 'prediction' | 'analysis' | 'history'
+export type HomeTab = 'prediction' | 'analysis' | 'history' | 'simulation'
 export type HomeModelView = 'card' | 'list' | 'score'
 export type ScoreViewSortKey =
   | 'overallScore'

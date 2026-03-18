@@ -49,6 +49,8 @@ from backend.app.schemas.requests import (
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
     SettingsPredictionRecordDetailPayload,
+    SimulationTicketDeletePayload,
+    SimulationTicketPayload,
     RoleCodePayload,
     RolePayload,
 )
@@ -61,6 +63,9 @@ from backend.app.schemas.responses import (
     PredictionsHistoryResponse,
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
+    SimulationTicketCreateResponse,
+    SimulationTicketListResponse,
+    SuccessResponse,
 )
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
@@ -68,6 +73,7 @@ from backend.app.services.model_service import ModelService
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
 from backend.app.services.prediction_service import PredictionService
+from backend.app.services.simulation_ticket_service import SimulationTicketService
 
 
 router = APIRouter(prefix="/api")
@@ -75,6 +81,7 @@ lottery_service = LotteryService()
 prediction_service = PredictionService()
 model_service = ModelService()
 prediction_generation_service = PredictionGenerationService()
+simulation_ticket_service = SimulationTicketService()
 
 
 @router.post("/auth/login", response_model=CurrentUserResponse)
@@ -155,6 +162,29 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])
     return {"predictions_history": [record], "total_count": 1, "model_stats": prediction_service._build_model_stats([record], score_profiles)}
+
+
+@router.post("/simulation/tickets/list", response_model=SimulationTicketListResponse)
+def get_simulation_tickets(current_user: dict = Depends(require_current_user)) -> dict:
+    return {"tickets": simulation_ticket_service.list_tickets(int(current_user["id"]))}
+
+
+@router.post("/simulation/tickets/create", response_model=SimulationTicketCreateResponse)
+def create_simulation_ticket(payload: SimulationTicketPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        ticket = simulation_ticket_service.create_ticket(int(current_user["id"]), payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ticket": ticket}
+
+
+@router.post("/simulation/tickets/delete", response_model=SuccessResponse)
+def delete_simulation_ticket(payload: SimulationTicketDeletePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        simulation_ticket_service.delete_ticket(int(current_user["id"]), payload.ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="方案不存在") from exc
+    return {"success": True}
 
 
 @router.post("/settings/profile/update", response_model=CurrentUserResponse)

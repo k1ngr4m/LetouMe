@@ -27,6 +27,10 @@ import type {
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProviderListResponse,
+  SimulationTicketCreateResponse,
+  SimulationTicketListResponse,
+  SimulationTicketPayload,
+  SuccessResponse,
   UserListResponse,
   RegisterPayload,
 } from '../types/api'
@@ -144,6 +148,24 @@ export const apiClient = {
     return requestJson<PredictionsHistoryResponse>('/api/predictions/history/detail', {
       method: 'POST',
       body: JSON.stringify({ target_period: targetPeriod }),
+    })
+  },
+  getSimulationTickets() {
+    return requestJson<SimulationTicketListResponse>('/api/simulation/tickets/list', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  createSimulationTicket(payload: SimulationTicketPayload) {
+    return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  deleteSimulationTicket(ticketId: number) {
+    return requestJson<SuccessResponse>('/api/simulation/tickets/delete', {
+      method: 'POST',
+      body: JSON.stringify({ ticket_id: ticketId }),
     })
   },
   getSettingsModels(includeDeleted = false) {

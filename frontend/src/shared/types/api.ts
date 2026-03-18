@@ -186,6 +186,32 @@ export type PredictionsHistoryResponse = {
   model_stats?: PredictionHistoryModelStat[]
 }
 
+export type SimulationTicketPayload = {
+  front_numbers: string[]
+  back_numbers: string[]
+}
+
+export type SimulationTicketRecord = {
+  id: number
+  front_numbers: string[]
+  back_numbers: string[]
+  bet_count: number
+  amount: number
+  created_at: string
+}
+
+export type SimulationTicketListResponse = {
+  tickets: SimulationTicketRecord[]
+}
+
+export type SimulationTicketCreateResponse = {
+  ticket: SimulationTicketRecord
+}
+
+export type SuccessResponse = {
+  success: boolean
+}
+
 export type SettingsModel = {
   model_code: string
   display_name: string

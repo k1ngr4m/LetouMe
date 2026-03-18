@@ -3322,6 +3322,172 @@ a {
   font-size: 0.88rem;
 }
 
+.simulation-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.simulation-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.simulation-section,
+.simulation-match-card,
+.simulation-saved-card,
+.simulation-summary-bar {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.simulation-section {
+  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.simulation-section__header,
+.simulation-match-card__header,
+.simulation-saved-card__header,
+.simulation-summary-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.simulation-section__header h3 {
+  margin: 0.25rem 0 0;
+}
+
+.simulation-section__header span,
+.simulation-summary-bar__meta span,
+.simulation-inline-message,
+.simulation-match-card__meta,
+.simulation-match-card__section span,
+.simulation-saved-card__header span,
+.simulation-saved-card__footer {
+  color: var(--text-2);
+}
+
+.simulation-ball-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.simulation-ball {
+  min-height: 2.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.simulation-ball:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.simulation-ball.is-front.is-selected {
+  border-color: rgba(215, 64, 90, 0.42);
+  background: rgba(215, 64, 90, 0.22);
+}
+
+.simulation-ball.is-back.is-selected {
+  border-color: rgba(61, 141, 245, 0.42);
+  background: rgba(61, 141, 245, 0.24);
+}
+
+.simulation-summary-bar {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+}
+
+.simulation-summary-bar__numbers,
+.simulation-summary-bar__meta {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.simulation-summary-bar__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.simulation-inline-message {
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(61, 141, 245, 0.12);
+}
+
+.simulation-match-list,
+.simulation-saved-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.simulation-match-card,
+.simulation-saved-card {
+  padding: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.simulation-match-card__meta,
+.simulation-saved-card__header div {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: end;
+}
+
+.simulation-match-card__section {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.simulation-prize-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.simulation-prize-list span {
+  padding: 0.38rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.simulation-saved-card__footer {
+  display: flex;
+  justify-content: space-between;
+}
+
+:root[data-theme='light'] .simulation-section,
+:root[data-theme='light'] .simulation-match-card,
+:root[data-theme='light'] .simulation-saved-card,
+:root[data-theme='light'] .simulation-summary-bar {
+  border-color: rgba(133, 150, 178, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme='light'] .simulation-ball {
+  border-color: rgba(133, 150, 178, 0.2);
+  background: rgba(244, 247, 252, 0.92);
+}
+
+:root[data-theme='light'] .simulation-inline-message {
+  background: rgba(122, 171, 244, 0.14);
+}
+
 .settings-side-stack {
   display: grid;
   gap: 1rem;
@@ -3409,6 +3575,10 @@ a {
 }
 
 @media (max-width: 1180px) {
+  .simulation-layout {
+    grid-template-columns: 1fr;
+  }
+
   .landing-panel--auth,
   .auth-highlight-list {
     grid-template-columns: 1fr;
@@ -3488,6 +3658,23 @@ a {
 
   .landing-shell {
     padding: 0.8rem;
+  }
+
+  .simulation-ball-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .simulation-summary-bar__actions,
+  .simulation-match-card__header,
+  .simulation-saved-card__header,
+  .simulation-saved-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .simulation-match-card__meta,
+  .simulation-saved-card__header div {
+    justify-items: start;
   }
 
   .landing-panel--auth {

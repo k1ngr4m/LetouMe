@@ -66,6 +66,15 @@ class PredictionHistoryDetailPayload(BaseModel):
     target_period: str
 
 
+class SimulationTicketPayload(BaseModel):
+    front_numbers: list[str] = Field(default_factory=list)
+    back_numbers: list[str] = Field(default_factory=list)
+
+
+class SimulationTicketDeletePayload(BaseModel):
+    ticket_id: int = Field(ge=1)
+
+
 class ProfileUpdatePayload(BaseModel):
     nickname: str
 
