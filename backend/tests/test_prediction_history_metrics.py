@@ -151,8 +151,8 @@ class _FakePl3PredictionRepository:
                         {
                             "group_id": 2,
                             "play_type": "group3",
-                            "digits": ["01", "08", "08"],
-                            "hit_result": {"digit_hits": ["01", "08", "08"], "digit_hit_count": 3, "is_exact_match": True},
+                            "digits": ["01", "01", "08"],
+                            "hit_result": {"digit_hits": ["01", "01", "08"], "digit_hit_count": 3, "is_exact_match": True},
                         },
                     ],
                 }
@@ -184,16 +184,16 @@ class _FakePl3PredictionRepository:
                                 "red_hit_count": 0,
                                 "blue_hit_count": 0,
                                 "total_hits": 3,
-                                "hit_result": {"digit_hit_count": 3},
+                                "hit_result": {"digit_hit_count": 2, "is_exact_match": False},
                             },
                             {
                                 "group_id": 2,
                                 "play_type": "group3",
-                                "digits": ["01", "08", "08"],
+                                "digits": ["01", "01", "08"],
                                 "red_hit_count": 0,
                                 "blue_hit_count": 0,
                                 "total_hits": 3,
-                                "hit_result": {"digit_hit_count": 3},
+                                "hit_result": {"digit_hit_count": 2, "is_exact_match": False},
                             },
                         ],
                     }
@@ -275,6 +275,16 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         )
 
         self.assertEqual(prize_level, "直选")
+
+    def test_calculate_hit_result_pl3_supports_red_ball_fallback(self) -> None:
+        hit_result = self.service.calculate_hit_result(
+            {"play_type": "direct", "red_balls": ["01", "01", "08"]},
+            {"lottery_code": "pl3", "red_balls": ["01", "01", "08"]},
+            lottery_code="pl3",
+        )
+
+        self.assertEqual(hit_result["digit_hit_count"], 3)
+        self.assertTrue(hit_result["is_exact_match"])
 
 
 if __name__ == "__main__":

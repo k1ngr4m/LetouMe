@@ -2265,8 +2265,8 @@ function HistoryRecordCard({
           : detailQuery.data.predictions_history[0].models,
       }
     : null
-  const summaryModels = detailRecord?.models || record.models
-  const periodSummary = summaryModels.reduce(
+  const listModels = record.models
+  const periodSummary = listModels.reduce(
     (accumulator, model) => ({
       total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
       total_cost_amount: accumulator.total_cost_amount + (model.cost_amount || 0),
@@ -2312,7 +2312,7 @@ function HistoryRecordCard({
         <span>奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
       </div>
       <div className="history-record-card__models">
-        {summaryModels.map((model) => (
+        {listModels.map((model) => (
           <div key={`${record.target_period}-${model.model_id}`} className="history-record-card__model">
             <strong>{model.model_name}</strong>
             <span>

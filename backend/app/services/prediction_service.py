@@ -111,7 +111,7 @@ class PredictionService:
     def get_history_list_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:history:list:{limit or 'all'}:{offset}",
+            f"predictions:{normalized_code}:history:list:v2:{limit or 'all'}:{offset}",
             ttl_seconds=60,
             loader=lambda: self._build_history_list_payload(limit=limit, offset=offset, lottery_code=normalized_code),
         )
@@ -315,8 +315,8 @@ class PredictionService:
         normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or actual_result.get("lottery_code"))
         if normalized_code == "pl3":
             play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
-            actual_digits = normalize_digit_balls(actual_result.get("digits", []))
-            digits = normalize_digit_balls(prediction_group.get("digits", []))
+            actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+            digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
             if play_type == "direct":
                 digit_hits = [digit for digit, actual in zip(digits, actual_digits) if digit == actual]
                 return {
@@ -409,20 +409,20 @@ class PredictionService:
             prize_amount = 0
 
             for metric in group_metrics:
-                base_hit_result = {
-                    "red_hit_count": int(metric.get("red_hit_count") or 0),
-                    "blue_hit_count": int(metric.get("blue_hit_count") or 0),
-                    "total_hits": int(metric.get("total_hits") or 0),
-                }
-                hit_result_from_metric = metric.get("hit_result")
-                hit_result = (
-                    {**base_hit_result, **hit_result_from_metric}
-                    if isinstance(hit_result_from_metric, dict)
-                    else base_hit_result
-                )
-                if lottery_code == "pl3" and "is_exact_match" not in hit_result and "digit_hit_count" not in hit_result:
+                if lottery_code == "pl3":
                     hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
                 else:
+                    base_hit_result = {
+                        "red_hit_count": int(metric.get("red_hit_count") or 0),
+                        "blue_hit_count": int(metric.get("blue_hit_count") or 0),
+                        "total_hits": int(metric.get("total_hits") or 0),
+                    }
+                    hit_result_from_metric = metric.get("hit_result")
+                    hit_result = (
+                        {**base_hit_result, **hit_result_from_metric}
+                        if isinstance(hit_result_from_metric, dict)
+                        else base_hit_result
+                    )
                     hit_result["digit_hit_count"] = int(hit_result.get("digit_hit_count") or 0)
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=metric)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
