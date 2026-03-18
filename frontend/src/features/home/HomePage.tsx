@@ -851,11 +851,11 @@ export function HomePage() {
                         <span>综合分 {item.score_profile?.overall_score || 0}</span>
                       </div>
                       <div className="history-stat-card__metrics">
-                        <span>按注 {item.score_profile?.per_bet_score || 0}</span>
-                        <span>按期 {item.score_profile?.per_period_score || 0}</span>
-                        <span>按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
-                        <span>按注中奖率 {formatPercent(item.win_rate_by_bet)}</span>
-                        <span>近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
+                        <span className="history-metric-pill">按注 {item.score_profile?.per_bet_score || 0}</span>
+                        <span className="history-metric-pill">按期 {item.score_profile?.per_period_score || 0}</span>
+                        <span className="history-metric-pill">按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
+                        <span className="history-metric-pill">按注中奖率 {formatPercent(item.win_rate_by_bet)}</span>
+                        <span className="history-metric-pill">近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
                       </div>
                     </article>
                   ))}
@@ -2282,19 +2282,19 @@ function HistoryRecordCard({
   return (
     <article className="history-record-card">
       <div className="history-record-card__header">
-        <div>
+        <div className="history-record-card__title-block">
           <p className="history-record-card__eyebrow">第 {record.target_period} 期</p>
           <h3>开奖回溯</h3>
         </div>
         <div className="history-record-card__actions">
-          <span>{record.actual_result?.date || '-'}</span>
+          <span className="history-record-card__date">{record.actual_result?.date || '-'}</span>
           <button className="ghost-button" onClick={() => setExpanded((value) => !value)}>
             {expanded ? '收起详情' : '展开详情'}
           </button>
         </div>
       </div>
       {record.actual_result ? (
-        <div className="number-row">
+        <div className="number-row history-record-card__numbers">
           {actualMainBalls.map((ball, index) => (
             <NumberBall key={`${record.target_period}-red-${index}-${ball}`} value={ball} color="red" />
           ))}
@@ -2307,17 +2307,30 @@ function HistoryRecordCard({
         </div>
       ) : null}
       <div className="history-record-card__summary">
-        <span>{periodSummary.total_bet_count} 注</span>
-        <span>成本 {formatCurrency(periodSummary.total_cost_amount)}</span>
-        <span>奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
+        <span className="history-metric-pill">{periodSummary.total_bet_count} 注</span>
+        <span className="history-metric-pill">成本 {formatCurrency(periodSummary.total_cost_amount)}</span>
+        <span className="history-metric-pill">奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
       </div>
       <div className="history-record-card__models">
         {listModels.map((model) => (
           <div key={`${record.target_period}-${model.model_id}`} className="history-record-card__model">
-            <strong>{model.model_name}</strong>
-            <span>
-              {model.bet_count || 0} 注 / {formatCurrency(model.cost_amount)} / {formatCurrency(model.prize_amount)}
-            </span>
+            <div className="history-record-card__model-nameplate">
+              <strong className="history-record-card__model-name">{model.model_name}</strong>
+            </div>
+            <div className="history-record-card__model-grid">
+              <span className="history-record-card__metric-cell">
+                <small>注数</small>
+                <strong>{model.bet_count || 0}</strong>
+              </span>
+              <span className="history-record-card__metric-cell">
+                <small>成本</small>
+                <strong>{formatCurrency(model.cost_amount)}</strong>
+              </span>
+              <span className="history-record-card__metric-cell">
+                <small>奖金</small>
+                <strong>{formatCurrency(model.prize_amount)}</strong>
+              </span>
+            </div>
           </div>
         ))}
       </div>
@@ -2332,18 +2345,25 @@ function HistoryRecordCard({
               {detailRecord.models.map((model) => (
                 <section key={`${record.target_period}-${model.model_id}-detail`} className="history-record-card__detail-model">
                   <div className="history-record-card__detail-header">
-                    <div>
+                    <div className="history-record-card__detail-heading">
                       <strong>{model.model_name}</strong>
                       <p>{model.model_provider}</p>
                     </div>
-                    <span>
-                      中奖率 {formatPercent(model.win_rate_by_period)} / {formatPercent(model.win_rate_by_bet)}
-                    </span>
+                    <div className="history-record-card__detail-rate-grid">
+                      <span className="history-record-card__metric-cell">
+                        <small>按期中奖率</small>
+                        <strong>{formatPercent(model.win_rate_by_period)}</strong>
+                      </span>
+                      <span className="history-record-card__metric-cell">
+                        <small>按注中奖率</small>
+                        <strong>{formatPercent(model.win_rate_by_bet)}</strong>
+                      </span>
+                    </div>
                   </div>
                   <div className="history-record-card__detail-summary">
-                    <span>{model.bet_count || 0} 注</span>
-                    <span>成本 {formatCurrency(model.cost_amount)}</span>
-                    <span>奖金 {formatCurrency(model.prize_amount)}</span>
+                    <span className="history-metric-pill">{model.bet_count || 0} 注</span>
+                    <span className="history-metric-pill">成本 {formatCurrency(model.cost_amount)}</span>
+                    <span className="history-metric-pill">奖金 {formatCurrency(model.prize_amount)}</span>
                   </div>
                   <div className="detail-group-list">
                     {model.predictions.map((group) => (
@@ -2351,6 +2371,7 @@ function HistoryRecordCard({
                         key={`${record.target_period}-${model.model_id}-${group.group_id}`}
                         group={group}
                         actualResult={record.actual_result}
+                        compact
                         grayMisses
                         emphasizeHitTier
                       />

@@ -421,9 +421,15 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(screen.getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
     expect(screen.getAllByText('成本 10 元').length).toBeGreaterThan(0)
-    expect(screen.getByText('5 注 / 10 元 / 300 元')).toBeInTheDocument()
     expect(screen.getAllByText('成本 20 元').length).toBeGreaterThan(0)
     expect(screen.getByText('奖金 305 元')).toBeInTheDocument()
+
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('注数').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('成本').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('奖金').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getByText('300 元')).toBeInTheDocument()
   })
 
   it('hides local sidebar navigation outside prediction tab', async () => {
@@ -612,6 +618,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(detailSection).not.toBeNull()
     const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
+    expect(groupCard).toHaveClass('is-compact')
     const cardScope = within(groupCard as HTMLElement)
     expect(cardScope.getByText('01')).toHaveClass('is-hit')
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
@@ -624,6 +631,11 @@ describe('HomePage dashboard sidebar', () => {
     const hit4Card = screen.getByText('G-2').closest('.prediction-group-card')
     const hit5Card = screen.getByText('G-3').closest('.prediction-group-card')
     const hit6Card = screen.getByText('G-4').closest('.prediction-group-card')
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('注数').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('成本').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('奖金').length).toBeGreaterThan(0)
+    expect(within(detailSection as HTMLElement).getByText('按期中奖率')).toBeInTheDocument()
+    expect(within(detailSection as HTMLElement).getByText('按注中奖率')).toBeInTheDocument()
     expect(groupCard).not.toHaveClass('is-hit-tier-4')
     expect(groupCard).not.toHaveClass('is-hit-tier-5')
     expect(groupCard).not.toHaveClass('is-hit-tier-6')
@@ -694,6 +706,8 @@ describe('HomePage dashboard sidebar', () => {
     expect(await screen.findByText('收起详情')).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
+    expect(screen.getByText('G-1').closest('.prediction-group-card')).toHaveClass('is-compact')
+    expect(screen.getByText('注数')).toBeInTheDocument()
   })
 
   it('requests pl3 history detail and highlights direct hits by position', async () => {
@@ -745,6 +759,8 @@ describe('HomePage dashboard sidebar', () => {
     expect(detailSection).not.toBeNull()
     const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
+    expect(groupCard).toHaveClass('is-compact')
+    expect(within(detailSection as HTMLElement).getByText('按期中奖率')).toBeInTheDocument()
 
     const cardScope = within(groupCard as HTMLElement)
     const oneDigits = cardScope.getAllByText('01')
