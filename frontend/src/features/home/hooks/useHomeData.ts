@@ -10,7 +10,13 @@ export function currentPredictionsQueryOptions(lotteryCode: LotteryCode = 'dlt')
   }
 }
 
-export function useHomeData(lotteryCode: LotteryCode, predictionLimit: number, lotteryPage: number, lotteryPageSize: number) {
+export function useHomeData(
+  lotteryCode: LotteryCode,
+  historyPage: number,
+  historyPageSize: number,
+  lotteryPage: number,
+  lotteryPageSize: number,
+) {
   const currentPredictions = useQuery({
     ...currentPredictionsQueryOptions(lotteryCode),
   })
@@ -27,8 +33,15 @@ export function useHomeData(lotteryCode: LotteryCode, predictionLimit: number, l
   })
 
   const predictionsHistory = useQuery({
-    queryKey: ['predictions-history', lotteryCode, predictionLimit],
-    queryFn: async () => normalizePredictionsHistoryList(await apiClient.getPredictionsHistoryList({ lottery_code: lotteryCode, limit: predictionLimit, offset: 0 })),
+    queryKey: ['predictions-history', lotteryCode, historyPage, historyPageSize],
+    queryFn: async () =>
+      normalizePredictionsHistoryList(
+        await apiClient.getPredictionsHistoryList({
+          lottery_code: lotteryCode,
+          limit: historyPageSize,
+          offset: (historyPage - 1) * historyPageSize,
+        }),
+      ),
   })
 
   const pagedLotteryHistory = useQuery({

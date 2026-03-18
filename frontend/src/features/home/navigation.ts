@@ -19,7 +19,8 @@ export type HomeDashboardState = {
   modelListView: HomeModelView
   scoreViewSortKey: ScoreViewSortKey
   scoreViewSortDirection: ScoreViewSortDirection
-  predictionLimit: number
+  historyPage: number
+  historyPageSize: number
   lotteryPage: number
   historyPeriodQuery: string
   commonOnly: boolean

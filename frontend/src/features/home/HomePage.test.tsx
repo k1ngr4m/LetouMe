@@ -12,6 +12,80 @@ const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDet
   getSimulationTickets: vi.fn(),
 }))
 
+function buildHistoryRecord(period: string, date: string, primaryModelId: 'model-a' | 'model-b' = 'model-b') {
+  const primaryModelName = primaryModelId === 'model-a' ? '模型A' : '模型B'
+  const secondaryModelId = primaryModelId === 'model-a' ? 'model-b' : 'model-a'
+  const secondaryModelName = secondaryModelId === 'model-a' ? '模型A' : '模型B'
+  return {
+    prediction_date: date,
+    target_period: period,
+    actual_result: {
+      period,
+      date,
+      red_balls: ['01', '08', '12', '19', '25'],
+      blue_balls: ['06', '11'],
+    },
+    period_summary: {
+      total_bet_count: 10,
+      total_cost_amount: 20,
+      total_prize_amount: primaryModelId === 'model-a' ? 305 : 25,
+    },
+    models: [
+      {
+        model_id: primaryModelId,
+        model_name: primaryModelName,
+        model_provider: primaryModelId === 'model-a' ? 'openai_compatible' : 'deepseek',
+        best_hit_count: primaryModelId === 'model-a' ? 3 : 2,
+        bet_count: 5,
+        cost_amount: 10,
+        winning_bet_count: 1,
+        prize_amount: primaryModelId === 'model-a' ? 300 : 15,
+        hit_period_win: true,
+      },
+      {
+        model_id: secondaryModelId,
+        model_name: secondaryModelName,
+        model_provider: secondaryModelId === 'model-a' ? 'openai_compatible' : 'deepseek',
+        best_hit_count: 1,
+        bet_count: 5,
+        cost_amount: 10,
+        winning_bet_count: 1,
+        prize_amount: secondaryModelId === 'model-a' ? 10 : 5,
+        hit_period_win: true,
+      },
+    ],
+  }
+}
+
+const SECOND_HISTORY_RECORD = {
+  prediction_date: '2026-03-11',
+  target_period: '2026030',
+  actual_result: {
+    period: '2026030',
+    date: '2026-03-08',
+    red_balls: ['03', '04', '05', '06', '07'],
+    blue_balls: ['08', '09'],
+  },
+  period_summary: {
+    total_bet_count: 5,
+    total_cost_amount: 10,
+    total_prize_amount: 15,
+  },
+  models: [
+    {
+      model_id: 'model-b',
+      model_name: '模型B',
+      model_provider: 'deepseek',
+      best_hit_count: 2,
+      bet_count: 5,
+      cost_amount: 10,
+      winning_bet_count: 1,
+      prize_amount: 15,
+      hit_period_win: true,
+    },
+  ],
+}
+
 vi.mock('../../shared/api/client', () => ({
   apiClient: {
     createSimulationTicket,
@@ -22,203 +96,154 @@ vi.mock('../../shared/api/client', () => ({
 }))
 
 vi.mock('./hooks/useHomeData', () => ({
-  useHomeData: () => ({
-    currentPredictions: {
-      data: {
-        prediction_date: '2026-03-12',
-        target_period: '2026032',
-        models: [
-          {
-            model_id: 'model-a',
-            model_name: '模型A',
-            model_provider: 'openai_compatible',
-            model_tags: ['reasoning'],
-            model_api_model: 'model-a-api',
-            predictions: Array.from({ length: 5 }, (_, index) => ({
-              group_id: index + 1,
-              red_balls: ['01', '02', '03', '04', '05'],
-              blue_balls: ['06', '07'],
-            })),
-          },
-          {
-            model_id: 'model-b',
-            model_name: '模型B',
-            model_provider: 'deepseek',
-            model_tags: ['fast'],
-            model_api_model: 'model-b-api',
-            predictions: Array.from({ length: 5 }, (_, index) => ({
-              group_id: index + 1,
-              red_balls: ['08', '09', '10', '11', '12'],
-              blue_balls: ['01', '02'],
-            })),
-          },
-        ],
-      },
-      isLoading: false,
-      error: null,
-    },
-    lotteryCharts: {
-      data: {
-        data: [
-          {
-            period: '2026031',
-            date: '2026-03-10',
-            red_balls: ['01', '02', '03', '04', '05'],
-            blue_balls: ['06', '07'],
-          },
-          {
-            period: '2026030',
-            date: '2026-03-08',
-            red_balls: ['08', '09', '10', '11', '12'],
-            blue_balls: ['01', '02'],
-          },
-        ],
-        next_draw: {
-          next_date_display: '2026-03-15',
+  useHomeData: (_lotteryCode: string, historyPage = 1, historyPageSize = 10) => {
+    const historyRecords = [
+      buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
+      SECOND_HISTORY_RECORD,
+      buildHistoryRecord('2026029', '2026-03-06', 'model-a'),
+      buildHistoryRecord('2026028', '2026-03-04', 'model-b'),
+      buildHistoryRecord('2026027', '2026-03-02', 'model-a'),
+      buildHistoryRecord('2026026', '2026-02-28', 'model-b'),
+      buildHistoryRecord('2026025', '2026-02-26', 'model-a'),
+      buildHistoryRecord('2026024', '2026-02-24', 'model-b'),
+      buildHistoryRecord('2026023', '2026-02-22', 'model-a'),
+      buildHistoryRecord('2026022', '2026-02-20', 'model-b'),
+      buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
+      buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
+    ]
+    const offset = (historyPage - 1) * historyPageSize
+    const pagedHistoryRecords = historyRecords.slice(offset, offset + historyPageSize)
+
+    return {
+      currentPredictions: {
+        data: {
+          prediction_date: '2026-03-12',
+          target_period: '2026032',
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                red_balls: ['01', '02', '03', '04', '05'],
+                blue_balls: ['06', '07'],
+              })),
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              model_tags: ['fast'],
+              model_api_model: 'model-b-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                red_balls: ['08', '09', '10', '11', '12'],
+                blue_balls: ['01', '02'],
+              })),
+            },
+          ],
         },
+        isLoading: false,
+        error: null,
       },
-      isLoading: false,
-      error: null,
-    },
-    predictionsHistory: {
-      data: {
-        model_stats: [
-          {
-            model_id: 'model-a',
-            model_name: '模型A',
-            periods: 8,
-            winning_periods: 5,
-            bet_count: 40,
-            winning_bet_count: 10,
-            cost_amount: 80,
-            prize_amount: 160,
-            win_rate_by_period: 0.625,
-            win_rate_by_bet: 0.25,
-            score_profile: {
-              overall_score: 72,
-              per_bet_score: 68,
-              per_period_score: 75,
-              recent_score: 78,
-              long_term_score: 70,
-              component_scores: {
-                profit: 74,
-                hit_rate: 71,
-                stability: 69,
-                ceiling: 80,
-                floor: 58,
-              },
-            },
-          },
-          {
-            model_id: 'model-b',
-            model_name: '模型B',
-            periods: 8,
-            winning_periods: 4,
-            bet_count: 40,
-            winning_bet_count: 8,
-            cost_amount: 80,
-            prize_amount: 110,
-            win_rate_by_period: 0.5,
-            win_rate_by_bet: 0.2,
-            score_profile: {
-              overall_score: 61,
-              per_bet_score: 57,
-              per_period_score: 64,
-              recent_score: 59,
-              long_term_score: 63,
-              component_scores: {
-                profit: 60,
-                hit_rate: 62,
-                stability: 58,
-                ceiling: 67,
-                floor: 52,
-              },
-            },
-          },
-        ],
-        predictions_history: [
-          {
-            prediction_date: '2026-03-12',
-            target_period: '2026031',
-            actual_result: {
+      lotteryCharts: {
+        data: {
+          data: [
+            {
               period: '2026031',
               date: '2026-03-10',
-              red_balls: ['01', '08', '12', '19', '25'],
-              blue_balls: ['06', '11'],
+              red_balls: ['01', '02', '03', '04', '05'],
+              blue_balls: ['06', '07'],
             },
-            period_summary: {
-              total_bet_count: 10,
-              total_cost_amount: 20,
-              total_prize_amount: 305,
-            },
-            models: [
-              {
-                model_id: 'model-a',
-                model_name: '模型A',
-                model_provider: 'openai_compatible',
-                best_hit_count: 3,
-                bet_count: 5,
-                cost_amount: 10,
-                winning_bet_count: 1,
-                prize_amount: 300,
-                hit_period_win: true,
-              },
-              {
-                model_id: 'model-b',
-                model_name: '模型B',
-                model_provider: 'deepseek',
-                best_hit_count: 1,
-                bet_count: 5,
-                cost_amount: 10,
-                winning_bet_count: 1,
-                prize_amount: 5,
-                hit_period_win: true,
-              },
-            ],
-          },
-          {
-            prediction_date: '2026-03-11',
-            target_period: '2026030',
-            actual_result: {
+            {
               period: '2026030',
               date: '2026-03-08',
-              red_balls: ['03', '04', '05', '06', '07'],
-              blue_balls: ['08', '09'],
+              red_balls: ['08', '09', '10', '11', '12'],
+              blue_balls: ['01', '02'],
             },
-            period_summary: {
-              total_bet_count: 5,
-              total_cost_amount: 10,
-              total_prize_amount: 15,
-            },
-            models: [
-              {
-                model_id: 'model-b',
-                model_name: '模型B',
-                model_provider: 'deepseek',
-                best_hit_count: 2,
-                bet_count: 5,
-                cost_amount: 10,
-                winning_bet_count: 1,
-                prize_amount: 15,
-                hit_period_win: true,
-              },
-            ],
+          ],
+          next_draw: {
+            next_date_display: '2026-03-15',
           },
-        ],
-        total_count: 2,
+        },
+        isLoading: false,
+        error: null,
       },
-      isLoading: false,
-      error: null,
-    },
-    pagedLotteryHistory: {
-      data: {
-        data: [],
-        total_count: 0,
+      predictionsHistory: {
+        data: {
+          model_stats: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              periods: 8,
+              winning_periods: 5,
+              bet_count: 40,
+              winning_bet_count: 10,
+              cost_amount: 80,
+              prize_amount: 160,
+              win_rate_by_period: 0.625,
+              win_rate_by_bet: 0.25,
+              score_profile: {
+                overall_score: 72,
+                per_bet_score: 68,
+                per_period_score: 75,
+                recent_score: 78,
+                long_term_score: 70,
+                component_scores: {
+                  profit: 74,
+                  hit_rate: 71,
+                  stability: 69,
+                  ceiling: 80,
+                  floor: 58,
+                },
+              },
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              periods: 8,
+              winning_periods: 4,
+              bet_count: 40,
+              winning_bet_count: 8,
+              cost_amount: 80,
+              prize_amount: 110,
+              win_rate_by_period: 0.5,
+              win_rate_by_bet: 0.2,
+              score_profile: {
+                overall_score: 61,
+                per_bet_score: 57,
+                per_period_score: 64,
+                recent_score: 59,
+                long_term_score: 63,
+                component_scores: {
+                  profit: 60,
+                  hit_rate: 62,
+                  stability: 58,
+                  ceiling: 67,
+                  floor: 52,
+                },
+              },
+            },
+          ],
+          predictions_history: pagedHistoryRecords,
+          total_count: historyRecords.length,
+        },
+        isLoading: false,
+        error: null,
       },
-      isLoading: false,
-      error: null,
-    },
-  }),
+      pagedLotteryHistory: {
+        data: {
+          data: [],
+          total_count: 0,
+        },
+        isLoading: false,
+        error: null,
+      },
+    }
+  },
 }))
 
 function renderPage() {
@@ -417,12 +442,13 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
 
-    expect(screen.getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('成本 10 元').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('成本 20 元').length).toBeGreaterThan(0)
-    expect(screen.getByText('奖金 305 元')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
+    expect(within(historySection as HTMLElement).getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
+    expect(within(historySection as HTMLElement).getAllByText('成本 20 元').length).toBeGreaterThan(0)
+    expect(within(historySection as HTMLElement).getAllByText('奖金 305 元').length).toBeGreaterThan(0)
 
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
@@ -430,7 +456,33 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getAllByText('注数').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getAllByText('成本').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getAllByText('奖金').length).toBeGreaterThan(0)
+    expect(within(firstHistoryCard as HTMLElement).getAllByText('10 元').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getByText('300 元')).toBeInTheDocument()
+  })
+
+  it('paginates history records and supports page size changes', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+
+    expect(within(historySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
+    expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.queryByText('第 2026021 期')).not.toBeInTheDocument()
+
+    await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '下一页' }))
+
+    expect(within(historySection as HTMLElement).getByText('第 2 / 2 页')).toBeInTheDocument()
+    expect(screen.getByText('第 2026021 期')).toBeInTheDocument()
+    expect(screen.queryByText('第 2026031 期')).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(within(historySection as HTMLElement).getByRole('combobox'), '20')
+
+    expect(within(historySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
+    expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.getByText('第 2026021 期')).toBeInTheDocument()
   })
 
   it('hides local sidebar navigation outside prediction tab', async () => {
@@ -695,20 +747,22 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '筛选' }))
     await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
 
     expect(screen.getByText('已显示 1 / 2 个模型')).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '展开详情' }))
+    await userEvent.click(within(historySection as HTMLElement).getAllByRole('button', { name: '展开详情' })[0])
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
 
     expect(await screen.findByText('收起详情')).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.getByText('G-1').closest('.prediction-group-card')).toHaveClass('is-compact')
-    expect(screen.getByText('注数')).toBeInTheDocument()
+    expect(screen.getAllByText('注数').length).toBeGreaterThan(0)
   })
 
   it('requests pl3 history detail and highlights direct hits by position', async () => {

@@ -2020,6 +2020,33 @@ a {
   max-width: 14rem;
 }
 
+.history-pagination-row {
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.history-pagination-row__meta,
+.history-pagination-row__actions,
+.history-pagination-row__size {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.history-pagination-row__meta {
+  color: var(--text-2);
+}
+
+.history-pagination-row__size {
+  color: var(--text-2);
+}
+
+.history-pagination-row__size select {
+  min-width: 6rem;
+}
+
 .table-shell {
   overflow-x: auto;
 }
