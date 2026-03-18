@@ -27,7 +27,9 @@ import {
   type BallStatItem,
   buildBlueFrequencyChart,
   buildOddEvenChart,
+  getPredictionPlayTypeLabel,
   buildRedFrequencyChart,
+  resolveHistoryFallbackState,
   buildSumTrendChart,
   compareNumbers,
   getActualResult,
@@ -174,6 +176,11 @@ type HistoryModelStatView = {
   score_profile?: PredictionModel['score_profile']
 }
 
+type HistoryModelRef = {
+  model_id: string
+  model_name: string
+}
+
 function formatCurrency(value: number | undefined) {
   return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
 }
@@ -182,7 +189,7 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
-function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models: PredictionModel[]): HistoryModelStatView[] {
+function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models: HistoryModelRef[]): HistoryModelStatView[] {
   const stats = new Map<string, HistoryModelStatView>()
 
   for (const record of records) {
@@ -244,6 +251,7 @@ export function HomePage() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState(restoredState?.historyPeriodQuery || '')
   const [commonOnly, setCommonOnly] = useState(Boolean(restoredState?.commonOnly))
+  const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
@@ -301,6 +309,10 @@ export function HomePage() {
   }, [selectedLottery])
 
   useEffect(() => {
+    setHistoryFallbackSignature(null)
+  }, [selectedLottery])
+
+  useEffect(() => {
     if (hasRestoredScrollRef.current || typeof restoredState?.scrollY !== 'number') return
     hasRestoredScrollRef.current = true
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: restoredState.scrollY }))
@@ -337,9 +349,71 @@ export function HomePage() {
     }
   }, [activeTab])
 
-  const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(historyPeriodQuery, commonOnly, weightedSummary)
+  const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
+    const references = new Map<string, HistoryModelRef>()
+    for (const stat of history?.model_stats || []) {
+      if (!stat.model_id) continue
+      references.set(stat.model_id, {
+        model_id: stat.model_id,
+        model_name: stat.model_name || stat.model_id,
+      })
+    }
+    for (const record of history?.predictions_history || []) {
+      for (const model of record.models || []) {
+        if (!model.model_id) continue
+        references.set(model.model_id, {
+          model_id: model.model_id,
+          model_name: model.model_name || model.model_id,
+        })
+      }
+    }
+    return [...references.values()]
+  }, [history])
+  const historyFilterSignature = useMemo(
+    () =>
+      JSON.stringify({
+        modelNameQuery: modelNameQuery.trim(),
+        selectedProviders: [...selectedProviders].sort(),
+        selectedTags: [...selectedTags].sort(),
+        selectedScoreRange,
+      }),
+    [modelNameQuery, selectedProviders, selectedTags, selectedScoreRange],
+  )
+  const historyFallbackEnabled = historyFallbackSignature === historyFilterSignature
+  const hasManualModelFilter = Boolean(
+    modelNameQuery.trim() ||
+      selectedProviders.length ||
+      selectedTags.length ||
+      selectedScoreRange !== 'all',
+  )
+  const { useHistoryFallbackModels, needsHistoryFallbackPrompt } = resolveHistoryFallbackState({
+    hasHistoryRecords: Boolean(history?.predictions_history?.length),
+    hasManualModelFilter,
+    hasCurrentModels: models.length > 0,
+    filteredModelIds,
+    historyModelIds: historyAllModelRefs.map((item) => item.model_id),
+    historyFallbackEnabled,
+  })
+  const historyVisibleModelIds = useMemo(
+    () => (useHistoryFallbackModels ? historyAllModelRefs.map((item) => item.model_id) : filteredModelIds),
+    [filteredModelIds, historyAllModelRefs, useHistoryFallbackModels],
+  )
+  const historyVisibleModels = useMemo<HistoryModelRef[]>(
+    () =>
+      useHistoryFallbackModels
+        ? historyAllModelRefs
+        : filteredModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name })),
+    [filteredModels, historyAllModelRefs, useHistoryFallbackModels],
+  )
+
+  const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
+    historyPeriodQuery,
+    commonOnly,
+    weightedSummary,
+    historyVisibleModelIds,
+  )
   const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
-  const historyModelStats = buildHistoryModelStats(filteredHistory, filteredModels)
+  const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / LOTTERY_PAGE_SIZE))
   const redChart = buildRedFrequencyChart(chartDraws)
   const blueChart = buildBlueFrequencyChart(chartDraws)
@@ -696,7 +770,7 @@ export function HomePage() {
       {activeTab === 'history' ? (
         <div className="page-section">
           <ChartCard title="模型历史命中趋势">
-            {filteredModels.length && historyHitTrend.length ? (
+            {historyVisibleModels.length && historyHitTrend.length ? (
               <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={historyHitTrend}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -704,7 +778,7 @@ export function HomePage() {
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  {filteredModels.map((model, index) => (
+                  {historyVisibleModels.map((model, index) => (
                     <Line
                       key={model.model_id}
                       type="monotone"
@@ -758,6 +832,14 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
+            {needsHistoryFallbackPrompt ? (
+              <div className="state-shell">
+                当前筛选模型在历史回溯中暂无匹配记录。
+                <button className="ghost-button" type="button" onClick={() => setHistoryFallbackSignature(historyFilterSignature)}>
+                  展示全部历史模型
+                </button>
+              </div>
+            ) : null}
 
             <div className="history-card-list">
               {historyModelStats.length ? (
@@ -779,10 +861,15 @@ export function HomePage() {
                   ))}
                 </div>
               ) : null}
-              {!filteredModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
-              {filteredModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
+              {!historyVisibleModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
+              {historyVisibleModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
               {filteredHistory.map((record) => (
-                <HistoryRecordCard key={record.target_period} record={record} visibleModelIds={filteredModelIds} />
+                <HistoryRecordCard
+                  key={`${selectedLottery}-${record.target_period}`}
+                  record={record}
+                  lotteryCode={selectedLottery}
+                  visibleModelIds={historyVisibleModelIds}
+                />
               ))}
             </div>
 
@@ -1593,6 +1680,7 @@ export function PredictionGroupCard({
   emphasizeHitTier?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
+  const playTypeLabel = getPredictionPlayTypeLabel(group, actualResult)
   const hitTierClass =
     emphasizeHitTier && hit
       ? hit.totalHits >= 6
@@ -1607,6 +1695,7 @@ export function PredictionGroupCard({
     <article className={clsx('prediction-group-card', compact && 'is-compact', hitTierClass)}>
       <div className="prediction-group-card__header">
         <span className="prediction-group-card__badge">G-{group.group_id}</span>
+        {playTypeLabel !== '复式' ? <span className="prediction-group-card__play-type">{playTypeLabel}</span> : null}
         <span className="prediction-group-card__strategy">{group.strategy || 'AI 组合策略'}</span>
         {hit ? <strong className="prediction-group-card__hit">{hit.totalHits} 中</strong> : null}
       </div>
@@ -1636,6 +1725,26 @@ function PredictionNumberRow({
   compact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
+  const isPl3Group = getPredictionPlayTypeLabel(group, actualResult) !== '复式'
+  const pl3Digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).slice(0, 3)
+  if (isPl3Group) {
+    return (
+      <div className={clsx('number-row', compact && 'number-row--compact')}>
+        {pl3Digits.map((digit, index) => {
+          const isHit = Boolean((hit?.digitHitIndexes || []).includes(index))
+          return (
+            <NumberBall
+              key={`d-${group.group_id}-${index}-${digit}`}
+              value={digit}
+              color="red"
+              isHit={isHit}
+              tone={grayMisses && !isHit ? 'muted' : 'default'}
+            />
+          )
+        })}
+      </div>
+    )
+  }
   return (
     <div className={clsx('number-row', compact && 'number-row--compact')}>
       {group.red_balls.map((ball, index) => {
@@ -2135,16 +2244,18 @@ function ModelFilterPanel({
 
 function HistoryRecordCard({
   record,
+  lotteryCode,
   visibleModelIds,
 }: {
   record: PredictionsHistoryListRecord
+  lotteryCode: LotteryCode
   visibleModelIds: string[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const detailQuery = useQuery({
-    queryKey: ['predictions-history-detail', record.target_period],
+    queryKey: ['predictions-history-detail', lotteryCode, record.target_period],
     enabled: expanded,
-    queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period)),
+    queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period, lotteryCode)),
   })
   const detailRecord = detailQuery.data?.predictions_history?.[0]
     ? {
@@ -2201,7 +2312,7 @@ function HistoryRecordCard({
         <span>奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
       </div>
       <div className="history-record-card__models">
-        {record.models.map((model) => (
+        {summaryModels.map((model) => (
           <div key={`${record.target_period}-${model.model_id}`} className="history-record-card__model">
             <strong>{model.model_name}</strong>
             <span>

@@ -1887,6 +1887,20 @@ a {
   color: #ffbe8a;
 }
 
+.prediction-group-card__play-type {
+  padding: 0.24rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(61, 141, 245, 0.18);
+  color: #a7d0ff;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.prediction-group-card.is-compact .prediction-group-card__play-type {
+  padding: 0.16rem 0.32rem;
+  font-size: 0.66rem;
+}
+
 .prediction-group-card__desc {
   margin: 0.7rem 0 0;
   color: var(--text-2);

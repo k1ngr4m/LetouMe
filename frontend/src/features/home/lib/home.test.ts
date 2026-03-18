@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildSummary, filterModels } from './home'
+import { buildHistoryHitTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, resolveHistoryFallbackState } from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -176,5 +176,125 @@ describe('filterModels', () => {
     })
 
     expect(result.map((item) => item.model_id)).toEqual(['gemini-pro'])
+  })
+})
+
+describe('resolveHistoryFallbackState', () => {
+  it('auto-falls back to history models when no manual filter and no intersection', () => {
+    const result = resolveHistoryFallbackState({
+      hasHistoryRecords: true,
+      hasManualModelFilter: false,
+      hasCurrentModels: true,
+      filteredModelIds: ['current-a'],
+      historyModelIds: ['history-only'],
+      historyFallbackEnabled: false,
+    })
+
+    expect(result.useHistoryFallbackModels).toBe(true)
+    expect(result.needsHistoryFallbackPrompt).toBe(false)
+  })
+
+  it('prompts before fallback when manual filter is active and no intersection', () => {
+    const result = resolveHistoryFallbackState({
+      hasHistoryRecords: true,
+      hasManualModelFilter: true,
+      hasCurrentModels: true,
+      filteredModelIds: ['current-a'],
+      historyModelIds: ['history-only'],
+      historyFallbackEnabled: false,
+    })
+
+    expect(result.useHistoryFallbackModels).toBe(false)
+    expect(result.needsHistoryFallbackPrompt).toBe(true)
+  })
+
+  it('enables manual fallback after user confirms', () => {
+    const result = resolveHistoryFallbackState({
+      hasHistoryRecords: true,
+      hasManualModelFilter: true,
+      hasCurrentModels: true,
+      filteredModelIds: ['current-a'],
+      historyModelIds: ['history-only'],
+      historyFallbackEnabled: true,
+    })
+
+    expect(result.useHistoryFallbackModels).toBe(true)
+    expect(result.needsHistoryFallbackPrompt).toBe(false)
+  })
+})
+
+describe('compareNumbers for pl3', () => {
+  it('highlights only matched positions for direct play', () => {
+    const hit = compareNumbers(
+      {
+        group_id: 1,
+        play_type: 'direct',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '01', '02'],
+      },
+      {
+        lottery_code: 'pl3',
+        period: '26067',
+        date: '2026-03-18',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '03', '02'],
+      },
+    )
+
+    expect(hit?.digitHitIndexes).toEqual([0, 2])
+    expect(hit?.digitHitCount).toBe(2)
+    expect(hit?.totalHits).toBe(2)
+  })
+
+  it('marks all digits hit for winning group3 and group6', () => {
+    const group3Hit = compareNumbers(
+      {
+        group_id: 1,
+        play_type: 'group3',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '01', '08'],
+      },
+      {
+        lottery_code: 'pl3',
+        period: '26067',
+        date: '2026-03-18',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '08', '01'],
+      },
+    )
+    const group6Hit = compareNumbers(
+      {
+        group_id: 2,
+        play_type: 'group6',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '03', '08'],
+      },
+      {
+        lottery_code: 'pl3',
+        period: '26067',
+        date: '2026-03-18',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['08', '03', '01'],
+      },
+    )
+
+    expect(group3Hit?.digitHitIndexes).toEqual([0, 1, 2])
+    expect(group3Hit?.digitHitCount).toBe(3)
+    expect(group6Hit?.digitHitIndexes).toEqual([0, 1, 2])
+    expect(group6Hit?.digitHitCount).toBe(3)
+  })
+})
+
+describe('getPredictionPlayTypeLabel', () => {
+  it('returns direct/group labels for pl3 groups and keeps dlt as 复式', () => {
+    expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] })).toBe('直选')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('复式')
   })
 })

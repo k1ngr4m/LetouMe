@@ -396,6 +396,7 @@ class PredictionService:
         actual_result = payload.get("actual_result")
         if not actual_result:
             return {**payload, "period_summary": self._empty_period_summary()}
+        lottery_code = normalize_lottery_code(payload.get("lottery_code") or actual_result.get("lottery_code") or "dlt")
 
         annotated_models: list[dict[str, Any]] = []
         total_bet_count = 0
@@ -408,11 +409,21 @@ class PredictionService:
             prize_amount = 0
 
             for metric in group_metrics:
-                hit_result = {
+                base_hit_result = {
                     "red_hit_count": int(metric.get("red_hit_count") or 0),
                     "blue_hit_count": int(metric.get("blue_hit_count") or 0),
                     "total_hits": int(metric.get("total_hits") or 0),
                 }
+                hit_result_from_metric = metric.get("hit_result")
+                hit_result = (
+                    {**base_hit_result, **hit_result_from_metric}
+                    if isinstance(hit_result_from_metric, dict)
+                    else base_hit_result
+                )
+                if lottery_code == "pl3" and "is_exact_match" not in hit_result and "digit_hit_count" not in hit_result:
+                    hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
+                else:
+                    hit_result["digit_hit_count"] = int(hit_result.get("digit_hit_count") or 0)
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=metric)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
                 if prize_info["amount"] > 0:
@@ -809,7 +820,10 @@ class PredictionService:
         if lottery_code == "pl3":
             play_type = str((prediction_group or {}).get("play_type") or "direct").strip().lower()
             if play_type == "direct":
-                return "直选" if bool(hit_result.get("is_exact_match")) else None
+                is_exact_match = hit_result.get("is_exact_match")
+                if is_exact_match is None:
+                    is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 3
+                return "直选" if bool(is_exact_match) else None
             if int(hit_result.get("digit_hit_count") or 0) != 3:
                 return None
             digits = normalize_group_digits((prediction_group or {}).get("digits", []))

@@ -277,6 +277,7 @@ describe('SettingsPage model management view switch', () => {
           model_provider: 'deepseek',
           predictions: [
             { group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] },
+            { group_id: 2, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['1', '1', '8'] },
           ],
           best_hit_count: 3,
         },
@@ -296,6 +297,7 @@ describe('SettingsPage model management view switch', () => {
 
     expect(await screen.findByRole('heading', { name: '第 2026032 期' })).toBeInTheDocument()
     expect(await screen.findByText('DeepSeek-V3.2')).toBeInTheDocument()
+    expect(await screen.findByText('第2组 组选3 01 01 08')).toBeInTheDocument()
   })
 
   it('filters prediction records by type and period', async () => {

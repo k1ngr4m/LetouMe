@@ -50,6 +50,33 @@ export type ModelListFilters = {
   scoreRange: ModelListScoreRange
 }
 
+export type HistoryFallbackResolutionInput = {
+  hasHistoryRecords: boolean
+  hasManualModelFilter: boolean
+  hasCurrentModels: boolean
+  filteredModelIds: string[]
+  historyModelIds: string[]
+  historyFallbackEnabled: boolean
+}
+
+export type HistoryFallbackResolution = {
+  useHistoryFallbackModels: boolean
+  needsHistoryFallbackPrompt: boolean
+  hasHistoryModelIntersection: boolean
+  noCurrentModelData: boolean
+}
+
+export type PredictionHitComparison = {
+  redHits: string[]
+  redHitCount: number
+  blueHits: string[]
+  blueHitCount: number
+  digitHits: string[]
+  digitHitCount: number
+  digitHitIndexes: number[]
+  totalHits: number
+}
+
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
   return {
     ...draw,
@@ -222,10 +249,36 @@ function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistory
   }
 }
 
-export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null) {
+export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null): PredictionHitComparison | null {
   if (!actualResult) return null
-  if ((actualResult.lottery_code || 'dlt') === 'pl3') {
-    const digitHits = (prediction.digits || []).filter((digit, index) => digit === (actualResult.digits || [])[index])
+  const inferredLotteryCode = actualResult.lottery_code || (prediction.play_type || (prediction.digits || []).length ? 'pl3' : 'dlt')
+  if (inferredLotteryCode === 'pl3') {
+    const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || []).map(padBall).slice(0, 3)
+    const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
+    const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
+    const isGroupPlay = playType === 'group3' || playType === 'group6'
+
+    if (isGroupPlay) {
+      const predictedNormalized = [...predictionDigits].sort()
+      const actualNormalized = [...actualDigits].sort()
+      const isWinning = predictedNormalized.length === 3 && actualNormalized.length === 3 && predictedNormalized.join(',') === actualNormalized.join(',')
+      const digitHitIndexes = isWinning ? [0, 1, 2] : []
+      return {
+        redHits: [],
+        redHitCount: 0,
+        blueHits: [],
+        blueHitCount: 0,
+        digitHits: digitHitIndexes.map((index) => predictionDigits[index]).filter(Boolean),
+        digitHitCount: digitHitIndexes.length,
+        digitHitIndexes,
+        totalHits: digitHitIndexes.length,
+      }
+    }
+
+    const digitHitIndexes = predictionDigits
+      .map((digit, index) => (digit === actualDigits[index] ? index : -1))
+      .filter((index) => index >= 0)
+    const digitHits = digitHitIndexes.map((index) => predictionDigits[index]).filter(Boolean)
     return {
       redHits: [],
       redHitCount: 0,
@@ -233,6 +286,7 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
       blueHitCount: 0,
       digitHits,
       digitHitCount: digitHits.length,
+      digitHitIndexes,
       totalHits: digitHits.length,
     }
   }
@@ -243,8 +297,25 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
     redHitCount: redHits.length,
     blueHits,
     blueHitCount: blueHits.length,
+    digitHits: [],
+    digitHitCount: 0,
+    digitHitIndexes: [],
     totalHits: redHits.length + blueHits.length,
   }
+}
+
+export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult: LotteryDraw | null = null): string {
+  const inferredLotteryCode = actualResult?.lottery_code || (group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  if (inferredLotteryCode !== 'pl3') {
+    return '复式'
+  }
+  if (group.play_type === 'group3') {
+    return '组选3'
+  }
+  if (group.play_type === 'group6') {
+    return '组选6'
+  }
+  return '直选'
 }
 
 export function buildModelScores(history: PredictionsHistoryListResponse, models: PredictionModel[]): Record<string, ModelScore> {
@@ -458,4 +529,31 @@ export function filterHistoryRecords(history: PredictionsHistoryListResponse, se
       const matchesModel = !selectedModelIds.length || record.models.length > 0
       return matchesPeriod && matchesModel
     })
+}
+
+export function resolveHistoryFallbackState({
+  hasHistoryRecords,
+  hasManualModelFilter,
+  hasCurrentModels,
+  filteredModelIds,
+  historyModelIds,
+  historyFallbackEnabled,
+}: HistoryFallbackResolutionInput): HistoryFallbackResolution {
+  const historyModelIdSet = new Set(historyModelIds)
+  const hasHistoryModelIntersection = filteredModelIds.some((modelId) => historyModelIdSet.has(modelId))
+  const noCurrentModelData = !hasCurrentModels && historyModelIds.length > 0
+  const hasModelCandidates = filteredModelIds.length > 0 && historyModelIds.length > 0
+  const noIntersection = hasModelCandidates && !hasHistoryModelIntersection
+  const autoFallbackWithoutManualFilter = !hasManualModelFilter && noIntersection
+  const manualFallbackEnabled = hasManualModelFilter && historyFallbackEnabled
+
+  const useHistoryFallbackModels = noCurrentModelData || autoFallbackWithoutManualFilter || (manualFallbackEnabled && noIntersection)
+  const needsHistoryFallbackPrompt = hasHistoryRecords && hasManualModelFilter && !noCurrentModelData && noIntersection && !historyFallbackEnabled
+
+  return {
+    useHistoryFallbackModels,
+    needsHistoryFallbackPrompt,
+    hasHistoryModelIntersection,
+    noCurrentModelData,
+  }
 }

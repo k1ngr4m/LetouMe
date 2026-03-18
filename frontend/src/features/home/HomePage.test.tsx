@@ -603,7 +603,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
 
-    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031'))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
     expect(await screen.findByText('收起详情')).toBeInTheDocument()
 
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
@@ -689,10 +689,68 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '展开详情' }))
-    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031'))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
 
     expect(await screen.findByText('收起详情')).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
+  })
+
+  it('requests pl3 history detail and highlights direct hits by position', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 2,
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'direct',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: ['01', '01', '12'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    expect(await screen.findByText('直选')).toBeInTheDocument()
+
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    const detailSection = within(firstHistoryCard as HTMLElement).getAllByText('模型A')[1].closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
+    expect(groupCard).not.toBeNull()
+
+    const cardScope = within(groupCard as HTMLElement)
+    const oneDigits = cardScope.getAllByText('01')
+    expect(oneDigits[0]).toHaveClass('is-hit')
+    expect(oneDigits[1]).not.toHaveClass('is-hit')
+    expect(oneDigits[1]).toHaveClass('number-ball--muted')
+    expect(cardScope.getByText('12')).toHaveClass('is-hit')
   })
 })

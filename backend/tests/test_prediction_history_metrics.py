@@ -78,10 +78,10 @@ class _FakePredictionRepository:
             ],
         }
 
-    def list_history_records(self, limit: int | None = None, offset: int = 0) -> list[dict]:
+    def list_history_records(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> list[dict]:
         return [self.record]
 
-    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0) -> list[dict]:
+    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> list[dict]:
         return [
             {
                 "prediction_date": "2026-03-12",
@@ -113,11 +113,99 @@ class _FakePredictionRepository:
             }
         ]
 
-    def count_history_records(self) -> int:
+    def count_history_records(self, lottery_code: str = "dlt") -> int:
         return 1
 
-    def get_history_record_detail(self, target_period: str) -> dict | None:
+    def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict | None:
         return self.record if target_period == "2026031" else None
+
+
+class _FakePl3PredictionRepository:
+    def __init__(self) -> None:
+        self.record = {
+            "lottery_code": "pl3",
+            "prediction_date": "2026-03-12",
+            "target_period": "26060",
+            "actual_result": {
+                "lottery_code": "pl3",
+                "period": "26060",
+                "date": "2026-03-11",
+                "digits": ["01", "01", "08"],
+                "prize_breakdown": [
+                    {"prize_level": "直选", "prize_type": "basic", "winner_count": 1, "prize_amount": 1040, "total_amount": 1040},
+                    {"prize_level": "组选3", "prize_type": "basic", "winner_count": 1, "prize_amount": 346, "total_amount": 346},
+                ],
+            },
+            "models": [
+                {
+                    "model_id": "deepseek-pl3",
+                    "model_name": "DeepSeek-PL3",
+                    "model_provider": "deepseek",
+                    "predictions": [
+                        {
+                            "group_id": 1,
+                            "play_type": "direct",
+                            "digits": ["01", "01", "08"],
+                            "hit_result": {"digit_hits": ["01", "01", "08"], "digit_hit_count": 3, "is_exact_match": True},
+                        },
+                        {
+                            "group_id": 2,
+                            "play_type": "group3",
+                            "digits": ["01", "08", "08"],
+                            "hit_result": {"digit_hits": ["01", "08", "08"], "digit_hit_count": 3, "is_exact_match": True},
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def list_history_records(self, limit: int | None = None, offset: int = 0, lottery_code: str = "pl3") -> list[dict]:
+        return [self.record]
+
+    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0, lottery_code: str = "pl3") -> list[dict]:
+        return [
+            {
+                "lottery_code": "pl3",
+                "prediction_date": "2026-03-12",
+                "target_period": "26060",
+                "actual_result": self.record["actual_result"],
+                "models": [
+                    {
+                        "model_id": "deepseek-pl3",
+                        "model_name": "DeepSeek-PL3",
+                        "model_provider": "deepseek",
+                        "best_group": 1,
+                        "best_hit_count": 3,
+                        "group_metrics": [
+                            {
+                                "group_id": 1,
+                                "play_type": "direct",
+                                "digits": ["01", "01", "08"],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 3,
+                                "hit_result": {"digit_hit_count": 3},
+                            },
+                            {
+                                "group_id": 2,
+                                "play_type": "group3",
+                                "digits": ["01", "08", "08"],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 3,
+                                "hit_result": {"digit_hit_count": 3},
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+
+    def count_history_records(self, lottery_code: str = "pl3") -> int:
+        return 1
+
+    def get_history_record_detail(self, target_period: str, lottery_code: str = "pl3") -> dict | None:
+        return self.record if target_period == "26060" else None
 
 
 class PredictionHistoryMetricsTests(unittest.TestCase):
@@ -165,6 +253,28 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(fixed, {"amount": 10000, "source": "fallback"})
         self.assertEqual(floating, {"amount": 0, "source": "missing"})
+
+    def test_pl3_history_list_payload_computes_model_prize_amount(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
+
+        payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="pl3")
+
+        self.assertEqual(payload["total_count"], 1)
+        self.assertEqual(payload["lottery_code"], "pl3")
+        record = payload["predictions_history"][0]
+        model = record["models"][0]
+        self.assertEqual(model["bet_count"], 2)
+        self.assertEqual(model["prize_amount"], 1386)
+        self.assertEqual(record["period_summary"]["total_prize_amount"], 1386)
+
+    def test_resolve_pl3_direct_prize_level_accepts_digit_hit_count_when_exact_flag_missing(self) -> None:
+        prize_level = self.service.resolve_prize_level(
+            {"digit_hit_count": 3},
+            actual_result={"lottery_code": "pl3"},
+            prediction_group={"play_type": "direct", "digits": ["01", "01", "08"]},
+        )
+
+        self.assertEqual(prize_level, "直选")
 
 
 if __name__ == "__main__":

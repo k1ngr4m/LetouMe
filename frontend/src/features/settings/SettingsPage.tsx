@@ -2068,13 +2068,20 @@ export function SettingsPage() {
                   </div>
                   {predictionRecordDetailQuery.data.actual_result ? (
                     <div className="number-row">
-                      {predictionRecordDetailQuery.data.actual_result.red_balls.map((ball) => (
+                      {((predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'pl3'
+                        ? ((predictionRecordDetailQuery.data.actual_result.digits?.length
+                            ? predictionRecordDetailQuery.data.actual_result.digits
+                            : predictionRecordDetailQuery.data.actual_result.red_balls) || [])
+                        : predictionRecordDetailQuery.data.actual_result.red_balls
+                      ).map((ball) => (
                         <NumberBall key={`detail-red-${ball}`} value={ball} color="red" />
                       ))}
-                      <span className="number-row__divider" />
-                      {predictionRecordDetailQuery.data.actual_result.blue_balls.map((ball) => (
-                        <NumberBall key={`detail-blue-${ball}`} value={ball} color="blue" />
-                      ))}
+                      {(predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'dlt' ? <span className="number-row__divider" /> : null}
+                      {(predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'dlt'
+                        ? predictionRecordDetailQuery.data.actual_result.blue_balls.map((ball) => (
+                            <NumberBall key={`detail-blue-${ball}`} value={ball} color="blue" />
+                          ))
+                        : null}
                     </div>
                   ) : null}
                   <div className="history-record-card__detail-list">
@@ -2090,7 +2097,10 @@ export function SettingsPage() {
                         <div className="settings-model-table__tags">
                           {model.predictions.map((group) => (
                             <span key={`${model.model_id}-${group.group_id}`} className="tag tag--muted">
-                              第{group.group_id}组 {group.red_balls.join(' ')} | {group.blue_balls.join(' ')}
+                              第{group.group_id}组{' '}
+                              {(group.play_type || (group.digits || []).length)
+                                ? `${group.play_type === 'group3' ? '组选3' : group.play_type === 'group6' ? '组选6' : '直选'} ${(group.digits?.length ? group.digits : group.red_balls).join(' ')}`
+                                : `${group.red_balls.join(' ')} | ${group.blue_balls.join(' ')}`}
                             </span>
                           ))}
                         </div>

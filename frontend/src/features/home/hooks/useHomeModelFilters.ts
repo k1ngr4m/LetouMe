@@ -86,11 +86,17 @@ export function useHomeModelFilters(
     })
   }
 
-  function buildHistoryState(periodQuery: string, commonOnly: boolean, weightedSummary: boolean) {
+  function buildHistoryState(
+    periodQuery: string,
+    commonOnly: boolean,
+    weightedSummary: boolean,
+    historyModelIdsOverride?: string[],
+  ) {
     const selectedSummaryIds = summarySelectedModelIds ?? filteredModelIds
     const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
-    const filteredHistory = history ? filterHistoryRecords(history, filteredModelIds, periodQuery) : []
-    const historyHitTrend = buildHistoryHitTrend(filteredHistory, filteredModelIds)
+    const historyModelIds = historyModelIdsOverride ?? filteredModelIds
+    const filteredHistory = history ? filterHistoryRecords(history, historyModelIds, periodQuery) : []
+    const historyHitTrend = buildHistoryHitTrend(filteredHistory, historyModelIds)
 
     return {
       selectedSummaryIds,
