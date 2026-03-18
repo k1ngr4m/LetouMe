@@ -128,6 +128,14 @@ function HomePlayIcon() {
   )
 }
 
+function HomeChevronIcon({ open }: { open: boolean }) {
+  return (
+    <HomeSvgIcon>
+      {open ? <path d="M6.5 12.2 10 8.7l3.5 3.5" /> : <path d="M6.5 8.2 10 11.7l3.5-3.5" />}
+    </HomeSvgIcon>
+  )
+}
+
 function PinIndicatorIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2340,10 +2348,11 @@ function HistoryRecordCard({
   lotteryCode: LotteryCode
   visibleModelIds: string[]
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
+  const hasExpandedModels = expandedModelIds.length > 0
   const detailQuery = useQuery({
     queryKey: ['predictions-history-detail', lotteryCode, record.target_period],
-    enabled: expanded,
+    enabled: hasExpandedModels,
     queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period, lotteryCode)),
   })
   const detailRecord = detailQuery.data?.predictions_history?.[0]
@@ -2355,6 +2364,13 @@ function HistoryRecordCard({
       }
     : null
   const listModels = record.models
+  const detailModelsById = useMemo(() => {
+    const mappings = new Map<string, PredictionModel>()
+    for (const model of detailRecord?.models || []) {
+      mappings.set(model.model_id, model)
+    }
+    return mappings
+  }, [detailRecord])
   const periodSummary = listModels.reduce(
     (accumulator, model) => ({
       total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
@@ -2367,6 +2383,20 @@ function HistoryRecordCard({
   const actualMainBalls = actualLotteryCode === 'pl3'
     ? (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
     : (record.actual_result?.red_balls || [])
+  const availableModelIds = useMemo(() => new Set(listModels.map((model) => model.model_id)), [listModels])
+
+  useEffect(() => {
+    setExpandedModelIds((previous) => {
+      const next = previous.filter((modelId) => availableModelIds.has(modelId))
+      return next.length === previous.length ? previous : next
+    })
+  }, [availableModelIds])
+
+  function toggleModelExpansion(modelId: string) {
+    setExpandedModelIds((previous) =>
+      previous.includes(modelId) ? previous.filter((id) => id !== modelId) : [...previous, modelId],
+    )
+  }
 
   return (
     <article className="history-record-card">
@@ -2377,9 +2407,6 @@ function HistoryRecordCard({
         </div>
         <div className="history-record-card__actions">
           <span className="history-record-card__date">{record.actual_result?.date || '-'}</span>
-          <button className="ghost-button" onClick={() => setExpanded((value) => !value)}>
-            {expanded ? '收起详情' : '展开详情'}
-          </button>
         </div>
       </div>
       {record.actual_result ? (
@@ -2401,77 +2428,95 @@ function HistoryRecordCard({
         <span className="history-metric-pill">奖金 {formatCurrency(periodSummary.total_prize_amount)}</span>
       </div>
       <div className="history-record-card__models">
-        {listModels.map((model) => (
-          <div key={`${record.target_period}-${model.model_id}`} className="history-record-card__model">
-            <div className="history-record-card__model-nameplate">
-              <strong className="history-record-card__model-name">{model.model_name}</strong>
-            </div>
-            <div className="history-record-card__model-grid">
-              <span className="history-record-card__metric-cell">
-                <small>注数</small>
-                <strong>{model.bet_count || 0}</strong>
-              </span>
-              <span className="history-record-card__metric-cell">
-                <small>成本</small>
-                <strong>{formatCurrency(model.cost_amount)}</strong>
-              </span>
-              <span className="history-record-card__metric-cell">
-                <small>奖金</small>
-                <strong>{formatCurrency(model.prize_amount)}</strong>
-              </span>
-            </div>
-          </div>
-        ))}
+        {listModels.map((model) => {
+          const isExpanded = expandedModelIds.includes(model.model_id)
+          const detailModel = detailModelsById.get(model.model_id)
+          const detailId = `history-record-card-${record.target_period}-${model.model_id}-detail`
+
+          return (
+            <section key={`${record.target_period}-${model.model_id}`} className={clsx('history-record-card__model', isExpanded && 'is-expanded')}>
+              <button
+                type="button"
+                className={clsx('history-record-card__model-trigger', isExpanded && 'is-expanded')}
+                onClick={() => toggleModelExpansion(model.model_id)}
+                aria-expanded={isExpanded}
+                aria-controls={detailId}
+                aria-label={`${isExpanded ? '收起模型详情' : '展开模型详情'}：${model.model_name}`}
+                title={`${isExpanded ? '收起模型详情' : '展开模型详情'}：${model.model_name}`}
+              >
+                <div className="history-record-card__model-nameplate">
+                  <strong className="history-record-card__model-name">{model.model_name}</strong>
+                </div>
+                <div className="history-record-card__model-grid">
+                  <span className="history-record-card__metric-cell">
+                    <small>注数</small>
+                    <strong>{model.bet_count || 0}</strong>
+                  </span>
+                  <span className="history-record-card__metric-cell">
+                    <small>成本</small>
+                    <strong>{formatCurrency(model.cost_amount)}</strong>
+                  </span>
+                  <span className="history-record-card__metric-cell">
+                    <small>奖金</small>
+                    <strong>{formatCurrency(model.prize_amount)}</strong>
+                  </span>
+                </div>
+                <span className={clsx('history-record-card__model-expand-indicator', isExpanded && 'is-expanded')} aria-hidden="true">
+                  <HomeChevronIcon open={isExpanded} />
+                </span>
+              </button>
+              {isExpanded ? (
+                <div id={detailId} className="history-record-card__model-detail">
+                  {detailQuery.isLoading ? <div className="state-shell">正在加载该模型预测详情...</div> : null}
+                  {detailQuery.error instanceof Error ? (
+                    <div className="state-shell state-shell--error">详情加载失败：{detailQuery.error.message}</div>
+                  ) : null}
+                  {!detailQuery.isLoading && !detailQuery.error && !detailModel ? (
+                    <div className="state-shell">暂无该模型预测详情。</div>
+                  ) : null}
+                  {!detailQuery.isLoading && !detailQuery.error && detailModel ? (
+                    <section className="history-record-card__detail-model">
+                      <div className="history-record-card__detail-header">
+                        <div className="history-record-card__detail-heading">
+                          <strong>{detailModel.model_name}</strong>
+                          <p>{detailModel.model_provider}</p>
+                        </div>
+                        <div className="history-record-card__detail-rate-grid">
+                          <span className="history-record-card__metric-cell">
+                            <small>按期中奖率</small>
+                            <strong>{formatPercent(detailModel.win_rate_by_period)}</strong>
+                          </span>
+                          <span className="history-record-card__metric-cell">
+                            <small>按注中奖率</small>
+                            <strong>{formatPercent(detailModel.win_rate_by_bet)}</strong>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="history-record-card__detail-summary">
+                        <span className="history-metric-pill">{detailModel.bet_count || 0} 注</span>
+                        <span className="history-metric-pill">成本 {formatCurrency(detailModel.cost_amount)}</span>
+                        <span className="history-metric-pill">奖金 {formatCurrency(detailModel.prize_amount)}</span>
+                      </div>
+                      <div className="detail-group-list">
+                        {detailModel.predictions.map((group) => (
+                          <PredictionGroupCard
+                            key={`${record.target_period}-${detailModel.model_id}-${group.group_id}`}
+                            group={group}
+                            actualResult={record.actual_result}
+                            compact
+                            grayMisses
+                            emphasizeHitTier
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          )
+        })}
       </div>
-      {expanded ? (
-        <div className="history-record-card__detail">
-          {detailQuery.isLoading ? <div className="state-shell">正在加载该期预测详情...</div> : null}
-          {detailQuery.error instanceof Error ? (
-            <div className="state-shell state-shell--error">详情加载失败：{detailQuery.error.message}</div>
-          ) : null}
-          {!detailQuery.isLoading && !detailQuery.error && detailRecord ? (
-            <div className="history-record-card__detail-list">
-              {detailRecord.models.map((model) => (
-                <section key={`${record.target_period}-${model.model_id}-detail`} className="history-record-card__detail-model">
-                  <div className="history-record-card__detail-header">
-                    <div className="history-record-card__detail-heading">
-                      <strong>{model.model_name}</strong>
-                      <p>{model.model_provider}</p>
-                    </div>
-                    <div className="history-record-card__detail-rate-grid">
-                      <span className="history-record-card__metric-cell">
-                        <small>按期中奖率</small>
-                        <strong>{formatPercent(model.win_rate_by_period)}</strong>
-                      </span>
-                      <span className="history-record-card__metric-cell">
-                        <small>按注中奖率</small>
-                        <strong>{formatPercent(model.win_rate_by_bet)}</strong>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="history-record-card__detail-summary">
-                    <span className="history-metric-pill">{model.bet_count || 0} 注</span>
-                    <span className="history-metric-pill">成本 {formatCurrency(model.cost_amount)}</span>
-                    <span className="history-metric-pill">奖金 {formatCurrency(model.prize_amount)}</span>
-                  </div>
-                  <div className="detail-group-list">
-                    {model.predictions.map((group) => (
-                      <PredictionGroupCard
-                        key={`${record.target_period}-${model.model_id}-${group.group_id}`}
-                        group={group}
-                        actualResult={record.actual_result}
-                        compact
-                        grayMisses
-                        emphasizeHitTier
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
     </article>
   )
 }

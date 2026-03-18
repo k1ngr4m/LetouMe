@@ -692,14 +692,14 @@ describe('HomePage dashboard sidebar', () => {
 
     renderPage()
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
-
-    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
-    expect(await screen.findByText('收起详情')).toBeInTheDocument()
-
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
-    const detailSection = within(firstHistoryCard as HTMLElement).getAllByText('模型A')[1].closest('.history-record-card__detail-model')
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型A' })).toBeInTheDocument()
+
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
     expect(detailSection).not.toBeNull()
     const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
@@ -727,6 +727,14 @@ describe('HomePage dashboard sidebar', () => {
     expect(hit4Card).toHaveClass('is-hit-tier-4')
     expect(hit5Card).toHaveClass('is-hit-tier-5')
     expect(hit6Card).toHaveClass('is-hit-tier-6')
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型B' }))
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型B' })).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('deepseek')).toBeInTheDocument()
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型A' }))
+    expect(within(firstHistoryCard as HTMLElement).queryByText('openai_compatible')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('deepseek')).toBeInTheDocument()
   })
 
   it('reuses shared model filters in history and trims record details', async () => {
@@ -787,10 +795,12 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
 
-    await userEvent.click(within(historySection as HTMLElement).getAllByRole('button', { name: '展开详情' })[0])
+    const firstHistoryCard = within(historySection as HTMLElement).getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
 
-    expect(await screen.findByText('收起详情')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型A' })).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.getByText('G-1').closest('.prediction-group-card')).toHaveClass('is-compact')
@@ -835,14 +845,14 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
 
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
     expect(await screen.findByText('直选')).toBeInTheDocument()
 
-    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
-    expect(firstHistoryCard).not.toBeNull()
-    const detailSection = within(firstHistoryCard as HTMLElement).getAllByText('模型A')[1].closest('.history-record-card__detail-model')
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
     expect(detailSection).not.toBeNull()
     const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
