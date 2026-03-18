@@ -520,10 +520,10 @@ describe('SettingsPage model management view switch', () => {
           cron_expression: null,
           is_active: true,
           next_run_at: '2026-03-19T01:30:00Z',
-          last_run_at: null,
-          last_run_status: null,
-          last_error_message: null,
-          last_task_id: null,
+          last_run_at: '2026-03-18T00:40:00Z',
+          last_run_status: 'failed',
+          last_error_message: '抓取接口返回 502',
+          last_task_id: 'task-fetch-1',
           rule_summary: '每日 09:30',
           created_at: '2026-03-18T01:00:00Z',
           updated_at: '2026-03-18T01:00:00Z',
@@ -534,9 +534,17 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    expect(screen.queryByLabelText('任务名称')).not.toBeInTheDocument()
     expect(await screen.findByText('大乐透抓取')).toBeInTheDocument()
     expect(screen.getAllByText('开奖抓取').length).toBeGreaterThan(0)
     expect(screen.getByText('每日 09:30')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '查看详情' }))
+    expect(screen.getByText('抓取接口返回 502')).toBeInTheDocument()
+    expect(screen.getByText('task-fetch-1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '收起详情' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }))
+    expect(await screen.findByRole('heading', { name: '编辑任务' })).toBeInTheDocument()
+    expect(screen.getByLabelText('任务名称')).toHaveValue('大乐透抓取')
   })
 
   it('creates a prediction schedule task', async () => {
@@ -592,10 +600,12 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    await userEvent.click(screen.getByRole('button', { name: '新增任务' }))
+    expect(await screen.findByRole('heading', { name: '新增任务' })).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('任务名称'), '大乐透预测')
     await userEvent.selectOptions(screen.getByLabelText('任务类型'), 'prediction_generate')
     await userEvent.click(screen.getByRole('checkbox', { name: 'DeepSeek-V3.2' }))
-    await userEvent.click(screen.getByRole('button', { name: '新增任务' }))
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
 
     await waitFor(() =>
       expect(apiClientMock.createScheduleTask).toHaveBeenCalledWith(

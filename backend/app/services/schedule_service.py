@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Lock, Thread
 from time import sleep
 from uuid import uuid4
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
@@ -18,6 +19,8 @@ from backend.app.services.prediction_generation_task_service import prediction_g
 TIME_OF_DAY_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 CRON_FIELD_PATTERN = re.compile(r"^\*|\d+(?:-\d+)?(?:/\d+)?(?:,\d+(?:-\d+)?(?:/\d+)?)*|\*/\d+$")
 WEEKDAY_LABELS = {0: "周一", 1: "周二", 2: "周三", 3: "周四", 4: "周五", 5: "周六", 6: "周日"}
+BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
+UTC = timezone.utc
 
 
 class ScheduleService:
@@ -60,7 +63,7 @@ class ScheduleService:
 
     def set_task_active(self, task_code: str, is_active: bool) -> dict[str, Any]:
         task = self.get_task(task_code)
-        next_run_at = self._compute_next_run(task, base_time=datetime.utcnow()) if is_active else None
+        next_run_at = self._compute_next_run(task, base_time=self._utc_now()) if is_active else None
         return self._decorate_task(self.repository.set_task_active(task_code, is_active, self._format_datetime(next_run_at)))
 
     def delete_task(self, task_code: str) -> None:
@@ -74,7 +77,7 @@ class ScheduleService:
     def _loop(self) -> None:
         while True:
             try:
-                due_tasks = self.repository.list_due_tasks(datetime.utcnow())
+                due_tasks = self.repository.list_due_tasks(self._utc_now().replace(tzinfo=None))
                 for task in due_tasks:
                     self._trigger_task(task)
             except Exception:
@@ -82,7 +85,7 @@ class ScheduleService:
             sleep(15)
 
     def _trigger_task(self, task: dict[str, Any], manual: bool = False) -> None:
-        now = datetime.utcnow()
+        now = self._utc_now()
         next_run_at = self._compute_next_run(task, base_time=now + timedelta(minutes=1)) if task.get("is_active") and not manual else (
             self._compute_next_run(task, base_time=now + timedelta(minutes=1)) if task.get("is_active") else None
         )
@@ -182,7 +185,7 @@ class ScheduleService:
             "is_active": bool(payload.get("is_active", True)),
         }
         normalized["next_run_at"] = self._format_datetime(
-            self._compute_next_run(normalized, base_time=datetime.utcnow()) if normalized["is_active"] else None
+            self._compute_next_run(normalized, base_time=self._utc_now()) if normalized["is_active"] else None
         )
         return normalized
 
@@ -192,18 +195,19 @@ class ScheduleService:
         return self._compute_next_cron_run(str(task.get("cron_expression") or ""), base_time=base_time)
 
     def _compute_next_preset_run(self, task: dict[str, Any], *, base_time: datetime) -> datetime:
+        beijing_base_time = self._to_beijing_time(base_time)
         hour, minute = [int(value) for value in str(task.get("time_of_day") or "00:00").split(":")]
-        candidate = base_time.replace(second=0, microsecond=0, hour=hour, minute=minute)
+        candidate = beijing_base_time.replace(second=0, microsecond=0, hour=hour, minute=minute)
         if task.get("preset_type") == "daily":
-            if candidate <= base_time.replace(second=0, microsecond=0):
+            if candidate <= beijing_base_time.replace(second=0, microsecond=0):
                 candidate += timedelta(days=1)
-            return candidate
+            return candidate.astimezone(UTC)
 
         weekdays = [int(value) for value in task.get("weekdays") or []]
         for offset in range(0, 8):
             probe = candidate + timedelta(days=offset)
-            if probe.weekday() in weekdays and probe > base_time.replace(second=0, microsecond=0):
-                return probe
+            if probe.weekday() in weekdays and probe > beijing_base_time.replace(second=0, microsecond=0):
+                return probe.astimezone(UTC)
         raise ValueError("无法计算下次执行时间")
 
     def _validate_cron_expression(self, expression: str) -> None:
@@ -220,7 +224,7 @@ class ScheduleService:
             self._parse_cron_values(field, min_value=min_value, max_value=max_value)
             for field, (min_value, max_value) in zip(expression.split(), [(0, 59), (0, 23), (1, 31), (1, 12), (0, 6)])
         ]
-        probe = base_time.replace(second=0, microsecond=0) + timedelta(minutes=1)
+        probe = self._to_beijing_time(base_time).replace(second=0, microsecond=0) + timedelta(minutes=1)
         max_probe = probe + timedelta(days=366)
         while probe <= max_probe:
             if (
@@ -230,7 +234,7 @@ class ScheduleService:
                 and probe.month in month_values
                 and probe.weekday() in weekday_values
             ):
-                return probe
+                return probe.astimezone(UTC)
             probe += timedelta(minutes=1)
         raise ValueError("无法在一年内计算出下次执行时间")
 
@@ -286,16 +290,28 @@ class ScheduleService:
 
     def _build_rule_summary(self, task: dict[str, Any]) -> str:
         if task.get("schedule_mode") == "cron":
-            return f"Cron · {task.get('cron_expression') or '-'}"
+            return f"Cron（北京时间）· {task.get('cron_expression') or '-'}"
         time_of_day = task.get("time_of_day") or "--:--"
         if task.get("preset_type") == "weekly":
             weekdays = [WEEKDAY_LABELS.get(int(value), str(value)) for value in task.get("weekdays") or []]
-            return f"每周 {' / '.join(weekdays)} {time_of_day}"
-        return f"每日 {time_of_day}"
+            return f"每周 {' / '.join(weekdays)} {time_of_day}（北京时间）"
+        return f"每日 {time_of_day}（北京时间）"
+
+    @staticmethod
+    def _utc_now() -> datetime:
+        return datetime.now(UTC)
+
+    @staticmethod
+    def _to_beijing_time(value: datetime) -> datetime:
+        normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return normalized.astimezone(BEIJING_TIMEZONE)
 
     @staticmethod
     def _format_datetime(value: datetime | None) -> str | None:
-        return value.strftime("%Y-%m-%dT%H:%M:%SZ") if value else None
+        if not value:
+            return None
+        normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return normalized.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 schedule_service = ScheduleService()
