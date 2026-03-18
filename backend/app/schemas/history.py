@@ -90,6 +90,7 @@ class PredictionHistoryModelStat(BaseModel):
 
 
 class PredictionHistorySummaryRecord(BaseModel):
+    lottery_code: str = "dlt"
     prediction_date: str
     target_period: str
     actual_result: dict[str, Any] | None = None

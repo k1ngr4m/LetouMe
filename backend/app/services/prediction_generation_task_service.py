@@ -12,15 +12,18 @@ class PredictionGenerationTaskService:
     def create_task(
         self,
         *,
+        lottery_code: str,
         mode: str,
         model_code: str,
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
     ) -> dict[str, Any]:
         return self.runner.create_task(
             initial_task={
+            "lottery_code": lottery_code,
             "mode": mode,
             "model_code": model_code,
             "progress_summary": {
+                "lottery_code": lottery_code,
                 "mode": mode,
                 "model_code": model_code,
                 "processed_count": 0,

@@ -50,6 +50,7 @@ from backend.app.schemas.requests import (
     PredictionHistoryDetailPayload,
     SettingsPredictionRecordDetailPayload,
     SimulationTicketDeletePayload,
+    SimulationTicketListPayload,
     SimulationTicketPayload,
     RoleCodePayload,
     RolePayload,
@@ -142,22 +143,22 @@ def get_current_auth_user(current_user: dict = Depends(require_current_user)) ->
 
 @router.post("/lottery/history", response_model=LotteryHistoryResponse)
 def get_lottery_history(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
-    return lottery_service.get_history_payload(limit=payload.limit, offset=payload.offset)
+    return lottery_service.get_history_payload(limit=payload.limit, offset=payload.offset, lottery_code=payload.lottery_code)
 
 
 @router.post("/predictions/current", response_model=CurrentPredictionsResponse)
-def get_current_predictions(_: dict = Depends(require_current_user)) -> dict:
-    return prediction_service.get_current_payload()
+def get_current_predictions(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
+    return prediction_service.get_current_payload(lottery_code=payload.lottery_code)
 
 
 @router.post("/predictions/history/list", response_model=PredictionsHistoryListResponse)
 def get_predictions_history_list(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
-    return prediction_service.get_history_list_payload(limit=payload.limit, offset=payload.offset)
+    return prediction_service.get_history_list_payload(limit=payload.limit, offset=payload.offset, lottery_code=payload.lottery_code)
 
 
 @router.post("/predictions/history/detail", response_model=PredictionsHistoryResponse)
 def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: dict = Depends(require_current_user)) -> dict:
-    record = prediction_service.get_history_detail_payload(payload.target_period)
+    record = prediction_service.get_history_detail_payload(payload.target_period, lottery_code=payload.lottery_code)
     if not record:
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])
@@ -165,8 +166,8 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
 
 
 @router.post("/simulation/tickets/list", response_model=SimulationTicketListResponse)
-def get_simulation_tickets(current_user: dict = Depends(require_current_user)) -> dict:
-    return {"tickets": simulation_ticket_service.list_tickets(int(current_user["id"]))}
+def get_simulation_tickets(payload: SimulationTicketListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return {"tickets": simulation_ticket_service.list_tickets(int(current_user["id"]), lottery_code=payload.lottery_code)}
 
 
 @router.post("/simulation/tickets/create", response_model=SimulationTicketCreateResponse)
@@ -181,7 +182,7 @@ def create_simulation_ticket(payload: SimulationTicketPayload, current_user: dic
 @router.post("/simulation/tickets/delete", response_model=SuccessResponse)
 def delete_simulation_ticket(payload: SimulationTicketDeletePayload, current_user: dict = Depends(require_current_user)) -> dict:
     try:
-        simulation_ticket_service.delete_ticket(int(current_user["id"]), payload.ticket_id)
+        simulation_ticket_service.delete_ticket(int(current_user["id"]), payload.ticket_id, lottery_code=payload.lottery_code)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="方案不存在") from exc
     return {"success": True}
@@ -216,7 +217,10 @@ def change_profile_password(
 
 @router.post("/settings/models/list", response_model=ModelListResponse)
 def get_settings_models(payload: ModelListPayload, _: dict = Depends(require_model_management_permission)) -> dict:
-    return {"models": model_service.list_models(include_deleted=payload.include_deleted)}
+    models = model_service.list_models(include_deleted=payload.include_deleted)
+    if payload.lottery_code:
+        models = [model for model in models if payload.lottery_code in (model.get("lottery_codes") or ["dlt"])]
+    return {"models": models}
 
 
 @router.post("/settings/model/detail", response_model=ModelResponse)
@@ -275,8 +279,8 @@ def get_settings_providers(_: dict = Depends(require_model_management_permission
 
 
 @router.post("/settings/lottery/fetch", response_model=LotteryFetchTaskResponse)
-def fetch_settings_lottery_history(_: dict = Depends(require_super_admin)) -> dict:
-    return lottery_fetch_task_service.create_task()
+def fetch_settings_lottery_history(payload: PaginationPayload, _: dict = Depends(require_super_admin)) -> dict:
+    return lottery_fetch_task_service.create_task(payload.lottery_code)
 
 
 @router.post("/settings/lottery/fetch/task-detail", response_model=LotteryFetchTaskResponse)
@@ -302,17 +306,20 @@ def generate_model_predictions(
         raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号")
 
     try:
-        prediction_generation_service.validate_model(payload.model_code)
+        prediction_generation_service.validate_model(payload.model_code, lottery_code=payload.lottery_code)
         task = prediction_generation_task_service.create_task(
+            lottery_code=payload.lottery_code,
             mode=mode,
             model_code=payload.model_code,
             worker=lambda progress_callback: prediction_generation_service.generate_current_for_model(
+                lottery_code=payload.lottery_code,
                 model_code=payload.model_code,
                 overwrite=payload.overwrite,
                 progress_callback=progress_callback,
             )
             if mode == "current"
             else prediction_generation_service.recalculate_history_for_model(
+                lottery_code=payload.lottery_code,
                 model_code=payload.model_code,
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
@@ -351,9 +358,11 @@ def bulk_generate_model_predictions(
 
     try:
         return prediction_generation_task_service.create_task(
+            lottery_code=payload.lottery_code,
             mode=mode,
             model_code="__bulk__",
             worker=lambda progress_callback: prediction_generation_service.generate_for_models(
+                lottery_code=payload.lottery_code,
                 model_codes=payload.model_codes,
                 mode=mode,
                 overwrite=payload.overwrite,
@@ -378,8 +387,8 @@ def get_model_prediction_generation_task(
 
 
 @router.post("/settings/predictions/records/list", response_model=SettingsPredictionRecordListResponse)
-def get_settings_prediction_records(_: dict = Depends(require_model_management_permission)) -> dict:
-    return prediction_service.get_settings_record_list_payload()
+def get_settings_prediction_records(payload: PaginationPayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    return prediction_service.get_settings_record_list_payload(lottery_code=payload.lottery_code)
 
 
 @router.post("/settings/predictions/records/detail", response_model=SettingsPredictionRecordDetailResponse)
@@ -388,7 +397,7 @@ def get_settings_prediction_record_detail(
     _: dict = Depends(require_model_management_permission),
 ) -> dict:
     try:
-        record = prediction_service.get_settings_record_detail_payload(payload.record_type, payload.target_period)
+        record = prediction_service.get_settings_record_detail_payload(payload.record_type, payload.target_period, lottery_code=payload.lottery_code)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not record:

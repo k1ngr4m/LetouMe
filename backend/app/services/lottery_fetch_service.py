@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
+from backend.app.lotteries import build_pl3_prize_breakdown, normalize_digit_balls, normalize_lottery_code
 from backend.app.services.lottery_service import LotteryService
 
 
@@ -23,8 +24,13 @@ class LotteryFetchService:
         "九等奖": 5,
     }
 
-    def __init__(self, lottery_service: LotteryService | None = None) -> None:
-        self.base_url = "https://datachart.500.com/dlt/history/newinc/history.php"
+    def __init__(self, lottery_service: LotteryService | None = None, lottery_code: str = "dlt") -> None:
+        self.lottery_code = normalize_lottery_code(lottery_code)
+        self.base_url = (
+            "https://datachart.500.com/dlt/history/newinc/history.php"
+            if self.lottery_code == "dlt"
+            else "https://www.500.com/kaijiang/p3/lskj/"
+        )
         self.headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -33,7 +39,11 @@ class LotteryFetchService:
             ),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Referer": "https://datachart.500.com/dlt/history/history.shtml",
+            "Referer": (
+                "https://datachart.500.com/dlt/history/history.shtml"
+                if self.lottery_code == "dlt"
+                else "https://www.500.com/kaijiang/p3/lskj/"
+            ),
         }
         self.session = requests.Session()
         self.session.headers.update(self.headers)
@@ -63,11 +73,12 @@ class LotteryFetchService:
 
         lottery_data = self.parse_lottery_data(soup)
         if not lottery_data:
-            raise ValueError("未解析到大乐透开奖数据")
+            raise ValueError("未解析到开奖数据")
 
-        saved_draws = self.lottery_service.save_draws(lottery_data)
+        saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
         summary = {
+            "lottery_code": self.lottery_code,
             "fetched_count": len(lottery_data),
             "saved_count": len(saved_draws),
             "latest_period": saved_draws[0]["period"] if saved_draws else None,
@@ -84,7 +95,7 @@ class LotteryFetchService:
                     extra={"context": {"attempt": attempt + 1, "retry": retry, "url": url}},
                 )
                 response = self.session.get(url, timeout=30)
-                response.encoding = "utf-8"
+                response.encoding = "utf-8" if self.lottery_code == "pl3" else "utf-8"
                 if response.status_code == 200:
                     return BeautifulSoup(response.text, "html.parser")
                 self.logger.warning("Unexpected HTTP status", extra={"context": {"status_code": response.status_code}})
@@ -95,6 +106,8 @@ class LotteryFetchService:
         return None
 
     def parse_lottery_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        if self.lottery_code == "pl3":
+            return self.parse_pl3_data(soup)
         data_list: list[dict[str, Any]] = []
         table = soup.find("tbody") or soup.find("table")
         if not table:
@@ -122,7 +135,32 @@ class LotteryFetchService:
         self.logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list)}})
         return data_list
 
+    def parse_pl3_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        data_list: list[dict[str, Any]] = []
+        for row in soup.find_all("tr"):
+            cols = row.find_all("td")
+            if len(cols) < 3:
+                continue
+            period = cols[0].get_text(strip=True)
+            date = cols[1].get_text(strip=True)
+            digit_nodes = cols[2].select(".ball") or cols[2].find_all("span")
+            digits = [node.get_text(strip=True) for node in digit_nodes if node.get_text(strip=True)]
+            if not period.isdigit() or len(digits) < 3:
+                continue
+            data_list.append(
+                {
+                    "period": period,
+                    "digits": normalize_digit_balls(digits[:3]),
+                    "date": date,
+                    "prize_breakdown": build_pl3_prize_breakdown(),
+                }
+            )
+        self.logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list), "lottery_code": self.lottery_code}})
+        return data_list
+
     def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
+        if self.lottery_code != "dlt":
+            return build_pl3_prize_breakdown()
         detail_url = self.DETAIL_URL_TEMPLATE.format(period=period)
         soup = self.fetch_page(detail_url, retry=2)
         if not soup:

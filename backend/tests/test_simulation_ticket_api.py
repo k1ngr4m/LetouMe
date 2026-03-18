@@ -82,6 +82,32 @@ class SimulationTicketApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["tickets"]), 1)
 
+    def test_create_pl3_ticket_and_filter_by_lottery(self) -> None:
+        create_response = self.client.post(
+            "/api/simulation/tickets/create",
+            json={
+                "lottery_code": "pl3",
+                "play_type": "direct",
+                "direct_hundreds": ["01", "02"],
+                "direct_tens": ["03"],
+                "direct_units": ["04", "05"],
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+        ticket = create_response.json()["ticket"]
+        self.assertEqual(ticket["bet_count"], 4)
+        self.assertEqual(ticket["amount"], 8)
+        self.assertEqual(ticket["lottery_code"], "pl3")
+        self.assertEqual(ticket["play_type"], "direct")
+
+        dlt_list_response = self.client.post("/api/simulation/tickets/list", json={"lottery_code": "dlt"})
+        self.assertEqual(dlt_list_response.status_code, 200)
+        self.assertEqual(len(dlt_list_response.json()["tickets"]), 0)
+
+        pl3_list_response = self.client.post("/api/simulation/tickets/list", json={"lottery_code": "pl3"})
+        self.assertEqual(pl3_list_response.status_code, 200)
+        self.assertEqual(len(pl3_list_response.json()["tickets"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

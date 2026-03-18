@@ -1,8 +1,12 @@
+export type LotteryCode = 'dlt' | 'pl3'
+
 export type LotteryDraw = {
+  lottery_code?: LotteryCode
   period: string
   date: string
   red_balls: string[]
   blue_balls: string[]
+  digits?: string[]
   blue_ball?: string | null
   prize_breakdown?: PrizeBreakdownItem[]
 }
@@ -22,6 +26,7 @@ export type NextDraw = {
 }
 
 export type LotteryHistoryResponse = {
+  lottery_code: LotteryCode
   last_updated: string
   data: LotteryDraw[]
   next_draw: NextDraw | null
@@ -33,15 +38,20 @@ export type PredictionHitResult = {
   red_hit_count: number
   blue_hits: string[]
   blue_hit_count: number
+  digit_hits?: string[]
+  digit_hit_count?: number
+  is_exact_match?: boolean
   total_hits: number
 }
 
 export type PredictionGroup = {
   group_id: number
+  play_type?: 'direct' | 'group3' | 'group6'
   strategy?: string
   description?: string
   red_balls: string[]
   blue_balls: string[]
+  digits?: string[]
   blue_ball?: string | null
   hit_result?: PredictionHitResult
   prize_level?: string | null
@@ -154,12 +164,14 @@ export type PredictionHistoryModelStat = {
 }
 
 export type CurrentPredictionsResponse = {
+  lottery_code: LotteryCode
   prediction_date: string
   target_period: string
   models: PredictionModel[]
 }
 
 export type PredictionsHistoryListRecord = {
+  lottery_code?: LotteryCode
   prediction_date: string
   target_period: string
   actual_result: LotteryDraw | null
@@ -168,12 +180,14 @@ export type PredictionsHistoryListRecord = {
 }
 
 export type PredictionsHistoryListResponse = {
+  lottery_code?: LotteryCode
   predictions_history: PredictionsHistoryListRecord[]
   total_count: number
   model_stats?: PredictionHistoryModelStat[]
 }
 
 export type PredictionsHistoryRecord = {
+  lottery_code?: LotteryCode
   prediction_date: string
   target_period: string
   actual_result: LotteryDraw | null
@@ -187,14 +201,26 @@ export type PredictionsHistoryResponse = {
 }
 
 export type SimulationTicketPayload = {
+  lottery_code?: LotteryCode
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_hundreds?: string[]
+  direct_tens?: string[]
+  direct_units?: string[]
+  group_numbers?: string[]
 }
 
 export type SimulationTicketRecord = {
   id: number
+  lottery_code?: LotteryCode
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_hundreds?: string[]
+  direct_tens?: string[]
+  direct_units?: string[]
+  group_numbers?: string[]
   bet_count: number
   amount: number
   created_at: string
@@ -225,6 +251,7 @@ export type SettingsModel = {
   temperature: number | null
   is_active: boolean
   is_deleted: boolean
+  lottery_codes: LotteryCode[]
   updated_at: string
 }
 
@@ -253,9 +280,11 @@ export type SettingsModelPayload = {
   app_code: string
   temperature: number | null
   is_active: boolean
+  lottery_codes: LotteryCode[]
 }
 
 export type GenerateSettingsModelPredictionsPayload = {
+  lottery_code: LotteryCode
   model_code: string
   mode: 'current' | 'history'
   overwrite: boolean
@@ -277,6 +306,7 @@ export type BulkSettingsModelActionPayload = {
 }
 
 export type BulkGenerateSettingsModelPredictionsPayload = {
+  lottery_code: LotteryCode
   model_codes: string[]
   mode: 'current' | 'history'
   overwrite: boolean
@@ -302,6 +332,7 @@ export type PredictionGenerationFailureDetail = {
 
 export type PredictionGenerationTask = {
   task_id: string
+  lottery_code?: LotteryCode
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   mode: 'current' | 'history'
   model_code: string
@@ -328,6 +359,7 @@ export type PredictionGenerationTask = {
 
 export type LotteryFetchTask = {
   task_id: string
+  lottery_code?: LotteryCode
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   created_at: string
   started_at?: string | null
@@ -342,6 +374,7 @@ export type LotteryFetchTask = {
 }
 
 export type SettingsPredictionRecordSummary = {
+  lottery_code?: LotteryCode
   record_type: 'current' | 'history'
   target_period: string
   prediction_date: string
@@ -355,6 +388,7 @@ export type SettingsPredictionRecordListResponse = {
 }
 
 export type SettingsPredictionRecordDetail = {
+  lottery_code?: LotteryCode
   record_type: 'current' | 'history'
   prediction_date: string
   target_period: string

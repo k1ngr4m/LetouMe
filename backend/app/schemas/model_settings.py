@@ -17,6 +17,7 @@ class ModelSettingsPayload(BaseModel):
     app_code: str | None = ""
     temperature: float | None = None
     is_active: bool = True
+    lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])
 
 
 class ModelStatusPayload(BaseModel):
@@ -36,6 +37,7 @@ class ModelResponse(BaseModel):
     temperature: float | None = None
     is_active: bool
     is_deleted: bool
+    lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])
     updated_at: str = ""
 
 

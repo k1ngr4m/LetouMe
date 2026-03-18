@@ -4,6 +4,7 @@ from time import perf_counter
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.lotteries import display_period, normalize_digit_balls, normalize_group_digits, normalize_lottery_code, storage_issue_no
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import _insert_number_rows, _upsert_issue
 from backend.app.repositories.write_log_repository import WriteLogRepository
@@ -19,44 +20,49 @@ class PredictionRepository:
     def sync_model_catalog(self) -> None:
         self._registry = _load_registry()
 
-    def get_current_prediction(self) -> dict[str, Any] | None:
+    def get_current_prediction(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT
                         pb.id,
+                        pb.lottery_code,
                         pb.prediction_date,
                         di.issue_no AS target_period,
                         di.id AS target_issue_id
                     FROM prediction_batch pb
                     INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'current'
+                    WHERE pb.status = 'current' AND pb.lottery_code = ?
                     ORDER BY di.issue_no DESC
                     LIMIT 1
-                    """
+                    """,
+                    (normalized_code,),
                 )
                 row = cursor.fetchone()
                 if not row:
                     return None
                 return self._build_batch_payload(cursor, row, include_actual_result=False)
 
-    def get_current_prediction_by_period(self, target_period: str) -> dict[str, Any] | None:
+    def get_current_prediction_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT
                         pb.id,
+                        pb.lottery_code,
                         pb.prediction_date,
                         di.issue_no AS target_period,
                         di.id AS target_issue_id
                     FROM prediction_batch pb
                     INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'current' AND di.issue_no = ?
+                    WHERE pb.status = 'current' AND pb.lottery_code = ? AND di.issue_no = ?
                     LIMIT 1
                     """,
-                    (target_period,),
+                    (normalized_code, storage_issue_no(normalized_code, target_period)),
                 )
                 row = cursor.fetchone()
                 if not row:
@@ -64,6 +70,7 @@ class PredictionRepository:
                 return self._build_batch_payload(cursor, row, include_actual_result=False)
 
     def upsert_current_prediction(self, payload: dict[str, Any]) -> None:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         target_period = str(payload["target_period"])
         target_key = f"target_period={target_period}"
         summary = f"upsert prediction_batch(current) {target_key}"
@@ -84,6 +91,7 @@ class PredictionRepository:
                     summary=summary,
                     payload={
                         "target_period": target_period,
+                        "lottery_code": lottery_code,
                         "prediction_date": payload.get("prediction_date"),
                         "batch_id": batch_id,
                     },
@@ -100,6 +108,7 @@ class PredictionRepository:
             raise
 
     def replace_current_prediction(self, payload: dict[str, Any]) -> None:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         target_period = str(payload["target_period"])
         target_key = f"target_period={target_period}"
         summary = f"replace prediction_batch(current) {target_key}"
@@ -107,7 +116,7 @@ class PredictionRepository:
             with get_connection() as connection:
                 self._sync_registry(connection)
                 with connection.cursor() as cursor:
-                    cursor.execute("DELETE FROM prediction_batch WHERE status = 'current'")
+                    cursor.execute("DELETE FROM prediction_batch WHERE status = 'current' AND lottery_code = ?", (lottery_code,))
                 batch_id = self._upsert_batch(
                     connection,
                     payload=payload,
@@ -122,6 +131,7 @@ class PredictionRepository:
                     summary=summary,
                     payload={
                         "target_period": target_period,
+                        "lottery_code": lottery_code,
                         "prediction_date": payload.get("prediction_date"),
                         "batch_id": batch_id,
                     },
@@ -138,6 +148,7 @@ class PredictionRepository:
             raise
 
     def upsert_history_record(self, payload: dict[str, Any]) -> None:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         target_period = str(payload["target_period"])
         target_key = f"target_period={target_period}"
         summary = f"upsert prediction_batch(archived) {target_key}"
@@ -158,6 +169,7 @@ class PredictionRepository:
                     summary=summary,
                     payload={
                         "target_period": target_period,
+                        "lottery_code": lottery_code,
                         "prediction_date": payload.get("prediction_date"),
                         "batch_id": batch_id,
                     },
@@ -177,19 +189,22 @@ class PredictionRepository:
         self,
         limit: int | None = None,
         offset: int = 0,
+        lottery_code: str = "dlt",
     ) -> list[dict[str, Any]]:
+        normalized_code = normalize_lottery_code(lottery_code)
         sql = """
             SELECT
                 pb.id,
+                pb.lottery_code,
                 pb.prediction_date,
                 di.issue_no AS target_period,
                 di.id AS target_issue_id
             FROM prediction_batch pb
             INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-            WHERE pb.status = 'archived'
+            WHERE pb.status = 'archived' AND pb.lottery_code = ?
             ORDER BY di.issue_no DESC
         """
-        params: list[Any] = []
+        params: list[Any] = [normalized_code]
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -207,26 +222,30 @@ class PredictionRepository:
         self,
         limit: int | None = None,
         offset: int = 0,
+        lottery_code: str = "dlt",
     ) -> list[dict[str, Any]]:
-        return self.list_history_record_summaries_with_metrics(limit=limit, offset=offset)["records"]
+        return self.list_history_record_summaries_with_metrics(limit=limit, offset=offset, lottery_code=lottery_code)["records"]
 
     def list_history_record_summaries_with_metrics(
         self,
         limit: int | None = None,
         offset: int = 0,
+        lottery_code: str = "dlt",
     ) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         sql = """
             SELECT
                 pb.id,
+                pb.lottery_code,
                 pb.prediction_date,
                 di.issue_no AS target_period,
                 di.id AS target_issue_id
             FROM prediction_batch pb
             INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-            WHERE pb.status = 'archived'
+            WHERE pb.status = 'archived' AND pb.lottery_code = ?
             ORDER BY di.issue_no DESC
         """
-        params: list[Any] = []
+        params: list[Any] = [normalized_code]
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -245,6 +264,7 @@ class PredictionRepository:
                 model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
                 model_run_ids = [int(row["id"]) for row in model_rows]
                 summaries_by_run = self._fetch_model_summaries(cursor, model_run_ids)
+                groups_by_run = self._fetch_groups(cursor, model_run_ids)
                 group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
         duration_ms = round((perf_counter() - started_at) * 1000, 2)
         self.logger.debug(
@@ -264,6 +284,11 @@ class PredictionRepository:
             batch_id = int(row["prediction_batch_id"])
             summary = summaries_by_run.get(int(row["id"]), {})
             group_metrics = group_metrics_by_run.get(int(row["id"]), [])
+            groups = groups_by_run.get(int(row["id"]), [])
+            merged_metrics: list[dict[str, Any]] = []
+            for group in groups:
+                metric = next((item for item in group_metrics if int(item.get("group_id") or 0) == int(group.get("group_id") or 0)), {})
+                merged_metrics.append({**group, **metric})
             models_by_batch.setdefault(batch_id, []).append(
                 {
                     "model_id": row["model_id"],
@@ -273,14 +298,15 @@ class PredictionRepository:
                     "model_api_model": row.get("model_api_model"),
                     "best_group": summary.get("best_group"),
                     "best_hit_count": summary.get("best_hit_count"),
-                    "group_metrics": group_metrics,
+                    "group_metrics": merged_metrics,
                 }
             )
 
         records = [
             {
+                "lottery_code": row.get("lottery_code") or "dlt",
                 "prediction_date": row["prediction_date"],
-                "target_period": row["target_period"],
+                "target_period": display_period(row.get("lottery_code") or "dlt", row["target_period"]),
                 "actual_result": actual_results_by_issue.get(int(row["target_issue_id"])),
                 "models": models_by_batch.get(int(row["id"]), []),
             }
@@ -296,42 +322,47 @@ class PredictionRepository:
             },
         }
 
-    def get_history_record_detail(self, target_period: str) -> dict[str, Any] | None:
+    def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT
                         pb.id,
+                        pb.lottery_code,
                         pb.prediction_date,
                         di.issue_no AS target_period,
                         di.id AS target_issue_id
                     FROM prediction_batch pb
                     INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'archived' AND di.issue_no = ?
+                    WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
                     LIMIT 1
                     """,
-                    (target_period,),
+                    (normalized_code, storage_issue_no(normalized_code, target_period)),
                 )
                 row = cursor.fetchone()
                 if not row:
                     return None
                 return self._build_batch_payload(cursor, row, include_actual_result=True)
 
-    def count_history_records(self) -> int:
+    def count_history_records(self, lottery_code: str = "dlt") -> int:
+        normalized_code = normalize_lottery_code(lottery_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT COUNT(*) AS total
                     FROM prediction_batch
-                    WHERE status = 'archived'
-                    """
+                    WHERE status = 'archived' AND lottery_code = ?
+                    """,
+                    (normalized_code,),
                 )
                 row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
 
-    def history_record_exists(self, target_period: str) -> bool:
+    def history_record_exists(self, target_period: str, lottery_code: str = "dlt") -> bool:
+        normalized_code = normalize_lottery_code(lottery_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -339,10 +370,10 @@ class PredictionRepository:
                     SELECT 1
                     FROM prediction_batch pb
                     INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'archived' AND di.issue_no = ?
+                    WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
                     LIMIT 1
                     """,
-                    (target_period,),
+                    (normalized_code, storage_issue_no(normalized_code, target_period)),
                 )
                 return cursor.fetchone() is not None
 
@@ -359,11 +390,12 @@ class PredictionRepository:
         status: str,
         archive_metadata: bool,
     ) -> int:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         target_period = str(payload["target_period"])
         actual_result = payload.get("actual_result")
         draw_date = (actual_result or {}).get("date")
         issue_status = "drawn" if actual_result else ("current" if status == "current" else "scheduled")
-        target_issue_id = _upsert_issue(connection, target_period, draw_date, issue_status)
+        target_issue_id = _upsert_issue(connection, target_period, draw_date, issue_status, lottery_code=lottery_code)
         draw_result_id = None
         if actual_result:
             draw_result_id = self._upsert_draw_result(
@@ -378,28 +410,28 @@ class PredictionRepository:
                     """
                     UPDATE prediction_batch
                     SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
-                    WHERE status = 'current' AND target_issue_id <> ?
+                    WHERE status = 'current' AND lottery_code = ? AND target_issue_id <> ?
                     """,
-                    (target_issue_id,),
+                    (lottery_code, target_issue_id),
                 )
                 cursor.execute(
                     """
                     SELECT id
                     FROM prediction_batch
-                    WHERE status = 'current' AND target_issue_id = ?
+                    WHERE status = 'current' AND lottery_code = ? AND target_issue_id = ?
                     LIMIT 1
                     """,
-                    (target_issue_id,),
+                    (lottery_code, target_issue_id),
                 )
             else:
                 cursor.execute(
                     """
                     SELECT id
                     FROM prediction_batch
-                    WHERE status = 'archived' AND target_issue_id = ?
+                    WHERE status = 'archived' AND lottery_code = ? AND target_issue_id = ?
                     LIMIT 1
                     """,
-                    (target_issue_id,),
+                    (lottery_code, target_issue_id),
                 )
             existing = cursor.fetchone()
 
@@ -408,10 +440,11 @@ class PredictionRepository:
                 cursor.execute(
                     """
                     UPDATE prediction_batch
-                    SET prediction_date = ?, source_type = ?, status = ?, archived_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET lottery_code = ?, prediction_date = ?, source_type = ?, status = ?, archived_at = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
                     (
+                        lottery_code,
                         payload["prediction_date"],
                         "script",
                         status,
@@ -432,11 +465,12 @@ class PredictionRepository:
             else:
                 cursor.execute(
                     """
-                    INSERT INTO prediction_batch (target_issue_id, prediction_date, source_type, status, archived_at)
-                    VALUES (?, ?, 'script', ?, ?)
+                    INSERT INTO prediction_batch (target_issue_id, lottery_code, prediction_date, source_type, status, archived_at)
+                    VALUES (?, ?, ?, 'script', ?, ?)
                     """,
                     (
                         target_issue_id,
+                        lottery_code,
                         payload["prediction_date"],
                         status,
                         None,
@@ -482,6 +516,7 @@ class PredictionRepository:
                 owner_id=draw_result_id,
                 red_balls=actual_result.get("red_balls", []),
                 blue_balls=actual_result.get("blue_balls", []),
+                digits=actual_result.get("digits", []),
             )
             if actual_result.get("prize_breakdown"):
                 cursor.execute("DELETE FROM draw_result_prize WHERE draw_result_id = ?", (draw_result_id,))
@@ -544,12 +579,13 @@ class PredictionRepository:
                     group_no = int(group.get("group_id") or 0)
                     cursor.execute(
                         """
-                        INSERT INTO prediction_group (model_run_id, group_no, strategy_text, description_text)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO prediction_group (model_run_id, group_no, play_type, strategy_text, description_text)
+                        VALUES (?, ?, ?, ?, ?)
                         """,
                         (
                             model_run_id,
                             group_no,
+                            group.get("play_type"),
                             group.get("strategy"),
                             group.get("description"),
                         ),
@@ -563,6 +599,7 @@ class PredictionRepository:
                         owner_id=group_id,
                         red_balls=group.get("red_balls", []),
                         blue_balls=group.get("blue_balls", group.get("blue_ball", [])),
+                        digits=group.get("digits", []),
                     )
                     if persist_hit_details and draw_result_id and group.get("hit_result"):
                         hit_result = group.get("hit_result", {})
@@ -602,6 +639,14 @@ class PredictionRepository:
                                 """,
                                 (hit_summary_id, str(ball).zfill(2)),
                             )
+                        for ball in hit_result.get("digit_hits", []):
+                            cursor.execute(
+                                """
+                                INSERT INTO prediction_hit_number (hit_summary_id, ball_color, ball_value)
+                                VALUES (?, 'digit', ?)
+                                """,
+                                (hit_summary_id, str(ball).zfill(2)),
+                            )
 
                 if persist_hit_details:
                     best_group_no = model_payload.get("best_group")
@@ -631,6 +676,7 @@ class PredictionRepository:
         api_model_name = str(model_payload.get("model_api_model") or (definition.api_model if definition else ""))
         version = model_payload.get("model_version") or (definition.version if definition else None)
         tags = model_payload.get("model_tags") or (definition.tags if definition else [])
+        lottery_codes = model_payload.get("lottery_codes") or (definition.lottery_codes if definition else ["dlt"])
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -688,6 +734,16 @@ class PredictionRepository:
                     """,
                     (model_db_id, tag_id),
                 )
+            cursor.execute("DELETE FROM ai_model_lottery WHERE model_id = ?", (model_db_id,))
+            for lottery_code in lottery_codes:
+                cursor.execute(
+                    """
+                    INSERT INTO ai_model_lottery (model_id, lottery_code)
+                    VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE lottery_code = VALUES(lottery_code)
+                    """,
+                    (model_db_id, normalize_lottery_code(str(lottery_code))),
+                )
             return model_db_id
 
     def _upsert_model_definition(self, connection, definition: ModelDefinition) -> None:
@@ -699,6 +755,7 @@ class PredictionRepository:
                 "model_provider": definition.provider,
                 "model_version": definition.version,
                 "model_tags": definition.tags,
+                "lottery_codes": definition.lottery_codes,
                 "model_api_model": definition.api_model,
             },
             definition,
@@ -770,8 +827,9 @@ class PredictionRepository:
             )
 
         payload = {
+            "lottery_code": batch_row.get("lottery_code") or "dlt",
             "prediction_date": batch_row["prediction_date"],
-            "target_period": batch_row["target_period"],
+            "target_period": display_period(batch_row.get("lottery_code") or "dlt", batch_row["target_period"]),
             "models": models,
         }
         if include_actual_result:
@@ -831,7 +889,7 @@ class PredictionRepository:
         placeholders = ", ".join("?" for _ in model_run_ids)
         cursor.execute(
             f"""
-            SELECT id, model_run_id, group_no, strategy_text, description_text
+            SELECT id, model_run_id, group_no, play_type, strategy_text, description_text
             FROM prediction_group
             WHERE model_run_id IN ({placeholders})
             ORDER BY model_run_id ASC, group_no ASC
@@ -849,15 +907,18 @@ class PredictionRepository:
             numbers = numbers_by_group.get(group_id, [])
             red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
             blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
+            digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
             hit_result = hit_by_group.get(group_id)
             groups_by_run.setdefault(int(row["model_run_id"]), []).append(
                 {
                     "group_id": int(row["group_no"]),
+                    "play_type": row.get("play_type"),
                     "strategy": row.get("strategy_text"),
                     "description": row.get("description_text"),
-                    "red_balls": red_balls,
+                    "red_balls": red_balls or digits,
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
+                    "digits": digits,
                     **({"hit_result": hit_result} if hit_result else {}),
                 }
             )
@@ -944,18 +1005,20 @@ class PredictionRepository:
         )
         hits_by_summary: dict[int, dict[str, list[str]]] = {}
         for row in cursor.fetchall():
-            entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": []})
+            entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": [], "digit": []})
             entry[row["ball_color"]].append(row["ball_value"])
 
         result: dict[int, dict[str, Any]] = {}
         for row in summary_rows:
             summary_id = int(row["id"])
-            hit_values = hits_by_summary.get(summary_id, {"red": [], "blue": []})
+            hit_values = hits_by_summary.get(summary_id, {"red": [], "blue": [], "digit": []})
             result[int(row["prediction_group_id"])] = {
                 "red_hits": hit_values["red"],
                 "red_hit_count": int(row["red_hit_count"]),
                 "blue_hits": hit_values["blue"],
                 "blue_hit_count": int(row["blue_hit_count"]),
+                "digit_hits": hit_values["digit"],
+                "digit_hit_count": len(hit_values["digit"]),
                 "total_hits": int(row["total_hit_count"]),
             }
         return result
@@ -993,7 +1056,7 @@ class PredictionRepository:
         placeholders = ", ".join("?" for _ in target_issue_ids)
         cursor.execute(
             """
-            SELECT dr.id AS draw_result_id, dr.issue_id, di.issue_no AS period, di.draw_date
+            SELECT dr.id AS draw_result_id, dr.issue_id, di.issue_no AS period, di.draw_date, di.lottery_code
             FROM draw_result dr
             INNER JOIN draw_issue di ON di.id = dr.issue_id
             WHERE dr.issue_id IN ("""
@@ -1044,14 +1107,18 @@ class PredictionRepository:
         result: dict[int, dict[str, Any]] = {}
         for row in rows:
             numbers = numbers_by_result.get(int(row["draw_result_id"]), [])
+            lottery_code = normalize_lottery_code(row.get("lottery_code") or "dlt")
             red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
             blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
+            digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
             result[int(row["issue_id"])] = {
-                "period": row["period"],
+                "lottery_code": lottery_code,
+                "period": display_period(lottery_code, row["period"]),
                 "date": row.get("draw_date") or "",
-                "red_balls": red_balls,
+                "red_balls": red_balls or digits,
                 "blue_balls": blue_balls,
                 "blue_ball": blue_balls[0] if blue_balls else None,
+                "digits": digits,
                 "prize_breakdown": prizes_by_result.get(int(row["draw_result_id"]), []),
             }
         return result

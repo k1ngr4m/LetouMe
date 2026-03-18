@@ -473,15 +473,21 @@ describe('HomePage dashboard sidebar', () => {
 
     await waitFor(() => {
       expect(createSimulationTicket).toHaveBeenCalledWith({
+        lottery_code: 'dlt',
+        play_type: 'dlt',
         front_numbers: ['01', '02', '03', '04', '05'],
         back_numbers: ['06', '07'],
+        direct_hundreds: [],
+        direct_tens: [],
+        direct_units: [],
+        group_numbers: [],
       })
     })
 
     expect(await screen.findByText('方案 #11')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
-    await waitFor(() => expect(deleteSimulationTicket).toHaveBeenCalledWith(11))
+    await waitFor(() => expect(deleteSimulationTicket).toHaveBeenCalledWith(11, 'dlt'))
   })
 
   it('calculates multiple bet count in simulation tab', async () => {

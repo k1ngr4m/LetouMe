@@ -6,17 +6,30 @@ from backend.app.db.connection import get_connection
 
 
 class SimulationTicketRepository:
-    def list_tickets(self, user_id: int) -> list[dict[str, Any]]:
+    def list_tickets(self, user_id: int, lottery_code: str = "dlt") -> list[dict[str, Any]]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, user_id, front_numbers, back_numbers, bet_count, amount, created_at
+                    SELECT
+                        id,
+                        user_id,
+                        lottery_code,
+                        play_type,
+                        front_numbers,
+                        back_numbers,
+                        direct_hundreds,
+                        direct_tens,
+                        direct_units,
+                        group_numbers,
+                        bet_count,
+                        amount,
+                        created_at
                     FROM simulation_ticket
-                    WHERE user_id = ?
+                    WHERE user_id = ? AND lottery_code = ?
                     ORDER BY created_at DESC, id DESC
                     """,
-                    (user_id,),
+                    (user_id, lottery_code),
                 )
                 return cursor.fetchall()
 
@@ -25,13 +38,31 @@ class SimulationTicketRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO simulation_ticket (user_id, front_numbers, back_numbers, bet_count, amount)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO simulation_ticket (
+                        user_id,
+                        lottery_code,
+                        play_type,
+                        front_numbers,
+                        back_numbers,
+                        direct_hundreds,
+                        direct_tens,
+                        direct_units,
+                        group_numbers,
+                        bet_count,
+                        amount
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
+                        payload.get("lottery_code", "dlt"),
+                        payload.get("play_type", "dlt"),
                         payload["front_numbers"],
                         payload["back_numbers"],
+                        payload.get("direct_hundreds"),
+                        payload.get("direct_tens"),
+                        payload.get("direct_units"),
+                        payload.get("group_numbers"),
                         int(payload["bet_count"]),
                         int(payload["amount"]),
                     ),
@@ -44,7 +75,20 @@ class SimulationTicketRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, user_id, front_numbers, back_numbers, bet_count, amount, created_at
+                    SELECT
+                        id,
+                        user_id,
+                        lottery_code,
+                        play_type,
+                        front_numbers,
+                        back_numbers,
+                        direct_hundreds,
+                        direct_tens,
+                        direct_units,
+                        group_numbers,
+                        bet_count,
+                        amount,
+                        created_at
                     FROM simulation_ticket
                     WHERE id = ? AND user_id = ?
                     LIMIT 1
@@ -53,11 +97,11 @@ class SimulationTicketRepository:
                 )
                 return cursor.fetchone()
 
-    def delete_ticket(self, ticket_id: int, user_id: int) -> bool:
+    def delete_ticket(self, ticket_id: int, user_id: int, lottery_code: str = "dlt") -> bool:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "DELETE FROM simulation_ticket WHERE id = ? AND user_id = ?",
-                    (ticket_id, user_id),
+                    "DELETE FROM simulation_ticket WHERE id = ? AND user_id = ? AND lottery_code = ?",
+                    (ticket_id, user_id, lottery_code),
                 )
                 return cursor.rowcount > 0

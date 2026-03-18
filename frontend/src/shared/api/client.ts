@@ -33,6 +33,7 @@ import type {
   SuccessResponse,
   UserListResponse,
   RegisterPayload,
+  LotteryCode,
 } from '../types/api'
 import { appLogger, sanitizeForLog } from '../lib/logger'
 
@@ -126,52 +127,52 @@ export const apiClient = {
       body: JSON.stringify(payload),
     })
   },
-  getLotteryHistory(payload?: { limit?: number; offset?: number }) {
+  getLotteryHistory(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
     return requestJson<LotteryHistoryResponse>('/api/lottery/history', {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     })
   },
-  getCurrentPredictions() {
+  getCurrentPredictions(lotteryCode: LotteryCode = 'dlt') {
     return requestJson<CurrentPredictionsResponse>('/api/predictions/current', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
-  getPredictionsHistoryList(payload?: { limit?: number; offset?: number }) {
+  getPredictionsHistoryList(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
     return requestJson<PredictionsHistoryListResponse>('/api/predictions/history/list', {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     })
   },
-  getPredictionsHistoryDetail(targetPeriod: string) {
+  getPredictionsHistoryDetail(targetPeriod: string, lotteryCode: LotteryCode = 'dlt') {
     return requestJson<PredictionsHistoryResponse>('/api/predictions/history/detail', {
       method: 'POST',
-      body: JSON.stringify({ target_period: targetPeriod }),
+      body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod }),
     })
   },
-  getSimulationTickets() {
+  getSimulationTickets(lotteryCode: LotteryCode = 'dlt') {
     return requestJson<SimulationTicketListResponse>('/api/simulation/tickets/list', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
     return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ lottery_code: payload.lottery_code || 'dlt', ...payload }),
     })
   },
-  deleteSimulationTicket(ticketId: number) {
+  deleteSimulationTicket(ticketId: number, lotteryCode: LotteryCode = 'dlt') {
     return requestJson<SuccessResponse>('/api/simulation/tickets/delete', {
       method: 'POST',
-      body: JSON.stringify({ ticket_id: ticketId }),
+      body: JSON.stringify({ ticket_id: ticketId, lottery_code: lotteryCode }),
     })
   },
-  getSettingsModels(includeDeleted = false) {
+  getSettingsModels(includeDeleted = false, lotteryCode?: LotteryCode) {
     return requestJson<SettingsModelListResponse>('/api/settings/models/list', {
       method: 'POST',
-      body: JSON.stringify({ include_deleted: includeDeleted }),
+      body: JSON.stringify({ include_deleted: includeDeleted, lottery_code: lotteryCode }),
     })
   },
   getSettingsModel(modelCode: string) {
@@ -186,10 +187,10 @@ export const apiClient = {
       body: JSON.stringify({}),
     })
   },
-  fetchSettingsLotteryHistory() {
+  fetchSettingsLotteryHistory(lotteryCode: LotteryCode = 'dlt') {
     return requestJson<LotteryFetchTask>('/api/settings/lottery/fetch', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
   getLotteryFetchTaskDetail(taskId: string) {
@@ -252,16 +253,16 @@ export const apiClient = {
       body: JSON.stringify({ task_id: taskId }),
     })
   },
-  getSettingsPredictionRecords() {
+  getSettingsPredictionRecords(lotteryCode: LotteryCode = 'dlt') {
     return requestJson<SettingsPredictionRecordListResponse>('/api/settings/predictions/records/list', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
-  getSettingsPredictionRecordDetail(recordType: 'current' | 'history', targetPeriod: string) {
+  getSettingsPredictionRecordDetail(recordType: 'current' | 'history', targetPeriod: string, lotteryCode: LotteryCode = 'dlt') {
     return requestJson<SettingsPredictionRecordDetail>('/api/settings/predictions/records/detail', {
       method: 'POST',
-      body: JSON.stringify({ record_type: recordType, target_period: targetPeriod }),
+      body: JSON.stringify({ lottery_code: lotteryCode, record_type: recordType, target_period: targetPeriod }),
     })
   },
   listUsers() {

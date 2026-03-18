@@ -7,6 +7,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
 from backend.app.db.connection import ensure_schema, get_connection
+from backend.app.lotteries import normalize_lottery_code
 
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
@@ -33,6 +34,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEFAULT_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "claude-sonnet-4.6",
@@ -45,6 +47,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEFAULT_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "gemini-3-flash-preview",
@@ -57,6 +60,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEFAULT_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "deepseek-v3.2",
@@ -69,6 +73,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEEPSEEK_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "deepseek-reasoner",
@@ -81,6 +86,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEEPSEEK_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "gemini-3.1-pro-preview",
@@ -93,6 +99,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEFAULT_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "doubao-seed-2-0-pro",
@@ -105,6 +112,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": DEFAULT_BASE_URL,
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
     {
         "model_code": "zhipuai-glm-5",
@@ -117,6 +125,7 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "base_url": "https://api-inference.modelscope.cn/v1",
         "api_key": "",
         "app_code": "",
+        "lottery_codes": ["dlt"],
     },
 ]
 
@@ -134,6 +143,7 @@ class ModelDefinition:
     version: str | None = None
     tags: list[str] = field(default_factory=list)
     temperature: float | None = None
+    lottery_codes: list[str] = field(default_factory=lambda: ["dlt"])
     is_active: bool = True
     is_deleted: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
@@ -160,6 +170,10 @@ class ModelDefinition:
             return True
         tags = {t.lower() for t in self.tags}
         return all(t.lower() in tags for t in include_tags)
+
+    def supports_lottery(self, lottery_code: str) -> bool:
+        code = normalize_lottery_code(lottery_code)
+        return code in (self.lottery_codes or ["dlt"])
 
 
 class ModelRegistry:
@@ -289,6 +303,15 @@ def bootstrap_default_models() -> None:
                             """,
                             (model_db_id, tag_id),
                         )
+                    for lottery_code in item.get("lottery_codes", ["dlt"]):
+                        cursor.execute(
+                            """
+                            INSERT INTO ai_model_lottery (model_id, lottery_code)
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE lottery_code = VALUES(lottery_code)
+                            """,
+                            (model_db_id, normalize_lottery_code(lottery_code)),
+                        )
         _bootstrap_ready = True
 
 
@@ -352,6 +375,7 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
                 raise ValueError("数据库中没有模型配置")
             model_codes = [str(row["model_code"]) for row in rows]
             tags_by_code = _fetch_tags(cursor, model_codes)
+            lotteries_by_code = _fetch_lotteries(cursor, model_codes)
 
     definitions: dict[str, ModelDefinition] = {}
     for row in rows:
@@ -368,6 +392,7 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             version=row.get("version"),
             tags=tags_by_code.get(model_code, []),
             temperature=row.get("temperature"),
+            lottery_codes=lotteries_by_code.get(model_code, ["dlt"]),
             is_active=bool(row.get("is_active")),
             is_deleted=bool(row.get("is_deleted")),
         )
@@ -392,4 +417,24 @@ def _fetch_tags(cursor, model_codes: list[str]) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     for row in cursor.fetchall():
         result.setdefault(str(row["model_code"]), []).append(str(row["tag_code"]))
+    return result
+
+
+def _fetch_lotteries(cursor, model_codes: list[str]) -> dict[str, list[str]]:
+    if not model_codes:
+        return {}
+    placeholders = ", ".join("?" for _ in model_codes)
+    cursor.execute(
+        f"""
+        SELECT am.model_code, aml.lottery_code
+        FROM ai_model am
+        INNER JOIN ai_model_lottery aml ON aml.model_id = am.id
+        WHERE am.model_code IN ({placeholders})
+        ORDER BY aml.lottery_code ASC
+        """,
+        tuple(model_codes),
+    )
+    result: dict[str, list[str]] = {}
+    for row in cursor.fetchall():
+        result.setdefault(str(row["model_code"]), []).append(str(row["lottery_code"]))
     return result

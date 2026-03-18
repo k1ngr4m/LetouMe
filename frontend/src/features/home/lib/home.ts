@@ -53,8 +53,10 @@ export type ModelListFilters = {
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
   return {
     ...draw,
+    lottery_code: draw.lottery_code || 'dlt',
     red_balls: (draw.red_balls || []).map(padBall).sort(),
     blue_balls: (draw.blue_balls || []).map(padBall).sort(),
+    digits: (draw.digits || []).map(padBall),
     blue_ball: (draw.blue_balls || [])[0] || null,
     prize_breakdown: (draw.prize_breakdown || []).map((item) => ({
       ...item,
@@ -70,6 +72,7 @@ export function normalizeGroup(group: PredictionGroup): PredictionGroup {
     ...group,
     red_balls: (group.red_balls || []).map(padBall).sort(),
     blue_balls: (group.blue_balls || []).map(padBall).sort(),
+    digits: (group.digits || []).map(padBall),
     blue_ball: (group.blue_balls || [])[0] || null,
     prize_amount: Number(group.prize_amount || 0),
     hit_result: group.hit_result
@@ -77,6 +80,7 @@ export function normalizeGroup(group: PredictionGroup): PredictionGroup {
           ...group.hit_result,
           red_hits: (group.hit_result.red_hits || []).map(padBall).sort(),
           blue_hits: (group.hit_result.blue_hits || []).map(padBall).sort(),
+          digit_hits: (group.hit_result.digit_hits || []).map(padBall),
         }
       : undefined,
   }
@@ -85,6 +89,7 @@ export function normalizeGroup(group: PredictionGroup): PredictionGroup {
 export function normalizeCurrentPredictions(data: CurrentPredictionsResponse): CurrentPredictionsResponse {
   return {
     ...data,
+    lottery_code: data.lottery_code || 'dlt',
     models: (data.models || []).map((model) => ({
       ...model,
       predictions: (model.predictions || []).map(normalizeGroup),
@@ -219,6 +224,18 @@ function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistory
 
 export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null) {
   if (!actualResult) return null
+  if ((actualResult.lottery_code || 'dlt') === 'pl3') {
+    const digitHits = (prediction.digits || []).filter((digit, index) => digit === (actualResult.digits || [])[index])
+    return {
+      redHits: [],
+      redHitCount: 0,
+      blueHits: [],
+      blueHitCount: 0,
+      digitHits,
+      digitHitCount: digitHits.length,
+      totalHits: digitHits.length,
+    }
+  }
   const redHits = prediction.red_balls.filter((ball) => actualResult.red_balls.includes(ball))
   const blueHits = prediction.blue_balls.filter((ball) => actualResult.blue_balls.includes(ball))
   return {

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from backend.app.db.connection import ensure_schema
+from backend.app.lotteries import normalize_digit_balls, normalize_group_digits, normalize_lottery_code
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.model_repository import ModelRepository
 from backend.app.repositories.prediction_repository import PredictionRepository
@@ -17,6 +18,7 @@ from backend.core.model_factory import ModelFactory
 
 
 DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2.0.md"
+PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
 
 
@@ -59,22 +61,24 @@ class PredictionGenerationService:
     def generate_current_for_model(
         self,
         *,
+        lottery_code: str = "dlt",
         model_code: str,
         overwrite: bool,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
-        model_def = self._get_model_definition(model_code)
-        prompt_template = self._load_prompt_template()
-        lottery_data = self._load_lottery_history()
-        self.prediction_service.archive_current_prediction_if_needed(lottery_data)
+        normalized_code = normalize_lottery_code(lottery_code)
+        model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
+        prompt_template = self._load_prompt_template(normalized_code)
+        lottery_data = self._load_lottery_history(normalized_code)
+        self.prediction_service.archive_current_prediction_if_needed(lottery_data, lottery_code=normalized_code)
         next_draw = lottery_data.get("next_draw") or {}
         target_period = str(next_draw.get("next_period") or "")
         target_date = str(next_draw.get("next_date_display") or "")
         if not target_period:
             raise ValueError("无法确定下一期，不能生成当前期预测")
 
-        current_payload = self.prediction_service.get_current_payload_by_period(target_period)
+        current_payload = self.prediction_service.get_current_payload_by_period(target_period, lottery_code=normalized_code)
         existing_models = {
             str(model.get("model_id") or "")
             for model in current_payload.get("models", [])
@@ -93,6 +97,7 @@ class PredictionGenerationService:
         prediction = self._generate_prediction(
             model=model,
             model_def=model_def,
+            lottery_code=normalized_code,
             prompt_template=prompt_template,
             target_period=target_period,
             prediction_date=prediction_date,
@@ -101,6 +106,7 @@ class PredictionGenerationService:
         )
         self.prediction_service.save_current_prediction(
             {
+                "lottery_code": normalized_code,
                 "prediction_date": prediction_date,
                 "target_period": target_period,
                 "models": [prediction],
@@ -114,6 +120,7 @@ class PredictionGenerationService:
     def recalculate_history_for_model(
         self,
         *,
+        lottery_code: str = "dlt",
         model_code: str,
         start_period: str,
         end_period: str,
@@ -126,10 +133,11 @@ class PredictionGenerationService:
         if start_value > end_value:
             raise ValueError("开始期号不能大于结束期号")
 
-        model_def = self._get_model_definition(model_code)
+        normalized_code = normalize_lottery_code(lottery_code)
+        model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
         model = self._prepare_model(model_def)
-        prompt_template = self._load_prompt_template()
-        history_data = self._load_lottery_history()
+        prompt_template = self._load_prompt_template(normalized_code)
+        history_data = self._load_lottery_history(normalized_code)
         period_map = self._build_period_map(history_data)
         available_periods = {int(period) for period in period_map}
         sorted_periods_desc = sorted((int(period), period) for period in period_map)
@@ -144,7 +152,7 @@ class PredictionGenerationService:
                     progress_callback(summary.to_dict())
                 continue
 
-            existing_record = self.prediction_repository.get_history_record_detail(target_period)
+            existing_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
             existing_model_map = {
                 str(item.get("model_id") or ""): item
                 for item in (existing_record or {}).get("models", [])
@@ -174,6 +182,7 @@ class PredictionGenerationService:
                 prediction = self._generate_prediction(
                     model=model,
                     model_def=model_def,
+                    lottery_code=normalized_code,
                     prompt_template=prompt_template,
                     target_period=target_period,
                     prediction_date=prediction_date,
@@ -193,7 +202,7 @@ class PredictionGenerationService:
             predictions_with_hits = []
             for group in prediction.get("predictions", []):
                 group_payload = dict(group)
-                group_payload["hit_result"] = self.prediction_service.calculate_hit_result(group, actual_result)
+                group_payload["hit_result"] = self.prediction_service.calculate_hit_result(group, actual_result, lottery_code=normalized_code)
                 predictions_with_hits.append(group_payload)
 
             best_group = max(predictions_with_hits, key=lambda item: item["hit_result"]["total_hits"])
@@ -210,6 +219,7 @@ class PredictionGenerationService:
             }
             record = existing_record or {
                 "prediction_date": prediction_date,
+                "lottery_code": normalized_code,
                 "target_period": target_period,
                 "actual_result": actual_result,
                 "models": [],
@@ -218,7 +228,7 @@ class PredictionGenerationService:
             record["actual_result"] = actual_result
             record["models"] = list(existing_model_map.values())
             self.prediction_repository.upsert_history_record(record)
-            self.prediction_service._invalidate_prediction_cache(target_period=target_period)
+            self.prediction_service._invalidate_prediction_cache(target_period=target_period, lottery_code=normalized_code)
             summary.processed_count += 1
             if progress_callback:
                 progress_callback(summary.to_dict())
@@ -228,6 +238,7 @@ class PredictionGenerationService:
     def generate_for_models(
         self,
         *,
+        lottery_code: str = "dlt",
         model_codes: list[str],
         mode: str,
         overwrite: bool,
@@ -262,11 +273,13 @@ class PredictionGenerationService:
             try:
                 result = (
                     self.generate_current_for_model(
+                        lottery_code=lottery_code,
                         model_code=model_code,
                         overwrite=overwrite,
                     )
                     if mode == "current"
                     else self.recalculate_history_for_model(
+                        lottery_code=lottery_code,
                         model_code=model_code,
                         start_period=str(start_period or ""),
                         end_period=str(end_period or ""),
@@ -308,31 +321,38 @@ class PredictionGenerationService:
             raise ValueError(f"模型健康检查失败: {message}")
         return model
 
-    def validate_model(self, model_code: str) -> dict[str, Any]:
+    def validate_model(self, model_code: str, lottery_code: str = "dlt") -> dict[str, Any]:
         model = self.model_repository.get_model(model_code)
         if not model:
             raise KeyError(model_code)
         if bool(model.get("is_deleted")):
             raise ValueError("已删除模型不能生成预测数据")
+        normalized_code = normalize_lottery_code(lottery_code)
+        if normalized_code not in (model.get("lottery_codes") or ["dlt"]):
+            raise ValueError("该模型未配置当前彩种")
         return model
 
-    def _get_model_definition(self, model_code: str) -> ModelDefinition:
-        self.validate_model(model_code)
+    def _get_model_definition(self, model_code: str, lottery_code: str = "dlt") -> ModelDefinition:
+        self.validate_model(model_code, lottery_code=lottery_code)
         registry = load_model_registry()
         try:
-            return registry.get(model_code)
+            model_def = registry.get(model_code)
+            if not model_def.supports_lottery(lottery_code):
+                raise ValueError("该模型未配置当前彩种")
+            return model_def
         except KeyError as exc:
             raise KeyError(model_code) from exc
 
     @staticmethod
-    def _load_prompt_template() -> str:
-        return DEFAULT_PROMPT_PATH.read_text(encoding="utf-8")
+    def _load_prompt_template(lottery_code: str = "dlt") -> str:
+        path = DEFAULT_PROMPT_PATH if normalize_lottery_code(lottery_code) == "dlt" else PL3_PROMPT_PATH
+        return path.read_text(encoding="utf-8")
 
-    def _load_lottery_history(self) -> dict[str, Any]:
-        data = self.lottery_service.get_history_payload()
+    def _load_lottery_history(self, lottery_code: str = "dlt") -> dict[str, Any]:
+        data = self.lottery_service.get_history_payload(lottery_code=lottery_code)
         return {
             **data,
-            "data": [self._normalize_draw(draw) for draw in data.get("data", [])],
+            "data": [self._normalize_draw(draw, lottery_code=lottery_code) for draw in data.get("data", [])],
         }
 
     @staticmethod
@@ -344,13 +364,15 @@ class PredictionGenerationService:
         return []
 
     @classmethod
-    def _normalize_draw(cls, draw: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_draw(cls, draw: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         blue_balls = cls._normalize_blue_balls(draw.get("blue_balls", draw.get("blue_ball")))
         return {
             **draw,
             "red_balls": sorted(str(item).zfill(2) for item in draw.get("red_balls", [])),
             "blue_balls": blue_balls,
             "blue_ball": blue_balls[0] if blue_balls else None,
+            "digits": normalize_digit_balls(draw.get("digits", [])),
+            "lottery_code": normalize_lottery_code(lottery_code or draw.get("lottery_code")),
         }
 
     def _generate_prediction(
@@ -358,6 +380,7 @@ class PredictionGenerationService:
         *,
         model: Any,
         model_def: ModelDefinition,
+        lottery_code: str,
         prompt_template: str,
         target_period: str,
         prediction_date: str,
@@ -373,8 +396,8 @@ class PredictionGenerationService:
             model_name=model_def.name,
         )
         raw_prediction = model.predict(prompt)
-        prediction = self._finalize_prediction(raw_prediction, model_def, prediction_date, target_period)
-        if not self._validate_prediction(prediction):
+        prediction = self._finalize_prediction(raw_prediction, model_def, prediction_date, target_period, lottery_code=lottery_code)
+        if not self._validate_prediction(prediction, lottery_code=lottery_code):
             raise ValueError(f"模型返回的预测结构无效: {model_def.model_id}")
         return prediction
 
@@ -384,10 +407,12 @@ class PredictionGenerationService:
         model_def: ModelDefinition,
         prediction_date: str,
         target_period: str,
+        lottery_code: str = "dlt",
     ) -> dict[str, Any]:
-        normalized = self.prediction_service.normalize_prediction(prediction)
+        normalized = self.prediction_service.normalize_prediction(prediction, lottery_code=lottery_code)
         normalized["prediction_date"] = prediction_date
         normalized["target_period"] = target_period
+        normalized["lottery_code"] = normalize_lottery_code(lottery_code)
         normalized["model_id"] = model_def.model_id
         normalized["model_name"] = model_def.name
         normalized["model_provider"] = model_def.provider
@@ -396,11 +421,24 @@ class PredictionGenerationService:
         normalized["model_api_model"] = model_def.api_model
         return normalized
 
-    def _validate_prediction(self, prediction: dict[str, Any]) -> bool:
+    def _validate_prediction(self, prediction: dict[str, Any], lottery_code: str = "dlt") -> bool:
         groups = prediction.get("predictions", [])
+        normalized_code = normalize_lottery_code(lottery_code)
         if len(groups) != 5:
             return False
         for group in groups:
+            if normalized_code == "pl3":
+                play_type = str(group.get("play_type") or "").strip().lower()
+                digits = normalize_digit_balls(group.get("digits", []))
+                if play_type not in {"direct", "group3", "group6"}:
+                    return False
+                if len(digits) != 3:
+                    return False
+                if play_type == "group3" and len(set(digits)) != 2:
+                    return False
+                if play_type == "group6" and len(set(digits)) != 3:
+                    return False
+                continue
             red_balls = group.get("red_balls", [])
             blue_balls = self._normalize_blue_balls(group.get("blue_balls", group.get("blue_ball")))
             if len(red_balls) != 5 or red_balls != sorted(red_balls):
@@ -418,6 +456,8 @@ class PredictionGenerationService:
                 "period": period,
                 "red_balls": sorted(str(item).zfill(2) for item in row.get("red_balls", [])),
                 "blue_balls": cls._normalize_blue_balls(row.get("blue_balls", row.get("blue_ball"))),
+                "digits": normalize_digit_balls(row.get("digits", [])),
+                "lottery_code": row.get("lottery_code", "dlt"),
                 "date": row.get("date"),
             }
         return result

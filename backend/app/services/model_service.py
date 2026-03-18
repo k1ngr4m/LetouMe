@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from backend.app.cache import runtime_cache
+from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.model_repository import ModelRepository
 
 
@@ -158,12 +159,17 @@ class ModelService:
         normalized["app_code"] = str(payload.get("app_code") or "").strip()
         normalized["temperature"] = payload.get("temperature")
         normalized["tags"] = payload.get("tags") or []
+        normalized["lottery_codes"] = [
+            normalize_lottery_code(str(item))
+            for item in (payload.get("lottery_codes") or ["dlt"])
+            if str(item).strip()
+        ] or ["dlt"]
         normalized["is_active"] = bool(payload.get("is_active", True))
         return normalized
 
     @staticmethod
     def _normalize_bulk_updates(payload: dict[str, Any]) -> dict[str, Any]:
-        allowed_fields = {"provider", "base_url", "api_key", "tags", "temperature", "is_active"}
+        allowed_fields = {"provider", "base_url", "api_key", "tags", "lottery_codes", "temperature", "is_active"}
         normalized: dict[str, Any] = {}
         for key in allowed_fields:
             if key not in payload:
@@ -173,6 +179,12 @@ class ModelService:
                 normalized[key] = str(value or "").strip()
             elif key == "tags":
                 normalized[key] = [str(item).strip() for item in (value or []) if str(item).strip()]
+            elif key == "lottery_codes":
+                normalized[key] = [
+                    normalize_lottery_code(str(item))
+                    for item in (value or [])
+                    if str(item).strip()
+                ] or ["dlt"]
             elif key == "temperature":
                 normalized[key] = value
             elif key == "is_active":

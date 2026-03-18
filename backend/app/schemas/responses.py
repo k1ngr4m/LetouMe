@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class LotteryHistoryResponse(BaseModel):
+    lottery_code: str = "dlt"
     last_updated: str
     data: list[dict[str, Any]]
     next_draw: dict[str, Any] | None = None
@@ -13,6 +14,7 @@ class LotteryHistoryResponse(BaseModel):
 
 
 class CurrentPredictionsResponse(BaseModel):
+    lottery_code: str = "dlt"
     prediction_date: str
     target_period: str
     models: list[dict[str, Any]]
@@ -25,6 +27,7 @@ class PredictionsHistoryResponse(BaseModel):
 
 
 class PredictionGenerationTaskResponse(BaseModel):
+    lottery_code: str = "dlt"
     task_id: str
     status: str
     mode: str
@@ -37,6 +40,7 @@ class PredictionGenerationTaskResponse(BaseModel):
 
 
 class LotteryFetchTaskResponse(BaseModel):
+    lottery_code: str = "dlt"
     task_id: str
     status: str
     created_at: str
@@ -57,6 +61,7 @@ class BulkModelActionResponse(BaseModel):
 
 
 class SettingsPredictionRecordSummaryResponse(BaseModel):
+    lottery_code: str = "dlt"
     record_type: str
     target_period: str
     prediction_date: str
@@ -70,6 +75,7 @@ class SettingsPredictionRecordListResponse(BaseModel):
 
 
 class SettingsPredictionRecordDetailResponse(BaseModel):
+    lottery_code: str = "dlt"
     record_type: str
     prediction_date: str
     target_period: str
@@ -80,8 +86,14 @@ class SettingsPredictionRecordDetailResponse(BaseModel):
 
 class SimulationTicketRecordResponse(BaseModel):
     id: int
+    lottery_code: str = "dlt"
+    play_type: str = "dlt"
     front_numbers: list[str] = Field(default_factory=list)
     back_numbers: list[str] = Field(default_factory=list)
+    direct_hundreds: list[str] = Field(default_factory=list)
+    direct_tens: list[str] = Field(default_factory=list)
+    direct_units: list[str] = Field(default_factory=list)
+    group_numbers: list[str] = Field(default_factory=list)
     bet_count: int = 0
     amount: int = 0
     created_at: str

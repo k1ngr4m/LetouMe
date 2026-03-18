@@ -1,23 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../../shared/api/client'
+import type { LotteryCode } from '../../../shared/types/api'
 import { normalizeCurrentPredictions, normalizeDraw, normalizePredictionsHistoryList } from '../lib/home'
 
-export function currentPredictionsQueryOptions() {
+export function currentPredictionsQueryOptions(lotteryCode: LotteryCode = 'dlt') {
   return {
-    queryKey: ['current-predictions'],
-    queryFn: async () => normalizeCurrentPredictions(await apiClient.getCurrentPredictions()),
+    queryKey: ['current-predictions', lotteryCode],
+    queryFn: async () => normalizeCurrentPredictions(await apiClient.getCurrentPredictions(lotteryCode)),
   }
 }
 
-export function useHomeData(predictionLimit: number, lotteryPage: number, lotteryPageSize: number) {
+export function useHomeData(lotteryCode: LotteryCode, predictionLimit: number, lotteryPage: number, lotteryPageSize: number) {
   const currentPredictions = useQuery({
-    ...currentPredictionsQueryOptions(),
+    ...currentPredictionsQueryOptions(lotteryCode),
   })
 
   const lotteryCharts = useQuery({
-    queryKey: ['lottery-history', 'charts'],
+    queryKey: ['lottery-history', lotteryCode, 'charts'],
     queryFn: async () => {
-      const data = await apiClient.getLotteryHistory({ limit: 120, offset: 0 })
+      const data = await apiClient.getLotteryHistory({ lottery_code: lotteryCode, limit: 120, offset: 0 })
       return {
         ...data,
         data: data.data.map(normalizeDraw),
@@ -26,14 +27,15 @@ export function useHomeData(predictionLimit: number, lotteryPage: number, lotter
   })
 
   const predictionsHistory = useQuery({
-    queryKey: ['predictions-history', predictionLimit],
-    queryFn: async () => normalizePredictionsHistoryList(await apiClient.getPredictionsHistoryList({ limit: predictionLimit, offset: 0 })),
+    queryKey: ['predictions-history', lotteryCode, predictionLimit],
+    queryFn: async () => normalizePredictionsHistoryList(await apiClient.getPredictionsHistoryList({ lottery_code: lotteryCode, limit: predictionLimit, offset: 0 })),
   })
 
   const pagedLotteryHistory = useQuery({
-    queryKey: ['lottery-history', 'paged', lotteryPage, lotteryPageSize],
+    queryKey: ['lottery-history', lotteryCode, 'paged', lotteryPage, lotteryPageSize],
     queryFn: async () => {
       const data = await apiClient.getLotteryHistory({
+        lottery_code: lotteryCode,
         limit: lotteryPageSize,
         offset: (lotteryPage - 1) * lotteryPageSize,
       })

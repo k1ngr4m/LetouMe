@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.lotteries import SUPPORTED_LOTTERY_CODES, normalize_lottery_code
 from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_PROVIDERS
 
 
@@ -20,8 +21,10 @@ class ModelRepository:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=include_deleted)
-                tags_by_code = self._fetch_tags(cursor, [row["model_code"] for row in rows])
-        return [self._serialize_model(row, tags_by_code.get(row["model_code"], [])) for row in rows]
+                model_codes = [row["model_code"] for row in rows]
+                tags_by_code = self._fetch_tags(cursor, model_codes)
+                lotteries_by_code = self._fetch_lotteries(cursor, model_codes)
+        return [self._serialize_model(row, tags_by_code.get(row["model_code"], []), lotteries_by_code.get(row["model_code"], ["dlt"])) for row in rows]
 
     def get_model(self, model_code: str) -> dict[str, Any] | None:
         with get_connection() as connection:
@@ -30,7 +33,8 @@ class ModelRepository:
                 if not rows:
                     return None
                 tags_by_code = self._fetch_tags(cursor, [model_code])
-        return self._serialize_model(rows[0], tags_by_code.get(model_code, []))
+                lotteries_by_code = self._fetch_lotteries(cursor, [model_code])
+        return self._serialize_model(rows[0], tags_by_code.get(model_code, []), lotteries_by_code.get(model_code, ["dlt"]))
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
         model_code = str(payload["model_code"]).strip()
@@ -76,6 +80,7 @@ class ModelRepository:
                 cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
                 model_id = int(cursor.fetchone()["id"])
                 self._save_tags(cursor, model_id, self._normalize_tags(payload.get("tags")))
+                self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
         return self.get_model(model_code) or {}
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -117,6 +122,7 @@ class ModelRepository:
                     ),
                 )
                 self._save_tags(cursor, model_id, self._normalize_tags(payload.get("tags")))
+                self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
         return self.get_model(model_code) or {}
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
@@ -219,6 +225,25 @@ class ModelRepository:
             result.setdefault(str(row["model_code"]), []).append(str(row["tag_code"]))
         return result
 
+    def _fetch_lotteries(self, cursor, model_codes: list[str]) -> dict[str, list[str]]:
+        if not model_codes:
+            return {}
+        placeholders = ", ".join("?" for _ in model_codes)
+        cursor.execute(
+            f"""
+            SELECT am.model_code, aml.lottery_code
+            FROM ai_model am
+            INNER JOIN ai_model_lottery aml ON aml.model_id = am.id
+            WHERE am.model_code IN ({placeholders})
+            ORDER BY aml.lottery_code ASC
+            """,
+            tuple(model_codes),
+        )
+        result: dict[str, list[str]] = {}
+        for row in cursor.fetchall():
+            result.setdefault(str(row["model_code"]), []).append(str(row["lottery_code"]))
+        return result
+
     def _save_tags(self, cursor, model_id: int, tags: list[str]) -> None:
         cursor.execute("DELETE FROM ai_model_tag WHERE model_id = ?", (model_id,))
         for tag in tags:
@@ -240,6 +265,17 @@ class ModelRepository:
                 (model_id, tag_id),
             )
 
+    def _save_lotteries(self, cursor, model_id: int, lottery_codes: list[str]) -> None:
+        cursor.execute("DELETE FROM ai_model_lottery WHERE model_id = ?", (model_id,))
+        for lottery_code in lottery_codes:
+            cursor.execute(
+                """
+                INSERT INTO ai_model_lottery (model_id, lottery_code)
+                VALUES (?, ?)
+                """,
+                (model_id, lottery_code),
+            )
+
     def _upsert_provider(self, cursor, provider_code: str) -> int:
         provider_name = PROVIDER_LABELS[provider_code]
         provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL
@@ -257,7 +293,7 @@ class ModelRepository:
         return int(cursor.fetchone()["id"])
 
     @staticmethod
-    def _serialize_model(row: dict[str, Any], tags: list[str]) -> dict[str, Any]:
+    def _serialize_model(row: dict[str, Any], tags: list[str], lottery_codes: list[str]) -> dict[str, Any]:
         return {
             "model_code": row["model_code"],
             "display_name": row["display_name"],
@@ -271,6 +307,7 @@ class ModelRepository:
             "temperature": row.get("temperature"),
             "is_active": bool(row.get("is_active")),
             "is_deleted": bool(row.get("is_deleted")),
+            "lottery_codes": lottery_codes or ["dlt"],
             "updated_at": row.get("updated_at") or "",
         }
 
@@ -297,6 +334,21 @@ class ModelRepository:
         return tags
 
     @staticmethod
+    def _normalize_lottery_codes(value: Any) -> list[str]:
+        if value is None:
+            return ["dlt"]
+        items = value if isinstance(value, list) else [value]
+        normalized: list[str] = []
+        for item in items:
+            try:
+                code = normalize_lottery_code(str(item))
+            except ValueError:
+                continue
+            if code not in normalized:
+                normalized.append(code)
+        return normalized or ["dlt"]
+
+    @staticmethod
     def _normalize_base_url(value: Any, provider_code: str) -> str:
         text = str(value or "").strip()
         if text:
@@ -314,6 +366,14 @@ class ModelRepository:
         provider = str(payload.get("provider") or "")
         if provider not in SUPPORTED_PROVIDERS:
             raise ValueError(f"不支持的 provider: {provider}")
+        lottery_codes = payload.get("lottery_codes")
+        if lottery_codes is not None:
+            normalized_lottery_codes = ModelRepository._normalize_lottery_codes(lottery_codes)
+            if not normalized_lottery_codes:
+                raise ValueError("至少选择一个适用彩种")
+            for code in normalized_lottery_codes:
+                if code not in SUPPORTED_LOTTERY_CODES:
+                    raise ValueError(f"不支持的彩种: {code}")
         temperature = payload.get("temperature")
         if temperature in ("", None):
             return

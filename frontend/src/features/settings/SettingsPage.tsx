@@ -6,6 +6,7 @@ import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { loadSelectedLottery, saveSelectedLottery } from '../../shared/lib/storage'
 import { normalizeCurrentPredictions, normalizePredictionsHistory } from '../home/lib/home'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import type {
@@ -22,6 +23,7 @@ import type {
   SettingsPredictionRecordSummary,
   SettingsModel,
   SettingsModelPayload,
+  LotteryCode,
 } from '../../shared/types/api'
 
 type SettingsTab = 'profile' | 'models' | 'users' | 'roles'
@@ -57,6 +59,7 @@ const EMPTY_MODEL_FORM: SettingsModelPayload = {
   app_code: '',
   temperature: null,
   is_active: true,
+  lottery_codes: ['dlt'],
 }
 
 const EMPTY_PASSWORD_FORM: PasswordChangePayload & { confirm_password: string } = {
@@ -302,10 +305,11 @@ export function SettingsPage() {
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
   const [message, setMessage] = useState<string | null>(null)
+  const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
-  const [modelForm, setModelForm] = useState<SettingsModelPayload>(EMPTY_MODEL_FORM)
+  const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [selectedLottery] })
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
@@ -333,8 +337,8 @@ export function SettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin'
 
   const modelsQuery = useQuery({
-    queryKey: ['settings-models'],
-    queryFn: () => apiClient.getSettingsModels(false),
+    queryKey: ['settings-models', selectedLottery],
+    queryFn: () => apiClient.getSettingsModels(false, selectedLottery),
     enabled: canManageModels,
   })
   const providersQuery = useQuery({
@@ -343,21 +347,23 @@ export function SettingsPage() {
     enabled: canManageModels,
   })
   const predictionRecordsQuery = useQuery({
-    queryKey: ['settings-prediction-records'],
-    queryFn: () => apiClient.getSettingsPredictionRecords(),
+    queryKey: ['settings-prediction-records', selectedLottery],
+    queryFn: () => apiClient.getSettingsPredictionRecords(selectedLottery),
     enabled: canManageModels,
   })
   const predictionRecordDetailQuery = useQuery({
-    queryKey: ['settings-prediction-record-detail', selectedPredictionRecord?.recordType, selectedPredictionRecord?.targetPeriod],
+    queryKey: ['settings-prediction-record-detail', selectedLottery, selectedPredictionRecord?.recordType, selectedPredictionRecord?.targetPeriod],
     queryFn: async () => {
       const detail = await apiClient.getSettingsPredictionRecordDetail(
         selectedPredictionRecord?.recordType || 'history',
         selectedPredictionRecord?.targetPeriod || '',
+        selectedLottery,
       )
       if (detail.record_type === 'history') {
         return normalizePredictionsHistory({ predictions_history: [detail], total_count: 1 }).predictions_history[0] as SettingsPredictionRecordDetail
       }
       return normalizeCurrentPredictions({
+        lottery_code: selectedLottery,
         prediction_date: detail.prediction_date,
         target_period: detail.target_period,
         models: detail.models,
@@ -365,6 +371,9 @@ export function SettingsPage() {
     },
     enabled: canManageModels && Boolean(selectedPredictionRecord),
   })
+  useEffect(() => {
+    saveSelectedLottery(selectedLottery)
+  }, [selectedLottery])
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => apiClient.listUsers(),
@@ -446,23 +455,23 @@ export function SettingsPage() {
         setLotteryFetchTask(task)
         if (task.status === 'succeeded') {
           const summary = task.progress_summary
-          setMessage(`大乐透数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessage(`${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
           setMessageType('success')
-          void queryClient.invalidateQueries({ queryKey: ['lottery-history'] })
-          void queryClient.invalidateQueries({ queryKey: ['current-predictions'] })
-          void queryClient.invalidateQueries({ queryKey: ['predictions-history'] })
-          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records'] })
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history', selectedLottery] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions', selectedLottery] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history', selectedLottery] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records', selectedLottery] })
         } else if (task.status === 'failed') {
-          setMessage(task.error_message || '大乐透数据更新失败')
+          setMessage(task.error_message || `${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新失败`)
           setMessageType('error')
         }
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '读取大乐透抓取任务状态失败')
+        setMessage(error instanceof Error ? error.message : `读取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}抓取任务状态失败`)
         setMessageType('error')
       }
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [lotteryFetchTask, queryClient])
+  }, [lotteryFetchTask, queryClient, selectedLottery])
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const predictionRecords = predictionRecordsQuery.data?.records ?? EMPTY_RECORDS
@@ -572,7 +581,7 @@ export function SettingsPage() {
       setMessage(modelMode === 'create' ? '模型已创建。' : '模型已更新。')
       setMessageType('success')
       setModelModalOpen(false)
-      void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+      void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型保存失败')
@@ -586,7 +595,7 @@ export function SettingsPage() {
       if (action.type === 'delete') return apiClient.deleteSettingsModel(action.modelCode)
       return apiClient.restoreSettingsModel(action.modelCode)
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings-models'] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] }),
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型操作失败')
       setMessageType('error')
@@ -597,6 +606,7 @@ export function SettingsPage() {
     mutationFn: () =>
       generationForm.modelCodes.length > 1
         ? apiClient.bulkGenerateSettingsModelPredictions({
+            lottery_code: selectedLottery,
             model_codes: generationForm.modelCodes,
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
@@ -604,6 +614,7 @@ export function SettingsPage() {
             end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
           })
         : apiClient.generateSettingsModelPredictions({
+            lottery_code: selectedLottery,
             model_code: generationForm.modelCodes[0] || '',
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
@@ -634,7 +645,7 @@ export function SettingsPage() {
       setBulkEditForm(EMPTY_BULK_EDIT_FORM)
       setMessage(`批量${mapBulkActionLabel(variables.action)}完成：成功 ${result.processed_count}，跳过 ${result.skipped_count}，失败 ${result.failed_count}。`)
       setMessageType('success')
-      void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+      void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '批量模型操作失败')
@@ -643,14 +654,14 @@ export function SettingsPage() {
   })
 
   const fetchLotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory(),
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory(selectedLottery),
     onSuccess: (task) => {
       setLotteryFetchTask(task)
-      setMessage('大乐透数据更新任务已创建，正在后台执行。')
+      setMessage(`${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新任务已创建，正在后台执行。`)
       setMessageType('success')
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : '创建大乐透数据更新任务失败')
+      setMessage(error instanceof Error ? error.message : `创建${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新任务失败`)
       setMessageType('error')
     },
   })
@@ -745,7 +756,7 @@ export function SettingsPage() {
   function openCreateModel() {
     setModelMode('create')
     setSelectedModelCode(null)
-    setModelForm(EMPTY_MODEL_FORM)
+    setModelForm({ ...EMPTY_MODEL_FORM, lottery_codes: [selectedLottery] })
     setModelModalOpen(true)
   }
 
@@ -841,6 +852,7 @@ export function SettingsPage() {
       app_code: model.app_code,
       temperature: model.temperature,
       is_active: model.is_active,
+      lottery_codes: model.lottery_codes,
     })
     setModelModalOpen(true)
   }
@@ -923,7 +935,19 @@ export function SettingsPage() {
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Settings Center</p>
           <h2 className="hero-panel__title">设置中心</h2>
-          <p className="hero-panel__description">可修改基础信息</p>
+          <p className="hero-panel__description">可修改基础信息，并按彩种维护模型、抓取与预测记录。</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {(['dlt', 'pl3'] as LotteryCode[]).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={clsx('chip-button', selectedLottery === code && 'is-active')}
+                onClick={() => setSelectedLottery(code)}
+              >
+                {code === 'pl3' ? '排列3' : '大乐透'}
+              </button>
+            ))}
+          </div>
           <div className="hero-panel__meta">
             <span>当前角色 {user?.role_name || '-'}</span>
             <span>权限数 {user?.permissions?.length || 0}</span>
@@ -1440,11 +1464,11 @@ export function SettingsPage() {
                 )}
               </StatusCard>
               {isSuperAdmin ? (
-                <StatusCard title="数据维护" subtitle="手动抓取大乐透开奖历史数据并更新到数据库。">
+                <StatusCard title="数据维护" subtitle={`手动抓取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}开奖历史数据并更新到数据库。`}>
                   <section className="settings-profile-hero settings-maintenance-hero">
                     <div className="settings-profile-hero__main">
                       <p className="settings-profile-hero__eyebrow">数据维护</p>
-                      <h2>大乐透历史同步</h2>
+                      <h2>{selectedLottery === 'pl3' ? '排列3历史同步' : '大乐透历史同步'}</h2>
                       <p className="settings-profile-hero__description">手动抓取开奖历史并写入数据库，用于更新首页统计、预测记录和后续模型分析。</p>
                     </div>
                     <div className="settings-profile-hero__badges">
@@ -1473,8 +1497,8 @@ export function SettingsPage() {
                     <div className="settings-maintenance-hero__actions">
                       <button className="primary-button" onClick={() => fetchLotteryMutation.mutate()} disabled={fetchLotteryMutation.isPending || Boolean(lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))}>
                         {fetchLotteryMutation.isPending || (lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))
-                          ? '正在获取大乐透数据...'
-                          : '获取大乐透数据'}
+                          ? `正在获取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据...`
+                          : `获取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据`}
                       </button>
                     </div>
                   </section>

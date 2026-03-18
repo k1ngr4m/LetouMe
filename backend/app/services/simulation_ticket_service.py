@@ -4,46 +4,34 @@ from datetime import datetime
 from math import comb
 from typing import Any
 
+from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.simulation_ticket_repository import SimulationTicketRepository
 
 
 class SimulationTicketService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
+    DIGIT_RANGE = range(0, 10)
 
     def __init__(self, repository: SimulationTicketRepository | None = None) -> None:
         self.repository = repository or SimulationTicketRepository()
 
-    def list_tickets(self, user_id: int) -> list[dict[str, Any]]:
-        return [self._serialize_ticket(ticket) for ticket in self.repository.list_tickets(user_id)]
+    def list_tickets(self, user_id: int, lottery_code: str = "dlt") -> list[dict[str, Any]]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        return [self._serialize_ticket(ticket) for ticket in self.repository.list_tickets(user_id, lottery_code=normalized_code)]
 
     def create_ticket(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-        front_numbers = self._normalize_numbers(payload.get("front_numbers"), zone="front")
-        back_numbers = self._normalize_numbers(payload.get("back_numbers"), zone="back")
-        if len(front_numbers) < 5:
-            raise ValueError("前区至少选择 5 个号码")
-        if len(back_numbers) < 2:
-            raise ValueError("后区至少选择 2 个号码")
-
-        bet_count = comb(len(front_numbers), 5) * comb(len(back_numbers), 2)
-        amount = bet_count * 2
-        created = self.repository.create_ticket(
-            user_id,
-            {
-                "front_numbers": ",".join(front_numbers),
-                "back_numbers": ",".join(back_numbers),
-                "bet_count": bet_count,
-                "amount": amount,
-            },
-        )
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
+        ticket_payload = self._build_dlt_ticket_payload(payload) if lottery_code == "dlt" else self._build_pl3_ticket_payload(payload)
+        created = self.repository.create_ticket(user_id, {"lottery_code": lottery_code, **ticket_payload})
         return self._serialize_ticket(created)
 
-    def delete_ticket(self, user_id: int, ticket_id: int) -> None:
-        deleted = self.repository.delete_ticket(ticket_id, user_id)
+    def delete_ticket(self, user_id: int, ticket_id: int, lottery_code: str = "dlt") -> None:
+        deleted = self.repository.delete_ticket(ticket_id, user_id, lottery_code=normalize_lottery_code(lottery_code))
         if not deleted:
             raise KeyError(ticket_id)
 
-    def _normalize_numbers(self, values: Any, *, zone: str) -> list[str]:
+    def _normalize_dlt_numbers(self, values: Any, *, zone: str) -> list[str]:
         if not isinstance(values, list):
             raise ValueError("号码格式不正确")
         normalized = sorted({str(item).zfill(2) for item in values})
@@ -52,6 +40,75 @@ class SimulationTicketService:
             raise ValueError("号码超出可选范围")
         return normalized
 
+    def _normalize_pl3_numbers(self, values: Any) -> list[str]:
+        if not isinstance(values, list):
+            raise ValueError("号码格式不正确")
+        normalized = sorted({str(item).zfill(2) for item in values})
+        if any(not number.isdigit() or int(number) not in self.DIGIT_RANGE for number in normalized):
+            raise ValueError("号码超出可选范围")
+        return normalized
+
+    def _build_dlt_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        front_numbers = self._normalize_dlt_numbers(payload.get("front_numbers"), zone="front")
+        back_numbers = self._normalize_dlt_numbers(payload.get("back_numbers"), zone="back")
+        if len(front_numbers) < 5:
+            raise ValueError("前区至少选择 5 个号码")
+        if len(back_numbers) < 2:
+            raise ValueError("后区至少选择 2 个号码")
+        bet_count = comb(len(front_numbers), 5) * comb(len(back_numbers), 2)
+        return {
+            "play_type": "dlt",
+            "front_numbers": ",".join(front_numbers),
+            "back_numbers": ",".join(back_numbers),
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "group_numbers": None,
+            "bet_count": bet_count,
+            "amount": bet_count * 2,
+        }
+
+    def _build_pl3_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "").strip().lower()
+        if play_type not in {"direct", "group3", "group6"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6")
+
+        if play_type == "direct":
+            hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
+            tens = self._normalize_pl3_numbers(payload.get("direct_tens"))
+            units = self._normalize_pl3_numbers(payload.get("direct_units"))
+            if not hundreds or not tens or not units:
+                raise ValueError("直选需为百位、十位、个位各选择至少 1 个号码")
+            bet_count = len(hundreds) * len(tens) * len(units)
+            return {
+                "play_type": "direct",
+                "front_numbers": "",
+                "back_numbers": "",
+                "direct_hundreds": ",".join(hundreds),
+                "direct_tens": ",".join(tens),
+                "direct_units": ",".join(units),
+                "group_numbers": None,
+                "bet_count": bet_count,
+                "amount": bet_count * 2,
+            }
+
+        group_numbers = self._normalize_pl3_numbers(payload.get("group_numbers"))
+        min_count = 2 if play_type == "group3" else 3
+        if len(group_numbers) < min_count:
+            raise ValueError("组选号码数量不足")
+        bet_count = len(group_numbers) * (len(group_numbers) - 1) if play_type == "group3" else comb(len(group_numbers), 3)
+        return {
+            "play_type": play_type,
+            "front_numbers": "",
+            "back_numbers": "",
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "group_numbers": ",".join(group_numbers),
+            "bet_count": bet_count,
+            "amount": bet_count * 2,
+        }
+
     @staticmethod
     def _serialize_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
         created_at = ticket.get("created_at")
@@ -59,8 +116,14 @@ class SimulationTicketService:
             created_at = created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
         return {
             "id": int(ticket.get("id") or 0),
+            "lottery_code": str(ticket.get("lottery_code") or "dlt"),
+            "play_type": str(ticket.get("play_type") or "dlt"),
             "front_numbers": [item for item in str(ticket.get("front_numbers") or "").split(",") if item],
             "back_numbers": [item for item in str(ticket.get("back_numbers") or "").split(",") if item],
+            "direct_hundreds": [item for item in str(ticket.get("direct_hundreds") or "").split(",") if item],
+            "direct_tens": [item for item in str(ticket.get("direct_tens") or "").split(",") if item],
+            "direct_units": [item for item in str(ticket.get("direct_units") or "").split(",") if item],
+            "group_numbers": [item for item in str(ticket.get("group_numbers") or "").split(",") if item],
             "bet_count": int(ticket.get("bet_count") or 0),
             "amount": int(ticket.get("amount") or 0),
             "created_at": created_at or "",

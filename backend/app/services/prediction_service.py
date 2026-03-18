@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
+from backend.app.lotteries import normalize_digit_balls, normalize_group_digits, normalize_lottery_code
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
 
@@ -22,6 +23,11 @@ class PredictionService:
         "七等奖": 100,
         "八等奖": 15,
         "九等奖": 5,
+    }
+    PL3_FIXED_PRIZE_RULES = {
+        "直选": 1040,
+        "组选3": 346,
+        "组选6": 173,
     }
 
     def __init__(
@@ -41,7 +47,8 @@ class PredictionService:
             return [str(value).zfill(2)]
         return []
 
-    def normalize_prediction(self, prediction: dict[str, Any]) -> dict[str, Any]:
+    def normalize_prediction(self, prediction: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code or prediction.get("lottery_code"))
         normalized_predictions = []
         for group in prediction.get("predictions", []):
             blue_balls = self.normalize_blue_balls(group.get("blue_balls", group.get("blue_ball")))
@@ -51,19 +58,25 @@ class PredictionService:
                     "red_balls": sorted(str(item).zfill(2) for item in group.get("red_balls", [])),
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
+                    "digits": normalize_digit_balls(group.get("digits", [])),
                 }
             )
+            if normalized_code == "pl3" and normalized_predictions[-1]["digits"]:
+                normalized_predictions[-1]["red_balls"] = list(normalized_predictions[-1]["digits"])
 
         return {
             **prediction,
+            "lottery_code": normalized_code,
             "predictions": normalized_predictions,
         }
 
-    def get_current_payload(self) -> dict[str, Any]:
+    def get_current_payload(self, lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         payload = runtime_cache.get_or_set(
-            "predictions:current",
+            f"predictions:{normalized_code}:current",
             ttl_seconds=60,
-            loader=lambda: self.prediction_repository.get_current_prediction() or {
+            loader=lambda: self.prediction_repository.get_current_prediction(lottery_code=normalized_code) or {
+                "lottery_code": normalized_code,
                 "prediction_date": "",
                 "target_period": "",
                 "models": [],
@@ -72,32 +85,37 @@ class PredictionService:
         self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
         return payload
 
-    def get_current_payload_by_period(self, target_period: str) -> dict[str, Any]:
+    def get_current_payload_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         return runtime_cache.get_or_set(
-            f"predictions:current:{target_period}",
+            f"predictions:{normalized_code}:current:{target_period}",
             ttl_seconds=60,
-            loader=lambda: self.prediction_repository.get_current_prediction_by_period(target_period) or {
+            loader=lambda: self.prediction_repository.get_current_prediction_by_period(target_period, lottery_code=normalized_code) or {
+                "lottery_code": normalized_code,
                 "prediction_date": "",
                 "target_period": target_period,
                 "models": [],
             },
         )
 
-    def get_history_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+    def get_history_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         return runtime_cache.get_or_set(
-            f"predictions:history:full:{limit or 'all'}:{offset}",
+            f"predictions:{normalized_code}:history:full:{limit or 'all'}:{offset}",
             ttl_seconds=60,
             loader=lambda: {
-                "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset),
-                "total_count": self.prediction_repository.count_history_records(),
+                "lottery_code": normalized_code,
+                "predictions_history": self.prediction_repository.list_history_records(limit=limit, offset=offset, lottery_code=normalized_code),
+                "total_count": self.prediction_repository.count_history_records(lottery_code=normalized_code),
             },
         )
 
-    def get_history_list_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+    def get_history_list_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         payload = runtime_cache.get_or_set(
-            f"predictions:history:list:{limit or 'all'}:{offset}",
+            f"predictions:{normalized_code}:history:list:{limit or 'all'}:{offset}",
             ttl_seconds=60,
-            loader=lambda: self._build_history_list_payload(limit=limit, offset=offset),
+            loader=lambda: self._build_history_list_payload(limit=limit, offset=offset, lottery_code=normalized_code),
         )
         self.logger.info(
             "Loaded prediction history summaries",
@@ -105,11 +123,12 @@ class PredictionService:
         )
         return payload
 
-    def get_history_detail_payload(self, target_period: str) -> dict[str, Any] | None:
+    def get_history_detail_payload(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
         raw_payload = runtime_cache.get_or_set(
-            f"predictions:history:detail:{target_period}",
+            f"predictions:{normalized_code}:history:detail:{target_period}",
             ttl_seconds=60,
-            loader=lambda: self.prediction_repository.get_history_record_detail(target_period),
+            loader=lambda: self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code),
         )
         payload = self._annotate_history_record(raw_payload) if raw_payload else None
         if payload:
@@ -130,21 +149,23 @@ class PredictionService:
         )
         return payload
 
-    def get_current_detail_payload(self, target_period: str) -> dict[str, Any] | None:
-        payload = self.get_current_payload_by_period(target_period)
+    def get_current_detail_payload(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        payload = self.get_current_payload_by_period(target_period, lottery_code=lottery_code)
         if not payload.get("target_period") or payload.get("target_period") != target_period:
             return None
         return payload
 
-    def get_settings_record_list_payload(self) -> dict[str, Any]:
-        current_payload = self.get_current_payload()
-        history_payload = self.get_history_list_payload()
+    def get_settings_record_list_payload(self, lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        current_payload = self.get_current_payload(normalized_code)
+        history_payload = self.get_history_list_payload(lottery_code=normalized_code)
         records: list[dict[str, Any]] = []
 
         if current_payload.get("target_period"):
             records.append(
                 {
                     "record_type": "current",
+                    "lottery_code": normalized_code,
                     "target_period": current_payload.get("target_period", ""),
                     "prediction_date": current_payload.get("prediction_date", ""),
                     "actual_result": None,
@@ -157,6 +178,7 @@ class PredictionService:
             records.append(
                 {
                     "record_type": "history",
+                    "lottery_code": normalized_code,
                     "target_period": record.get("target_period", ""),
                     "prediction_date": record.get("prediction_date", ""),
                     "actual_result": record.get("actual_result"),
@@ -174,12 +196,13 @@ class PredictionService:
         self.logger.info("Loaded settings prediction records", extra={"context": {"record_count": len(records)}})
         return {"records": records}
 
-    def get_settings_record_detail_payload(self, record_type: str, target_period: str) -> dict[str, Any] | None:
+    def get_settings_record_detail_payload(self, record_type: str, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
         normalized_type = str(record_type or "").strip().lower()
         if normalized_type == "current":
-            payload = self.get_current_detail_payload(target_period)
+            payload = self.get_current_detail_payload(target_period, lottery_code=normalized_code)
         elif normalized_type == "history":
-            payload = self.get_history_detail_payload(target_period)
+            payload = self.get_history_detail_payload(target_period, lottery_code=normalized_code)
         else:
             raise ValueError("不支持的预测记录类型")
 
@@ -188,6 +211,7 @@ class PredictionService:
         score_profiles = self._build_score_profiles([payload]) if normalized_type == "history" else {}
         return {
             "record_type": normalized_type,
+            "lottery_code": normalized_code,
             "prediction_date": payload.get("prediction_date", ""),
             "target_period": payload.get("target_period", ""),
             "actual_result": payload.get("actual_result"),
@@ -196,8 +220,9 @@ class PredictionService:
         }
 
     def save_current_prediction(self, payload: dict[str, Any]) -> dict[str, Any]:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         target_period = str(payload.get("target_period") or "")
-        current = self.get_current_payload_by_period(target_period) if target_period else self.get_current_payload()
+        current = self.get_current_payload_by_period(target_period, lottery_code=lottery_code) if target_period else self.get_current_payload(lottery_code=lottery_code)
         if current.get("target_period") == target_period:
             existing_model_map = {
                 model.get("model_id"): model
@@ -209,21 +234,24 @@ class PredictionService:
 
             payload = {
                 **current,
+                "lottery_code": lottery_code,
                 "prediction_date": payload.get("prediction_date", current.get("prediction_date")),
                 "target_period": target_period or current.get("target_period"),
                 "models": list(existing_model_map.values()),
             }
 
+        payload["lottery_code"] = lottery_code
         self.prediction_repository.upsert_current_prediction(payload)
-        self._invalidate_prediction_cache(target_period=target_period)
+        self._invalidate_prediction_cache(target_period=target_period, lottery_code=lottery_code)
         self.logger.info(
             "Saved current prediction",
             extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}},
         )
         return payload
 
-    def archive_current_prediction_if_needed(self, lottery_data: dict[str, Any]) -> None:
-        old_predictions = self.prediction_repository.get_current_prediction()
+    def archive_current_prediction_if_needed(self, lottery_data: dict[str, Any], lottery_code: str = "dlt") -> None:
+        normalized_code = normalize_lottery_code(lottery_code or lottery_data.get("lottery_code"))
+        old_predictions = self.prediction_repository.get_current_prediction(lottery_code=normalized_code)
         if not old_predictions:
             return
 
@@ -232,7 +260,7 @@ class PredictionService:
         if not old_target_period or not latest_period or int(old_target_period) > int(latest_period):
             return
 
-        if self.prediction_repository.history_record_exists(old_target_period):
+        if self.prediction_repository.history_record_exists(old_target_period, lottery_code=normalized_code):
             self.logger.debug("Archive skipped because history record already exists", extra={"context": {"target_period": old_target_period}})
             return
 
@@ -247,9 +275,9 @@ class PredictionService:
         for model_data in old_predictions.get("models", []):
             predictions_with_hits = []
             for pred_group in model_data.get("predictions", []):
-                normalized_group = self.normalize_prediction({"predictions": [pred_group]}).get("predictions", [pred_group])[0]
+                normalized_group = self.normalize_prediction({"predictions": [pred_group]}, lottery_code=normalized_code).get("predictions", [pred_group])[0]
                 pred_with_hit = dict(normalized_group)
-                pred_with_hit["hit_result"] = self.calculate_hit_result(normalized_group, actual_result)
+                pred_with_hit["hit_result"] = self.calculate_hit_result(normalized_group, actual_result, lottery_code=normalized_code)
                 predictions_with_hits.append(pred_with_hit)
 
             if not predictions_with_hits:
@@ -272,19 +300,51 @@ class PredictionService:
 
         new_record = {
             "prediction_date": old_predictions.get("prediction_date"),
+            "lottery_code": normalized_code,
             "target_period": old_target_period,
             "actual_result": actual_result,
             "models": models_with_hits,
         }
         self.prediction_repository.upsert_history_record(new_record)
-        self._invalidate_prediction_cache(target_period=old_target_period)
+        self._invalidate_prediction_cache(target_period=old_target_period, lottery_code=normalized_code)
         self.logger.info(
             "Archived current prediction into history",
             extra={"context": {"target_period": old_target_period, "model_count": len(models_with_hits)}},
         )
 
     @staticmethod
-    def calculate_hit_result(prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+    def calculate_hit_result(prediction_group: dict[str, Any], actual_result: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or actual_result.get("lottery_code"))
+        if normalized_code == "pl3":
+            play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
+            actual_digits = normalize_digit_balls(actual_result.get("digits", []))
+            digits = normalize_digit_balls(prediction_group.get("digits", []))
+            if play_type == "direct":
+                digit_hits = [digit for digit, actual in zip(digits, actual_digits) if digit == actual]
+                return {
+                    "digit_hits": digit_hits,
+                    "digit_hit_count": len(digit_hits),
+                    "red_hits": [],
+                    "red_hit_count": 0,
+                    "blue_hits": [],
+                    "blue_hit_count": 0,
+                    "total_hits": len(digit_hits),
+                    "is_exact_match": digits == actual_digits,
+                }
+            predicted_group = normalize_group_digits(digits)
+            actual_group = normalize_group_digits(actual_digits)
+            is_winning = predicted_group == actual_group
+            return {
+                "digit_hits": predicted_group if is_winning else [],
+                "digit_hit_count": 3 if is_winning else 0,
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 3 if is_winning else 0,
+                "is_exact_match": is_winning,
+            }
+
         red_hits = [b for b in prediction_group["red_balls"] if b in actual_result["red_balls"]]
         blue_hits = [b for b in prediction_group["blue_balls"] if b in actual_result["blue_balls"]]
         return {
@@ -295,21 +355,22 @@ class PredictionService:
             "total_hits": len(red_hits) + len(blue_hits),
         }
 
-    def _build_history_list_payload(self, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
+    def _build_history_list_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
         started_at = perf_counter()
         db_metrics: dict[str, Any] = {}
         if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
-            summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(limit=limit, offset=offset)
+            summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(limit=limit, offset=offset, lottery_code=lottery_code)
             summary_records = summary_payload.get("records", [])
             db_metrics = summary_payload.get("metrics", {})
         else:
-            summary_records = self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset)
+            summary_records = self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset, lottery_code=lottery_code)
         aggregate_started_at = perf_counter()
         records = [self._annotate_history_summary_record(record) for record in summary_records]
         score_profiles = self._build_score_profiles(records)
         payload = {
+            "lottery_code": normalize_lottery_code(lottery_code),
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
-            "total_count": self.prediction_repository.count_history_records(),
+            "total_count": self.prediction_repository.count_history_records(lottery_code=lottery_code),
             "model_stats": self._build_model_stats(records, score_profiles),
         }
         aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
@@ -354,7 +415,7 @@ class PredictionService:
                     "blue_hit_count": int(metric.get("blue_hit_count") or 0),
                     "total_hits": int(metric.get("total_hits") or 0),
                 }
-                prize_level = self.resolve_prize_level(hit_result)
+                prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=metric)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
                 if prize_info["amount"] > 0:
                     winning_bet_count += 1
@@ -405,8 +466,8 @@ class PredictionService:
             winning_bet_count = 0
             prize_amount = 0
             for group in model.get("predictions", []):
-                hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result)
-                prize_level = self.resolve_prize_level(hit_result)
+                hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result, lottery_code=payload.get("lottery_code", "dlt"))
+                prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=group)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
                 predictions.append(
                     {
@@ -739,7 +800,26 @@ class PredictionService:
         }
 
     @classmethod
-    def resolve_prize_level(cls, hit_result: dict[str, Any]) -> str | None:
+    def resolve_prize_level(
+        cls,
+        hit_result: dict[str, Any],
+        *,
+        actual_result: dict[str, Any] | None = None,
+        prediction_group: dict[str, Any] | None = None,
+    ) -> str | None:
+        lottery_code = normalize_lottery_code((actual_result or {}).get("lottery_code") or "dlt")
+        if lottery_code == "pl3":
+            play_type = str((prediction_group or {}).get("play_type") or "direct").strip().lower()
+            if play_type == "direct":
+                return "直选" if bool(hit_result.get("is_exact_match")) else None
+            if int(hit_result.get("digit_hit_count") or 0) != 3:
+                return None
+            digits = normalize_group_digits((prediction_group or {}).get("digits", []))
+            if len(set(digits)) == 2:
+                return "组选3"
+            if len(set(digits)) == 3:
+                return "组选6"
+            return None
         red_hit_count = int(hit_result.get("red_hit_count") or 0)
         blue_hit_count = int(hit_result.get("blue_hit_count") or 0)
         if red_hit_count == 5 and blue_hit_count == 2:
@@ -776,6 +856,8 @@ class PredictionService:
                 amount = int(prize.get("prize_amount") or 0)
                 if amount > 0:
                     return {"amount": amount, "source": "official"}
+        if normalize_lottery_code(actual_result.get("lottery_code") or "dlt") == "pl3" and prize_level in cls.PL3_FIXED_PRIZE_RULES:
+            return {"amount": cls.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         if prize_level in cls.FIXED_PRIZE_RULES:
             return {"amount": cls.FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         return {"amount": 0, "source": "missing"}
@@ -789,12 +871,13 @@ class PredictionService:
         }
 
     @staticmethod
-    def _invalidate_prediction_cache(target_period: str | None = None) -> None:
-        runtime_cache.delete("predictions:current")
-        runtime_cache.invalidate_prefix("predictions:current:")
-        runtime_cache.invalidate_prefix("predictions:history:full:")
-        runtime_cache.invalidate_prefix("predictions:history:list:")
+    def _invalidate_prediction_cache(target_period: str | None = None, lottery_code: str = "dlt") -> None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        runtime_cache.delete(f"predictions:{normalized_code}:current")
+        runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:current:")
+        runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:history:full:")
+        runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:history:list:")
         if target_period:
-            runtime_cache.delete(f"predictions:history:detail:{target_period}")
+            runtime_cache.delete(f"predictions:{normalized_code}:history:detail:{target_period}")
         else:
-            runtime_cache.invalidate_prefix("predictions:history:detail:")
+            runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:history:detail:")

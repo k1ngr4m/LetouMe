@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
+import { loadSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
 import { getActualResult } from './lib/home'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
@@ -17,7 +18,7 @@ export function HomeModelDetailPage() {
   const routeState = location.state as HomeDetailRouteState | null
   const restoredState = routeState?.dashboardState
 
-  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(HISTORY_BATCH_SIZE, 1, LOTTERY_PAGE_SIZE)
+  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), HISTORY_BATCH_SIZE, 1, LOTTERY_PAGE_SIZE)
   const models = currentPredictions.data?.models || []
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []

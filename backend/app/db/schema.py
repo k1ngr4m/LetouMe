@@ -3,12 +3,13 @@ SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS draw_issue (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         issue_no VARCHAR(32) NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
         draw_date VARCHAR(32) NULL,
         sales_close_at VARCHAR(64) NULL,
         status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_draw_issue_status_date (status, draw_date),
+        INDEX idx_draw_issue_status_date (lottery_code, status, draw_date),
         INDEX idx_draw_issue_draw_date (draw_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -82,9 +83,19 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS ai_model_lottery (
+        model_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL,
+        PRIMARY KEY (model_id, lottery_code),
+        CONSTRAINT fk_ai_model_lottery_model FOREIGN KEY (model_id) REFERENCES ai_model(id) ON DELETE CASCADE,
+        INDEX idx_ai_model_lottery_code (lottery_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS prediction_batch (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         target_issue_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
         prediction_date VARCHAR(32) NOT NULL,
         source_type VARCHAR(32) NOT NULL DEFAULT 'script',
         status VARCHAR(32) NOT NULL DEFAULT 'current',
@@ -92,7 +103,7 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_prediction_batch_issue FOREIGN KEY (target_issue_id) REFERENCES draw_issue(id),
-        INDEX idx_prediction_batch_status_date (status, prediction_date),
+        INDEX idx_prediction_batch_status_date (lottery_code, status, prediction_date),
         INDEX idx_prediction_batch_target_issue (target_issue_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -119,6 +130,7 @@ SCHEMA_STATEMENTS = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         model_run_id BIGINT NOT NULL,
         group_no INT NOT NULL,
+        play_type VARCHAR(32) NULL,
         strategy_text TEXT NULL,
         description_text TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -253,14 +265,20 @@ SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS simulation_ticket (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
         bet_count INT NOT NULL DEFAULT 0,
         amount INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_simulation_ticket_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
-        INDEX idx_simulation_ticket_user_created (user_id, created_at)
+        INDEX idx_simulation_ticket_user_created (user_id, lottery_code, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -296,6 +314,23 @@ SCHEMA_STATEMENTS = [
 SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     "app_user": {
         "nickname": "ALTER TABLE app_user ADD COLUMN nickname VARCHAR(128) NULL AFTER username",
+    },
+    "draw_issue": {
+        "lottery_code": "ALTER TABLE draw_issue ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER issue_no",
+    },
+    "prediction_batch": {
+        "lottery_code": "ALTER TABLE prediction_batch ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER target_issue_id",
+    },
+    "prediction_group": {
+        "play_type": "ALTER TABLE prediction_group ADD COLUMN play_type VARCHAR(32) NULL AFTER group_no",
+    },
+    "simulation_ticket": {
+        "lottery_code": "ALTER TABLE simulation_ticket ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER user_id",
+        "play_type": "ALTER TABLE simulation_ticket ADD COLUMN play_type VARCHAR(32) NOT NULL DEFAULT 'dlt' AFTER lottery_code",
+        "direct_hundreds": "ALTER TABLE simulation_ticket ADD COLUMN direct_hundreds VARCHAR(255) NULL AFTER back_numbers",
+        "direct_tens": "ALTER TABLE simulation_ticket ADD COLUMN direct_tens VARCHAR(255) NULL AFTER direct_hundreds",
+        "direct_units": "ALTER TABLE simulation_ticket ADD COLUMN direct_units VARCHAR(255) NULL AFTER direct_tens",
+        "group_numbers": "ALTER TABLE simulation_ticket ADD COLUMN group_numbers VARCHAR(255) NULL AFTER direct_units",
     },
     "app_permission": {
         "permission_description": "ALTER TABLE app_permission ADD COLUMN permission_description TEXT NULL AFTER permission_name",
