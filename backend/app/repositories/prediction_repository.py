@@ -4,6 +4,7 @@ from time import perf_counter
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.lotteries import display_period, normalize_digit_balls, normalize_group_digits, normalize_lottery_code, storage_issue_no
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import _insert_number_rows, _upsert_issue
@@ -22,52 +23,54 @@ class PredictionRepository:
 
     def get_current_prediction(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        pb.id,
-                        pb.lottery_code,
-                        pb.prediction_date,
-                        di.issue_no AS target_period,
-                        di.id AS target_issue_id
-                    FROM prediction_batch pb
-                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'current' AND pb.lottery_code = ?
-                    ORDER BY di.issue_no DESC
-                    LIMIT 1
-                    """,
-                    (normalized_code,),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                return self._build_batch_payload(cursor, row, include_actual_result=False)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            pb.id,
+                            pb.lottery_code,
+                            pb.prediction_date,
+                            di.issue_no AS target_period,
+                            di.id AS target_issue_id
+                        FROM prediction_batch pb
+                        INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                        WHERE pb.status = 'current' AND pb.lottery_code = ?
+                        ORDER BY di.issue_no DESC
+                        LIMIT 1
+                        """,
+                        (normalized_code,),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        return None
+                    return self._build_batch_payload(cursor, row, include_actual_result=False)
 
     def get_current_prediction_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        pb.id,
-                        pb.lottery_code,
-                        pb.prediction_date,
-                        di.issue_no AS target_period,
-                        di.id AS target_issue_id
-                    FROM prediction_batch pb
-                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'current' AND pb.lottery_code = ? AND di.issue_no = ?
-                    LIMIT 1
-                    """,
-                    (normalized_code, storage_issue_no(normalized_code, target_period)),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                return self._build_batch_payload(cursor, row, include_actual_result=False)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            pb.id,
+                            pb.lottery_code,
+                            pb.prediction_date,
+                            di.issue_no AS target_period,
+                            di.id AS target_issue_id
+                        FROM prediction_batch pb
+                        INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                        WHERE pb.status = 'current' AND pb.lottery_code = ? AND di.issue_no = ?
+                        LIMIT 1
+                        """,
+                        (normalized_code, storage_issue_no(normalized_code, target_period)),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        return None
+                    return self._build_batch_payload(cursor, row, include_actual_result=False)
 
     def upsert_current_prediction(self, payload: dict[str, Any]) -> None:
         lottery_code = normalize_lottery_code(payload.get("lottery_code"))
@@ -75,27 +78,28 @@ class PredictionRepository:
         target_key = f"target_period={target_period}"
         summary = f"upsert prediction_batch(current) {target_key}"
         try:
-            with get_connection() as connection:
-                self._sync_registry(connection)
-                batch_id = self._upsert_batch(
-                    connection,
-                    payload=payload,
-                    status="current",
-                    archive_metadata=False,
-                )
-                self.log_repository.log_success(
-                    connection,
-                    table_name="prediction_batch",
-                    action="upsert",
-                    target_key=target_key,
-                    summary=summary,
-                    payload={
-                        "target_period": target_period,
-                        "lottery_code": lottery_code,
-                        "prediction_date": payload.get("prediction_date"),
-                        "batch_id": batch_id,
-                    },
-                )
+            with use_lottery_table_scope(lottery_code):
+                with get_connection() as connection:
+                    self._sync_registry(connection)
+                    batch_id = self._upsert_batch(
+                        connection,
+                        payload=payload,
+                        status="current",
+                        archive_metadata=False,
+                    )
+                    self.log_repository.log_success(
+                        connection,
+                        table_name="prediction_batch",
+                        action="upsert",
+                        target_key=target_key,
+                        summary=summary,
+                        payload={
+                            "target_period": target_period,
+                            "lottery_code": lottery_code,
+                            "prediction_date": payload.get("prediction_date"),
+                            "batch_id": batch_id,
+                        },
+                    )
         except Exception as exc:
             self.log_repository.log_failure(
                 table_name="prediction_batch",
@@ -113,29 +117,30 @@ class PredictionRepository:
         target_key = f"target_period={target_period}"
         summary = f"replace prediction_batch(current) {target_key}"
         try:
-            with get_connection() as connection:
-                self._sync_registry(connection)
-                with connection.cursor() as cursor:
-                    cursor.execute("DELETE FROM prediction_batch WHERE status = 'current' AND lottery_code = ?", (lottery_code,))
-                batch_id = self._upsert_batch(
-                    connection,
-                    payload=payload,
-                    status="current",
-                    archive_metadata=False,
-                )
-                self.log_repository.log_success(
-                    connection,
-                    table_name="prediction_batch",
-                    action="replace",
-                    target_key=target_key,
-                    summary=summary,
-                    payload={
-                        "target_period": target_period,
-                        "lottery_code": lottery_code,
-                        "prediction_date": payload.get("prediction_date"),
-                        "batch_id": batch_id,
-                    },
-                )
+            with use_lottery_table_scope(lottery_code):
+                with get_connection() as connection:
+                    self._sync_registry(connection)
+                    with connection.cursor() as cursor:
+                        cursor.execute("DELETE FROM prediction_batch WHERE status = 'current' AND lottery_code = ?", (lottery_code,))
+                    batch_id = self._upsert_batch(
+                        connection,
+                        payload=payload,
+                        status="current",
+                        archive_metadata=False,
+                    )
+                    self.log_repository.log_success(
+                        connection,
+                        table_name="prediction_batch",
+                        action="replace",
+                        target_key=target_key,
+                        summary=summary,
+                        payload={
+                            "target_period": target_period,
+                            "lottery_code": lottery_code,
+                            "prediction_date": payload.get("prediction_date"),
+                            "batch_id": batch_id,
+                        },
+                    )
         except Exception as exc:
             self.log_repository.log_failure(
                 table_name="prediction_batch",
@@ -153,27 +158,28 @@ class PredictionRepository:
         target_key = f"target_period={target_period}"
         summary = f"upsert prediction_batch(archived) {target_key}"
         try:
-            with get_connection() as connection:
-                self._sync_registry(connection)
-                batch_id = self._upsert_batch(
-                    connection,
-                    payload=payload,
-                    status="archived",
-                    archive_metadata=True,
-                )
-                self.log_repository.log_success(
-                    connection,
-                    table_name="prediction_batch",
-                    action="upsert",
-                    target_key=target_key,
-                    summary=summary,
-                    payload={
-                        "target_period": target_period,
-                        "lottery_code": lottery_code,
-                        "prediction_date": payload.get("prediction_date"),
-                        "batch_id": batch_id,
-                    },
-                )
+            with use_lottery_table_scope(lottery_code):
+                with get_connection() as connection:
+                    self._sync_registry(connection)
+                    batch_id = self._upsert_batch(
+                        connection,
+                        payload=payload,
+                        status="archived",
+                        archive_metadata=True,
+                    )
+                    self.log_repository.log_success(
+                        connection,
+                        table_name="prediction_batch",
+                        action="upsert",
+                        target_key=target_key,
+                        summary=summary,
+                        payload={
+                            "target_period": target_period,
+                            "lottery_code": lottery_code,
+                            "prediction_date": payload.get("prediction_date"),
+                            "batch_id": batch_id,
+                        },
+                    )
         except Exception as exc:
             self.log_repository.log_failure(
                 table_name="prediction_batch",
@@ -212,11 +218,12 @@ class PredictionRepository:
             sql += " OFFSET ?"
             params.append(offset)
 
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, tuple(params))
-                rows = cursor.fetchall()
-                return [self._build_batch_payload(cursor, row, include_actual_result=True) for row in rows]
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, tuple(params))
+                    rows = cursor.fetchall()
+                    return [self._build_batch_payload(cursor, row, include_actual_result=True) for row in rows]
 
     def list_history_record_summaries(
         self,
@@ -254,18 +261,19 @@ class PredictionRepository:
             params.append(offset)
 
         started_at = perf_counter()
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, tuple(params))
-                batch_rows = cursor.fetchall()
-                batch_ids = [int(row["id"]) for row in batch_rows]
-                issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
-                actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids)
-                model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
-                model_run_ids = [int(row["id"]) for row in model_rows]
-                summaries_by_run = self._fetch_model_summaries(cursor, model_run_ids)
-                groups_by_run = self._fetch_groups(cursor, model_run_ids)
-                group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, tuple(params))
+                    batch_rows = cursor.fetchall()
+                    batch_ids = [int(row["id"]) for row in batch_rows]
+                    issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
+                    actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids)
+                    model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
+                    model_run_ids = [int(row["id"]) for row in model_rows]
+                    summaries_by_run = self._fetch_model_summaries(cursor, model_run_ids)
+                    groups_by_run = self._fetch_groups(cursor, model_run_ids)
+                    group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
         duration_ms = round((perf_counter() - started_at) * 1000, 2)
         self.logger.debug(
             "Loaded prediction history summary batches",
@@ -324,58 +332,61 @@ class PredictionRepository:
 
     def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        pb.id,
-                        pb.lottery_code,
-                        pb.prediction_date,
-                        di.issue_no AS target_period,
-                        di.id AS target_issue_id
-                    FROM prediction_batch pb
-                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
-                    LIMIT 1
-                    """,
-                    (normalized_code, storage_issue_no(normalized_code, target_period)),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                return self._build_batch_payload(cursor, row, include_actual_result=True)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            pb.id,
+                            pb.lottery_code,
+                            pb.prediction_date,
+                            di.issue_no AS target_period,
+                            di.id AS target_issue_id
+                        FROM prediction_batch pb
+                        INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                        WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
+                        LIMIT 1
+                        """,
+                        (normalized_code, storage_issue_no(normalized_code, target_period)),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        return None
+                    return self._build_batch_payload(cursor, row, include_actual_result=True)
 
     def count_history_records(self, lottery_code: str = "dlt") -> int:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM prediction_batch
-                    WHERE status = 'archived' AND lottery_code = ?
-                    """,
-                    (normalized_code,),
-                )
-                row = cursor.fetchone() or {}
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) AS total
+                        FROM prediction_batch
+                        WHERE status = 'archived' AND lottery_code = ?
+                        """,
+                        (normalized_code,),
+                    )
+                    row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
 
     def history_record_exists(self, target_period: str, lottery_code: str = "dlt") -> bool:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT 1
-                    FROM prediction_batch pb
-                    INNER JOIN draw_issue di ON di.id = pb.target_issue_id
-                    WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
-                    LIMIT 1
-                    """,
-                    (normalized_code, storage_issue_no(normalized_code, target_period)),
-                )
-                return cursor.fetchone() is not None
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT 1
+                        FROM prediction_batch pb
+                        INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                        WHERE pb.status = 'archived' AND pb.lottery_code = ? AND di.issue_no = ?
+                        LIMIT 1
+                        """,
+                        (normalized_code, storage_issue_no(normalized_code, target_period)),
+                    )
+                    return cursor.fetchone() is not None
 
     def _sync_registry(self, connection) -> None:
         if self._registry is None:

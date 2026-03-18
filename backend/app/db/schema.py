@@ -1,3 +1,6 @@
+from backend.app.lotteries import SUPPORTED_LOTTERY_CODES
+
+
 SCHEMA_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS draw_issue (
@@ -32,7 +35,6 @@ SCHEMA_STATEMENTS = [
         ball_value VARCHAR(8) NOT NULL,
         CONSTRAINT fk_draw_result_number_result FOREIGN KEY (draw_result_id) REFERENCES draw_result(id) ON DELETE CASCADE,
         UNIQUE KEY uq_draw_result_number_position (draw_result_id, ball_color, ball_position),
-        UNIQUE KEY uq_draw_result_number_value (draw_result_id, ball_color, ball_value),
         INDEX idx_draw_result_number_color_value (ball_color, ball_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -148,7 +150,6 @@ SCHEMA_STATEMENTS = [
         ball_value VARCHAR(8) NOT NULL,
         CONSTRAINT fk_prediction_group_number_group FOREIGN KEY (prediction_group_id) REFERENCES prediction_group(id) ON DELETE CASCADE,
         UNIQUE KEY uq_prediction_group_number_position (prediction_group_id, ball_color, ball_position),
-        UNIQUE KEY uq_prediction_group_number_value (prediction_group_id, ball_color, ball_value),
         INDEX idx_prediction_group_number_color_value (ball_color, ball_value),
         INDEX idx_prediction_group_number_group (prediction_group_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -175,7 +176,7 @@ SCHEMA_STATEMENTS = [
         ball_color VARCHAR(16) NOT NULL,
         ball_value VARCHAR(8) NOT NULL,
         CONSTRAINT fk_prediction_hit_number_summary FOREIGN KEY (hit_summary_id) REFERENCES prediction_hit_summary(id) ON DELETE CASCADE,
-        UNIQUE KEY uq_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)
+        INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -309,6 +310,231 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
 ]
+
+_LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_draw_issue (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        issue_no VARCHAR(32) NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        draw_date VARCHAR(32) NULL,
+        sales_close_at VARCHAR(64) NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_draw_issue_status_date (lottery_code, status, draw_date),
+        INDEX idx_draw_issue_draw_date (draw_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_draw_result (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        issue_id BIGINT NOT NULL UNIQUE,
+        red_hit_count_rule INT NOT NULL DEFAULT 5,
+        blue_hit_count_rule INT NOT NULL DEFAULT 2,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_draw_result_issue FOREIGN KEY (issue_id) REFERENCES {table_prefix}_draw_issue(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_draw_result_number (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        draw_result_id BIGINT NOT NULL,
+        ball_color VARCHAR(16) NOT NULL,
+        ball_position INT NOT NULL,
+        ball_value VARCHAR(8) NOT NULL,
+        CONSTRAINT fk_{fk_prefix}_draw_result_number_result FOREIGN KEY (draw_result_id) REFERENCES {table_prefix}_draw_result(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_draw_result_number_position (draw_result_id, ball_color, ball_position),
+        INDEX idx_draw_result_number_color_value (ball_color, ball_value)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_batch (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        target_issue_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        prediction_date VARCHAR(32) NOT NULL,
+        source_type VARCHAR(32) NOT NULL DEFAULT 'script',
+        status VARCHAR(32) NOT NULL DEFAULT 'current',
+        archived_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_prediction_batch_issue FOREIGN KEY (target_issue_id) REFERENCES {table_prefix}_draw_issue(id),
+        INDEX idx_prediction_batch_status_date (lottery_code, status, prediction_date),
+        INDEX idx_prediction_batch_target_issue (target_issue_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_model_run (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        prediction_batch_id BIGINT NOT NULL,
+        model_id BIGINT NOT NULL,
+        requested_at DATETIME NULL,
+        completed_at DATETIME NULL,
+        run_status VARCHAR(32) NOT NULL DEFAULT 'success',
+        display_order INT NOT NULL DEFAULT 0,
+        notes TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_prediction_model_run_batch FOREIGN KEY (prediction_batch_id) REFERENCES {table_prefix}_prediction_batch(id) ON DELETE CASCADE,
+        CONSTRAINT fk_{fk_prefix}_prediction_model_run_model FOREIGN KEY (model_id) REFERENCES ai_model(id),
+        UNIQUE KEY uq_prediction_model_run_batch_model (prediction_batch_id, model_id),
+        INDEX idx_prediction_model_run_batch (prediction_batch_id),
+        INDEX idx_prediction_model_run_model (model_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_group (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        model_run_id BIGINT NOT NULL,
+        group_no INT NOT NULL,
+        play_type VARCHAR(32) NULL,
+        strategy_text TEXT NULL,
+        description_text TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_prediction_group_model_run FOREIGN KEY (model_run_id) REFERENCES {table_prefix}_prediction_model_run(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_prediction_group_model_run_group (model_run_id, group_no),
+        INDEX idx_prediction_group_model_run (model_run_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_group_number (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        prediction_group_id BIGINT NOT NULL,
+        ball_color VARCHAR(16) NOT NULL,
+        ball_position INT NOT NULL,
+        ball_value VARCHAR(8) NOT NULL,
+        CONSTRAINT fk_{fk_prefix}_prediction_group_number_group FOREIGN KEY (prediction_group_id) REFERENCES {table_prefix}_prediction_group(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_prediction_group_number_position (prediction_group_id, ball_color, ball_position),
+        INDEX idx_prediction_group_number_color_value (ball_color, ball_value),
+        INDEX idx_prediction_group_number_group (prediction_group_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_hit_summary (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        prediction_group_id BIGINT NOT NULL UNIQUE,
+        draw_result_id BIGINT NOT NULL,
+        red_hit_count INT NOT NULL DEFAULT 0,
+        blue_hit_count INT NOT NULL DEFAULT 0,
+        total_hit_count INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_prediction_hit_summary_group FOREIGN KEY (prediction_group_id) REFERENCES {table_prefix}_prediction_group(id) ON DELETE CASCADE,
+        CONSTRAINT fk_{fk_prefix}_prediction_hit_summary_result FOREIGN KEY (draw_result_id) REFERENCES {table_prefix}_draw_result(id),
+        INDEX idx_prediction_hit_summary_result (draw_result_id),
+        INDEX idx_prediction_hit_summary_total (total_hit_count)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_prediction_hit_number (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        hit_summary_id BIGINT NOT NULL,
+        ball_color VARCHAR(16) NOT NULL,
+        ball_value VARCHAR(8) NOT NULL,
+        CONSTRAINT fk_{fk_prefix}_prediction_hit_number_summary FOREIGN KEY (hit_summary_id) REFERENCES {table_prefix}_prediction_hit_summary(id) ON DELETE CASCADE,
+        INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_draw_result_prize (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        draw_result_id BIGINT NOT NULL,
+        prize_level VARCHAR(32) NOT NULL,
+        prize_type VARCHAR(32) NOT NULL DEFAULT 'basic',
+        winner_count BIGINT NOT NULL DEFAULT 0,
+        prize_amount BIGINT NOT NULL DEFAULT 0,
+        total_amount BIGINT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_draw_result_prize_result FOREIGN KEY (draw_result_id) REFERENCES {table_prefix}_draw_result(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_draw_result_prize_level_type (draw_result_id, prize_level, prize_type),
+        INDEX idx_draw_result_prize_result (draw_result_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_model_batch_summary (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        model_run_id BIGINT NOT NULL UNIQUE,
+        best_group_id BIGINT NULL,
+        best_hit_count INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_model_batch_summary_run FOREIGN KEY (model_run_id) REFERENCES {table_prefix}_prediction_model_run(id) ON DELETE CASCADE,
+        CONSTRAINT fk_{fk_prefix}_model_batch_summary_group FOREIGN KEY (best_group_id) REFERENCES {table_prefix}_prediction_group(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_simulation_ticket (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_simulation_ticket_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_simulation_ticket_user_created (user_id, lottery_code, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+]
+
+
+for _lottery_code in SUPPORTED_LOTTERY_CODES:
+    for _template in _LOTTERY_SPLIT_SCHEMA_TEMPLATES:
+        SCHEMA_STATEMENTS.append(
+            _template.format(
+                table_prefix=_lottery_code,
+                fk_prefix=_lottery_code,
+                lottery_code=_lottery_code,
+            )
+        )
+
+
+SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
+    "draw_result_number": {
+        "drop": {
+            "uq_draw_result_number_value": "ALTER TABLE draw_result_number DROP INDEX uq_draw_result_number_value",
+        },
+    },
+    "prediction_group_number": {
+        "drop": {
+            "uq_prediction_group_number_value": "ALTER TABLE prediction_group_number DROP INDEX uq_prediction_group_number_value",
+        },
+    },
+    "prediction_hit_number": {
+        "drop": {
+            "uq_prediction_hit_number_value": "ALTER TABLE prediction_hit_number DROP INDEX uq_prediction_hit_number_value",
+        },
+        "add": {
+            "idx_prediction_hit_number_value": "ALTER TABLE prediction_hit_number ADD INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)",
+        },
+    },
+}
+
+for _lottery_code in SUPPORTED_LOTTERY_CODES:
+    _table_prefix = f"{_lottery_code}_"
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}draw_result_number"] = {
+        "drop": {
+            "uq_draw_result_number_value": f"ALTER TABLE {_table_prefix}draw_result_number DROP INDEX uq_draw_result_number_value",
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_group_number"] = {
+        "drop": {
+            "uq_prediction_group_number_value": f"ALTER TABLE {_table_prefix}prediction_group_number DROP INDEX uq_prediction_group_number_value",
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_hit_number"] = {
+        "drop": {
+            "uq_prediction_hit_number_value": f"ALTER TABLE {_table_prefix}prediction_hit_number DROP INDEX uq_prediction_hit_number_value",
+        },
+        "add": {
+            "idx_prediction_hit_number_value": f"ALTER TABLE {_table_prefix}prediction_hit_number ADD INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)",
+        },
+    }
 
 
 SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {

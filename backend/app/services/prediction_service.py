@@ -61,8 +61,6 @@ class PredictionService:
                     "digits": normalize_digit_balls(group.get("digits", [])),
                 }
             )
-            if normalized_code == "pl3" and normalized_predictions[-1]["digits"]:
-                normalized_predictions[-1]["red_balls"] = list(normalized_predictions[-1]["digits"])
 
         return {
             **prediction,

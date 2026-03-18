@@ -806,23 +806,28 @@ export function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedDraws.map((draw) => (
-                    <tr key={draw.period}>
-                      <td>{draw.period}</td>
-                      <td>{draw.date}</td>
-                      <td>
-                        <div className="number-row number-row--tight">
-                          {draw.red_balls.map((ball) => (
-                            <NumberBall key={`${draw.period}-r-${ball}`} value={ball} color="red" size="sm" />
-                          ))}
-                          <span className="number-row__divider" />
-                          {draw.blue_balls.map((ball) => (
-                            <NumberBall key={`${draw.period}-b-${ball}`} value={ball} color="blue" size="sm" />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {pagedDraws.map((draw) => {
+                    const mainBalls = selectedLottery === 'pl3' ? (draw.digits?.length ? draw.digits : draw.red_balls) : draw.red_balls
+                    return (
+                      <tr key={draw.period}>
+                        <td>{draw.period}</td>
+                        <td>{draw.date}</td>
+                        <td>
+                          <div className="number-row number-row--tight">
+                            {mainBalls.map((ball, index) => (
+                              <NumberBall key={`${draw.period}-r-${index}-${ball}`} value={ball} color="red" size="sm" />
+                            ))}
+                            {selectedLottery === 'dlt' ? <span className="number-row__divider" /> : null}
+                            {selectedLottery === 'dlt'
+                              ? draw.blue_balls.map((ball, index) => (
+                                  <NumberBall key={`${draw.period}-b-${index}-${ball}`} value={ball} color="blue" size="sm" />
+                                ))
+                              : null}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1259,9 +1264,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     {(lotteryCode === 'dlt'
                       ? match.actualResult.red_balls
                       : (match.actualResult.digits || match.actualResult.red_balls)
-                    ).map((ball) => (
+                    ).map((ball, index) => (
                       <NumberBall
-                        key={`${match.period}-actual-main-${ball}`}
+                        key={`${match.period}-actual-main-${index}-${ball}`}
                         value={ball}
                         color="red"
                         size="sm"
@@ -1270,8 +1275,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     ))}
                     {lotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
                     {lotteryCode === 'dlt'
-                      ? match.actualResult.blue_balls.map((ball) => (
-                          <NumberBall key={`${match.period}-actual-blue-${ball}`} value={ball} color="blue" size="sm" isHit={match.blueHits.includes(ball)} />
+                      ? match.actualResult.blue_balls.map((ball, index) => (
+                          <NumberBall key={`${match.period}-actual-blue-${index}-${ball}`} value={ball} color="blue" size="sm" isHit={match.blueHits.includes(ball)} />
                         ))
                       : null}
                   </div>
@@ -1633,11 +1638,11 @@ function PredictionNumberRow({
   const hit = compareNumbers(group, actualResult)
   return (
     <div className={clsx('number-row', compact && 'number-row--compact')}>
-      {group.red_balls.map((ball) => {
+      {group.red_balls.map((ball, index) => {
         const isHit = Boolean((hit?.redHits || []).includes(ball))
         return (
           <NumberBall
-            key={`r-${group.group_id}-${ball}`}
+            key={`r-${group.group_id}-${index}-${ball}`}
             value={ball}
             color="red"
             isHit={isHit}
@@ -1646,11 +1651,11 @@ function PredictionNumberRow({
         )
       })}
       <span className="number-row__divider" />
-      {group.blue_balls.map((ball) => {
+      {group.blue_balls.map((ball, index) => {
         const isHit = Boolean((hit?.blueHits || []).includes(ball))
         return (
           <NumberBall
-            key={`b-${group.group_id}-${ball}`}
+            key={`b-${group.group_id}-${index}-${ball}`}
             value={ball}
             color="blue"
             isHit={isHit}
@@ -2158,6 +2163,10 @@ function HistoryRecordCard({
     }),
     { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
   )
+  const actualLotteryCode = record.actual_result?.lottery_code || 'dlt'
+  const actualMainBalls = actualLotteryCode === 'pl3'
+    ? (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
+    : (record.actual_result?.red_balls || [])
 
   return (
     <article className="history-record-card">
@@ -2175,13 +2184,15 @@ function HistoryRecordCard({
       </div>
       {record.actual_result ? (
         <div className="number-row">
-          {record.actual_result.red_balls.map((ball) => (
-            <NumberBall key={`${record.target_period}-red-${ball}`} value={ball} color="red" />
+          {actualMainBalls.map((ball, index) => (
+            <NumberBall key={`${record.target_period}-red-${index}-${ball}`} value={ball} color="red" />
           ))}
-          <span className="number-row__divider" />
-          {record.actual_result.blue_balls.map((ball) => (
-            <NumberBall key={`${record.target_period}-blue-${ball}`} value={ball} color="blue" />
-          ))}
+          {actualLotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
+          {actualLotteryCode === 'dlt'
+            ? record.actual_result.blue_balls.map((ball, index) => (
+                <NumberBall key={`${record.target_period}-blue-${index}-${ball}`} value={ball} color="blue" />
+              ))
+            : null}
         </div>
       ) : null}
       <div className="history-record-card__summary">

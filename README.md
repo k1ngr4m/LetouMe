@@ -59,6 +59,7 @@ APP_ENV=prod
 - 运行时数据库已切换为 MySQL
 - 可通过 `DATABASE_URL` 一次性配置连接，或使用 `MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE`
 - `SQLITE_PATH` 仅用于一次性迁移旧的 SQLite 数据
+- `LOTTERY_SPLIT_TABLES_ENABLED=true` 时启用按彩种分表（如 `dlt_draw_issue`、`pl3_draw_issue`）
 - 模型 API Key、Base URL、APP Code 通过设置页写入 MySQL
 - 首次启动若无管理员账号，可通过 `AUTH_BOOTSTRAP_ADMIN_USERNAME / AUTH_BOOTSTRAP_ADMIN_PASSWORD` 自动初始化管理员
 - `dev` 默认允许 `http://localhost:5173`
@@ -162,6 +163,18 @@ python backend/predict/dlt_engine.py
 
 ```bash
 python backend/scripts/dlt_recalculate_history_predictions.py --start-period 26022 --end-period 26024
+```
+
+### 分表改造前备份 MySQL
+
+```bash
+python -m backend.scripts.backup_mysql_database --output-dir backups
+```
+
+### 将共享业务表迁移到分彩种表
+
+```bash
+python -m backend.scripts.migrate_lottery_split_tables --lottery-codes dlt,pl3 --truncate-target
 ```
 
 ## 生产部署

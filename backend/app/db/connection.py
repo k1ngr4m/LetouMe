@@ -7,7 +7,8 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, Iterator
 
 from backend.app.config import Settings, load_settings
-from backend.app.db.schema import SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS
+from backend.app.db.lottery_tables import rewrite_lottery_tables
+from backend.app.db.schema import SCHEMA_INDEX_MIGRATIONS, SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS
 from backend.app.logging_utils import get_logger
 
 if TYPE_CHECKING:
@@ -108,13 +109,14 @@ def _format_mysql_operational_error(settings: Settings, exc: Exception) -> str:
 
 
 class CursorContext:
-    def __init__(self, connection) -> None:
+    def __init__(self, connection, settings: Settings) -> None:
         self._connection = connection
+        self._settings = settings
         self._cursor = None
 
     def __enter__(self):
         self._cursor = self._connection.cursor()
-        return MySQLCursorAdapter(self._cursor)
+        return MySQLCursorAdapter(self._cursor, settings=self._settings)
 
     def __exit__(self, exc_type, exc, tb) -> None:
         if self._cursor is not None:
@@ -122,8 +124,9 @@ class CursorContext:
 
 
 class MySQLCursorAdapter:
-    def __init__(self, cursor) -> None:
+    def __init__(self, cursor, *, settings: Settings) -> None:
         self._cursor = cursor
+        self._settings = settings
 
     @property
     def lastrowid(self) -> int:
@@ -134,20 +137,28 @@ class MySQLCursorAdapter:
         return int(self._cursor.rowcount or 0)
 
     def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None) -> int:
-        normalized_query = query.replace("?", "%s")
+        routed_query = rewrite_lottery_tables(
+            query,
+            split_enabled=self._settings.lottery_split_tables_enabled,
+        )
+        normalized_query = routed_query.replace("?", "%s")
         started_at = perf_counter()
         try:
             return self._cursor.execute(normalized_query, params)
         finally:
-            _track_query((perf_counter() - started_at) * 1000, query)
+            _track_query((perf_counter() - started_at) * 1000, routed_query)
 
     def executemany(self, query: str, params: list[tuple[Any, ...]]) -> int:
-        normalized_query = query.replace("?", "%s")
+        routed_query = rewrite_lottery_tables(
+            query,
+            split_enabled=self._settings.lottery_split_tables_enabled,
+        )
+        normalized_query = routed_query.replace("?", "%s")
         started_at = perf_counter()
         try:
             return self._cursor.executemany(normalized_query, params)
         finally:
-            _track_query((perf_counter() - started_at) * 1000, query)
+            _track_query((perf_counter() - started_at) * 1000, routed_query)
 
     def fetchone(self) -> dict[str, Any] | None:
         return self._cursor.fetchone()
@@ -162,7 +173,7 @@ class MySQLConnectionAdapter:
         self._settings = settings
 
     def cursor(self) -> CursorContext:
-        return CursorContext(self._connection)
+        return CursorContext(self._connection, self._settings)
 
     def commit(self) -> None:
         self._connection.commit()
@@ -296,4 +307,23 @@ def ensure_schema() -> None:
                     for column_name, statement in migrations.items():
                         if column_name not in existing_columns:
                             cursor.execute(statement)
+
+                for table_name, index_migrations in SCHEMA_INDEX_MIGRATIONS.items():
+                    cursor.execute(
+                        """
+                        SELECT INDEX_NAME
+                        FROM INFORMATION_SCHEMA.STATISTICS
+                        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                        """,
+                        (settings.mysql_database, table_name),
+                    )
+                    existing_indexes = {str(row["INDEX_NAME"]) for row in cursor.fetchall()}
+                    for index_name, statement in index_migrations.get("add", {}).items():
+                        if index_name not in existing_indexes:
+                            cursor.execute(statement)
+                            existing_indexes.add(index_name)
+                    for index_name, statement in index_migrations.get("drop", {}).items():
+                        if index_name in existing_indexes:
+                            cursor.execute(statement)
+                            existing_indexes.discard(index_name)
         _schema_ready = True

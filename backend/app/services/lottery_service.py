@@ -34,8 +34,6 @@ class LotteryService:
             "digits": normalize_digit_balls(draw.get("digits", [])),
             "date": draw.get("date", ""),
         }
-        if normalized_code == "pl3" and payload["digits"]:
-            payload["red_balls"] = list(payload["digits"])
         return payload
 
     def save_draws(self, draws: list[dict[str, Any]], lottery_code: str = "dlt") -> list[dict[str, Any]]:

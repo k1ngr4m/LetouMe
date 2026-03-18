@@ -37,6 +37,7 @@ class Settings:
     auth_bootstrap_admin_username: str = "admin"
     auth_bootstrap_admin_password: str = "admin123456"
     mysql_pool_size: int = 6
+    lottery_split_tables_enabled: bool = False
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -102,4 +103,5 @@ def load_settings() -> Settings:
         auth_bootstrap_admin_username=os.getenv("AUTH_BOOTSTRAP_ADMIN_USERNAME", "admin"),
         auth_bootstrap_admin_password=os.getenv("AUTH_BOOTSTRAP_ADMIN_PASSWORD", "admin123456"),
         mysql_pool_size=int(os.getenv("MYSQL_POOL_SIZE", "6")),
+        lottery_split_tables_enabled=os.getenv("LOTTERY_SPLIT_TABLES_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
     )

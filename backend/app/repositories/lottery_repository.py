@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.lotteries import display_period, normalize_lottery_code, storage_issue_no
 from backend.app.repositories.write_log_repository import WriteLogRepository
 
@@ -19,18 +20,19 @@ class LotteryRepository:
         normalized_code = normalize_lottery_code(lottery_code)
         current_draw: dict[str, Any] | None = None
         try:
-            with get_connection() as connection:
-                for draw in draws:
-                    current_draw = draw
-                    self._execute_upsert(connection, draw, normalized_code)
-                    period = str(draw["period"])
-                    self.log_repository.log_success(
-                        connection,
-                        table_name="draw_issue",
-                        action="upsert",
-                        target_key=f"period={period}",
-                        summary=f"upsert draw_issue period={period}",
-                    )
+            with use_lottery_table_scope(normalized_code):
+                with get_connection() as connection:
+                    for draw in draws:
+                        current_draw = draw
+                        self._execute_upsert(connection, draw, normalized_code)
+                        period = str(draw["period"])
+                        self.log_repository.log_success(
+                            connection,
+                            table_name="draw_issue",
+                            action="upsert",
+                            target_key=f"period={period}",
+                            summary=f"upsert draw_issue period={period}",
+                        )
         except Exception as exc:
             target_key = "period=unknown"
             summary = "upsert draw_issue period=unknown"
@@ -71,55 +73,58 @@ class LotteryRepository:
             sql += " OFFSET ?"
             params.append(offset)
 
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, tuple(params))
-                rows = cursor.fetchall()
-                result_ids = [row["draw_result_id"] for row in rows if row.get("draw_result_id")]
-                numbers_by_result = self._fetch_draw_numbers(cursor, result_ids)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, tuple(params))
+                    rows = cursor.fetchall()
+                    result_ids = [row["draw_result_id"] for row in rows if row.get("draw_result_id")]
+                    numbers_by_result = self._fetch_draw_numbers(cursor, result_ids)
 
         return [self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], [])) for row in rows]
 
     def count_draws(self, lottery_code: str = "dlt") -> int:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM draw_issue di
-                    INNER JOIN draw_result dr ON dr.issue_id = di.id
-                    WHERE di.lottery_code = ?
-                    """,
-                    (normalized_code,),
-                )
-                row = cursor.fetchone() or {}
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) AS total
+                        FROM draw_issue di
+                        INNER JOIN draw_result dr ON dr.issue_id = di.id
+                        WHERE di.lottery_code = ?
+                        """,
+                        (normalized_code,),
+                    )
+                    row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
 
     def get_draw_by_period(self, period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        di.id AS issue_id,
-                        di.issue_no AS period,
-                        di.lottery_code,
-                        di.draw_date,
-                        di.updated_at,
-                        dr.id AS draw_result_id
-                    FROM draw_issue di
-                    LEFT JOIN draw_result dr ON dr.issue_id = di.id
-                    WHERE di.issue_no = ? AND di.lottery_code = ?
-                    LIMIT 1
-                    """,
-                    (storage_issue_no(normalized_code, period), normalized_code),
-                )
-                row = cursor.fetchone()
-                if not row or not row.get("draw_result_id"):
-                    return None
-                numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            di.id AS issue_id,
+                            di.issue_no AS period,
+                            di.lottery_code,
+                            di.draw_date,
+                            di.updated_at,
+                            dr.id AS draw_result_id
+                        FROM draw_issue di
+                        LEFT JOIN draw_result dr ON dr.issue_id = di.id
+                        WHERE di.issue_no = ? AND di.lottery_code = ?
+                        LIMIT 1
+                        """,
+                        (storage_issue_no(normalized_code, period), normalized_code),
+                    )
+                    row = cursor.fetchone()
+                    if not row or not row.get("draw_result_id"):
+                        return None
+                    numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
         return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []))
 
     def get_latest_draw(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
@@ -131,15 +136,17 @@ class LotteryRepository:
         target_key = f"period={period}"
         summary = f"upsert draw_issue {target_key}"
         try:
-            with get_connection() as connection:
-                self._execute_upsert(connection, draw, normalize_lottery_code(lottery_code))
-                self.log_repository.log_success(
-                    connection,
-                    table_name="draw_issue",
-                    action="upsert",
-                    target_key=target_key,
-                    summary=summary,
-                )
+            normalized_code = normalize_lottery_code(lottery_code)
+            with use_lottery_table_scope(normalized_code):
+                with get_connection() as connection:
+                    self._execute_upsert(connection, draw, normalized_code)
+                    self.log_repository.log_success(
+                        connection,
+                        table_name="draw_issue",
+                        action="upsert",
+                        target_key=target_key,
+                        summary=summary,
+                    )
         except Exception as exc:
             self.log_repository.log_failure(
                 table_name="draw_issue",
@@ -219,14 +226,16 @@ class LotteryRepository:
 
     @staticmethod
     def _to_draw_dict(row: dict[str, Any], numbers: list[dict[str, Any]]) -> dict[str, Any]:
+        lottery_code = normalize_lottery_code(row.get("lottery_code") or "dlt")
         red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
         blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
         digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
+        if lottery_code == "pl3" and not red_balls and digits:
+            red_balls = list(digits)
         draw_date = row.get("draw_date") or ""
         updated_at = row.get("updated_at")
         if isinstance(updated_at, str):
             updated_at = _parse_timestamp(updated_at)
-        lottery_code = normalize_lottery_code(row.get("lottery_code") or "dlt")
 
         return {
             "lottery_code": lottery_code,
@@ -242,21 +251,22 @@ class LotteryRepository:
 def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str, lottery_code: str = "dlt") -> int:
     normalized_code = normalize_lottery_code(lottery_code)
     stored_issue_no = storage_issue_no(normalized_code, issue_no)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO draw_issue (issue_no, lottery_code, draw_date, status, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON DUPLICATE KEY UPDATE
-                lottery_code = VALUES(lottery_code),
-                draw_date = VALUES(draw_date),
-                status = VALUES(status),
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (stored_issue_no, normalized_code, draw_date, status),
-        )
-        cursor.execute("SELECT id FROM draw_issue WHERE issue_no = ?", (stored_issue_no,))
-        return int(cursor.fetchone()["id"])
+    with use_lottery_table_scope(normalized_code):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO draw_issue (issue_no, lottery_code, draw_date, status, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE
+                    lottery_code = VALUES(lottery_code),
+                    draw_date = VALUES(draw_date),
+                    status = VALUES(status),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (stored_issue_no, normalized_code, draw_date, status),
+            )
+            cursor.execute("SELECT id FROM draw_issue WHERE issue_no = ?", (stored_issue_no,))
+            return int(cursor.fetchone()["id"])
 
 
 def _insert_number_rows(
