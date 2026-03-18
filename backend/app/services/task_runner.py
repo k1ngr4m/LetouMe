@@ -19,6 +19,7 @@ class BackgroundTaskRunner:
         *,
         initial_task: dict[str, Any],
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
+        on_update: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         task_id = uuid4().hex
         task = {
@@ -32,8 +33,10 @@ class BackgroundTaskRunner:
         }
         with self._lock:
             self._tasks[task_id] = task
+        if on_update:
+            on_update(dict(task))
 
-        thread = Thread(target=self._run_task, args=(task_id, worker), daemon=True)
+        thread = Thread(target=self._run_task, args=(task_id, worker, on_update), daemon=True)
         thread.start()
         return dict(task)
 
@@ -46,10 +49,11 @@ class BackgroundTaskRunner:
         self,
         task_id: str,
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
+        on_update: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
-        self._update_task(task_id, {"status": "running", "started_at": self._timestamp()})
+        self._update_task(task_id, {"status": "running", "started_at": self._timestamp()}, on_update=on_update)
         try:
-            result = worker(lambda summary: self._update_task(task_id, {"progress_summary": summary}))
+            result = worker(lambda summary: self._update_task(task_id, {"progress_summary": summary}, on_update=on_update))
             self._update_task(
                 task_id,
                 {
@@ -57,6 +61,7 @@ class BackgroundTaskRunner:
                     "finished_at": self._timestamp(),
                     "progress_summary": result,
                 },
+                on_update=on_update,
             )
         except Exception as exc:
             self.logger.exception("Background task failed", extra={"context": {"task_id": task_id}})
@@ -67,14 +72,18 @@ class BackgroundTaskRunner:
                     "finished_at": self._timestamp(),
                     "error_message": str(exc),
                 },
+                on_update=on_update,
             )
 
-    def _update_task(self, task_id: str, updates: dict[str, Any]) -> None:
+    def _update_task(self, task_id: str, updates: dict[str, Any], *, on_update: Callable[[dict[str, Any]], None] | None = None) -> None:
         with self._lock:
             task = self._tasks.get(task_id)
             if not task:
                 return
             task.update(updates)
+            snapshot = dict(task)
+        if on_update:
+            on_update(snapshot)
 
     @staticmethod
     def _timestamp() -> str:

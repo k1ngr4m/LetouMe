@@ -10,6 +10,7 @@ from backend.app.auth import (
     require_current_user,
     require_model_management_permission,
     require_role_management_permission,
+    require_schedule_management_permission,
     require_super_admin,
     require_user_management_permission,
     set_session_cookie,
@@ -48,6 +49,10 @@ from backend.app.schemas.requests import (
     PredictionGenerationTaskPayload,
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
+    ScheduleTaskCodePayload,
+    ScheduleTaskPayload,
+    ScheduleTaskStatusPayload,
+    ScheduleTaskUpdatePayload,
     SettingsPredictionRecordDetailPayload,
     SimulationTicketDeletePayload,
     SimulationTicketListPayload,
@@ -62,6 +67,8 @@ from backend.app.schemas.responses import (
     LotteryHistoryResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
+    ScheduleTaskListResponse,
+    ScheduleTaskResponse,
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
     SimulationTicketCreateResponse,
@@ -69,12 +76,14 @@ from backend.app.schemas.responses import (
     SuccessResponse,
 )
 from backend.app.lotteries import normalize_lottery_code
+from backend.app.rbac import MODEL_MANAGEMENT_PERMISSION, SCHEDULE_MANAGEMENT_PERMISSION
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.model_service import ModelService
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
 from backend.app.services.prediction_service import PredictionService
+from backend.app.services.schedule_service import schedule_service
 from backend.app.services.simulation_ticket_service import SimulationTicketService
 
 
@@ -217,7 +226,10 @@ def change_profile_password(
 
 
 @router.post("/settings/models/list", response_model=ModelListResponse)
-def get_settings_models(payload: ModelListPayload, _: dict = Depends(require_model_management_permission)) -> dict:
+def get_settings_models(payload: ModelListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    permissions = set(current_user.get("permissions") or [])
+    if MODEL_MANAGEMENT_PERMISSION not in permissions and SCHEDULE_MANAGEMENT_PERMISSION not in permissions:
+        raise HTTPException(status_code=403, detail="没有权限")
     models = model_service.list_models(include_deleted=payload.include_deleted)
     return {"models": models}
 
@@ -291,6 +303,58 @@ def get_settings_lottery_fetch_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task
+
+
+@router.post("/settings/schedules/list", response_model=ScheduleTaskListResponse)
+def list_schedule_tasks(_: dict = Depends(require_schedule_management_permission)) -> dict:
+    return {"tasks": schedule_service.list_tasks()}
+
+
+@router.post("/settings/schedules/create", response_model=ScheduleTaskResponse)
+def create_schedule_task(payload: ScheduleTaskPayload, _: dict = Depends(require_schedule_management_permission)) -> dict:
+    try:
+        return schedule_service.create_task(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/schedules/update", response_model=ScheduleTaskResponse)
+def update_schedule_task(payload: ScheduleTaskUpdatePayload, _: dict = Depends(require_schedule_management_permission)) -> dict:
+    try:
+        return schedule_service.update_task(payload.task_code, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="定时任务不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/schedules/status", response_model=ScheduleTaskResponse)
+def update_schedule_task_status(payload: ScheduleTaskStatusPayload, _: dict = Depends(require_schedule_management_permission)) -> dict:
+    try:
+        return schedule_service.set_task_active(payload.task_code, payload.is_active)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="定时任务不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/schedules/delete", response_model=SuccessResponse)
+def delete_schedule_task(payload: ScheduleTaskCodePayload, _: dict = Depends(require_schedule_management_permission)) -> dict:
+    try:
+        schedule_service.delete_task(payload.task_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="定时任务不存在") from exc
+    return {"success": True}
+
+
+@router.post("/settings/schedules/run-now", response_model=ScheduleTaskResponse)
+def run_schedule_task_now(payload: ScheduleTaskCodePayload, _: dict = Depends(require_schedule_management_permission)) -> dict:
+    try:
+        return schedule_service.run_task_now(payload.task_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="定时任务不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/settings/models/predictions/generate", response_model=PredictionGenerationTaskResponse)

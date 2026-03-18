@@ -20,6 +20,9 @@ import type {
   RoleItem,
   RoleListResponse,
   RolePayload,
+  ScheduleTask,
+  ScheduleTaskListResponse,
+  ScheduleTaskPayload,
   PredictionGenerationTask,
   SettingsPredictionRecordDetail,
   SettingsPredictionRecordListResponse,
@@ -323,6 +326,42 @@ export const apiClient = {
     return requestJson<RoleItem>('/api/admin/roles/delete', {
       method: 'POST',
       body: JSON.stringify({ role_code: roleCode }),
+    })
+  },
+  listScheduleTasks() {
+    return requestJson<ScheduleTaskListResponse>('/api/settings/schedules/list', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  createScheduleTask(payload: ScheduleTaskPayload) {
+    return requestJson<ScheduleTask>('/api/settings/schedules/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  updateScheduleTask(taskCode: string, payload: ScheduleTaskPayload) {
+    return requestJson<ScheduleTask>('/api/settings/schedules/update', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, task_code: taskCode }),
+    })
+  },
+  toggleScheduleTask(taskCode: string, isActive: boolean) {
+    return requestJson<ScheduleTask>('/api/settings/schedules/status', {
+      method: 'POST',
+      body: JSON.stringify({ task_code: taskCode, is_active: isActive }),
+    })
+  },
+  deleteScheduleTask(taskCode: string) {
+    return requestJson<SuccessResponse>('/api/settings/schedules/delete', {
+      method: 'POST',
+      body: JSON.stringify({ task_code: taskCode }),
+    })
+  },
+  runScheduleTaskNow(taskCode: string) {
+    return requestJson<ScheduleTask>('/api/settings/schedules/run-now', {
+      method: 'POST',
+      body: JSON.stringify({ task_code: taskCode }),
     })
   },
 }

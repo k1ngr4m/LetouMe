@@ -9,6 +9,7 @@ BASIC_PROFILE_PERMISSION = "basic_profile"
 MODEL_MANAGEMENT_PERMISSION = "model_management"
 USER_MANAGEMENT_PERMISSION = "user_management"
 ROLE_MANAGEMENT_PERMISSION = "role_management"
+SCHEDULE_MANAGEMENT_PERMISSION = "schedule_management"
 
 SUPER_ADMIN_ROLE = "super_admin"
 NORMAL_USER_ROLE = "normal_user"
@@ -29,6 +30,10 @@ DEFAULT_PERMISSIONS = {
     ROLE_MANAGEMENT_PERMISSION: {
         "name": "角色管理",
         "description": "允许查看角色、编辑角色权限以及维护权限点说明，是最高级别的后台授权入口之一。",
+    },
+    SCHEDULE_MANAGEMENT_PERMISSION: {
+        "name": "定时任务",
+        "description": "允许查看、创建、编辑、启停和执行开奖抓取与预测生成的定时任务。",
     },
 }
 

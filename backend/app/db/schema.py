@@ -312,6 +312,34 @@ SCHEMA_STATEMENTS = [
         CONSTRAINT fk_app_role_permission_permission FOREIGN KEY (permission_id) REFERENCES app_permission(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS scheduled_task (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        task_code VARCHAR(64) NOT NULL UNIQUE,
+        task_name VARCHAR(128) NOT NULL,
+        task_type VARCHAR(32) NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        model_codes_json TEXT NULL,
+        generation_mode VARCHAR(32) NOT NULL DEFAULT 'current',
+        overwrite_existing TINYINT(1) NOT NULL DEFAULT 0,
+        schedule_mode VARCHAR(32) NOT NULL DEFAULT 'preset',
+        preset_type VARCHAR(32) NULL,
+        time_of_day VARCHAR(8) NULL,
+        weekdays_json VARCHAR(128) NULL,
+        cron_expression VARCHAR(128) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        next_run_at DATETIME NULL,
+        last_run_at DATETIME NULL,
+        last_run_status VARCHAR(32) NULL,
+        last_error_message TEXT NULL,
+        last_task_id VARCHAR(64) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_scheduled_task_type_active (task_type, is_active),
+        INDEX idx_scheduled_task_lottery_active (lottery_code, is_active),
+        INDEX idx_scheduled_task_next_run (is_active, next_run_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [

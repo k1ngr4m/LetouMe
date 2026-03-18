@@ -116,3 +116,31 @@ class PermissionUpdatePayload(BaseModel):
     permission_code: str
     permission_name: str
     permission_description: str
+
+
+class ScheduleTaskPayload(BaseModel):
+    task_name: str
+    task_type: str
+    lottery_code: str = "dlt"
+    model_codes: list[str] = Field(default_factory=list)
+    generation_mode: str = "current"
+    overwrite_existing: bool = False
+    schedule_mode: str
+    preset_type: str | None = None
+    time_of_day: str | None = None
+    weekdays: list[int] = Field(default_factory=list)
+    cron_expression: str | None = None
+    is_active: bool = True
+
+
+class ScheduleTaskUpdatePayload(ScheduleTaskPayload):
+    task_code: str
+
+
+class ScheduleTaskCodePayload(BaseModel):
+    task_code: str
+
+
+class ScheduleTaskStatusPayload(BaseModel):
+    task_code: str
+    is_active: bool

@@ -109,3 +109,31 @@ class SimulationTicketCreateResponse(BaseModel):
 
 class SuccessResponse(BaseModel):
     success: bool = True
+
+
+class ScheduleTaskResponse(BaseModel):
+    task_code: str
+    task_name: str
+    task_type: str
+    lottery_code: str = "dlt"
+    model_codes: list[str] = Field(default_factory=list)
+    generation_mode: str = "current"
+    overwrite_existing: bool = False
+    schedule_mode: str
+    preset_type: str | None = None
+    time_of_day: str | None = None
+    weekdays: list[int] = Field(default_factory=list)
+    cron_expression: str | None = None
+    is_active: bool = True
+    next_run_at: str | None = None
+    last_run_at: str | None = None
+    last_run_status: str | None = None
+    last_error_message: str | None = None
+    last_task_id: str | None = None
+    rule_summary: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ScheduleTaskListResponse(BaseModel):
+    tasks: list[ScheduleTaskResponse] = Field(default_factory=list)

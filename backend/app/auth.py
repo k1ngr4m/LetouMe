@@ -16,6 +16,7 @@ from backend.app.rbac import (
     MODEL_MANAGEMENT_PERMISSION,
     NORMAL_USER_ROLE,
     ROLE_MANAGEMENT_PERMISSION,
+    SCHEDULE_MANAGEMENT_PERMISSION,
     SUPER_ADMIN_ROLE,
     USER_MANAGEMENT_PERMISSION,
     ensure_rbac_setup,
@@ -333,6 +334,10 @@ def require_user_management_permission(current_user: dict[str, Any] = Depends(re
 
 
 def require_role_management_permission(current_user: dict[str, Any] = Depends(require_permission(ROLE_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
+    return current_user
+
+
+def require_schedule_management_permission(current_user: dict[str, Any] = Depends(require_permission(SCHEDULE_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
     return current_user
 
 

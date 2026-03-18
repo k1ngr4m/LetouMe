@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
@@ -19,6 +19,11 @@ import type {
   PredictionGenerationTask,
   RoleItem,
   RolePayload,
+  ScheduleTask,
+  ScheduleTaskPayload,
+  ScheduleTaskType,
+  ScheduleMode,
+  SchedulePresetType,
   SettingsPredictionRecordDetail,
   SettingsPredictionRecordSummary,
   SettingsModel,
@@ -26,12 +31,13 @@ import type {
   LotteryCode,
 } from '../../shared/types/api'
 
-type SettingsTab = 'profile' | 'models' | 'users' | 'roles'
+type SettingsTab = 'profile' | 'models' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelManagementTab = 'catalog' | 'records'
 type PredictionRecordTypeFilter = 'all' | 'current' | 'history'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
+type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type BulkEditForm = {
   providerEnabled: boolean
   provider: string
@@ -46,6 +52,7 @@ type BulkEditForm = {
   isActiveEnabled: boolean
   is_active: boolean
 }
+type ScheduleForm = ScheduleTaskPayload
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
@@ -98,6 +105,20 @@ const EMPTY_BULK_EDIT_FORM: BulkEditForm = {
   isActiveEnabled: false,
   is_active: true,
 }
+const EMPTY_SCHEDULE_FORM: ScheduleForm = {
+  task_name: '',
+  task_type: 'lottery_fetch',
+  lottery_code: 'dlt',
+  model_codes: [],
+  generation_mode: 'current',
+  overwrite_existing: false,
+  schedule_mode: 'preset',
+  preset_type: 'daily',
+  time_of_day: '09:00',
+  weekdays: [],
+  cron_expression: '',
+  is_active: true,
+}
 
 const EMPTY_MODELS: SettingsModel[] = []
 const EMPTY_PROVIDERS: Array<{ code: string; name: string }> = []
@@ -105,6 +126,15 @@ const EMPTY_RECORDS: SettingsPredictionRecordSummary[] = []
 const EMPTY_USERS: AuthUser[] = []
 const EMPTY_ROLES: RoleItem[] = []
 const EMPTY_PERMISSIONS: PermissionItem[] = []
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: '周一' },
+  { value: 1, label: '周二' },
+  { value: 2, label: '周三' },
+  { value: 3, label: '周四' },
+  { value: 4, label: '周五' },
+  { value: 5, label: '周六' },
+  { value: 6, label: '周日' },
+]
 
 const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> = {
   updated_desc: { label: '最近更新', hint: '按更新时间从新到旧排序' },
@@ -279,6 +309,15 @@ function getTaskStatusLabel(status: string) {
   return status
 }
 
+function getScheduleTaskTypeLabel(taskType: ScheduleTaskType) {
+  return taskType === 'lottery_fetch' ? '开奖抓取' : '预测生成'
+}
+
+function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: SchedulePresetType | null) {
+  if (scheduleMode === 'cron') return 'Cron'
+  return presetType === 'weekly' ? '每周' : '每日'
+}
+
 function getGenerationTaskTotal(task: PredictionGenerationTask | null) {
   if (!task) return 0
   return task.progress_summary.selected_count ?? (
@@ -324,6 +363,10 @@ export function SettingsPage() {
   const [selectedPredictionRecord, setSelectedPredictionRecord] = useState<{ recordType: 'current' | 'history'; targetPeriod: string } | null>(null)
   const [predictionRecordPeriodQuery, setPredictionRecordPeriodQuery] = useState('')
   const [predictionRecordTypeFilter, setPredictionRecordTypeFilter] = useState<PredictionRecordTypeFilter>('all')
+  const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
+  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+  const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
+  const [expandedScheduleTaskCode, setExpandedScheduleTaskCode] = useState<string | null>(null)
   const [newUserForm, setNewUserForm] = useState({ username: '', nickname: '', password: '', role: 'normal_user', is_active: true })
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
@@ -333,6 +376,7 @@ export function SettingsPage() {
   const [modelActionMenu, setModelActionMenu] = useState<string | null>(null)
 
   const canManageModels = hasPermission('model_management')
+  const canManageSchedules = hasPermission('schedule_management')
   const canManageUsers = hasPermission('user_management')
   const canManageRoles = hasPermission('role_management')
   const isSuperAdmin = user?.role === 'super_admin'
@@ -340,7 +384,7 @@ export function SettingsPage() {
   const modelsQuery = useQuery({
     queryKey: ['settings-models', selectedLottery],
     queryFn: () => apiClient.getSettingsModels(false, selectedLottery),
-    enabled: canManageModels,
+    enabled: canManageModels || canManageSchedules,
   })
   const providersQuery = useQuery({
     queryKey: ['settings-providers'],
@@ -372,8 +416,16 @@ export function SettingsPage() {
     },
     enabled: canManageModels && Boolean(selectedPredictionRecord),
   })
+  const scheduleTasksQuery = useQuery({
+    queryKey: ['settings-schedules'],
+    queryFn: () => apiClient.listScheduleTasks(),
+    enabled: canManageSchedules,
+  })
   useEffect(() => {
     saveSelectedLottery(selectedLottery)
+  }, [selectedLottery])
+  useEffect(() => {
+    setScheduleForm((previous) => ({ ...previous, lottery_code: selectedLottery }))
   }, [selectedLottery])
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
@@ -394,10 +446,11 @@ export function SettingsPage() {
   const availableTabs = useMemo(() => {
     const tabs: Array<{ id: SettingsTab; label: string }> = [{ id: 'profile', label: '基础信息' }]
     if (canManageModels) tabs.push({ id: 'models', label: '模型管理' })
+    if (canManageSchedules) tabs.push({ id: 'schedules', label: '定时任务' })
     if (canManageUsers) tabs.push({ id: 'users', label: '用户管理' })
     if (canManageRoles) tabs.push({ id: 'roles', label: '角色管理' })
     return tabs
-  }, [canManageModels, canManageRoles, canManageUsers])
+  }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers])
 
   useEffect(() => {
     if (!availableTabs.some((item) => item.id === activeTab)) {
@@ -480,7 +533,9 @@ export function SettingsPage() {
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
+  const scheduleTasks = scheduleTasksQuery.data?.tasks ?? []
   const selectedRole = roles.find((role) => role.role_code === selectedRoleCode) || null
+  const selectedScheduleTask = scheduleTasks.find((task) => task.task_code === selectedScheduleTaskCode) || null
   const permissionMap = useMemo(
     () => Object.fromEntries(permissions.map((permission) => [permission.permission_code, permission])),
     [permissions],
@@ -502,6 +557,14 @@ export function SettingsPage() {
       history: predictionRecords.filter((record) => record.record_type === 'history').length,
     }),
     [predictionRecords],
+  )
+  const filteredScheduleTasks = useMemo(
+    () => scheduleTasks.filter((task) => scheduleTaskFilter === 'all' || task.task_type === scheduleTaskFilter),
+    [scheduleTaskFilter, scheduleTasks],
+  )
+  const selectedLotteryModels = useMemo(
+    () => models.filter((model) => (model.lottery_codes || [selectedLottery]).includes(scheduleForm.lottery_code)),
+    [models, scheduleForm.lottery_code, selectedLottery],
   )
   const sortedModels = useMemo(() => {
     const items = [...models]
@@ -663,6 +726,52 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : `创建${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新任务失败`)
+      setMessageType('error')
+    },
+  })
+
+  const saveScheduleTaskMutation = useMutation({
+    mutationFn: (payload: ScheduleForm) =>
+      selectedScheduleTaskCode
+        ? apiClient.updateScheduleTask(selectedScheduleTaskCode, payload)
+        : apiClient.createScheduleTask(payload),
+    onSuccess: () => {
+      setMessage(selectedScheduleTaskCode ? '定时任务已更新。' : '定时任务已创建。')
+      setMessageType('success')
+      setSelectedScheduleTaskCode(null)
+      setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+      void queryClient.invalidateQueries({ queryKey: ['settings-schedules'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '保存定时任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const scheduleTaskActionMutation = useMutation({
+    mutationFn: async (action: { type: 'toggle' | 'delete' | 'run'; task: ScheduleTask }) => {
+      if (action.type === 'toggle') return apiClient.toggleScheduleTask(action.task.task_code, !action.task.is_active)
+      if (action.type === 'run') return apiClient.runScheduleTaskNow(action.task.task_code)
+      await apiClient.deleteScheduleTask(action.task.task_code)
+      return null
+    },
+    onSuccess: (_, variables) => {
+      if (variables.type === 'delete') {
+        setMessage('定时任务已删除。')
+        if (selectedScheduleTaskCode === variables.task.task_code) {
+          setSelectedScheduleTaskCode(null)
+          setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+        }
+      } else if (variables.type === 'toggle') {
+        setMessage(`定时任务已${variables.task.is_active ? '停用' : '启用'}。`)
+      } else {
+        setMessage('定时任务已立即执行。')
+      }
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-schedules'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '定时任务操作失败')
       setMessageType('error')
     },
   })
@@ -926,6 +1035,61 @@ export function SettingsPage() {
     if (bulkEditForm.temperatureEnabled) updates.temperature = bulkEditForm.temperature ? Number(bulkEditForm.temperature) : null
     if (bulkEditForm.isActiveEnabled) updates.is_active = bulkEditForm.is_active
     bulkModelActionMutation.mutate({ action: 'edit', updates })
+  }
+
+  function openCreateScheduleTask() {
+    setSelectedScheduleTaskCode(null)
+    setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+  }
+
+  function openEditScheduleTask(task: ScheduleTask) {
+    setSelectedScheduleTaskCode(task.task_code)
+    setScheduleForm({
+      task_name: task.task_name,
+      task_type: task.task_type,
+      lottery_code: task.lottery_code,
+      model_codes: task.model_codes,
+      generation_mode: 'current',
+      overwrite_existing: task.overwrite_existing,
+      schedule_mode: task.schedule_mode,
+      preset_type: task.preset_type || 'daily',
+      time_of_day: task.time_of_day || '09:00',
+      weekdays: task.weekdays,
+      cron_expression: task.cron_expression || '',
+      is_active: task.is_active,
+    })
+  }
+
+  function toggleScheduleWeekday(weekday: number) {
+    setScheduleForm((previous) => ({
+      ...previous,
+      weekdays: previous.weekdays.includes(weekday)
+        ? previous.weekdays.filter((value) => value !== weekday)
+        : [...previous.weekdays, weekday].sort((left, right) => left - right),
+    }))
+  }
+
+  function submitScheduleForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (scheduleForm.task_type === 'prediction_generate' && scheduleForm.model_codes.length === 0) {
+      setMessage('预测任务至少选择一个模型')
+      setMessageType('error')
+      return
+    }
+    saveScheduleTaskMutation.mutate({
+      ...scheduleForm,
+      task_name: scheduleForm.task_name.trim(),
+      cron_expression: scheduleForm.schedule_mode === 'cron' ? scheduleForm.cron_expression?.trim() || '' : undefined,
+      preset_type: scheduleForm.schedule_mode === 'preset' ? scheduleForm.preset_type || 'daily' : undefined,
+      time_of_day: scheduleForm.schedule_mode === 'preset' ? scheduleForm.time_of_day || '09:00' : undefined,
+      weekdays: scheduleForm.schedule_mode === 'preset' ? scheduleForm.weekdays : [],
+      model_codes: scheduleForm.task_type === 'prediction_generate' ? scheduleForm.model_codes : [],
+      generation_mode: 'current',
+    })
+  }
+
+  function toggleScheduleTaskDetail(taskCode: string) {
+    setExpandedScheduleTaskCode((previous) => (previous === taskCode ? null : taskCode))
   }
 
   function getPermissionLabel(permissionCode: string) {
@@ -1507,6 +1671,317 @@ export function SettingsPage() {
                   </section>
                 </StatusCard>
               ) : null}
+            </div>
+          ) : null}
+
+          {activeTab === 'schedules' ? (
+            <div className="page-section">
+              <StatusCard title="定时任务" subtitle="按彩种维护开奖抓取与预测生成任务，支持固定时间表和 Cron 表达式。">
+                <div className="settings-grid-react">
+                  <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={submitScheduleForm}>
+                    <div className="panel-card__header">
+                      <div>
+                        <h2 className="panel-card__title">{selectedScheduleTask ? '编辑任务' : '新增任务'}</h2>
+                        <p className="settings-profile-form-card__hint">预测任务按“彩种 + 多模型”执行，开奖抓取任务按彩种执行。</p>
+                      </div>
+                      {selectedScheduleTask ? (
+                        <button className="ghost-button" type="button" onClick={openCreateScheduleTask}>
+                          新建任务
+                        </button>
+                      ) : null}
+                    </div>
+                    <label className="field">
+                      <span>任务名称</span>
+                      <input
+                        value={scheduleForm.task_name}
+                        onChange={(event) => setScheduleForm((previous) => ({ ...previous, task_name: event.target.value }))}
+                        required
+                      />
+                    </label>
+                    <div className="settings-inline-form settings-inline-form--users">
+                      <label className="field">
+                        <span>任务类型</span>
+                        <select
+                          aria-label="任务类型"
+                          value={scheduleForm.task_type}
+                          onChange={(event) =>
+                            setScheduleForm((previous) => ({
+                              ...previous,
+                              task_type: event.target.value as ScheduleTaskType,
+                              model_codes: event.target.value === 'prediction_generate' ? previous.model_codes : [],
+                            }))
+                          }
+                        >
+                          <option value="lottery_fetch">开奖抓取</option>
+                          <option value="prediction_generate">预测生成</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>彩种</span>
+                        <select
+                          aria-label="彩种"
+                          value={scheduleForm.lottery_code}
+                          onChange={(event) =>
+                            {
+                              const nextLottery = event.target.value as LotteryCode
+                              setSelectedLottery(nextLottery)
+                              setScheduleForm((previous) => ({
+                                ...previous,
+                                lottery_code: nextLottery,
+                                model_codes: [],
+                              }))
+                            }
+                          }
+                        >
+                          <option value="dlt">大乐透</option>
+                          <option value="pl3">排列3</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>规则模式</span>
+                        <select
+                          aria-label="规则模式"
+                          value={scheduleForm.schedule_mode}
+                          onChange={(event) => setScheduleForm((previous) => ({ ...previous, schedule_mode: event.target.value as ScheduleMode }))}
+                        >
+                          <option value="preset">固定时间表</option>
+                          <option value="cron">Cron 表达式</option>
+                        </select>
+                      </label>
+                    </div>
+                    {scheduleForm.task_type === 'prediction_generate' ? (
+                      <div className="field">
+                        <span>预测模型</span>
+                        <div className="settings-model-table__tags">
+                          {selectedLotteryModels.length ? (
+                            selectedLotteryModels.map((model) => (
+                              <label key={model.model_code} className="checkbox-field">
+                                <input
+                                  type="checkbox"
+                                  checked={scheduleForm.model_codes.includes(model.model_code)}
+                                  onChange={(event) =>
+                                    setScheduleForm((previous) => ({
+                                      ...previous,
+                                      model_codes: event.target.checked
+                                        ? [...previous.model_codes, model.model_code]
+                                        : previous.model_codes.filter((code) => code !== model.model_code),
+                                    }))
+                                  }
+                                />
+                                <span>{model.display_name}</span>
+                              </label>
+                            ))
+                          ) : (
+                            <span className="settings-inline-hint">当前彩种暂无可选模型。</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {scheduleForm.schedule_mode === 'preset' ? (
+                      <>
+                        <div className="settings-inline-form settings-inline-form--users">
+                          <label className="field">
+                            <span>执行频率</span>
+                            <select
+                              aria-label="执行频率"
+                              value={scheduleForm.preset_type || 'daily'}
+                              onChange={(event) => setScheduleForm((previous) => ({ ...previous, preset_type: event.target.value as SchedulePresetType }))}
+                            >
+                              <option value="daily">每天</option>
+                              <option value="weekly">每周</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span>执行时间</span>
+                            <input
+                              aria-label="执行时间"
+                              type="time"
+                              value={scheduleForm.time_of_day || '09:00'}
+                              onChange={(event) => setScheduleForm((previous) => ({ ...previous, time_of_day: event.target.value }))}
+                              required
+                            />
+                          </label>
+                          {scheduleForm.task_type === 'prediction_generate' ? (
+                            <label className="toggle-chip">
+                              <input
+                                type="checkbox"
+                                checked={scheduleForm.overwrite_existing}
+                                onChange={(event) => setScheduleForm((previous) => ({ ...previous, overwrite_existing: event.target.checked }))}
+                              />
+                              <span>覆盖已有预测</span>
+                            </label>
+                          ) : null}
+                        </div>
+                        {scheduleForm.preset_type === 'weekly' ? (
+                          <div className="filter-chip-group">
+                            {WEEKDAY_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                className={clsx('filter-chip', scheduleForm.weekdays.includes(option.value) && 'is-active')}
+                                onClick={() => toggleScheduleWeekday(option.value)}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <label className="field">
+                        <span>Cron 表达式</span>
+                        <input
+                          aria-label="Cron 表达式"
+                          value={scheduleForm.cron_expression || ''}
+                          onChange={(event) => setScheduleForm((previous) => ({ ...previous, cron_expression: event.target.value }))}
+                          placeholder="例如 30 9 * * 1,3,5"
+                          required
+                        />
+                      </label>
+                    )}
+                    <label className="toggle-chip">
+                      <input
+                        type="checkbox"
+                        checked={scheduleForm.is_active}
+                        onChange={(event) => setScheduleForm((previous) => ({ ...previous, is_active: event.target.checked }))}
+                      />
+                      <span>创建后立即启用</span>
+                    </label>
+                    <button className="primary-button" type="submit" disabled={saveScheduleTaskMutation.isPending}>
+                      {selectedScheduleTask ? '保存任务' : '新增任务'}
+                    </button>
+                  </form>
+
+                  <div className="panel-card">
+                    <div className="panel-card__header">
+                      <div>
+                        <h2 className="panel-card__title">任务列表</h2>
+                        <p className="panel-card__subtitle">当前共 {scheduleTasks.length} 条定时任务配置。</p>
+                      </div>
+                      <div className="filter-chip-group">
+                        {[
+                          { value: 'all', label: '全部' },
+                          { value: 'lottery_fetch', label: '抓取' },
+                          { value: 'prediction_generate', label: '预测' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={clsx('filter-chip', scheduleTaskFilter === option.value && 'is-active')}
+                            onClick={() => setScheduleTaskFilter(option.value as ScheduleTaskFilter)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {filteredScheduleTasks.length ? (
+                      <div className="table-shell settings-model-table-shell">
+                        <table className="history-table settings-model-table">
+                          <thead>
+                            <tr>
+                              <th>名称</th>
+                              <th>类型</th>
+                              <th>彩种</th>
+                              <th>模型</th>
+                              <th>规则</th>
+                              <th>下次执行</th>
+                              <th>最近状态</th>
+                              <th>启用</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredScheduleTasks.map((task) => {
+                              const isExpanded = expandedScheduleTaskCode === task.task_code
+                              return (
+                                <Fragment key={task.task_code}>
+                                  <tr>
+                                    <td>
+                                      <div className="settings-model-table__title">
+                                        <strong>{task.task_name}</strong>
+                                        <span>{task.task_code}</span>
+                                      </div>
+                                    </td>
+                                    <td>{getScheduleTaskTypeLabel(task.task_type)}</td>
+                                    <td>{task.lottery_code === 'pl3' ? '排列3' : '大乐透'}</td>
+                                    <td>
+                                      {task.task_type === 'prediction_generate'
+                                        ? task.model_codes.map((code) => modelNameMap[code] || code).join(' / ') || '-'
+                                        : '-'}
+                                    </td>
+                                    <td>{task.rule_summary || `${getScheduleModeLabel(task.schedule_mode, task.preset_type)} / ${task.time_of_day || task.cron_expression || '-'}`}</td>
+                                    <td>{task.next_run_at ? formatDateTimeLocal(task.next_run_at) : '-'}</td>
+                                    <td>{task.last_run_status ? getTaskStatusLabel(task.last_run_status) : '未执行'}</td>
+                                    <td>
+                                      <span className={clsx('status-pill', task.is_active ? 'is-active' : 'is-muted')}>
+                                        {task.is_active ? '启用中' : '已停用'}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <div className="settings-model-table__actions">
+                                        <button className="ghost-button" type="button" onClick={() => toggleScheduleTaskDetail(task.task_code)}>
+                                          {isExpanded ? '收起详情' : '查看详情'}
+                                        </button>
+                                        <button className="ghost-button" type="button" onClick={() => openEditScheduleTask(task)}>
+                                          编辑
+                                        </button>
+                                        <button className="ghost-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}>
+                                          立即执行
+                                        </button>
+                                        <button className="ghost-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'toggle', task })}>
+                                          {task.is_active ? '停用' : '启用'}
+                                        </button>
+                                        <button className="danger-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'delete', task })}>
+                                          删除
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isExpanded ? (
+                                    <tr>
+                                      <td colSpan={9} className="settings-schedule-detail-cell">
+                                        <div className="settings-schedule-detail-panel">
+                                          <div className="settings-schedule-detail-grid">
+                                            <article className="settings-schedule-detail-item">
+                                              <span>最近执行</span>
+                                              <strong>{task.last_run_at ? formatDateTimeLocal(task.last_run_at) : '尚未执行'}</strong>
+                                            </article>
+                                            <article className="settings-schedule-detail-item">
+                                              <span>最近状态</span>
+                                              <strong>{task.last_run_status ? getTaskStatusLabel(task.last_run_status) : '未执行'}</strong>
+                                            </article>
+                                            <article className="settings-schedule-detail-item">
+                                              <span>最近任务 ID</span>
+                                              <strong>{task.last_task_id || '-'}</strong>
+                                            </article>
+                                            <article className="settings-schedule-detail-item">
+                                              <span>规则类型</span>
+                                              <strong>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</strong>
+                                            </article>
+                                          </div>
+                                          <div className="settings-schedule-detail-log">
+                                            <span>错误信息</span>
+                                            <div className={clsx('state-shell', task.last_error_message ? 'state-shell--error' : 'settings-schedule-detail-log--empty')}>
+                                              {task.last_error_message || '最近一次执行没有错误信息。'}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ) : null}
+                                </Fragment>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="state-shell">当前筛选下还没有定时任务。</div>
+                    )}
+                  </div>
+                </div>
+              </StatusCard>
             </div>
           ) : null}
 

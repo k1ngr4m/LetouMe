@@ -488,3 +488,50 @@ export type PasswordChangePayload = {
   current_password: string
   new_password: string
 }
+
+export type ScheduleTaskType = 'lottery_fetch' | 'prediction_generate'
+export type ScheduleMode = 'preset' | 'cron'
+export type SchedulePresetType = 'daily' | 'weekly'
+
+export type ScheduleTask = {
+  task_code: string
+  task_name: string
+  task_type: ScheduleTaskType
+  lottery_code: LotteryCode
+  model_codes: string[]
+  generation_mode: 'current'
+  overwrite_existing: boolean
+  schedule_mode: ScheduleMode
+  preset_type?: SchedulePresetType | null
+  time_of_day?: string | null
+  weekdays: number[]
+  cron_expression?: string | null
+  is_active: boolean
+  next_run_at?: string | null
+  last_run_at?: string | null
+  last_run_status?: string | null
+  last_error_message?: string | null
+  last_task_id?: string | null
+  rule_summary?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type ScheduleTaskPayload = {
+  task_name: string
+  task_type: ScheduleTaskType
+  lottery_code: LotteryCode
+  model_codes: string[]
+  generation_mode: 'current'
+  overwrite_existing: boolean
+  schedule_mode: ScheduleMode
+  preset_type?: SchedulePresetType | null
+  time_of_day?: string | null
+  weekdays: number[]
+  cron_expression?: string | null
+  is_active: boolean
+}
+
+export type ScheduleTaskListResponse = {
+  tasks: ScheduleTask[]
+}

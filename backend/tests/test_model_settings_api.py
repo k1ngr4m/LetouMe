@@ -260,6 +260,76 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "lottery-task-1")
         create_task.assert_called_once()
 
+    def test_schedule_task_endpoints(self) -> None:
+        with (
+            patch("backend.app.api.routes.schedule_service.list_tasks") as list_tasks,
+            patch("backend.app.api.routes.schedule_service.create_task") as create_task,
+            patch("backend.app.api.routes.schedule_service.set_task_active") as set_task_active,
+            patch("backend.app.api.routes.schedule_service.run_task_now") as run_task_now,
+        ):
+            schedule_payload = {
+                "task_code": "sched-predict-dlt",
+                "task_name": "大乐透预测",
+                "task_type": "prediction_generate",
+                "lottery_code": "dlt",
+                "model_codes": ["claude-sonnet-4.6"],
+                "generation_mode": "current",
+                "overwrite_existing": False,
+                "schedule_mode": "preset",
+                "preset_type": "daily",
+                "time_of_day": "10:00",
+                "weekdays": [],
+                "cron_expression": None,
+                "is_active": True,
+                "next_run_at": "2026-03-19T02:00:00Z",
+                "last_run_at": None,
+                "last_run_status": None,
+                "last_error_message": None,
+                "last_task_id": None,
+                "rule_summary": "每日 10:00",
+                "created_at": "2026-03-18T02:00:00Z",
+                "updated_at": "2026-03-18T02:00:00Z",
+            }
+            list_tasks.return_value = [schedule_payload]
+            create_task.return_value = schedule_payload
+            set_task_active.return_value = {**schedule_payload, "is_active": False}
+            run_task_now.return_value = {**schedule_payload, "last_run_status": "queued"}
+
+            list_response = self.client.post("/api/settings/schedules/list", json={})
+            create_response = self.client.post(
+                "/api/settings/schedules/create",
+                json={
+                    "task_name": "大乐透预测",
+                    "task_type": "prediction_generate",
+                    "lottery_code": "dlt",
+                    "model_codes": ["claude-sonnet-4.6"],
+                    "generation_mode": "current",
+                    "overwrite_existing": False,
+                    "schedule_mode": "preset",
+                    "preset_type": "daily",
+                    "time_of_day": "10:00",
+                    "weekdays": [],
+                    "is_active": True,
+                },
+            )
+            status_response = self.client.post(
+                "/api/settings/schedules/status",
+                json={"task_code": "sched-predict-dlt", "is_active": False},
+            )
+            run_response = self.client.post(
+                "/api/settings/schedules/run-now",
+                json={"task_code": "sched-predict-dlt"},
+            )
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["tasks"][0]["task_code"], "sched-predict-dlt")
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_response.json()["task_name"], "大乐透预测")
+        self.assertEqual(status_response.status_code, 200)
+        self.assertFalse(status_response.json()["is_active"])
+        self.assertEqual(run_response.status_code, 200)
+        self.assertEqual(run_response.json()["last_run_status"], "queued")
+
 
 if __name__ == "__main__":
     unittest.main()

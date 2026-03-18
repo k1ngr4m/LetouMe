@@ -16,6 +16,7 @@ class PredictionGenerationTaskService:
         mode: str,
         model_code: str,
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
+        on_update: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         return self.runner.create_task(
             initial_task={
@@ -36,6 +37,7 @@ class PredictionGenerationTaskService:
             "error_message": None,
             },
             worker=worker,
+            on_update=on_update,
         )
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:

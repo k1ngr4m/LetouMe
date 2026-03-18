@@ -35,6 +35,12 @@ const { apiClientMock } = vi.hoisted(() => ({
     updatePermission: vi.fn(),
     deleteRole: vi.fn(),
     getSettingsModel: vi.fn(),
+    listScheduleTasks: vi.fn(),
+    createScheduleTask: vi.fn(),
+    updateScheduleTask: vi.fn(),
+    toggleScheduleTask: vi.fn(),
+    deleteScheduleTask: vi.fn(),
+    runScheduleTaskNow: vi.fn(),
   },
 }))
 
@@ -51,9 +57,9 @@ vi.mock('../../shared/auth/AuthProvider', () => ({
       role: 'super_admin',
       role_name: '超级管理员',
       is_active: true,
-      permissions: ['basic_profile', 'model_management', 'user_management', 'role_management'],
+      permissions: ['basic_profile', 'model_management', 'schedule_management', 'user_management', 'role_management'],
     },
-    hasPermission: (permission: string) => ['basic_profile', 'model_management', 'user_management', 'role_management'].includes(permission),
+    hasPermission: (permission: string) => ['basic_profile', 'model_management', 'schedule_management', 'user_management', 'role_management'].includes(permission),
     logout: vi.fn(),
   }),
 }))
@@ -77,6 +83,7 @@ function renderPage() {
 describe('SettingsPage model management view switch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    apiClientMock.listScheduleTasks.mockResolvedValue({ tasks: [] })
   })
 
   it('defaults to list view and can switch to card view', async () => {
@@ -487,5 +494,119 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByRole('heading', { name: '已选 2 个模型' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
+  })
+
+  it('shows schedule tab and renders schedule tasks', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listScheduleTasks.mockResolvedValue({
+      tasks: [
+        {
+          task_code: 'sched-fetch-dlt',
+          task_name: '大乐透抓取',
+          task_type: 'lottery_fetch',
+          lottery_code: 'dlt',
+          model_codes: [],
+          generation_mode: 'current',
+          overwrite_existing: false,
+          schedule_mode: 'preset',
+          preset_type: 'daily',
+          time_of_day: '09:30',
+          weekdays: [],
+          cron_expression: null,
+          is_active: true,
+          next_run_at: '2026-03-19T01:30:00Z',
+          last_run_at: null,
+          last_run_status: null,
+          last_error_message: null,
+          last_task_id: null,
+          rule_summary: '每日 09:30',
+          created_at: '2026-03-18T01:00:00Z',
+          updated_at: '2026-03-18T01:00:00Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    expect(await screen.findByText('大乐透抓取')).toBeInTheDocument()
+    expect(screen.getAllByText('开奖抓取').length).toBeGreaterThan(0)
+    expect(screen.getByText('每日 09:30')).toBeInTheDocument()
+  })
+
+  it('creates a prediction schedule task', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v3.2',
+          display_name: 'DeepSeek-V3.2',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['dlt'],
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createScheduleTask.mockResolvedValue({
+      task_code: 'sched-predict-dlt',
+      task_name: '大乐透预测',
+      task_type: 'prediction_generate',
+      lottery_code: 'dlt',
+      model_codes: ['deepseek-v3.2'],
+      generation_mode: 'current',
+      overwrite_existing: false,
+      schedule_mode: 'preset',
+      preset_type: 'daily',
+      time_of_day: '10:00',
+      weekdays: [],
+      cron_expression: null,
+      is_active: true,
+      next_run_at: '2026-03-19T02:00:00Z',
+      last_run_at: null,
+      last_run_status: null,
+      last_error_message: null,
+      last_task_id: null,
+      rule_summary: '每日 10:00',
+      created_at: '2026-03-18T02:00:00Z',
+      updated_at: '2026-03-18T02:00:00Z',
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    await userEvent.type(screen.getByLabelText('任务名称'), '大乐透预测')
+    await userEvent.selectOptions(screen.getByLabelText('任务类型'), 'prediction_generate')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'DeepSeek-V3.2' }))
+    await userEvent.click(screen.getByRole('button', { name: '新增任务' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.createScheduleTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          task_name: '大乐透预测',
+          task_type: 'prediction_generate',
+          model_codes: ['deepseek-v3.2'],
+          schedule_mode: 'preset',
+          time_of_day: '09:00',
+        }),
+      ),
+    )
   })
 })
