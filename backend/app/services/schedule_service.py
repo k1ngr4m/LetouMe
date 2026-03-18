@@ -40,6 +40,7 @@ class ScheduleService:
         with self._lock:
             if self._started:
                 return
+            self._refresh_active_task_next_runs()
             self._thread = Thread(target=self._loop, daemon=True)
             self._thread.start()
             self._started = True
@@ -312,6 +313,20 @@ class ScheduleService:
             return None
         normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
         return normalized.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _refresh_active_task_next_runs(self) -> None:
+        now = self._utc_now()
+        for task in self.repository.list_tasks():
+            if not task.get("is_active"):
+                continue
+            try:
+                next_run_at = self._compute_next_run(task, base_time=now)
+                self.repository.set_task_active(task["task_code"], True, self._format_datetime(next_run_at))
+            except Exception:
+                self.logger.exception(
+                    "Refresh scheduled task next run failed",
+                    extra={"context": {"task_code": task.get("task_code")}},
+                )
 
 
 schedule_service = ScheduleService()

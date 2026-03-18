@@ -538,13 +538,18 @@ describe('SettingsPage model management view switch', () => {
     expect(await screen.findByText('大乐透抓取')).toBeInTheDocument()
     expect(screen.getAllByText('开奖抓取').length).toBeGreaterThan(0)
     expect(screen.getByText('每日 09:30')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '查看详情' }))
+    await userEvent.click(screen.getByRole('button', { name: /查看详情：大乐透抓取/ }))
     expect(screen.getByText('抓取接口返回 502')).toBeInTheDocument()
     expect(screen.getByText('task-fetch-1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '收起详情' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '编辑' }))
+    expect(screen.getByRole('button', { name: /收起详情：大乐透抓取/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /编辑任务：大乐透抓取/ }))
     expect(await screen.findByRole('heading', { name: '编辑任务' })).toBeInTheDocument()
     expect(screen.getByLabelText('任务名称')).toHaveValue('大乐透抓取')
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await userEvent.click(screen.getByRole('button', { name: /删除任务：大乐透抓取/ }))
+    expect(confirmSpy).toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 
   it('creates a prediction schedule task', async () => {

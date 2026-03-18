@@ -3096,6 +3096,17 @@ a {
   font-size: 0.82rem;
 }
 
+.settings-schedule-actions {
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.settings-schedule-actions .icon-button {
+  width: 2.05rem;
+  height: 2.05rem;
+  border-radius: 0.78rem;
+}
+
 .settings-schedule-detail-panel {
   display: grid;
   gap: 0.85rem;
@@ -3993,5 +4004,9 @@ a {
 
   .settings-schedule-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-schedule-actions {
+    flex-wrap: wrap;
   }
 }

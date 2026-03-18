@@ -20,6 +20,34 @@ export function formatDateTimeLocal(value?: string | null) {
   return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
+export function formatDateTimeInTimeZone(value: string | null | undefined, timeZone: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  const formatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(date)
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '--'
+  const year = pick('year')
+  const month = pick('month')
+  const day = pick('day')
+  const hour = pick('hour')
+  const minute = pick('minute')
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+export function formatDateTimeBeijing(value?: string | null) {
+  return formatDateTimeInTimeZone(value, 'Asia/Shanghai')
+}
+
 export function average(values: number[]) {
   if (!values.length) return 0
   return values.reduce((sum, value) => sum + value, 0) / values.length

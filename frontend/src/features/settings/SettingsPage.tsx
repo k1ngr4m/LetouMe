@@ -8,7 +8,7 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { loadSelectedLottery, saveSelectedLottery } from '../../shared/lib/storage'
 import { normalizeCurrentPredictions, normalizePredictionsHistory } from '../home/lib/home'
-import { formatDateTimeLocal } from '../../shared/lib/format'
+import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
 import type {
   AuthUser,
   BulkModelActionResult,
@@ -242,6 +242,34 @@ function HistoryIcon() {
       <path d="M4.5 10a5.5 5.5 0 1 0 1.7-4" />
       <path d="M4.5 5.2v2.7h2.7" />
       <path d="M10 7.3v3.2l2 1.2" />
+    </SvgIcon>
+  )
+}
+
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <SvgIcon>
+      <path d="M2.8 10s2.6-4.4 7.2-4.4 7.2 4.4 7.2 4.4-2.6 4.4-7.2 4.4S2.8 10 2.8 10Z" />
+      {open ? <circle cx="10" cy="10" r="2.1" fill="currentColor" stroke="none" /> : <circle cx="10" cy="10" r="2.1" />}
+    </SvgIcon>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <SvgIcon>
+      <path d="M6.8 5.5v9l7.2-4.5-7.2-4.5Z" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4.8 6.2h10.4" />
+      <path d="M7.1 6.2v8.1M10 6.2v8.1M12.9 6.2v8.1" />
+      <path d="M7.5 6.2V4.9c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9v1.3" />
+      <path d="M6.6 6.2h6.8l-.5 9a1 1 0 0 1-1 .9H8.1a1 1 0 0 1-1-.9l-.5-9Z" />
     </SvgIcon>
   )
 }
@@ -1728,7 +1756,7 @@ export function SettingsPage() {
                               <th>彩种</th>
                               <th>模型</th>
                               <th>规则</th>
-                              <th>下次执行</th>
+                              <th>下次执行（北京时间）</th>
                               <th>最近状态</th>
                               <th>启用</th>
                               <th>操作</th>
@@ -1759,7 +1787,7 @@ export function SettingsPage() {
                                       <strong>{task.rule_summary || '-'}</strong>
                                       <span>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
                                     </td>
-                                    <td>{task.next_run_at ? formatDateTimeLocal(task.next_run_at) : '-'}</td>
+                                    <td>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
                                     <td>
                                       <span className={clsx('status-pill', task.last_run_status === 'succeeded' && 'is-active', task.last_run_status === 'failed' && 'is-deleted')}>
                                         {task.last_run_status ? getTaskStatusLabel(task.last_run_status) : '未执行'}
@@ -1771,22 +1799,40 @@ export function SettingsPage() {
                                       </span>
                                     </td>
                                     <td>
-                                      <div className="settings-model-table__actions">
-                                        <button className="ghost-button" type="button" onClick={() => toggleScheduleTaskDetail(task.task_code)}>
-                                          {isExpanded ? '收起详情' : '查看详情'}
-                                        </button>
-                                        <button className="ghost-button" type="button" onClick={() => openEditScheduleTask(task)}>
-                                          编辑
-                                        </button>
-                                        <button className="ghost-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}>
-                                          立即执行
-                                        </button>
-                                        <button className="ghost-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'toggle', task })}>
-                                          {task.is_active ? '停用' : '启用'}
-                                        </button>
-                                        <button className="danger-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'delete', task })}>
-                                          删除
-                                        </button>
+                                      <div className="settings-model-table__actions settings-schedule-actions">
+                                        <IconButton
+                                          label={`${isExpanded ? '收起详情' : '查看详情'}：${task.task_name}`}
+                                          icon={<EyeIcon open={isExpanded} />}
+                                          active={isExpanded}
+                                          expanded={isExpanded}
+                                          onClick={() => toggleScheduleTaskDetail(task.task_code)}
+                                        />
+                                        <IconButton
+                                          label={`编辑任务：${task.task_name}`}
+                                          icon={<EditIcon />}
+                                          onClick={() => openEditScheduleTask(task)}
+                                        />
+                                        <IconButton
+                                          label={`立即执行：${task.task_name}`}
+                                          icon={<PlayIcon />}
+                                          onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}
+                                        />
+                                        <IconButton
+                                          label={`${task.is_active ? '停用' : '启用'}任务：${task.task_name}`}
+                                          icon={<ToggleIcon active={task.is_active} />}
+                                          onClick={() => scheduleTaskActionMutation.mutate({ type: 'toggle', task })}
+                                        />
+                                        <IconButton
+                                          label={`删除任务：${task.task_name}`}
+                                          icon={<TrashIcon />}
+                                          danger
+                                          onClick={() => {
+                                            const confirmed = window.confirm(`确认删除定时任务“${task.task_name}”吗？`)
+                                            if (confirmed) {
+                                              scheduleTaskActionMutation.mutate({ type: 'delete', task })
+                                            }
+                                          }}
+                                        />
                                       </div>
                                     </td>
                                   </tr>
@@ -1797,7 +1843,7 @@ export function SettingsPage() {
                                           <div className="settings-schedule-detail-grid">
                                             <article className="settings-schedule-detail-item">
                                               <span>最近执行</span>
-                                              <strong>{task.last_run_at ? formatDateTimeLocal(task.last_run_at) : '尚未执行'}</strong>
+                                              <strong>{task.last_run_at ? formatDateTimeBeijing(task.last_run_at) : '尚未执行'}</strong>
                                             </article>
                                             <article className="settings-schedule-detail-item">
                                               <span>最近状态</span>
