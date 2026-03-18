@@ -863,14 +863,18 @@ export function HomePage() {
               ) : null}
               {!historyVisibleModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
               {historyVisibleModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
-              {filteredHistory.map((record) => (
-                <HistoryRecordCard
-                  key={`${selectedLottery}-${record.target_period}`}
-                  record={record}
-                  lotteryCode={selectedLottery}
-                  visibleModelIds={historyVisibleModelIds}
-                />
-              ))}
+              {filteredHistory.length ? (
+                <div className="history-card-list__records">
+                  {filteredHistory.map((record) => (
+                    <HistoryRecordCard
+                      key={`${selectedLottery}-${record.target_period}`}
+                      record={record}
+                      lotteryCode={selectedLottery}
+                      visibleModelIds={historyVisibleModelIds}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {(history?.total_count || 0) > predictionLimit ? (
