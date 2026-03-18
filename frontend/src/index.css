@@ -1914,6 +1914,17 @@ a {
   font-size: 0.92rem;
 }
 
+.prediction-group-card__desc--compact {
+  margin-top: 0.42rem;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .number-row {
   display: flex;
   align-items: center;

@@ -618,6 +618,7 @@ describe('HomePage dashboard sidebar', () => {
                   group_id: 1,
                   red_balls: ['01', '02', '03', '12', '15'],
                   blue_balls: ['06', '10'],
+                  description: '模型A第1组：覆盖胆码与后区防守组合，优先控制回撤并兼顾上限。',
                   hit_result: {
                     red_hits: ['01', '12'],
                     red_hit_count: 2,
@@ -674,6 +675,7 @@ describe('HomePage dashboard sidebar', () => {
                   group_id: 1,
                   red_balls: ['08', '09', '10', '11', '12'],
                   blue_balls: ['01', '02'],
+                  description: '模型B第1组：偏进攻型号码分布。',
                   hit_result: {
                     red_hits: ['08', '12'],
                     red_hit_count: 2,
@@ -705,6 +707,9 @@ describe('HomePage dashboard sidebar', () => {
     expect(groupCard).not.toBeNull()
     expect(groupCard).toHaveClass('is-compact')
     const cardScope = within(groupCard as HTMLElement)
+    const descNode = cardScope.getByText('模型A第1组：覆盖胆码与后区防守组合，优先控制回撤并兼顾上限。')
+    expect(descNode).toHaveAttribute('title', '模型A第1组：覆盖胆码与后区防守组合，优先控制回撤并兼顾上限。')
+    expect(descNode).toHaveClass('prediction-group-card__desc--compact')
     expect(cardScope.getByText('01')).toHaveClass('is-hit')
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
     expect(cardScope.getByText('06')).toHaveClass('is-hit')
@@ -804,6 +809,9 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
     expect(screen.queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.getByText('G-1').closest('.prediction-group-card')).toHaveClass('is-compact')
+    const descFallback = within(firstHistoryCard as HTMLElement).getByText('暂无说明')
+    expect(descFallback).toHaveClass('prediction-group-card__desc--compact')
+    expect(descFallback).toHaveAttribute('title', '暂无说明')
     expect(screen.getAllByText('注数').length).toBeGreaterThan(0)
   })
 

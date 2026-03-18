@@ -1713,14 +1713,17 @@ export function PredictionGroupCard({
   compact = false,
   grayMisses = false,
   emphasizeHitTier = false,
+  showDescriptionInCompact = false,
 }: {
   group: PredictionGroup
   actualResult: LotteryDraw | null
   compact?: boolean
   grayMisses?: boolean
   emphasizeHitTier?: boolean
+  showDescriptionInCompact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
+  const description = group.description?.trim() || '暂无说明'
   const playTypeLabel = getPredictionPlayTypeLabel(group, actualResult)
   const hitTierClass =
     emphasizeHitTier && hit
@@ -1749,7 +1752,14 @@ export function PredictionGroupCard({
           {group.prize_source === 'missing' ? <small>浮动奖待补全</small> : null}
         </div>
       ) : null}
-      {compact ? null : <p className="prediction-group-card__desc">{group.description || '暂无说明'}</p>}
+      {compact && !showDescriptionInCompact ? null : (
+        <p
+          className={clsx('prediction-group-card__desc', compact && 'prediction-group-card__desc--compact')}
+          title={description}
+        >
+          {description}
+        </p>
+      )}
     </article>
   )
 }
@@ -2506,6 +2516,7 @@ function HistoryRecordCard({
                             compact
                             grayMisses
                             emphasizeHitTier
+                            showDescriptionInCompact
                           />
                         ))}
                       </div>
