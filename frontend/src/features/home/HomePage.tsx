@@ -35,6 +35,7 @@ import {
   getActualResult,
   type ModelScore,
   type ModelListScoreRange,
+  normalizeStrategyLabel,
   normalizePredictionsHistory,
 } from './lib/home'
 import {
@@ -262,6 +263,8 @@ export function HomePage() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState(restoredState?.historyPeriodQuery || '')
   const [commonOnly, setCommonOnly] = useState(Boolean(restoredState?.commonOnly))
+  const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
+  const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
@@ -272,6 +275,7 @@ export function HomePage() {
     selectedLottery,
     historyPage,
     historyPageSize,
+    historyStrategyFilters,
     lotteryPage,
     lotteryPageSize,
   )
@@ -324,6 +328,8 @@ export function HomePage() {
     setHistoryFallbackSignature(null)
     setHistoryPage(1)
     setLotteryPage(1)
+    setSummaryStrategyFilters([])
+    setHistoryStrategyFilters([])
   }, [selectedLottery])
 
   useEffect(() => {
@@ -419,12 +425,38 @@ export function HomePage() {
         : filteredModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name })),
     [filteredModels, historyAllModelRefs, useHistoryFallbackModels],
   )
+  const summaryStrategyOptions = useMemo(
+    () =>
+      [...new Set(filteredModels.flatMap((model) => (model.predictions || []).map((group) => normalizeStrategyLabel(group.strategy))))].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [filteredModels],
+  )
+  const historyStrategyOptions = useMemo(
+    () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
+    [history?.strategy_options],
+  )
+
+  useEffect(() => {
+    setSummaryStrategyFilters((previous) => {
+      const next = previous.filter((item) => summaryStrategyOptions.includes(item))
+      return next.length === previous.length && next.every((item, index) => item === previous[index]) ? previous : next
+    })
+  }, [summaryStrategyOptions])
+
+  useEffect(() => {
+    setHistoryStrategyFilters((previous) => {
+      const next = previous.filter((item) => historyStrategyOptions.includes(item))
+      return next.length === previous.length && next.every((item, index) => item === previous[index]) ? previous : next
+    })
+  }, [historyStrategyOptions])
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
     historyPeriodQuery,
     commonOnly,
     weightedSummary,
     historyVisibleModelIds,
+    summaryStrategyFilters,
   )
   const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
@@ -517,6 +549,25 @@ export function HomePage() {
   function handleLotteryPageSizeChange(nextPageSize: number) {
     setLotteryPage((currentPage) => calculatePageForPageSize(currentPage, lotteryPageSize, nextPageSize))
     setLotteryPageSize(nextPageSize)
+  }
+
+  function toggleSummaryStrategyFilter(strategy: string) {
+    const normalized = normalizeStrategyLabel(strategy)
+    setSummaryStrategyFilters((previous) =>
+      previous.includes(normalized) ? previous.filter((item) => item !== normalized) : [...previous, normalized],
+    )
+  }
+
+  function updateHistoryStrategyFilters(updater: (previous: string[]) => string[]) {
+    setHistoryPage(1)
+    setHistoryStrategyFilters((previous) => updater(previous))
+  }
+
+  function toggleHistoryStrategyFilter(strategy: string) {
+    const normalized = normalizeStrategyLabel(strategy)
+    updateHistoryStrategyFilters((previous) =>
+      previous.includes(normalized) ? previous.filter((item) => item !== normalized) : [...previous, normalized],
+    )
   }
 
   return (
@@ -733,6 +784,30 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
+                <div className="history-strategy-filter">
+                  <span className="history-strategy-filter__label">方案筛选</span>
+                  {summaryStrategyOptions.length ? (
+                    <div className="filter-chip-group">
+                      {summaryStrategyOptions.map((strategy) => (
+                        <button
+                          key={`summary-strategy-${strategy}`}
+                          className={clsx('filter-chip', summaryStrategyFilters.includes(strategy) && 'is-active')}
+                          onClick={() => toggleSummaryStrategyFilter(strategy)}
+                          type="button"
+                        >
+                          {strategy}
+                        </button>
+                      ))}
+                      {summaryStrategyFilters.length ? (
+                        <button className="ghost-button ghost-button--compact" type="button" onClick={() => setSummaryStrategyFilters([])}>
+                          清空方案
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="model-filter-panel__empty">当前暂无可选方案</span>
+                  )}
+                </div>
                 {!filteredModels.length ? (
                   <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
                 ) : !selectedSummaryIds.length ? (
@@ -867,6 +942,30 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
+            <div className="history-strategy-filter">
+              <span className="history-strategy-filter__label">开奖方案筛选</span>
+              {historyStrategyOptions.length ? (
+                <div className="filter-chip-group">
+                  {historyStrategyOptions.map((strategy) => (
+                    <button
+                      key={`history-strategy-${strategy}`}
+                      className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
+                      onClick={() => toggleHistoryStrategyFilter(strategy)}
+                      type="button"
+                    >
+                      {strategy}
+                    </button>
+                  ))}
+                  {historyStrategyFilters.length ? (
+                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
+                      清空方案
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="model-filter-panel__empty">当前暂无可选方案</span>
+              )}
+            </div>
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。
@@ -906,6 +1005,7 @@ export function HomePage() {
                       record={record}
                       lotteryCode={selectedLottery}
                       visibleModelIds={historyVisibleModelIds}
+                      strategyFilters={historyStrategyFilters}
                     />
                   ))}
                 </div>
@@ -2353,10 +2453,12 @@ function HistoryRecordCard({
   record,
   lotteryCode,
   visibleModelIds,
+  strategyFilters,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
   visibleModelIds: string[]
+  strategyFilters: string[]
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const hasExpandedModels = expandedModelIds.length > 0
@@ -2381,6 +2483,14 @@ function HistoryRecordCard({
     }
     return mappings
   }, [detailRecord])
+  const normalizedStrategyFilters = useMemo(
+    () => strategyFilters.map((item) => normalizeStrategyLabel(item)),
+    [strategyFilters],
+  )
+  const strategyFilterSet = useMemo(
+    () => new Set(normalizedStrategyFilters),
+    [normalizedStrategyFilters],
+  )
   const periodSummary = listModels.reduce(
     (accumulator, model) => ({
       total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
@@ -2442,6 +2552,17 @@ function HistoryRecordCard({
           const isExpanded = expandedModelIds.includes(model.model_id)
           const detailModel = detailModelsById.get(model.model_id)
           const detailId = `history-record-card-${record.target_period}-${model.model_id}-detail`
+          const detailModelStrategies = new Set((detailModel?.predictions || []).map((group) => normalizeStrategyLabel(group.strategy)))
+          const matchesAllStrategies = !normalizedStrategyFilters.length || normalizedStrategyFilters.every((strategy) => detailModelStrategies.has(strategy))
+          const filteredDetailPredictions = !normalizedStrategyFilters.length
+            ? (detailModel?.predictions || [])
+            : (detailModel?.predictions || []).filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+          const filteredDetailBetCount = filteredDetailPredictions.length
+          const filteredDetailWinningBetCount = filteredDetailPredictions.filter((group) => Number(group.prize_amount || 0) > 0).length
+          const filteredDetailPrizeAmount = filteredDetailPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0)
+          const filteredDetailCostAmount = filteredDetailBetCount * 2
+          const filteredWinRateByPeriod = filteredDetailWinningBetCount > 0 ? 1 : 0
+          const filteredWinRateByBet = filteredDetailBetCount ? filteredDetailWinningBetCount / filteredDetailBetCount : 0
 
           return (
             <section key={`${record.target_period}-${model.model_id}`} className={clsx('history-record-card__model', isExpanded && 'is-expanded')}>
@@ -2484,7 +2605,10 @@ function HistoryRecordCard({
                   {!detailQuery.isLoading && !detailQuery.error && !detailModel ? (
                     <div className="state-shell">暂无该模型预测详情。</div>
                   ) : null}
-                  {!detailQuery.isLoading && !detailQuery.error && detailModel ? (
+                  {!detailQuery.isLoading && !detailQuery.error && detailModel && !matchesAllStrategies ? (
+                    <div className="state-shell">该模型不满足所选方案组合。</div>
+                  ) : null}
+                  {!detailQuery.isLoading && !detailQuery.error && detailModel && matchesAllStrategies ? (
                     <section className="history-record-card__detail-model">
                       <div className="history-record-card__detail-header">
                         <div className="history-record-card__detail-heading">
@@ -2494,21 +2618,21 @@ function HistoryRecordCard({
                         <div className="history-record-card__detail-rate-grid">
                           <span className="history-record-card__metric-cell">
                             <small>按期中奖率</small>
-                            <strong>{formatPercent(detailModel.win_rate_by_period)}</strong>
+                            <strong>{formatPercent(filteredWinRateByPeriod)}</strong>
                           </span>
                           <span className="history-record-card__metric-cell">
                             <small>按注中奖率</small>
-                            <strong>{formatPercent(detailModel.win_rate_by_bet)}</strong>
+                            <strong>{formatPercent(filteredWinRateByBet)}</strong>
                           </span>
                         </div>
                       </div>
                       <div className="history-record-card__detail-summary">
-                        <span className="history-metric-pill">{detailModel.bet_count || 0} 注</span>
-                        <span className="history-metric-pill">成本 {formatCurrency(detailModel.cost_amount)}</span>
-                        <span className="history-metric-pill">奖金 {formatCurrency(detailModel.prize_amount)}</span>
+                        <span className="history-metric-pill">{filteredDetailBetCount} 注</span>
+                        <span className="history-metric-pill">成本 {formatCurrency(filteredDetailCostAmount)}</span>
+                        <span className="history-metric-pill">奖金 {formatCurrency(filteredDetailPrizeAmount)}</span>
                       </div>
                       <div className="detail-group-list">
-                        {detailModel.predictions.map((group) => (
+                        {filteredDetailPredictions.map((group) => (
                           <PredictionGroupCard
                             key={`${record.target_period}-${detailModel.model_id}-${group.group_id}`}
                             group={group}

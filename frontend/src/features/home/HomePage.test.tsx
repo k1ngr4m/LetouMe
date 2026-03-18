@@ -96,7 +96,23 @@ vi.mock('../../shared/api/client', () => ({
 }))
 
 vi.mock('./hooks/useHomeData', () => ({
-  useHomeData: (_lotteryCode: string, historyPage = 1, historyPageSize = 10, lotteryPage = 1, lotteryPageSize = 10) => {
+  useHomeData: (
+    _lotteryCode: string,
+    historyPage = 1,
+    historyPageSize = 10,
+    historyStrategyFilters: string[] = [],
+    lotteryPage = 1,
+    lotteryPageSize = 10,
+  ) => {
+    const modelStrategiesById: Record<string, string[]> = {
+      'model-a': ['增强型热号追随者', 'AI 组合策略'],
+      'model-b': ['冷号补位'],
+    }
+    const normalizedHistoryStrategyFilters = [...new Set(historyStrategyFilters)]
+    const matchesHistoryStrategies = (modelId: string) =>
+      !normalizedHistoryStrategyFilters.length ||
+      normalizedHistoryStrategyFilters.every((strategy) => (modelStrategiesById[modelId] || []).includes(strategy))
+
     const historyRecords = [
       buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
       SECOND_HISTORY_RECORD,
@@ -111,8 +127,30 @@ vi.mock('./hooks/useHomeData', () => ({
       buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
       buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
     ]
+    const filteredHistoryRecords = historyRecords
+      .map((record) => {
+        const models = (record.models || []).filter((model) => matchesHistoryStrategies(model.model_id))
+        const periodSummary = models.reduce(
+          (accumulator, model) => ({
+            total_bet_count: accumulator.total_bet_count + Number(model.bet_count || 0),
+            total_cost_amount: accumulator.total_cost_amount + Number(model.cost_amount || 0),
+            total_prize_amount: accumulator.total_prize_amount + Number(model.prize_amount || 0),
+          }),
+          {
+            total_bet_count: 0,
+            total_cost_amount: 0,
+            total_prize_amount: 0,
+          },
+        )
+        return {
+          ...record,
+          models,
+          period_summary: periodSummary,
+        }
+      })
+      .filter((record) => record.models.length > 0)
     const offset = (historyPage - 1) * historyPageSize
-    const pagedHistoryRecords = historyRecords.slice(offset, offset + historyPageSize)
+    const pagedHistoryRecords = filteredHistoryRecords.slice(offset, offset + historyPageSize)
     const lotteryRecords = Array.from({ length: 12 }, (_, index) => ({
       period: `${2026031 - index}`,
       date: `2026-03-${String(10 - index).padStart(2, '0')}`,
@@ -136,6 +174,7 @@ vi.mock('./hooks/useHomeData', () => ({
               model_api_model: 'model-a-api',
               predictions: Array.from({ length: 5 }, (_, index) => ({
                 group_id: index + 1,
+                strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
                 red_balls: ['01', '02', '03', '04', '05'],
                 blue_balls: ['06', '07'],
               })),
@@ -148,6 +187,7 @@ vi.mock('./hooks/useHomeData', () => ({
               model_api_model: 'model-b-api',
               predictions: Array.from({ length: 5 }, (_, index) => ({
                 group_id: index + 1,
+                strategy: '冷号补位',
                 red_balls: ['08', '09', '10', '11', '12'],
                 blue_balls: ['01', '02'],
               })),
@@ -237,7 +277,8 @@ vi.mock('./hooks/useHomeData', () => ({
             },
           ],
           predictions_history: pagedHistoryRecords,
-          total_count: historyRecords.length,
+          total_count: filteredHistoryRecords.length,
+          strategy_options: ['AI 组合策略', '冷号补位', '增强型热号追随者'],
         },
         isLoading: false,
         error: null,
@@ -491,6 +532,53 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(historySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
     expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
     expect(screen.getByText('第 2026021 期')).toBeInTheDocument()
+  })
+
+  it('filters history records by selected strategy', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+    expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getByText('第 2026030 期')).toBeInTheDocument()
+
+    await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '增强型热号追随者' }))
+
+    await waitFor(() => {
+      expect(within(historySection as HTMLElement).getByText('共 11 条记录')).toBeInTheDocument()
+    })
+    expect(within(historySection as HTMLElement).queryByText('第 2026030 期')).not.toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getByText('第 2026031 期')).toBeInTheDocument()
+
+    await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '清空方案' }))
+
+    await waitFor(() => {
+      expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
+    })
+    expect(within(historySection as HTMLElement).getByText('第 2026030 期')).toBeInTheDocument()
+  })
+
+  it('applies history strategy from page 2 with one click', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+
+    await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '下一页' }))
+    expect(within(historySection as HTMLElement).getByText('第 2 / 2 页')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getByText('第 2026021 期')).toBeInTheDocument()
+
+    const strategyButton = within(historySection as HTMLElement).getByRole('button', { name: '增强型热号追随者' })
+    await userEvent.click(strategyButton)
+
+    await waitFor(() => {
+      expect(within(historySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
+    })
+    expect(strategyButton).toHaveClass('is-active')
+    expect(within(historySection as HTMLElement).getByText('第 2026031 期')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).queryByText('第 2026030 期')).not.toBeInTheDocument()
   })
 
   it('reuses pager selector in lottery history', async () => {

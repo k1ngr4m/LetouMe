@@ -184,6 +184,7 @@ export type PredictionsHistoryListResponse = {
   predictions_history: PredictionsHistoryListRecord[]
   total_count: number
   model_stats?: PredictionHistoryModelStat[]
+  strategy_options?: string[]
 }
 
 export type PredictionsHistoryRecord = {

@@ -112,6 +112,37 @@ describe('buildSummary', () => {
 
     expect(commonOnly.red.map((item) => item.ball)).toEqual(['01'])
   })
+
+  it('filters summary with strategy all-match semantics', () => {
+    const result = buildSummary(
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          predictions: [
+            { group_id: 1, strategy: '增强型热号追随者', red_balls: ['01'], blue_balls: ['09'] },
+            { group_id: 2, strategy: 'AI 组合策略', red_balls: ['02'], blue_balls: ['10'] },
+          ],
+        },
+        {
+          model_id: 'm2',
+          model_name: 'Model 2',
+          model_provider: 'gemini',
+          predictions: [{ group_id: 1, strategy: '增强型热号追随者', red_balls: ['03'], blue_balls: ['11'] }],
+        },
+      ],
+      {},
+      ['m1', 'm2'],
+      false,
+      false,
+      ['增强型热号追随者', 'AI 组合策略'],
+    )
+
+    expect(result.red.map((item) => item.ball)).toEqual(['01', '02'])
+    expect(result.red[0].selectedModelCount).toBe(1)
+    expect(result.red[0].totalGroupCount).toBe(2)
+  })
 })
 
 describe('filterModels', () => {

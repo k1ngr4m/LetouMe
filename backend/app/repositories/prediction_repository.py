@@ -371,6 +371,24 @@ class PredictionRepository:
                     row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
 
+    def list_history_strategy_options(self, lottery_code: str = "dlt") -> list[str]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT DISTINCT COALESCE(NULLIF(TRIM(pg.strategy_text), ''), 'AI 组合策略') AS strategy_label
+                        FROM prediction_batch pb
+                        INNER JOIN prediction_model_run pmr ON pmr.prediction_batch_id = pb.id
+                        INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id
+                        WHERE pb.status = 'archived' AND pb.lottery_code = ?
+                        ORDER BY strategy_label ASC
+                        """,
+                        (normalized_code,),
+                    )
+                    return [str(row.get("strategy_label") or "AI 组合策略") for row in cursor.fetchall()]
+
     def history_record_exists(self, target_period: str, lottery_code: str = "dlt") -> bool:
         normalized_code = normalize_lottery_code(lottery_code)
         with use_lottery_table_scope(normalized_code):

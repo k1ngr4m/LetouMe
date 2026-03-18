@@ -95,8 +95,8 @@ class _FakePredictionRepository:
                         "best_group": 1,
                         "best_hit_count": 5,
                         "group_metrics": [
-                            {"group_id": 1, "red_hit_count": 5, "blue_hit_count": 0, "total_hits": 5},
-                            {"group_id": 2, "red_hit_count": 0, "blue_hit_count": 0, "total_hits": 0},
+                            {"group_id": 1, "strategy": "增强型热号追随者", "red_hit_count": 5, "blue_hit_count": 0, "total_hits": 5},
+                            {"group_id": 2, "strategy": "AI 组合策略", "red_hit_count": 0, "blue_hit_count": 0, "total_hits": 0},
                         ],
                     },
                     {
@@ -106,7 +106,7 @@ class _FakePredictionRepository:
                         "best_group": 1,
                         "best_hit_count": 2,
                         "group_metrics": [
-                            {"group_id": 1, "red_hit_count": 0, "blue_hit_count": 2, "total_hits": 2},
+                            {"group_id": 1, "strategy": "冷号补位", "red_hit_count": 0, "blue_hit_count": 2, "total_hits": 2},
                         ],
                     },
                 ],
@@ -115,6 +115,9 @@ class _FakePredictionRepository:
 
     def count_history_records(self, lottery_code: str = "dlt") -> int:
         return 1
+
+    def list_history_strategy_options(self, lottery_code: str = "dlt") -> list[str]:
+        return ["增强型热号追随者", "AI 组合策略", "冷号补位"]
 
     def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict | None:
         return self.record if target_period == "2026031" else None
@@ -253,6 +256,34 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(fixed, {"amount": 10000, "source": "fallback"})
         self.assertEqual(floating, {"amount": 0, "source": "missing"})
+
+    def test_history_list_payload_filters_by_single_strategy(self) -> None:
+        payload = self.service.get_history_list_payload(strategy_filters=["增强型热号追随者"], strategy_match_mode="all")
+
+        self.assertEqual(payload["total_count"], 1)
+        self.assertEqual(payload["strategy_options"], ["AI 组合策略", "冷号补位", "增强型热号追随者"])
+        record = payload["predictions_history"][0]
+        self.assertEqual(record["period_summary"]["total_bet_count"], 1)
+        self.assertEqual(record["period_summary"]["total_cost_amount"], 2)
+        self.assertEqual(record["period_summary"]["total_prize_amount"], 10000)
+        self.assertEqual(len(record["models"]), 1)
+        self.assertEqual(record["models"][0]["model_id"], "model-a")
+        self.assertEqual(record["models"][0]["bet_count"], 1)
+        self.assertEqual(record["models"][0]["prize_amount"], 10000)
+
+    def test_history_list_payload_filters_by_multi_strategy_with_all_match(self) -> None:
+        payload = self.service.get_history_list_payload(
+            strategy_filters=["增强型热号追随者", "AI 组合策略"],
+            strategy_match_mode="all",
+        )
+
+        self.assertEqual(payload["total_count"], 1)
+        record = payload["predictions_history"][0]
+        self.assertEqual(len(record["models"]), 1)
+        self.assertEqual(record["models"][0]["model_id"], "model-a")
+        self.assertEqual(record["models"][0]["bet_count"], 2)
+        self.assertEqual(record["period_summary"]["total_bet_count"], 2)
+        self.assertEqual(record["period_summary"]["total_prize_amount"], 10000)
 
     def test_pl3_history_list_payload_computes_model_prize_amount(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())

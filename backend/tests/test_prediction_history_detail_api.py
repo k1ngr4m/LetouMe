@@ -35,7 +35,7 @@ class PredictionHistoryDetailApiTests(unittest.TestCase):
         with patch.object(routes.prediction_service, "get_history_detail_payload", return_value=record) as mocked_get_detail:
             response = routes.get_predictions_history_detail(PredictionHistoryDetailPayload(target_period="26026"), {})
 
-        mocked_get_detail.assert_called_once_with("26026")
+        mocked_get_detail.assert_called_once_with("26026", lottery_code="dlt")
         self.assertEqual(response["total_count"], 1)
         self.assertEqual(response["predictions_history"], [record])
 
@@ -44,7 +44,7 @@ class PredictionHistoryDetailApiTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as context:
                 routes.get_predictions_history_detail(PredictionHistoryDetailPayload(target_period="99999"), {})
 
-        mocked_get_detail.assert_called_once_with("99999")
+        mocked_get_detail.assert_called_once_with("99999", lottery_code="dlt")
         self.assertEqual(context.exception.status_code, 404)
         self.assertEqual(context.exception.detail, "历史记录不存在")
 

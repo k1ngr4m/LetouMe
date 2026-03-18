@@ -29,7 +29,7 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         service = LotteryService(repository=repository)
         payload = service.get_history_payload(limit=20, offset=40)
 
-        repository.list_draws.assert_called_once_with(limit=20, offset=40)
+        repository.list_draws.assert_called_once_with(limit=20, offset=40, lottery_code="dlt")
         self.assertEqual(payload["total_count"], 128)
         self.assertEqual(len(payload["data"]), 1)
         self.assertEqual(payload["next_draw"]["next_period"], "26026")
@@ -43,14 +43,14 @@ class PredictionHistoryPaginationTests(unittest.TestCase):
             "records": [{"target_period": "26025", "models": []}],
             "metrics": {"db_query_ms": 1.23, "batch_count": 1, "model_run_count": 0, "group_metric_count": 0},
         }
+        repository.list_history_strategy_options.return_value = []
         repository.count_history_records.return_value = 64
 
         service = PredictionService(prediction_repository=repository)
         payload = service.get_history_list_payload(limit=20, offset=20)
 
-        repository.list_history_record_summaries_with_metrics.assert_called_once_with(limit=20, offset=20)
-        self.assertEqual(payload["predictions_history"][0]["target_period"], "26025")
-        self.assertEqual(payload["predictions_history"][0]["models"], [])
+        repository.list_history_record_summaries_with_metrics.assert_called_once_with(limit=20, offset=20, lottery_code="dlt")
+        self.assertEqual(payload["predictions_history"], [])
         self.assertEqual(payload["total_count"], 64)
 
 

@@ -14,6 +14,7 @@ from backend.app.services.lottery_service import LotteryService
 
 class PredictionService:
     BET_COST = 2
+    DEFAULT_STRATEGY_LABEL = "AI 组合策略"
     RECENT_SCORE_WINDOW = 20
     FIXED_PRIZE_RULES = {
         "三等奖": 10000,
@@ -108,16 +109,42 @@ class PredictionService:
             },
         )
 
-    def get_history_list_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
+    def get_history_list_payload(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+        lottery_code: str = "dlt",
+        strategy_filters: list[str] | None = None,
+        strategy_match_mode: str = "all",
+    ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
+        normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
+        if normalized_strategy_match_mode != "all":
+            raise ValueError("不支持的方案筛选模式")
+        strategy_cache_key = ",".join(normalized_strategy_filters) if normalized_strategy_filters else "-"
         payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:history:list:v2:{limit or 'all'}:{offset}",
+            f"predictions:{normalized_code}:history:list:v2:{limit or 'all'}:{offset}:strategy:{strategy_cache_key}:{normalized_strategy_match_mode}",
             ttl_seconds=60,
-            loader=lambda: self._build_history_list_payload(limit=limit, offset=offset, lottery_code=normalized_code),
+            loader=lambda: self._build_history_list_payload(
+                limit=limit,
+                offset=offset,
+                lottery_code=normalized_code,
+                strategy_filters=normalized_strategy_filters,
+                strategy_match_mode=normalized_strategy_match_mode,
+            ),
         )
         self.logger.info(
             "Loaded prediction history summaries",
-            extra={"context": {"limit": limit, "offset": offset, "returned_count": len(payload["predictions_history"])}},
+            extra={
+                "context": {
+                    "limit": limit,
+                    "offset": offset,
+                    "strategy_filter_count": len(normalized_strategy_filters),
+                    "strategy_match_mode": normalized_strategy_match_mode,
+                    "returned_count": len(payload["predictions_history"]),
+                }
+            },
         )
         return payload
 
@@ -353,23 +380,55 @@ class PredictionService:
             "total_hits": len(red_hits) + len(blue_hits),
         }
 
-    def _build_history_list_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
+    def _build_history_list_payload(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+        lottery_code: str = "dlt",
+        strategy_filters: list[str] | None = None,
+        strategy_match_mode: str = "all",
+    ) -> dict[str, Any]:
         started_at = perf_counter()
+        normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
+        normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
         db_metrics: dict[str, Any] = {}
+        fetch_limit = None if normalized_strategy_filters else limit
+        fetch_offset = 0 if normalized_strategy_filters else offset
         if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
-            summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(limit=limit, offset=offset, lottery_code=lottery_code)
+            summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(
+                limit=fetch_limit,
+                offset=fetch_offset,
+                lottery_code=lottery_code,
+            )
             summary_records = summary_payload.get("records", [])
             db_metrics = summary_payload.get("metrics", {})
         else:
-            summary_records = self.prediction_repository.list_history_record_summaries(limit=limit, offset=offset, lottery_code=lottery_code)
+            summary_records = self.prediction_repository.list_history_record_summaries(limit=fetch_limit, offset=fetch_offset, lottery_code=lottery_code)
         aggregate_started_at = perf_counter()
-        records = [self._annotate_history_summary_record(record) for record in summary_records]
+        records = [
+            self._annotate_history_summary_record(
+                record,
+                strategy_filters=normalized_strategy_filters,
+                strategy_match_mode=normalized_strategy_match_mode,
+            )
+            for record in summary_records
+        ]
+        records = [record for record in records if record.get("models")]
+        if normalized_strategy_filters:
+            filtered_total_count = len(records)
+            if offset:
+                records = records[offset:]
+            if limit is not None:
+                records = records[:limit]
+        else:
+            filtered_total_count = self.prediction_repository.count_history_records(lottery_code=lottery_code)
         score_profiles = self._build_score_profiles(records)
         payload = {
             "lottery_code": normalize_lottery_code(lottery_code),
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
-            "total_count": self.prediction_repository.count_history_records(lottery_code=lottery_code),
+            "total_count": filtered_total_count,
             "model_stats": self._build_model_stats(records, score_profiles),
+            "strategy_options": self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
         }
         aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
         total_duration_ms = round((perf_counter() - started_at) * 1000, 2)
@@ -382,21 +441,31 @@ class PredictionService:
                     "db_query_ms": db_metrics.get("db_query_ms"),
                     "service_aggregate_ms": aggregate_duration_ms,
                     "total_duration_ms": total_duration_ms,
+                    "strategy_filter_count": len(normalized_strategy_filters),
+                    "strategy_match_mode": normalized_strategy_match_mode,
                     "batch_count": db_metrics.get("batch_count", len(summary_records)),
                     "model_run_count": db_metrics.get("model_run_count"),
                     "group_metric_count": db_metrics.get("group_metric_count"),
                     "returned_count": len(payload["predictions_history"]),
+                    "filtered_total_count": filtered_total_count,
                     "model_stat_count": len(payload["model_stats"]),
                 }
             },
         )
         return payload
 
-    def _annotate_history_summary_record(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _annotate_history_summary_record(
+        self,
+        payload: dict[str, Any],
+        *,
+        strategy_filters: list[str] | None = None,
+        strategy_match_mode: str = "all",
+    ) -> dict[str, Any]:
         actual_result = payload.get("actual_result")
         if not actual_result:
             return {**payload, "period_summary": self._empty_period_summary()}
         lottery_code = normalize_lottery_code(payload.get("lottery_code") or actual_result.get("lottery_code") or "dlt")
+        normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
 
         annotated_models: list[dict[str, Any]] = []
         total_bet_count = 0
@@ -404,7 +473,25 @@ class PredictionService:
         total_prize_amount = 0
 
         for model in payload.get("models", []):
-            group_metrics = model.get("group_metrics") or []
+            group_metrics = [dict(metric) for metric in (model.get("group_metrics") or [])]
+            if normalized_strategy_filters:
+                strategy_labels = {
+                    self._normalize_strategy_label(metric.get("strategy"))
+                    for metric in group_metrics
+                }
+                if strategy_match_mode == "all" and not all(strategy in strategy_labels for strategy in normalized_strategy_filters):
+                    continue
+                group_metrics = [
+                    {
+                        **metric,
+                        "strategy": self._normalize_strategy_label(metric.get("strategy")),
+                    }
+                    for metric in group_metrics
+                    if self._normalize_strategy_label(metric.get("strategy")) in normalized_strategy_filters
+                ]
+            if not group_metrics:
+                continue
+
             winning_bet_count = 0
             prize_amount = 0
 
@@ -432,9 +519,18 @@ class PredictionService:
 
             bet_count = len(group_metrics)
             cost_amount = bet_count * self.BET_COST
+            best_metric = max(
+                group_metrics,
+                key=lambda item: (
+                    int(item.get("total_hits") or 0),
+                    -int(item.get("group_id") or 0),
+                ),
+            )
             annotated_models.append(
                 {
                     **model,
+                    "best_group": int(best_metric.get("group_id") or 0) or None,
+                    "best_hit_count": int(best_metric.get("total_hits") or 0),
                     "bet_count": bet_count,
                     "cost_amount": cost_amount,
                     "winning_bet_count": winning_bet_count,
@@ -807,6 +903,33 @@ class PredictionService:
             "sample_size_periods": 0,
             "sample_size_bets": 0,
         }
+
+    @classmethod
+    def _normalize_strategy_label(cls, value: Any) -> str:
+        text = str(value or "").strip()
+        return text or cls.DEFAULT_STRATEGY_LABEL
+
+    @classmethod
+    def _normalize_strategy_filters(cls, values: list[str] | None) -> list[str]:
+        if not values:
+            return []
+        normalized = [cls._normalize_strategy_label(value) for value in values if str(value or "").strip()]
+        return list(dict.fromkeys(normalized))
+
+    def _list_history_strategy_options(self, *, lottery_code: str, records: list[dict[str, Any]]) -> list[str]:
+        list_strategy_options = getattr(self.prediction_repository, "list_history_strategy_options", None)
+        if callable(list_strategy_options):
+            options = list_strategy_options(lottery_code=lottery_code)
+            if isinstance(options, (list, tuple, set)):
+                normalized = [self._normalize_strategy_label(option) for option in options]
+                return sorted(dict.fromkeys(normalized))
+        options = {
+            self._normalize_strategy_label(group.get("strategy"))
+            for record in records
+            for model in record.get("models", [])
+            for group in (model.get("group_metrics") or [])
+        }
+        return sorted(options)
 
     @classmethod
     def resolve_prize_level(

@@ -14,6 +14,7 @@ export function useHomeData(
   lotteryCode: LotteryCode,
   historyPage: number,
   historyPageSize: number,
+  historyStrategyFilters: string[],
   lotteryPage: number,
   lotteryPageSize: number,
 ) {
@@ -33,13 +34,15 @@ export function useHomeData(
   })
 
   const predictionsHistory = useQuery({
-    queryKey: ['predictions-history', lotteryCode, historyPage, historyPageSize],
+    queryKey: ['predictions-history', lotteryCode, historyPage, historyPageSize, [...historyStrategyFilters].sort().join('|')],
     queryFn: async () =>
       normalizePredictionsHistoryList(
         await apiClient.getPredictionsHistoryList({
           lottery_code: lotteryCode,
           limit: historyPageSize,
           offset: (historyPage - 1) * historyPageSize,
+          strategy_filters: historyStrategyFilters,
+          strategy_match_mode: 'all',
         }),
       ),
   })

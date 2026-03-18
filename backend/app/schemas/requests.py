@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from backend.app.schemas.model_settings import ModelSettingsPayload
@@ -9,6 +11,14 @@ class PaginationPayload(BaseModel):
     lottery_code: str = "dlt"
     limit: int | None = Field(default=None, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
+
+
+class PredictionsHistoryListPayload(BaseModel):
+    lottery_code: str = "dlt"
+    limit: int | None = Field(default=None, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+    strategy_filters: list[str] = Field(default_factory=list)
+    strategy_match_mode: Literal["all"] = "all"
 
 
 class ModelListPayload(BaseModel):

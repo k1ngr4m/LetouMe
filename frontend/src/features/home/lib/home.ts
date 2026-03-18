@@ -77,6 +77,11 @@ export type PredictionHitComparison = {
   totalHits: number
 }
 
+export function normalizeStrategyLabel(value?: string | null): string {
+  const normalized = String(value || '').trim()
+  return normalized || 'AI 组合策略'
+}
+
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
   return {
     ...draw,
@@ -401,17 +406,39 @@ export function filterModels(
   })
 }
 
-export function buildSummary(models: PredictionModel[], scores: Record<string, ModelScore>, selectedIds: string[], weighted: boolean, commonOnly: boolean) {
+export function buildSummary(
+  models: PredictionModel[],
+  scores: Record<string, ModelScore>,
+  selectedIds: string[],
+  weighted: boolean,
+  commonOnly: boolean,
+  strategyFilters: string[] = [],
+) {
+  const normalizedStrategyFilters = strategyFilters.map(normalizeStrategyLabel)
+  const strategyFilterSet = new Set(normalizedStrategyFilters)
   const selectedModels = models.filter((model) => selectedIds.includes(model.model_id))
   const redMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const blueMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
-  const totalGroupCount = selectedModels.reduce((sum, model) => sum + model.predictions.length, 0)
+  let totalGroupCount = 0
+  let selectedModelCount = 0
 
   for (const model of selectedModels) {
+    let activeGroups = model.predictions || []
+    if (normalizedStrategyFilters.length) {
+      const modelStrategies = new Set(activeGroups.map((group) => normalizeStrategyLabel(group.strategy)))
+      if (!normalizedStrategyFilters.every((strategy) => modelStrategies.has(strategy))) {
+        continue
+      }
+      activeGroups = activeGroups.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+    }
+    if (!activeGroups.length) continue
+    selectedModelCount += 1
+    totalGroupCount += activeGroups.length
+
     const weight = weighted ? (scores[model.model_id]?.overallScore || 0) / 100 || 1 : 1
     const redSeen = new Set<string>()
     const blueSeen = new Set<string>()
-    for (const group of model.predictions) {
+    for (const group of activeGroups) {
       for (const red of group.red_balls) {
         const current = redMap.get(red) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
         current.appearanceCount += 1
@@ -431,7 +458,7 @@ export function buildSummary(models: PredictionModel[], scores: Record<string, M
     for (const blue of blueSeen) blueMap.get(blue)?.models.add(model.model_id)
   }
 
-  const modelCount = selectedModels.length
+  const modelCount = selectedModelCount
   const normalize = (source: Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>) =>
     [...source.entries()]
       .map(([ball, meta]) => ({

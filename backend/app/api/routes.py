@@ -47,6 +47,7 @@ from backend.app.schemas.requests import (
     PaginationPayload,
     PermissionUpdatePayload,
     PredictionGenerationTaskPayload,
+    PredictionsHistoryListPayload,
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
     ScheduleTaskCodePayload,
@@ -162,8 +163,14 @@ def get_current_predictions(payload: PaginationPayload, _: dict = Depends(requir
 
 
 @router.post("/predictions/history/list", response_model=PredictionsHistoryListResponse)
-def get_predictions_history_list(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
-    return prediction_service.get_history_list_payload(limit=payload.limit, offset=payload.offset, lottery_code=payload.lottery_code)
+def get_predictions_history_list(payload: PredictionsHistoryListPayload, _: dict = Depends(require_current_user)) -> dict:
+    return prediction_service.get_history_list_payload(
+        limit=payload.limit,
+        offset=payload.offset,
+        lottery_code=payload.lottery_code,
+        strategy_filters=payload.strategy_filters,
+        strategy_match_mode=payload.strategy_match_mode,
+    )
 
 
 @router.post("/predictions/history/detail", response_model=PredictionsHistoryResponse)

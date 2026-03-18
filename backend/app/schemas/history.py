@@ -102,3 +102,4 @@ class PredictionsHistoryListResponse(BaseModel):
     predictions_history: list[PredictionHistorySummaryRecord] = Field(default_factory=list)
     total_count: int = 0
     model_stats: list[PredictionHistoryModelStat] = Field(default_factory=list)
+    strategy_options: list[str] = Field(default_factory=list)

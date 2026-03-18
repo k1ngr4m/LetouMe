@@ -142,7 +142,13 @@ export const apiClient = {
       body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
-  getPredictionsHistoryList(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
+  getPredictionsHistoryList(payload?: {
+    lottery_code?: LotteryCode
+    limit?: number
+    offset?: number
+    strategy_filters?: string[]
+    strategy_match_mode?: 'all'
+  }) {
     return requestJson<PredictionsHistoryListResponse>('/api/predictions/history/list', {
       method: 'POST',
       body: JSON.stringify(payload || {}),

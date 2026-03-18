@@ -858,6 +858,12 @@ a {
   width: 100%;
 }
 
+.ghost-button--compact {
+  min-height: 1.85rem;
+  padding: 0.28rem 0.62rem;
+  font-size: 0.76rem;
+}
+
 .danger-button {
   color: white;
   background: linear-gradient(135deg, #c73752, #ef6c6c);
@@ -2004,6 +2010,18 @@ a {
 .history-toolbar {
   justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+.history-strategy-filter {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.history-strategy-filter__label {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
 }
 
 .settings-records-hero,

@@ -91,9 +91,10 @@ export function useHomeModelFilters(
     commonOnly: boolean,
     weightedSummary: boolean,
     historyModelIdsOverride?: string[],
+    summaryStrategyFilters: string[] = [],
   ) {
     const selectedSummaryIds = summarySelectedModelIds ?? filteredModelIds
-    const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly)
+    const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly, summaryStrategyFilters)
     const historyModelIds = historyModelIdsOverride ?? filteredModelIds
     const filteredHistory = history ? filterHistoryRecords(history, historyModelIds, periodQuery) : []
     const historyHitTrend = buildHistoryHitTrend(filteredHistory, historyModelIds)
