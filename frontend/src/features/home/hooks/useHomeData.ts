@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../../shared/api/client'
 import type { LotteryCode } from '../../../shared/types/api'
 import { normalizeCurrentPredictions, normalizeDraw, normalizePredictionsHistoryList } from '../lib/home'
@@ -35,6 +35,7 @@ export function useHomeData(
 
   const predictionsHistory = useQuery({
     queryKey: ['predictions-history', lotteryCode, historyPage, historyPageSize, [...historyStrategyFilters].sort().join('|')],
+    placeholderData: keepPreviousData,
     queryFn: async () =>
       normalizePredictionsHistoryList(
         await apiClient.getPredictionsHistoryList({

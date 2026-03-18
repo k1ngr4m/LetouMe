@@ -445,11 +445,12 @@ export function HomePage() {
   }, [summaryStrategyOptions])
 
   useEffect(() => {
+    if (predictionsHistory.isFetching && !historyStrategyOptions.length) return
     setHistoryStrategyFilters((previous) => {
       const next = previous.filter((item) => historyStrategyOptions.includes(item))
       return next.length === previous.length && next.every((item, index) => item === previous[index]) ? previous : next
     })
-  }, [historyStrategyOptions])
+  }, [historyStrategyOptions, predictionsHistory.isFetching])
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
     historyPeriodQuery,
@@ -471,7 +472,7 @@ export function HomePage() {
     [filteredModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
 
-  const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || predictionsHistory.isLoading
+  const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || (!predictionsHistory.data && predictionsHistory.isLoading)
   const error =
     currentPredictions.error instanceof Error
       ? currentPredictions.error
@@ -966,6 +967,7 @@ export function HomePage() {
                 <span className="model-filter-panel__empty">当前暂无可选方案</span>
               )}
             </div>
+            {predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。

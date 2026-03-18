@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -5,11 +6,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
-const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets } = vi.hoisted(() => ({
+const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets, simulateHistoryFilterLoading } = vi.hoisted(() => ({
   createSimulationTicket: vi.fn(),
   deleteSimulationTicket: vi.fn(),
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
+  simulateHistoryFilterLoading: { current: false },
 }))
 
 function buildHistoryRecord(period: string, date: string, primaryModelId: 'model-a' | 'model-b' = 'model-b') {
@@ -104,11 +106,14 @@ vi.mock('./hooks/useHomeData', () => ({
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
+    const [effectiveHistoryStrategyFilters, setEffectiveHistoryStrategyFilters] = useState(historyStrategyFilters)
+    const [isHistoryFetching, setIsHistoryFetching] = useState(false)
+
     const modelStrategiesById: Record<string, string[]> = {
       'model-a': ['增强型热号追随者', 'AI 组合策略'],
       'model-b': ['冷号补位'],
     }
-    const normalizedHistoryStrategyFilters = [...new Set(historyStrategyFilters)]
+    const normalizedHistoryStrategyFilters = [...new Set(effectiveHistoryStrategyFilters)]
     const matchesHistoryStrategies = (modelId: string) =>
       !normalizedHistoryStrategyFilters.length ||
       normalizedHistoryStrategyFilters.every((strategy) => (modelStrategiesById[modelId] || []).includes(strategy))
@@ -159,6 +164,83 @@ vi.mock('./hooks/useHomeData', () => ({
     }))
     const lotteryOffset = (lotteryPage - 1) * lotteryPageSize
     const pagedLotteryRecords = lotteryRecords.slice(lotteryOffset, lotteryOffset + lotteryPageSize)
+    const currentHistoryPayload = useMemo(
+      () => ({
+        model_stats: [
+          {
+            model_id: 'model-a',
+            model_name: '模型A',
+            periods: 8,
+            winning_periods: 5,
+            bet_count: 40,
+            winning_bet_count: 10,
+            cost_amount: 80,
+            prize_amount: 160,
+            win_rate_by_period: 0.625,
+            win_rate_by_bet: 0.25,
+            score_profile: {
+              overall_score: 72,
+              per_bet_score: 68,
+              per_period_score: 75,
+              recent_score: 78,
+              long_term_score: 70,
+              component_scores: {
+                profit: 74,
+                hit_rate: 71,
+                stability: 69,
+                ceiling: 80,
+                floor: 58,
+              },
+            },
+          },
+          {
+            model_id: 'model-b',
+            model_name: '模型B',
+            periods: 8,
+            winning_periods: 4,
+            bet_count: 40,
+            winning_bet_count: 8,
+            cost_amount: 80,
+            prize_amount: 110,
+            win_rate_by_period: 0.5,
+            win_rate_by_bet: 0.2,
+            score_profile: {
+              overall_score: 61,
+              per_bet_score: 57,
+              per_period_score: 64,
+              recent_score: 59,
+              long_term_score: 63,
+              component_scores: {
+                profit: 60,
+                hit_rate: 62,
+                stability: 58,
+                ceiling: 67,
+                floor: 52,
+              },
+            },
+          },
+        ],
+        predictions_history: pagedHistoryRecords,
+        total_count: filteredHistoryRecords.length,
+        strategy_options: ['AI 组合策略', '冷号补位', '增强型热号追随者'],
+      }),
+      [filteredHistoryRecords.length, pagedHistoryRecords],
+    )
+    useEffect(() => {
+      if (!simulateHistoryFilterLoading.current) {
+        setEffectiveHistoryStrategyFilters(historyStrategyFilters)
+        setIsHistoryFetching(false)
+        return
+      }
+
+      setIsHistoryFetching(true)
+      const timer = window.setTimeout(() => {
+        setEffectiveHistoryStrategyFilters(historyStrategyFilters)
+        setIsHistoryFetching(false)
+      }, 150)
+
+      return () => window.clearTimeout(timer)
+    }, [historyStrategyFilters])
 
     return {
       currentPredictions: {
@@ -221,66 +303,9 @@ vi.mock('./hooks/useHomeData', () => ({
         error: null,
       },
       predictionsHistory: {
-        data: {
-          model_stats: [
-            {
-              model_id: 'model-a',
-              model_name: '模型A',
-              periods: 8,
-              winning_periods: 5,
-              bet_count: 40,
-              winning_bet_count: 10,
-              cost_amount: 80,
-              prize_amount: 160,
-              win_rate_by_period: 0.625,
-              win_rate_by_bet: 0.25,
-              score_profile: {
-                overall_score: 72,
-                per_bet_score: 68,
-                per_period_score: 75,
-                recent_score: 78,
-                long_term_score: 70,
-                component_scores: {
-                  profit: 74,
-                  hit_rate: 71,
-                  stability: 69,
-                  ceiling: 80,
-                  floor: 58,
-                },
-              },
-            },
-            {
-              model_id: 'model-b',
-              model_name: '模型B',
-              periods: 8,
-              winning_periods: 4,
-              bet_count: 40,
-              winning_bet_count: 8,
-              cost_amount: 80,
-              prize_amount: 110,
-              win_rate_by_period: 0.5,
-              win_rate_by_bet: 0.2,
-              score_profile: {
-                overall_score: 61,
-                per_bet_score: 57,
-                per_period_score: 64,
-                recent_score: 59,
-                long_term_score: 63,
-                component_scores: {
-                  profit: 60,
-                  hit_rate: 62,
-                  stability: 58,
-                  ceiling: 67,
-                  floor: 52,
-                },
-              },
-            },
-          ],
-          predictions_history: pagedHistoryRecords,
-          total_count: filteredHistoryRecords.length,
-          strategy_options: ['AI 组合策略', '冷号补位', '增强型热号追随者'],
-        },
-        isLoading: false,
+        data: currentHistoryPayload,
+        isFetching: isHistoryFetching,
+        isLoading: isHistoryFetching,
         error: null,
       },
       pagedLotteryHistory: {
@@ -330,6 +355,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  simulateHistoryFilterLoading.current = false
   createSimulationTicket.mockReset()
   createSimulationTicket.mockResolvedValue({
     ticket: {
@@ -578,6 +604,31 @@ describe('HomePage dashboard sidebar', () => {
     })
     expect(strategyButton).toHaveClass('is-active')
     expect(within(historySection as HTMLElement).getByText('第 2026031 期')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).queryByText('第 2026030 期')).not.toBeInTheDocument()
+  })
+
+  it('keeps selected history strategy during refetch gap', async () => {
+    simulateHistoryFilterLoading.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+
+    const strategyButton = within(historySection as HTMLElement).getByRole('button', { name: '增强型热号追随者' })
+    await userEvent.click(strategyButton)
+
+    expect(strategyButton).toHaveClass('is-active')
+    await waitFor(() => {
+      expect(screen.queryByText('正在加载大乐透预测控制台...')).not.toBeInTheDocument()
+      expect(within(historySection as HTMLElement).getByText('正在更新开奖方案筛选结果...')).toBeInTheDocument()
+      expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(within(historySection as HTMLElement).getByText('共 11 条记录')).toBeInTheDocument()
+    })
+    expect(strategyButton).toHaveClass('is-active')
     expect(within(historySection as HTMLElement).queryByText('第 2026030 期')).not.toBeInTheDocument()
   })
 
