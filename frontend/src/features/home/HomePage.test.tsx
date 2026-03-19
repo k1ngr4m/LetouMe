@@ -105,6 +105,7 @@ vi.mock('./hooks/useHomeData', () => ({
     historyPage = 1,
     historyPageSize = 10,
     historyStrategyFilters: string[] = [],
+    _historyPlayTypeFilters: Array<'direct' | 'group3' | 'group6'> = [],
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
@@ -1116,6 +1117,65 @@ describe('HomePage dashboard sidebar', () => {
     expect(oneDigits[1]).not.toHaveClass('is-hit')
     expect(oneDigits[1]).toHaveClass('number-ball--muted')
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
+  })
+
+  it('highlights group3 hits without position and deduplicates repeated numbers', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '01', '08'],
+            blue_balls: [],
+            digits: ['01', '01', '08'],
+            lottery_code: 'pl3',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 2,
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'group3',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: ['01', '08', '08'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    expect(await within(firstHistoryCard as HTMLElement).findByText('组选3')).toBeInTheDocument()
+
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
+    expect(groupCard).not.toBeNull()
+    const cardScope = within(groupCard as HTMLElement)
+    expect(cardScope.getByText('2 中')).toBeInTheDocument()
+    const eightDigits = cardScope.getAllByText('08')
+    expect(eightDigits[0]).toHaveClass('is-hit')
+    expect(eightDigits[1]).not.toHaveClass('is-hit')
+    expect(eightDigits[1]).toHaveClass('number-ball--muted')
   })
 
   it('filters pl3 prediction groups by play type in overview views', async () => {

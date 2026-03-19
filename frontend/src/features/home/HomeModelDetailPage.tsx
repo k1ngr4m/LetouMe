@@ -14,7 +14,7 @@ export function HomeModelDetailPage() {
   const navigate = useNavigate()
   const { modelId = '' } = useParams()
 
-  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, [], 1, LOTTERY_PAGE_SIZE, {
+  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
     enableCurrentPredictions: true,
     enableLotteryCharts: true,
     enablePredictionsHistory: false,

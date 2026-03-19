@@ -272,6 +272,71 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByLabelText('结束期号')).toBeInTheDocument()
   })
 
+  it('submits generate task with manually selected lottery code', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v3.2',
+          display_name: 'DeepSeek-V3.2',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt', 'pl3'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.generateSettingsModelPredictions.mockResolvedValue({
+      task_id: 'task-1',
+      status: 'queued',
+      mode: 'current',
+      model_code: 'deepseek-v3.2',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: 'deepseek-v3.2',
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.selectOptions(screen.getByLabelText('生成彩种'), 'pl3')
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.generateSettingsModelPredictions).toHaveBeenCalledWith({
+        lottery_code: 'pl3',
+        model_code: 'deepseek-v3.2',
+        mode: 'current',
+        overwrite: false,
+        start_period: undefined,
+        end_period: undefined,
+      }),
+    )
+  })
+
   it('shows lottery maintenance card and starts fetch task for super admin', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
@@ -409,6 +474,94 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByRole('heading', { name: '已选 2 个模型' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
+  })
+
+  it('auto-removes incompatible models after generation lottery changes in bulk modal', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'dlt-only',
+          display_name: 'DltOnly',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'pl3-only',
+          display_name: 'Pl3Only',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'pl3',
+          lottery_codes: ['pl3'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:01',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.bulkGenerateSettingsModelPredictions.mockResolvedValue({
+      task_id: 'bulk-task-2',
+      status: 'queued',
+      mode: 'current',
+      model_code: '__bulk__',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: '__bulk__',
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
+
+    expect(screen.getByText('已移除 1 个不支持大乐透的模型。')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '已选 1 个模型' })).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('生成彩种'), 'pl3')
+    expect(screen.getByText('已移除 1 个不支持排列3的模型。')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '已选 1 个模型' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+    await waitFor(() =>
+      expect(apiClientMock.generateSettingsModelPredictions).toHaveBeenCalledWith({
+        lottery_code: 'pl3',
+        model_code: 'pl3-only',
+        mode: 'current',
+        overwrite: false,
+        start_period: undefined,
+        end_period: undefined,
+      }),
+    )
   })
 
   it('shows schedule tab and renders schedule tasks', async () => {

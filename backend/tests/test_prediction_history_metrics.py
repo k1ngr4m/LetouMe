@@ -148,14 +148,20 @@ class _FakePl3PredictionRepository:
                         {
                             "group_id": 1,
                             "play_type": "direct",
-                            "digits": ["01", "01", "08"],
-                            "hit_result": {"digit_hits": ["01", "01", "08"], "digit_hit_count": 3, "is_exact_match": True},
+                            "digits": ["01", "02", "08"],
+                            "hit_result": {"digit_hits": ["01", "08"], "digit_hit_count": 2, "is_exact_match": False},
                         },
                         {
                             "group_id": 2,
                             "play_type": "group3",
                             "digits": ["01", "01", "08"],
                             "hit_result": {"digit_hits": ["01", "01", "08"], "digit_hit_count": 3, "is_exact_match": True},
+                        },
+                        {
+                            "group_id": 3,
+                            "play_type": "group6",
+                            "digits": ["01", "03", "09"],
+                            "hit_result": {"digit_hits": ["01"], "digit_hit_count": 1, "is_exact_match": False},
                         },
                     ],
                 }
@@ -183,7 +189,7 @@ class _FakePl3PredictionRepository:
                             {
                                 "group_id": 1,
                                 "play_type": "direct",
-                                "digits": ["01", "01", "08"],
+                                "digits": ["01", "02", "08"],
                                 "red_hit_count": 0,
                                 "blue_hit_count": 0,
                                 "total_hits": 3,
@@ -197,6 +203,15 @@ class _FakePl3PredictionRepository:
                                 "blue_hit_count": 0,
                                 "total_hits": 3,
                                 "hit_result": {"digit_hit_count": 2, "is_exact_match": False},
+                            },
+                            {
+                                "group_id": 3,
+                                "play_type": "group6",
+                                "digits": ["01", "03", "09"],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 3,
+                                "hit_result": {"digit_hit_count": 1, "is_exact_match": False},
                             },
                         ],
                     }
@@ -294,9 +309,38 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(payload["lottery_code"], "pl3")
         record = payload["predictions_history"][0]
         model = record["models"][0]
-        self.assertEqual(model["bet_count"], 2)
-        self.assertEqual(model["prize_amount"], 1386)
-        self.assertEqual(record["period_summary"]["total_prize_amount"], 1386)
+        self.assertEqual(model["bet_count"], 3)
+        self.assertEqual(model["prize_amount"], 346)
+        self.assertEqual(record["period_summary"]["total_prize_amount"], 346)
+
+    def test_pl3_history_best_hit_count_uses_new_group_rule(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
+
+        list_payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="pl3")
+        list_model = list_payload["predictions_history"][0]["models"][0]
+        self.assertEqual(list_model["best_hit_count"], 2)
+
+        detail_payload = service.get_history_detail_payload("26060", lottery_code="pl3")
+        self.assertIsNotNone(detail_payload)
+        detail_model = detail_payload["models"][0]
+        self.assertEqual(detail_model["best_hit_count"], 2)
+
+    def test_pl3_history_list_payload_filters_by_play_type_for_trend(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
+
+        payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="pl3", play_type_filters=["group6"])
+        model = payload["predictions_history"][0]["models"][0]
+
+        self.assertEqual(model["bet_count"], 1)
+        self.assertEqual(model["best_hit_count"], 1)
+
+    def test_pl3_group6_trend_hit_count_ignores_position(self) -> None:
+        hit_count = self.service._calculate_pl3_trend_hit_count(
+            {"play_type": "group6", "digits": ["01", "02", "03"]},
+            {"lottery_code": "pl3", "digits": ["03", "08", "01"]},
+        )
+
+        self.assertEqual(hit_count, 2)
 
     def test_resolve_pl3_direct_prize_level_accepts_digit_hit_count_when_exact_flag_missing(self) -> None:
         prize_level = self.service.resolve_prize_level(

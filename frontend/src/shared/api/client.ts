@@ -148,6 +148,7 @@ export const apiClient = {
     limit?: number
     offset?: number
     strategy_filters?: string[]
+    play_type_filters?: Array<'direct' | 'group3' | 'group6'>
     strategy_match_mode?: 'all'
   }) {
     return requestJson<PredictionsHistoryListResponse>('/api/predictions/history/list', {

@@ -279,14 +279,14 @@ describe('compareNumbers for pl3', () => {
     expect(hit?.totalHits).toBe(2)
   })
 
-  it('marks all digits hit for winning group3 and group6', () => {
+  it('counts group3 hits by unique numbers and group6 hits by numbers', () => {
     const group3Hit = compareNumbers(
       {
         group_id: 1,
         play_type: 'group3',
         red_balls: [],
         blue_balls: [],
-        digits: ['01', '01', '08'],
+        digits: ['01', '08', '08'],
       },
       {
         lottery_code: 'pl3',
@@ -294,7 +294,7 @@ describe('compareNumbers for pl3', () => {
         date: '2026-03-18',
         red_balls: [],
         blue_balls: [],
-        digits: ['01', '08', '01'],
+        digits: ['01', '01', '08'],
       },
     )
     const group6Hit = compareNumbers(
@@ -315,8 +315,9 @@ describe('compareNumbers for pl3', () => {
       },
     )
 
-    expect(group3Hit?.digitHitIndexes).toEqual([0, 1, 2])
-    expect(group3Hit?.digitHitCount).toBe(3)
+    expect(group3Hit?.digitHitIndexes).toEqual([0, 1])
+    expect(group3Hit?.digitHitCount).toBe(2)
+    expect(group3Hit?.totalHits).toBe(2)
     expect(group6Hit?.digitHitIndexes).toEqual([0, 1, 2])
     expect(group6Hit?.digitHitCount).toBe(3)
   })

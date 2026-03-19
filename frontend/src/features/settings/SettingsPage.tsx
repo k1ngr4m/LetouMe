@@ -373,6 +373,8 @@ export function SettingsPage() {
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
   const [generationModalOpen, setGenerationModalOpen] = useState(false)
   const [generationForm, setGenerationForm] = useState(EMPTY_GENERATION_FORM)
+  const [generationSourceModelCodes, setGenerationSourceModelCodes] = useState<string[]>([])
+  const [generationFilterNotice, setGenerationFilterNotice] = useState<string | null>(null)
   const [generationTask, setGenerationTask] = useState<PredictionGenerationTask | null>(null)
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
@@ -579,6 +581,13 @@ export function SettingsPage() {
   const currentSortMeta = MODEL_SORT_META[modelSortOption]
   const modelNameMap = useMemo(
     () => Object.fromEntries(models.map((model) => [model.model_code, model.display_name])),
+    [models],
+  )
+  const modelLotteryCodeMap = useMemo(
+    () =>
+      Object.fromEntries(
+        models.map((model) => [model.model_code, model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]]),
+      ),
     [models],
   )
   const isBulkGenerationTask = generationTask?.model_code === '__bulk__'
@@ -874,10 +883,15 @@ export function SettingsPage() {
   }
 
   function openGenerateModel(modelCode: string, displayName: string) {
+    const sourceModelCodes = [modelCode]
+    const nextLottery = DEFAULT_SETTINGS_LOTTERY
+    const nextModelCodes = sourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationTask(null)
+    setGenerationSourceModelCodes(sourceModelCodes)
+    setGenerationFilterNotice(sourceModelCodes.length > nextModelCodes.length ? `已移除 ${sourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null)
     setGenerationForm({
-      lotteryCode: DEFAULT_SETTINGS_LOTTERY,
-      modelCodes: [modelCode],
+      lotteryCode: nextLottery,
+      modelCodes: nextModelCodes,
       displayName,
       mode: 'current',
       overwrite: false,
@@ -888,10 +902,15 @@ export function SettingsPage() {
   }
 
   function openBulkGenerateModels() {
+    const sourceModelCodes = selectedModelCodes
+    const nextLottery = DEFAULT_SETTINGS_LOTTERY
+    const nextModelCodes = sourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationTask(null)
+    setGenerationSourceModelCodes(sourceModelCodes)
+    setGenerationFilterNotice(sourceModelCodes.length > nextModelCodes.length ? `已移除 ${sourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null)
     setGenerationForm({
-      lotteryCode: DEFAULT_SETTINGS_LOTTERY,
-      modelCodes: selectedModelCodes,
+      lotteryCode: nextLottery,
+      modelCodes: nextModelCodes,
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
       overwrite: false,
@@ -1009,7 +1028,7 @@ export function SettingsPage() {
   function submitGenerationForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!generationForm.modelCodes.length) {
-      setMessage('请至少选择一个模型')
+      setMessage('当前彩种暂无可用模型，请切换彩种后重试。')
       setMessageType('error')
       return
     }
@@ -1026,6 +1045,18 @@ export function SettingsPage() {
       }
     }
     generatePredictionMutation.mutate()
+  }
+
+  function handleGenerationLotteryChange(nextLottery: LotteryCode) {
+    const nextModelCodes = generationSourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
+    setGenerationFilterNotice(
+      generationSourceModelCodes.length > nextModelCodes.length ? `已移除 ${generationSourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null,
+    )
+    setGenerationForm((previous) => ({
+      ...previous,
+      lotteryCode: nextLottery,
+      modelCodes: nextModelCodes,
+    }))
   }
 
   function submitBulkEditForm(event: FormEvent<HTMLFormElement>) {
@@ -1070,6 +1101,10 @@ export function SettingsPage() {
     setSelectedScheduleTaskCode(null)
     setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   }
+
+  const generationDisplayName = generationSourceModelCodes.length > 1
+    ? `已选 ${generationForm.modelCodes.length} 个模型`
+    : generationForm.displayName || generationForm.modelCodes.join(', ')
 
   function toggleScheduleWeekday(weekday: number) {
     setScheduleForm((previous) => ({
@@ -2352,13 +2387,22 @@ export function SettingsPage() {
               <div className="modal-card__header">
                 <div>
                   <p className="modal-card__eyebrow">预测生成</p>
-                  <h3>{generationForm.displayName || generationForm.modelCodes.join(', ')}</h3>
+                  <h3>{generationDisplayName}</h3>
                   <p className="settings-inline-hint">
                     当前生成彩种：{generationForm.lotteryCode === 'pl3' ? '排列3' : '大乐透'}
                   </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
               </div>
+              <label className="field">
+                <span>彩种</span>
+                <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as LotteryCode)}>
+                  <option value="dlt">大乐透</option>
+                  <option value="pl3">排列3</option>
+                </select>
+              </label>
+              {generationFilterNotice ? <div className="settings-inline-hint">{generationFilterNotice}</div> : null}
+              {!generationForm.modelCodes.length ? <div className="state-shell">当前彩种暂无可用模型，请切换彩种。</div> : null}
               <label className="field">
                 <span>生成模式</span>
                 <select
@@ -2475,7 +2519,7 @@ export function SettingsPage() {
                 </section>
               ) : null}
               <div className="form-actions">
-                <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending}>创建任务</button>
+                <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending || generationForm.modelCodes.length === 0}>创建任务</button>
               </div>
             </form>
           </div>

@@ -278,13 +278,34 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
     const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || []).map(padBall).slice(0, 3)
     const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
     const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
-    const isGroupPlay = playType === 'group3' || playType === 'group6'
+    if (playType === 'group3') {
+      const actualDigitSet = new Set(actualDigits)
+      const seenDigits = new Set<string>()
+      const digitHitIndexes: number[] = []
+      for (const [index, digit] of predictionDigits.entries()) {
+        if (!digit || seenDigits.has(digit)) continue
+        seenDigits.add(digit)
+        if (actualDigitSet.has(digit)) {
+          digitHitIndexes.push(index)
+        }
+      }
+      return {
+        redHits: [],
+        redHitCount: 0,
+        blueHits: [],
+        blueHitCount: 0,
+        digitHits: digitHitIndexes.map((index) => predictionDigits[index]).filter(Boolean),
+        digitHitCount: digitHitIndexes.length,
+        digitHitIndexes,
+        totalHits: digitHitIndexes.length,
+      }
+    }
 
-    if (isGroupPlay) {
-      const predictedNormalized = [...predictionDigits].sort()
-      const actualNormalized = [...actualDigits].sort()
-      const isWinning = predictedNormalized.length === 3 && actualNormalized.length === 3 && predictedNormalized.join(',') === actualNormalized.join(',')
-      const digitHitIndexes = isWinning ? [0, 1, 2] : []
+    if (playType === 'group6') {
+      const actualDigitSet = new Set(actualDigits)
+      const digitHitIndexes = predictionDigits
+        .map((digit, index) => (actualDigitSet.has(digit) ? index : -1))
+        .filter((index) => index >= 0)
       return {
         redHits: [],
         redHitCount: 0,

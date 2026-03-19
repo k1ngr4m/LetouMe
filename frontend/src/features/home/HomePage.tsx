@@ -277,6 +277,7 @@ export function HomePage() {
     historyPage,
     historyPageSize,
     historyStrategyFilters,
+    historyPlayTypeFilters,
     lotteryPage,
     lotteryPageSize,
     {

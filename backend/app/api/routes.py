@@ -171,6 +171,7 @@ def get_predictions_history_list(payload: PredictionsHistoryListPayload, _: dict
         offset=payload.offset,
         lottery_code=payload.lottery_code,
         strategy_filters=payload.strategy_filters,
+        play_type_filters=payload.play_type_filters,
         strategy_match_mode=payload.strategy_match_mode,
     )
 
