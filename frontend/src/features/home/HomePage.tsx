@@ -557,15 +557,18 @@ export function HomePage() {
       <section className="hero-panel">
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Prediction Command Center</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div className="lottery-switch" role="tablist" aria-label="彩种切换">
             {(['dlt', 'pl3'] as LotteryCode[]).map((code) => (
               <button
                 key={code}
                 type="button"
                 className={clsx('chip-button', selectedLottery === code && 'is-active')}
                 onClick={() => setSelectedLottery(code)}
+                aria-label={code === 'pl3' ? '排列3' : '大乐透'}
+                aria-pressed={selectedLottery === code}
               >
-                {code === 'pl3' ? '排列3' : '大乐透'}
+                <span className="chip-button__title">{code === 'pl3' ? '排列3' : '大乐透'}</span>
+                <span className="chip-button__meta">{code === 'pl3' ? '直选 / 组选玩法' : '前区后区复式预测'}</span>
               </button>
             ))}
           </div>

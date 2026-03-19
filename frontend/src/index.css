@@ -661,6 +661,84 @@ a {
   max-width: 620px;
 }
 
+.lottery-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(100%, 28rem);
+  margin: 0 0 1rem;
+}
+
+.chip-button {
+  display: grid;
+  gap: 0.28rem;
+  align-content: start;
+  min-height: 4.85rem;
+  padding: 0.92rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.15rem;
+  text-align: left;
+  color: var(--text-2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)),
+    rgba(9, 14, 24, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 24px rgba(6, 10, 18, 0.18);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.chip-button:hover {
+  transform: translateY(-1px);
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 16px 32px rgba(8, 12, 22, 0.22);
+}
+
+.chip-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(241, 178, 76, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 16px 32px rgba(8, 12, 22, 0.22);
+}
+
+.chip-button.is-active {
+  color: var(--text-1);
+  border-color: rgba(241, 178, 76, 0.38);
+  background:
+    linear-gradient(135deg, rgba(228, 108, 64, 0.28), rgba(241, 178, 76, 0.16)),
+    rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 34px rgba(241, 178, 76, 0.14);
+}
+
+.chip-button__title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.chip-button__meta {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-3);
+}
+
+.chip-button.is-active .chip-button__meta,
+.chip-button:hover .chip-button__meta {
+  color: rgba(244, 240, 232, 0.82);
+}
+
 .hero-panel__meta {
   display: flex;
   gap: 0.75rem;
@@ -3971,6 +4049,10 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .lottery-switch {
+    width: 100%;
+  }
+
   .dashboard-sidebar {
     position: static;
     grid-template-columns: 1fr;
@@ -4095,5 +4177,15 @@ a {
 
   .settings-schedule-actions {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .lottery-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .chip-button {
+    min-height: 4.2rem;
   }
 }

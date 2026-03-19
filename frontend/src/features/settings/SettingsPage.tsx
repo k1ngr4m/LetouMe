@@ -1153,15 +1153,18 @@ export function SettingsPage() {
           <p className="hero-panel__eyebrow">Settings Center</p>
           <h2 className="hero-panel__title">设置中心</h2>
           <p className="hero-panel__description">可修改基础信息，并按彩种维护模型、抓取与预测记录。</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div className="lottery-switch" role="tablist" aria-label="彩种切换">
             {(['dlt', 'pl3'] as LotteryCode[]).map((code) => (
               <button
                 key={code}
                 type="button"
                 className={clsx('chip-button', selectedLottery === code && 'is-active')}
                 onClick={() => setSelectedLottery(code)}
+                aria-label={code === 'pl3' ? '排列3' : '大乐透'}
+                aria-pressed={selectedLottery === code}
               >
-                {code === 'pl3' ? '排列3' : '大乐透'}
+                <span className="chip-button__title">{code === 'pl3' ? '排列3' : '大乐透'}</span>
+                <span className="chip-button__meta">{code === 'pl3' ? '彩种配置 / 记录管理' : '模型抓取 / 开奖维护'}</span>
               </button>
             ))}
           </div>
