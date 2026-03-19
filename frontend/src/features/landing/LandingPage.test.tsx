@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { LandingPage } from './LandingPage'
+import { DISCLAIMER_TEXT } from '../../shared/components/SiteDisclaimer'
 
 const navigateMock = vi.fn()
 const currentPredictionsQueryOptionsMock = vi.fn()
@@ -57,6 +58,17 @@ describe('LandingPage', () => {
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/dashboard/prediction')
     })
+  })
+
+  it('shows the site disclaimer', () => {
+    currentPredictionsQueryOptionsMock.mockReturnValue({
+      queryKey: ['current-predictions'],
+      queryFn: vi.fn().mockResolvedValue({ models: [] }),
+    })
+
+    renderPage()
+
+    expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument()
   })
 
   it('shows an error when preload fails', async () => {

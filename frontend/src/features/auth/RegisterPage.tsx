@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 
 function PasswordToggleIcon({ visible }: { visible: boolean }) {
   return visible ? (
@@ -62,7 +63,9 @@ export function RegisterPage() {
 
   return (
     <div className="landing-shell">
-      <section className="landing-panel landing-panel--auth">
+      <div className="landing-page-stack">
+        <SiteDisclaimer />
+        <section className="landing-panel landing-panel--auth">
         <div className="landing-panel__copy landing-panel__copy--auth">
           <p className="landing-panel__eyebrow">Registration</p>
           <h1 className="landing-panel__title landing-panel__title--auth">创建 LetouMe 账号</h1>
@@ -147,7 +150,8 @@ export function RegisterPage() {
             </Link>
           </div>
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   )
 }

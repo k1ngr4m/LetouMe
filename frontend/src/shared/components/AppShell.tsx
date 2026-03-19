@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import type { PropsWithChildren } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { SiteDisclaimer } from './SiteDisclaimer'
 
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
@@ -38,7 +39,10 @@ export function AppShell({ children }: PropsWithChildren) {
           </button>
         </nav>
       </header>
-      <main className="app-main">{children}</main>
+      <main className="app-main">
+        <SiteDisclaimer compact />
+        {children}
+      </main>
     </div>
   )
 }

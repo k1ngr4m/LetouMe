@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { currentPredictionsQueryOptions } from '../home/hooks/useHomeData'
 import { appLogger } from '../../shared/lib/logger'
+import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 
 export function LandingPage() {
   const navigate = useNavigate()
@@ -32,7 +33,9 @@ export function LandingPage() {
 
   return (
     <div className="landing-shell">
-      <section className="landing-panel">
+      <div className="landing-page-stack">
+        <SiteDisclaimer />
+        <section className="landing-panel">
         <div className="landing-panel__copy">
           <p className="landing-panel__eyebrow">AI DLT Forecast System</p>
           <h1 className="landing-panel__title">AI 大乐透预测系统</h1>
@@ -46,7 +49,8 @@ export function LandingPage() {
           </button>
           {error ? <p className="landing-panel__error">加载失败：{error}</p> : null}
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   )
 }

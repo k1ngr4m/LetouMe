@@ -3,6 +3,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { DISCLAIMER_TEXT } from '../shared/components/SiteDisclaimer'
 
 vi.mock('../features/home/HomePage', () => ({
   HomePage: () => <div>Home Page Mock</div>,
@@ -67,6 +68,7 @@ describe('App routing', () => {
   it('redirects dashboard route to prediction route', () => {
     renderApp(['/dashboard'])
     expect(screen.getByText('Home Page Mock')).toBeInTheDocument()
+    expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument()
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
   })
 
@@ -78,6 +80,7 @@ describe('App routing', () => {
   it('redirects settings route to profile route', () => {
     renderApp(['/settings'])
     expect(screen.getByText('Settings Page Mock')).toBeInTheDocument()
+    expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument()
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
   })
 
