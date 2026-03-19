@@ -95,6 +95,10 @@ class SimulationTicketPayload(BaseModel):
     group_numbers: list[str] = Field(default_factory=list)
 
 
+class SimulationTicketQuotePayload(SimulationTicketPayload):
+    pass
+
+
 class SimulationTicketListPayload(BaseModel):
     lottery_code: str = "dlt"
 

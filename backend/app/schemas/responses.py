@@ -107,6 +107,13 @@ class SimulationTicketCreateResponse(BaseModel):
     ticket: SimulationTicketRecordResponse
 
 
+class SimulationTicketQuoteResponse(BaseModel):
+    lottery_code: str = "dlt"
+    play_type: str = "dlt"
+    bet_count: int = 0
+    amount: int = 0
+
+
 class SuccessResponse(BaseModel):
     success: bool = True
 

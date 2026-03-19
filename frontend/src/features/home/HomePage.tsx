@@ -43,14 +43,12 @@ import {
 import {
   buildBallRange,
   buildSimulationMatches,
-  calculateAmount,
-  calculateBetCount,
   createRandomSelection,
   normalizeSimulationTicket,
   type SimulationPlayType,
   type SimulationSelection,
 } from './lib/simulation'
-import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketRecord } from '../../shared/types/api'
+import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
 import { getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 10
@@ -288,6 +286,12 @@ export function HomePage() {
     historyStrategyFilters,
     lotteryPage,
     lotteryPageSize,
+    {
+      enableCurrentPredictions: true,
+      enableLotteryCharts: true,
+      enablePredictionsHistory: activeTab === 'history',
+      enablePagedLotteryHistory: activeTab === 'history',
+    },
   )
   const lotteryLabel = selectedLottery === 'pl3' ? '排列3' : '大乐透'
 
@@ -1207,29 +1211,37 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       groupNumbers: selectedGroupNumbers,
     }
   }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
-  const betCount = useMemo(() => calculateBetCount(selection), [selection])
-  const amount = useMemo(() => calculateAmount(selection), [selection])
-  const canSubmit = betCount > 0
-  const matches = useMemo(
-    () => (showMatches && canSubmit ? buildSimulationMatches(selection, draws, matchWindow) : []),
-    [canSubmit, draws, matchWindow, selection, showMatches],
+  const simulationPayload = useMemo<SimulationTicketPayload>(
+    () => ({
+      lottery_code: lotteryCode,
+      play_type: lotteryCode === 'dlt' ? 'dlt' : pl3PlayType,
+      front_numbers: selectedFront,
+      back_numbers: selectedBack,
+      direct_hundreds: selectedHundreds,
+      direct_tens: selectedTens,
+      direct_units: selectedUnits,
+      group_numbers: selectedGroupNumbers,
+    }),
+    [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
   )
   const ticketsQuery = useQuery({
     queryKey: ['simulation-tickets', lotteryCode],
     queryFn: async () => (await apiClient.getSimulationTickets(lotteryCode)).tickets.map(normalizeSimulationTicket),
   })
+  const ticketQuoteQuery = useQuery({
+    queryKey: ['simulation-ticket-quote', simulationPayload],
+    queryFn: async () => apiClient.quoteSimulationTicket(simulationPayload),
+  })
+  const betCount = ticketQuoteQuery.data?.bet_count || 0
+  const amount = ticketQuoteQuery.data?.amount || 0
+  const canSubmit = betCount > 0
+  const matches = useMemo(
+    () => (showMatches && canSubmit ? buildSimulationMatches(selection, draws, matchWindow) : []),
+    [canSubmit, draws, matchWindow, selection, showMatches],
+  )
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiClient.createSimulationTicket({
-        lottery_code: lotteryCode,
-        play_type: lotteryCode === 'dlt' ? 'dlt' : pl3PlayType,
-        front_numbers: selectedFront,
-        back_numbers: selectedBack,
-        direct_hundreds: selectedHundreds,
-        direct_tens: selectedTens,
-        direct_units: selectedUnits,
-        group_numbers: selectedGroupNumbers,
-      })
+      const response = await apiClient.createSimulationTicket(simulationPayload)
       return normalizeSimulationTicket(response.ticket)
     },
     onSuccess: async () => {

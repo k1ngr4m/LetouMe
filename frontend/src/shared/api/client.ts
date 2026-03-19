@@ -31,6 +31,7 @@ import type {
   SettingsModelPayload,
   SettingsProviderListResponse,
   SimulationTicketCreateResponse,
+  SimulationTicketQuoteResponse,
   SimulationTicketListResponse,
   SimulationTicketPayload,
   SuccessResponse,
@@ -168,6 +169,12 @@ export const apiClient = {
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
     return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: payload.lottery_code || 'dlt', ...payload }),
+    })
+  },
+  quoteSimulationTicket(payload: SimulationTicketPayload) {
+    return requestJson<SimulationTicketQuoteResponse>('/api/simulation/tickets/quote', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: payload.lottery_code || 'dlt', ...payload }),
     })

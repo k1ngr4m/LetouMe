@@ -72,14 +72,9 @@ class PredictionService:
     def get_current_payload(self, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:current",
+            f"predictions:{normalized_code}:current:scored",
             ttl_seconds=60,
-            loader=lambda: self.prediction_repository.get_current_prediction(lottery_code=normalized_code) or {
-                "lottery_code": normalized_code,
-                "prediction_date": "",
-                "target_period": "",
-                "models": [],
-            },
+            loader=lambda: self._build_current_payload(lottery_code=normalized_code),
         )
         self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
         return payload
@@ -87,15 +82,35 @@ class PredictionService:
     def get_current_payload_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         return runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:current:{target_period}",
+            f"predictions:{normalized_code}:current:{target_period}:scored",
             ttl_seconds=60,
-            loader=lambda: self.prediction_repository.get_current_prediction_by_period(target_period, lottery_code=normalized_code) or {
-                "lottery_code": normalized_code,
-                "prediction_date": "",
-                "target_period": target_period,
-                "models": [],
-            },
+            loader=lambda: self._build_current_payload(target_period=target_period, lottery_code=normalized_code),
         )
+
+    def _build_current_payload(self, lottery_code: str = "dlt", target_period: str | None = None) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        payload = (
+            self.prediction_repository.get_current_prediction_by_period(target_period, lottery_code=normalized_code)
+            if target_period
+            else self.prediction_repository.get_current_prediction(lottery_code=normalized_code)
+        ) or {
+            "lottery_code": normalized_code,
+            "prediction_date": "",
+            "target_period": target_period or "",
+            "models": [],
+        }
+        score_profiles = self._get_current_model_score_profiles(lottery_code=normalized_code)
+        return {
+            **payload,
+            "lottery_code": normalized_code,
+            "models": [
+                {
+                    **model,
+                    "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
+                }
+                for model in payload.get("models", [])
+            ],
+        }
 
     def get_history_payload(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -693,6 +708,33 @@ class PredictionService:
             reverse=True,
         )
         return result
+
+    def _get_current_model_score_profiles(self, lottery_code: str = "dlt") -> dict[str, dict[str, Any]]:
+        normalized_code = normalize_lottery_code(lottery_code)
+
+        def load_profiles() -> dict[str, dict[str, Any]]:
+            if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
+                summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(
+                    limit=120,
+                    offset=0,
+                    lottery_code=normalized_code,
+                )
+                summary_records = summary_payload.get("records", [])
+            else:
+                summary_records = self.prediction_repository.list_history_record_summaries(
+                    limit=120,
+                    offset=0,
+                    lottery_code=normalized_code,
+                )
+            records = [self._annotate_history_summary_record(record) for record in summary_records]
+            records = [record for record in records if record.get("models")]
+            return self._build_score_profiles(records)
+
+        return runtime_cache.get_or_set(
+            f"predictions:{normalized_code}:score-profiles:current",
+            ttl_seconds=120,
+            loader=load_profiles,
+        )
 
     def _build_score_profiles(self, records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         grouped: dict[str, list[dict[str, Any]]] = {}

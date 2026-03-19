@@ -25,6 +25,16 @@ export function useHomeModelFilters(
   pinnedModelIds: string[],
   initialState?: HomeModelFilterInitialState,
 ) {
+  const effectiveHistory = useMemo<PredictionsHistoryListResponse>(
+    () =>
+      history || {
+        predictions_history: [],
+        total_count: 0,
+        model_stats: [],
+        strategy_options: [],
+      },
+    [history],
+  )
   const [isModelFilterOpen, setIsModelFilterOpen] = useState(Boolean(initialState?.isModelFilterOpen))
   const [modelNameQuery, setModelNameQuery] = useState(initialState?.modelNameQuery || '')
   const [selectedProviders, setSelectedProviders] = useState<string[]>(initialState?.selectedProviders || [])
@@ -32,7 +42,7 @@ export function useHomeModelFilters(
   const [selectedScoreRange, setSelectedScoreRange] = useState<ModelListScoreRange>(initialState?.selectedScoreRange || 'all')
   const [summarySelectedModelIds, setSummarySelectedModelIds] = useState<string[] | null>(null)
 
-  const modelScores = useMemo(() => (history ? buildModelScores(history, models) : {}), [history, models])
+  const modelScores = useMemo(() => buildModelScores(effectiveHistory, models), [effectiveHistory, models])
   const orderedModels = useMemo(() => sortModels(models, modelScores, pinnedModelIds), [models, modelScores, pinnedModelIds])
   const availableProviders = useMemo(
     () => [...new Set(orderedModels.map((model) => model.model_provider).filter(Boolean))],

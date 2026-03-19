@@ -26,6 +26,24 @@ class SimulationTicketService:
         created = self.repository.create_ticket(user_id, {"lottery_code": lottery_code, **ticket_payload})
         return self._serialize_ticket(created)
 
+    def quote_ticket(self, payload: dict[str, Any]) -> dict[str, Any]:
+        lottery_code = normalize_lottery_code(payload.get("lottery_code"))
+        try:
+            ticket_payload = self._build_dlt_ticket_payload(payload) if lottery_code == "dlt" else self._build_pl3_ticket_payload(payload)
+        except ValueError:
+            return {
+                "lottery_code": lottery_code,
+                "play_type": str(payload.get("play_type") or ("dlt" if lottery_code == "dlt" else "direct")).strip().lower() or ("dlt" if lottery_code == "dlt" else "direct"),
+                "bet_count": 0,
+                "amount": 0,
+            }
+        return {
+            "lottery_code": lottery_code,
+            "play_type": str(ticket_payload.get("play_type") or "dlt"),
+            "bet_count": int(ticket_payload.get("bet_count") or 0),
+            "amount": int(ticket_payload.get("amount") or 0),
+        }
+
     def delete_ticket(self, user_id: int, ticket_id: int, lottery_code: str = "dlt") -> None:
         deleted = self.repository.delete_ticket(ticket_id, user_id, lottery_code=normalize_lottery_code(lottery_code))
         if not deleted:

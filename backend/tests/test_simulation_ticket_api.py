@@ -108,6 +108,36 @@ class SimulationTicketApiTests(unittest.TestCase):
         self.assertEqual(pl3_list_response.status_code, 200)
         self.assertEqual(len(pl3_list_response.json()["tickets"]), 1)
 
+    def test_quote_ticket_returns_calculated_amounts_without_creating_record(self) -> None:
+        dlt_quote_response = self.client.post(
+            "/api/simulation/tickets/quote",
+            json={"front_numbers": ["01", "02", "03", "04", "05", "06"], "back_numbers": ["01", "02", "03"]},
+        )
+        self.assertEqual(dlt_quote_response.status_code, 200)
+        dlt_quote = dlt_quote_response.json()
+        self.assertEqual(dlt_quote["lottery_code"], "dlt")
+        self.assertEqual(dlt_quote["bet_count"], 18)
+        self.assertEqual(dlt_quote["amount"], 36)
+
+        pl3_quote_response = self.client.post(
+            "/api/simulation/tickets/quote",
+            json={
+                "lottery_code": "pl3",
+                "play_type": "group3",
+                "group_numbers": ["01", "02", "03"],
+            },
+        )
+        self.assertEqual(pl3_quote_response.status_code, 200)
+        pl3_quote = pl3_quote_response.json()
+        self.assertEqual(pl3_quote["lottery_code"], "pl3")
+        self.assertEqual(pl3_quote["play_type"], "group3")
+        self.assertEqual(pl3_quote["bet_count"], 6)
+        self.assertEqual(pl3_quote["amount"], 12)
+
+        list_response = self.client.post("/api/simulation/tickets/list", json={})
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.json()["tickets"]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

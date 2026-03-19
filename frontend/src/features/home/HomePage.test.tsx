@@ -6,11 +6,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
-const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets, simulateHistoryFilterLoading } = vi.hoisted(() => ({
+const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets, quoteSimulationTicket, simulateHistoryFilterLoading } = vi.hoisted(() => ({
   createSimulationTicket: vi.fn(),
   deleteSimulationTicket: vi.fn(),
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
+  quoteSimulationTicket: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
 }))
 
@@ -94,6 +95,7 @@ vi.mock('../../shared/api/client', () => ({
     deleteSimulationTicket,
     getPredictionsHistoryDetail,
     getSimulationTickets,
+    quoteSimulationTicket,
   },
 }))
 
@@ -420,6 +422,39 @@ beforeEach(() => {
   getPredictionsHistoryDetail.mockReset()
   getSimulationTickets.mockReset()
   getSimulationTickets.mockResolvedValue({ tickets: [] })
+  quoteSimulationTicket.mockReset()
+  quoteSimulationTicket.mockImplementation(async (payload: Record<string, unknown>) => {
+    const lotteryCode = payload.lottery_code === 'pl3' ? 'pl3' : 'dlt'
+    if (lotteryCode === 'pl3') {
+      const playType = String(payload.play_type || 'direct')
+      if (playType === 'direct') {
+        const hundreds = Array.isArray(payload.direct_hundreds) ? payload.direct_hundreds.length : 0
+        const tens = Array.isArray(payload.direct_tens) ? payload.direct_tens.length : 0
+        const units = Array.isArray(payload.direct_units) ? payload.direct_units.length : 0
+        const betCount = hundreds && tens && units ? hundreds * tens * units : 0
+        return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
+      }
+      const groupCount = Array.isArray(payload.group_numbers) ? payload.group_numbers.length : 0
+      const betCount = playType === 'group3'
+        ? (groupCount >= 2 ? groupCount * (groupCount - 1) : 0)
+        : (groupCount >= 3 ? (groupCount * (groupCount - 1) * (groupCount - 2)) / 6 : 0)
+      return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
+    }
+    const frontCount = Array.isArray(payload.front_numbers) ? payload.front_numbers.length : 0
+    const backCount = Array.isArray(payload.back_numbers) ? payload.back_numbers.length : 0
+    const combination = (total: number, choose: number) => {
+      if (choose < 0 || choose > total) return 0
+      if (choose === 0 || choose === total) return 1
+      const actualChoose = Math.min(choose, total - choose)
+      let result = 1
+      for (let index = 1; index <= actualChoose; index += 1) {
+        result = (result * (total - actualChoose + index)) / index
+      }
+      return Math.round(result)
+    }
+    const betCount = frontCount >= 5 && backCount >= 2 ? combination(frontCount, 5) * combination(backCount, 2) : 0
+    return { lottery_code: 'dlt', play_type: 'dlt', bet_count: betCount, amount: betCount * 2 }
+  })
 })
 
 describe('HomePage dashboard sidebar', () => {

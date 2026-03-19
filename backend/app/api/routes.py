@@ -56,6 +56,7 @@ from backend.app.schemas.requests import (
     ScheduleTaskUpdatePayload,
     SettingsPredictionRecordDetailPayload,
     SimulationTicketDeletePayload,
+    SimulationTicketQuotePayload,
     SimulationTicketListPayload,
     SimulationTicketPayload,
     RoleCodePayload,
@@ -73,6 +74,7 @@ from backend.app.schemas.responses import (
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
     SimulationTicketCreateResponse,
+    SimulationTicketQuoteResponse,
     SimulationTicketListResponse,
     SuccessResponse,
 )
@@ -194,6 +196,11 @@ def create_simulation_ticket(payload: SimulationTicketPayload, current_user: dic
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ticket": ticket}
+
+
+@router.post("/simulation/tickets/quote", response_model=SimulationTicketQuoteResponse)
+def quote_simulation_ticket(payload: SimulationTicketQuotePayload, _: dict = Depends(require_current_user)) -> dict:
+    return simulation_ticket_service.quote_ticket(payload.model_dump())
 
 
 @router.post("/simulation/tickets/delete", response_model=SuccessResponse)

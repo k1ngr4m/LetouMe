@@ -346,7 +346,7 @@ export function buildModelScores(history: PredictionsHistoryListResponse, models
 
   for (const model of models) {
     const stat = statsMap.get(model.model_id)
-    const profile = normalizeScoreProfile(stat?.score_profile)
+    const profile = normalizeScoreProfile(stat?.score_profile || model.score_profile)
     result[model.model_id] = {
       overallScore: profile.overall_score,
       perBetScore: profile.per_bet_score,

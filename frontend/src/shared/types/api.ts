@@ -235,6 +235,13 @@ export type SimulationTicketCreateResponse = {
   ticket: SimulationTicketRecord
 }
 
+export type SimulationTicketQuoteResponse = {
+  lottery_code: LotteryCode
+  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  bet_count: number
+  amount: number
+}
+
 export type SuccessResponse = {
   success: boolean
 }

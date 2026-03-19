@@ -17,9 +17,16 @@ export function useHomeData(
   historyStrategyFilters: string[],
   lotteryPage: number,
   lotteryPageSize: number,
+  options?: {
+    enableCurrentPredictions?: boolean
+    enableLotteryCharts?: boolean
+    enablePredictionsHistory?: boolean
+    enablePagedLotteryHistory?: boolean
+  },
 ) {
   const currentPredictions = useQuery({
     ...currentPredictionsQueryOptions(lotteryCode),
+    enabled: options?.enableCurrentPredictions ?? true,
   })
 
   const lotteryCharts = useQuery({
@@ -31,6 +38,7 @@ export function useHomeData(
         data: data.data.map(normalizeDraw),
       }
     },
+    enabled: options?.enableLotteryCharts ?? true,
   })
 
   const predictionsHistory = useQuery({
@@ -46,6 +54,7 @@ export function useHomeData(
           strategy_match_mode: 'all',
         }),
       ),
+    enabled: options?.enablePredictionsHistory ?? true,
   })
 
   const pagedLotteryHistory = useQuery({
@@ -61,6 +70,7 @@ export function useHomeData(
         data: data.data.map(normalizeDraw),
       }
     },
+    enabled: options?.enablePagedLotteryHistory ?? true,
   })
 
   return {
