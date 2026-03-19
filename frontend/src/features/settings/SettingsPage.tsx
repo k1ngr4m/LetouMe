@@ -93,6 +93,7 @@ const EMPTY_GENERATION_FORM = {
   displayName: '',
   mode: 'current' as ModelPredictionMode,
   overwrite: false,
+  parallelism: '3',
   startPeriod: '',
   endPeriod: '',
 }
@@ -594,6 +595,7 @@ export function SettingsPage() {
   const generationTaskTotal = getGenerationTaskTotal(generationTask)
   const generationTaskCompleted = getGenerationTaskCompleted(generationTask)
   const generationProgressPercent = generationTaskTotal > 0 ? Math.min(100, Math.round((generationTaskCompleted / generationTaskTotal) * 100)) : 0
+  const generationTaskParallelism = generationTask?.progress_summary.parallelism
   const generationFailedDetails = useMemo(
     () =>
       (generationTask?.progress_summary.failed_details ?? []).map((item) => ({
@@ -667,13 +669,15 @@ export function SettingsPage() {
   })
 
   const generatePredictionMutation = useMutation({
-    mutationFn: () =>
-      generationForm.modelCodes.length > 1
+    mutationFn: () => {
+      const parallelism = Number(generationForm.parallelism.trim())
+      return generationForm.modelCodes.length > 1
         ? apiClient.bulkGenerateSettingsModelPredictions({
             lottery_code: generationForm.lotteryCode,
             model_codes: generationForm.modelCodes,
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
+            parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
             end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
           })
@@ -682,9 +686,11 @@ export function SettingsPage() {
             model_code: generationForm.modelCodes[0] || '',
             mode: generationForm.mode,
             overwrite: generationForm.overwrite,
+            parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
             end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
-          }),
+          })
+    },
     onSuccess: (task) => {
       setGenerationTask(task)
       setGenerationModalOpen(true)
@@ -895,6 +901,7 @@ export function SettingsPage() {
       displayName,
       mode: 'current',
       overwrite: false,
+      parallelism: '3',
       startPeriod: '',
       endPeriod: '',
     })
@@ -914,6 +921,7 @@ export function SettingsPage() {
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
       overwrite: false,
+      parallelism: '3',
       startPeriod: '',
       endPeriod: '',
     })
@@ -1029,6 +1037,12 @@ export function SettingsPage() {
     event.preventDefault()
     if (!generationForm.modelCodes.length) {
       setMessage('当前彩种暂无可用模型，请切换彩种后重试。')
+      setMessageType('error')
+      return
+    }
+    const parsedParallelism = Number(generationForm.parallelism.trim())
+    if (!Number.isInteger(parsedParallelism) || parsedParallelism < 1 || parsedParallelism > 8) {
+      setMessage('并发线程数必须为 1 到 8 的整数')
       setMessageType('error')
       return
     }
@@ -2423,6 +2437,18 @@ export function SettingsPage() {
                   <option value="overwrite">已有结果时覆盖</option>
                 </select>
               </label>
+              <label className="field">
+                <span>并发线程数</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={generationForm.parallelism}
+                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, parallelism: event.target.value }))}
+                  placeholder="默认 3"
+                />
+              </label>
               {generationForm.mode === 'history' ? (
                 <>
                   <label className="field">
@@ -2467,6 +2493,10 @@ export function SettingsPage() {
                           <span>总模型数</span>
                         </article>
                         <article>
+                          <strong>{generationTaskParallelism || '-'}</strong>
+                          <span>并发线程数</span>
+                        </article>
+                        <article>
                           <strong>{generationTask.progress_summary.processed_count}</strong>
                           <span>成功</span>
                         </article>
@@ -2501,6 +2531,10 @@ export function SettingsPage() {
                     </>
                   ) : (
                     <div className="generation-task-panel__stats">
+                      <article>
+                        <strong>{generationTaskParallelism || '-'}</strong>
+                        <span>并发线程数</span>
+                      </article>
                       <article>
                         <strong>{generationTask.progress_summary.processed_count}</strong>
                         <span>成功</span>

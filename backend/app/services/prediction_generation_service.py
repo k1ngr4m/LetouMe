@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from threading import Lock
+from threading import Lock, local
 from typing import Any, Callable
 
 from backend.app.db.connection import ensure_schema
@@ -23,6 +23,8 @@ DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
 DEFAULT_BULK_PARALLELISM = 3
+DEFAULT_SINGLE_MODEL_PARALLELISM = 3
+MAX_GENERATION_PARALLELISM = 8
 MAX_BULK_RETRIES_PER_MODEL = 1
 
 
@@ -31,6 +33,7 @@ class GenerationSummary:
     mode: str
     model_code: str
     target_period: str | None = None
+    parallelism: int | None = None
     processed_count: int = 0
     skipped_count: int = 0
     failed_count: int = 0
@@ -41,6 +44,7 @@ class GenerationSummary:
             "mode": self.mode,
             "model_code": self.model_code,
             "target_period": self.target_period,
+            "parallelism": self.parallelism,
             "processed_count": self.processed_count,
             "skipped_count": self.skipped_count,
             "failed_count": self.failed_count,
@@ -88,7 +92,7 @@ class PredictionGenerationService:
             for model in current_payload.get("models", [])
             if model.get("model_id")
         }
-        summary = GenerationSummary(mode="current", model_code=model_code, target_period=target_period, failed_periods=[])
+        summary = GenerationSummary(mode="current", model_code=model_code, target_period=target_period, parallelism=1, failed_periods=[])
         if model_code in existing_models and not overwrite:
             summary.skipped_count = 1
             if progress_callback:
@@ -129,6 +133,7 @@ class PredictionGenerationService:
         start_period: str,
         end_period: str,
         overwrite: bool,
+        parallelism: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
@@ -139,21 +144,29 @@ class PredictionGenerationService:
 
         normalized_code = normalize_lottery_code(lottery_code)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
-        model = self._prepare_model(model_def)
         prompt_template = self._load_prompt_template(normalized_code)
         history_data = self._load_lottery_history(normalized_code)
         period_map = self._build_period_map(history_data)
         available_periods = {int(period) for period in period_map}
         sorted_periods_desc = sorted((int(period), period) for period in period_map)
-        summary = GenerationSummary(mode="history", model_code=model_code, failed_periods=[])
+        target_periods = list(range(start_value, end_value + 1))
+        max_workers = self._normalize_single_model_parallelism(parallelism, period_count=len(target_periods))
+        summary = GenerationSummary(mode="history", model_code=model_code, parallelism=max_workers, failed_periods=[])
+        summary_lock = Lock()
+        thread_local = local()
+        pending_payloads: list[dict[str, Any]] = []
 
-        for period_int in range(start_value, end_value + 1):
+        def emit_progress_snapshot() -> None:
+            if progress_callback:
+                progress_callback(summary.to_dict())
+
+        for period_int in target_periods:
             target_period = str(period_int)
             if period_int not in available_periods:
-                summary.failed_count += 1
-                summary.failed_periods.append(target_period)
-                if progress_callback:
-                    progress_callback(summary.to_dict())
+                with summary_lock:
+                    summary.failed_count += 1
+                    summary.failed_periods.append(target_period)
+                    emit_progress_snapshot()
                 continue
 
             existing_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
@@ -163,9 +176,9 @@ class PredictionGenerationService:
                 if item.get("model_id")
             }
             if model_code in existing_model_map and not overwrite:
-                summary.skipped_count += 1
-                if progress_callback:
-                    progress_callback(summary.to_dict())
+                with summary_lock:
+                    summary.skipped_count += 1
+                    emit_progress_snapshot()
                 continue
 
             actual_result = period_map[target_period]
@@ -175,16 +188,42 @@ class PredictionGenerationService:
                 if period_int_value < period_int
             ][:DEFAULT_CONTEXT_SIZE]
             if not history_context:
-                summary.failed_count += 1
-                summary.failed_periods.append(target_period)
-                if progress_callback:
-                    progress_callback(summary.to_dict())
+                with summary_lock:
+                    summary.failed_count += 1
+                    summary.failed_periods.append(target_period)
+                    emit_progress_snapshot()
                 continue
 
             prediction_date = self._make_prediction_date(actual_result.get("date"))
+            pending_payloads.append(
+                {
+                    "target_period": target_period,
+                    "prediction_date": prediction_date,
+                    "actual_result": actual_result,
+                    "history_context": history_context,
+                    "existing_record": existing_record,
+                    "existing_model_map": existing_model_map,
+                }
+            )
+
+        def get_thread_model() -> Any:
+            cached_model = getattr(thread_local, "history_generation_model", None)
+            if cached_model is not None:
+                return cached_model
+            prepared_model = self._prepare_model(model_def)
+            thread_local.history_generation_model = prepared_model
+            return prepared_model
+
+        def run_period_generation(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any] | None]:
+            target_period = str(payload["target_period"])
+            prediction_date = str(payload["prediction_date"])
+            actual_result = dict(payload["actual_result"])
+            history_context = list(payload["history_context"])
+            existing_record = payload["existing_record"]
+            existing_model_map = dict(payload["existing_model_map"])
             try:
                 prediction = self._generate_prediction(
-                    model=model,
+                    model=get_thread_model(),
                     model_def=model_def,
                     lottery_code=normalized_code,
                     prompt_template=prompt_template,
@@ -193,15 +232,11 @@ class PredictionGenerationService:
                     history_context=history_context,
                 )
             except Exception:
-                summary.failed_count += 1
-                summary.failed_periods.append(target_period)
                 self.logger.exception(
                     "Historical prediction generation failed",
                     extra={"context": {"target_period": target_period, "model_code": model_code}},
                 )
-                if progress_callback:
-                    progress_callback(summary.to_dict())
-                continue
+                return "failed", target_period, None
 
             predictions_with_hits = []
             for group in prediction.get("predictions", []):
@@ -231,11 +266,33 @@ class PredictionGenerationService:
             record["prediction_date"] = prediction_date
             record["actual_result"] = actual_result
             record["models"] = list(existing_model_map.values())
-            self.prediction_repository.upsert_history_record(record)
-            self.prediction_service._invalidate_prediction_cache(target_period=target_period, lottery_code=normalized_code)
-            summary.processed_count += 1
-            if progress_callback:
-                progress_callback(summary.to_dict())
+            return "processed", target_period, record
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(run_period_generation, payload): str(payload["target_period"])
+                for payload in pending_payloads
+            }
+            for future in as_completed(futures):
+                target_period = futures[future]
+                try:
+                    status, target_period, record = future.result()
+                except Exception:
+                    status, record = "failed", None
+                    self.logger.exception(
+                        "Historical prediction generation worker crashed",
+                        extra={"context": {"target_period": target_period, "model_code": model_code}},
+                    )
+                if status == "processed" and record is not None:
+                    self.prediction_repository.upsert_history_record(record)
+                    self.prediction_service._invalidate_prediction_cache(target_period=target_period, lottery_code=normalized_code)
+                with summary_lock:
+                    if status == "processed":
+                        summary.processed_count += 1
+                    else:
+                        summary.failed_count += 1
+                        summary.failed_periods.append(target_period)
+                    emit_progress_snapshot()
 
         return summary.to_dict()
 
@@ -315,6 +372,7 @@ class PredictionGenerationService:
                             start_period=str(start_period or ""),
                             end_period=str(end_period or ""),
                             overwrite=overwrite,
+                            parallelism=1,
                         )
                     )
                     status, reason = self._classify_bulk_model_result(result)
@@ -381,15 +439,32 @@ class PredictionGenerationService:
 
     @staticmethod
     def _normalize_bulk_parallelism(parallelism: int | None, *, selected_count: int) -> int:
-        if selected_count <= 0:
+        return PredictionGenerationService._normalize_parallelism(
+            parallelism,
+            task_count=selected_count,
+            default_parallelism=DEFAULT_BULK_PARALLELISM,
+        )
+
+    @staticmethod
+    def _normalize_single_model_parallelism(parallelism: int | None, *, period_count: int) -> int:
+        return PredictionGenerationService._normalize_parallelism(
+            parallelism,
+            task_count=period_count,
+            default_parallelism=DEFAULT_SINGLE_MODEL_PARALLELISM,
+        )
+
+    @staticmethod
+    def _normalize_parallelism(parallelism: int | None, *, task_count: int, default_parallelism: int) -> int:
+        if task_count <= 0:
             return 1
         if parallelism is None:
-            requested = DEFAULT_BULK_PARALLELISM
+            requested = default_parallelism
         else:
             requested = int(parallelism)
             if requested < 1:
                 raise ValueError("并发数必须大于 0")
-        return max(1, min(requested, selected_count))
+        normalized = min(requested, MAX_GENERATION_PARALLELISM)
+        return max(1, min(normalized, task_count))
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         model = ModelFactory().create(model_def)

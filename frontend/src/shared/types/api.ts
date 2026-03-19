@@ -296,6 +296,7 @@ export type GenerateSettingsModelPredictionsPayload = {
   model_code: string
   mode: 'current' | 'history'
   overwrite: boolean
+  parallelism?: number
   start_period?: string
   end_period?: string
 }
@@ -352,6 +353,7 @@ export type PredictionGenerationTask = {
     mode: string
     model_code: string
     target_period?: string | null
+    parallelism?: number
     selected_count?: number
     completed_count?: number
     processed_count: number

@@ -45,6 +45,7 @@ class GenerateModelPredictionsPayload(BaseModel):
     model_code: str
     mode: str
     overwrite: bool = False
+    parallelism: int | None = Field(default=None, ge=1, le=8)
     start_period: str | None = None
     end_period: str | None = None
 

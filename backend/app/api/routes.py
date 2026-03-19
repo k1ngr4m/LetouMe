@@ -406,6 +406,7 @@ def generate_model_predictions(
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
                 overwrite=payload.overwrite,
+                parallelism=payload.parallelism,
                 progress_callback=progress_callback,
             ),
         )

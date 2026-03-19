@@ -331,8 +331,83 @@ describe('SettingsPage model management view switch', () => {
         model_code: 'deepseek-v3.2',
         mode: 'current',
         overwrite: false,
+        parallelism: 3,
         start_period: undefined,
         end_period: undefined,
+      }),
+    )
+  })
+
+  it('submits single-model generate task with custom parallelism', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v3.2',
+          display_name: 'DeepSeek-V3.2',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt', 'pl3'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.generateSettingsModelPredictions.mockResolvedValue({
+      task_id: 'task-1',
+      status: 'queued',
+      mode: 'history',
+      model_code: 'deepseek-v3.2',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'history',
+        model_code: 'deepseek-v3.2',
+        parallelism: 5,
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.selectOptions(screen.getByLabelText('生成模式'), 'history')
+    await userEvent.clear(screen.getByLabelText('并发线程数'))
+    await userEvent.type(screen.getByLabelText('并发线程数'), '5')
+    await userEvent.type(screen.getByLabelText('开始期号'), '26050')
+    await userEvent.type(screen.getByLabelText('结束期号'), '26052')
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+    expect(await screen.findByRole('heading', { name: '单模型生成任务' })).toBeInTheDocument()
+    expect(screen.getAllByText('并发线程数').length).toBeGreaterThan(1)
+    expect(screen.getByText('5')).toBeInTheDocument()
+
+    await waitFor(() =>
+      expect(apiClientMock.generateSettingsModelPredictions).toHaveBeenCalledWith({
+        lottery_code: 'dlt',
+        model_code: 'deepseek-v3.2',
+        mode: 'history',
+        overwrite: false,
+        parallelism: 5,
+        start_period: '26050',
+        end_period: '26052',
       }),
     )
   })
@@ -558,6 +633,7 @@ describe('SettingsPage model management view switch', () => {
         model_code: 'pl3-only',
         mode: 'current',
         overwrite: false,
+        parallelism: 3,
         start_period: undefined,
         end_period: undefined,
       }),
