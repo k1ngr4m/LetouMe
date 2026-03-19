@@ -3,11 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
-import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
-import { loadSelectedLottery, saveSelectedLottery } from '../../shared/lib/storage'
-import { normalizeCurrentPredictions, normalizePredictionsHistory } from '../home/lib/home'
 import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
 import type {
   AuthUser,
@@ -24,8 +21,6 @@ import type {
   ScheduleTaskType,
   ScheduleMode,
   SchedulePresetType,
-  SettingsPredictionRecordDetail,
-  SettingsPredictionRecordSummary,
   SettingsModel,
   SettingsModelPayload,
   LotteryCode,
@@ -34,8 +29,6 @@ import type {
 type SettingsTab = 'profile' | 'models' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
-type ModelManagementTab = 'catalog' | 'records'
-type PredictionRecordTypeFilter = 'all' | 'current' | 'history'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type BulkEditForm = {
@@ -132,10 +125,10 @@ const EMPTY_SCHEDULE_FORM: ScheduleForm = {
   cron_expression: '',
   is_active: true,
 }
+const DEFAULT_SETTINGS_LOTTERY: LotteryCode = 'dlt'
 
 const EMPTY_MODELS: SettingsModel[] = []
 const EMPTY_PROVIDERS: Array<{ code: string; name: string }> = []
-const EMPTY_RECORDS: SettingsPredictionRecordSummary[] = []
 const EMPTY_USERS: AuthUser[] = []
 const EMPTY_ROLES: RoleItem[] = []
 const EMPTY_PERMISSIONS: PermissionItem[] = []
@@ -154,6 +147,10 @@ const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> 
   updated_asc: { label: '最早更新', hint: '按更新时间从旧到新排序' },
   name_asc: { label: '名称 A-Z', hint: '按名称正序排序' },
   name_desc: { label: '名称 Z-A', hint: '按名称倒序排序' },
+}
+
+function getLotteryLabel(lotteryCode: LotteryCode) {
+  return lotteryCode === 'pl3' ? '排列3' : '大乐透'
 }
 
 function SvgIcon({ children }: { children: ReactNode }) {
@@ -236,25 +233,6 @@ function PlusIcon() {
   return (
     <SvgIcon>
       <path d="M10 4.5v11M4.5 10h11" />
-    </SvgIcon>
-  )
-}
-
-function CatalogIcon() {
-  return (
-    <SvgIcon>
-      <path d="M5 4.5h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
-      <path d="M7 8h6M7 11h4" />
-    </SvgIcon>
-  )
-}
-
-function HistoryIcon() {
-  return (
-    <SvgIcon>
-      <path d="M4.5 10a5.5 5.5 0 1 0 1.7-4" />
-      <path d="M4.5 5.2v2.7h2.7" />
-      <path d="M10 7.3v3.2l2 1.2" />
     </SvgIcon>
   )
 }
@@ -383,15 +361,13 @@ export function SettingsPage() {
   const location = useLocation()
   const { user, hasPermission, logout } = useAuth()
   const activeTab = getSettingsTabFromPath(location.pathname)
-  const [modelManagementTab, setModelManagementTab] = useState<ModelManagementTab>('catalog')
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
   const [message, setMessage] = useState<string | null>(null)
-  const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
-  const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [selectedLottery] })
+  const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
@@ -401,12 +377,9 @@ export function SettingsPage() {
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
-  const [lotteryFetchTask, setLotteryFetchTask] = useState<LotteryFetchTask | null>(null)
-  const [selectedPredictionRecord, setSelectedPredictionRecord] = useState<{ recordType: 'current' | 'history'; targetPeriod: string } | null>(null)
-  const [predictionRecordPeriodQuery, setPredictionRecordPeriodQuery] = useState('')
-  const [predictionRecordTypeFilter, setPredictionRecordTypeFilter] = useState<PredictionRecordTypeFilter>('all')
+  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null })
   const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
-  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [expandedScheduleTaskCode, setExpandedScheduleTaskCode] = useState<string | null>(null)
@@ -425,8 +398,8 @@ export function SettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin'
 
   const modelsQuery = useQuery({
-    queryKey: ['settings-models', selectedLottery],
-    queryFn: () => apiClient.getSettingsModels(false, selectedLottery),
+    queryKey: ['settings-models'],
+    queryFn: () => apiClient.getSettingsModels(false),
     enabled: canManageModels || canManageSchedules,
   })
   const providersQuery = useQuery({
@@ -434,42 +407,11 @@ export function SettingsPage() {
     queryFn: () => apiClient.getSettingsProviders(),
     enabled: canManageModels,
   })
-  const predictionRecordsQuery = useQuery({
-    queryKey: ['settings-prediction-records', selectedLottery],
-    queryFn: () => apiClient.getSettingsPredictionRecords(selectedLottery),
-    enabled: canManageModels,
-  })
-  const predictionRecordDetailQuery = useQuery({
-    queryKey: ['settings-prediction-record-detail', selectedLottery, selectedPredictionRecord?.recordType, selectedPredictionRecord?.targetPeriod],
-    queryFn: async () => {
-      const detail = await apiClient.getSettingsPredictionRecordDetail(
-        selectedPredictionRecord?.recordType || 'history',
-        selectedPredictionRecord?.targetPeriod || '',
-        selectedLottery,
-      )
-      if (detail.record_type === 'history') {
-        return normalizePredictionsHistory({ predictions_history: [detail], total_count: 1 }).predictions_history[0] as SettingsPredictionRecordDetail
-      }
-      return normalizeCurrentPredictions({
-        lottery_code: selectedLottery,
-        prediction_date: detail.prediction_date,
-        target_period: detail.target_period,
-        models: detail.models,
-      }) as unknown as SettingsPredictionRecordDetail
-    },
-    enabled: canManageModels && Boolean(selectedPredictionRecord),
-  })
   const scheduleTasksQuery = useQuery({
     queryKey: ['settings-schedules'],
     queryFn: () => apiClient.listScheduleTasks(),
     enabled: canManageSchedules,
   })
-  useEffect(() => {
-    saveSelectedLottery(selectedLottery)
-  }, [selectedLottery])
-  useEffect(() => {
-    setScheduleForm((previous) => ({ ...previous, lottery_code: selectedLottery }))
-  }, [selectedLottery])
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => apiClient.listUsers(),
@@ -531,7 +473,6 @@ export function SettingsPage() {
           }
           setMessageType('success')
           void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
-          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records'] })
         } else if (task.status === 'failed') {
           setMessage(task.error_message || '预测任务执行失败')
           setMessageType('error')
@@ -545,33 +486,58 @@ export function SettingsPage() {
   }, [generationTask, queryClient])
 
   useEffect(() => {
-    if (!lotteryFetchTask || !['queued', 'running'].includes(lotteryFetchTask.status)) return undefined
+    const task = lotteryFetchTasks.dlt
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
     const timer = window.setTimeout(async () => {
       try {
-        const task = await apiClient.getLotteryFetchTaskDetail(lotteryFetchTask.task_id)
-        setLotteryFetchTask(task)
-        if (task.status === 'succeeded') {
-          const summary = task.progress_summary
-          setMessage(`${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryFetchTasks((previous) => ({ ...previous, dlt: nextTask }))
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`大乐透数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
           setMessageType('success')
-          void queryClient.invalidateQueries({ queryKey: ['lottery-history', selectedLottery] })
-          void queryClient.invalidateQueries({ queryKey: ['current-predictions', selectedLottery] })
-          void queryClient.invalidateQueries({ queryKey: ['predictions-history', selectedLottery] })
-          void queryClient.invalidateQueries({ queryKey: ['settings-prediction-records', selectedLottery] })
-        } else if (task.status === 'failed') {
-          setMessage(task.error_message || `${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新失败`)
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'dlt'] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'dlt'] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'dlt'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '大乐透数据更新失败')
           setMessageType('error')
         }
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : `读取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}抓取任务状态失败`)
+        setMessage(error instanceof Error ? error.message : '读取大乐透抓取任务状态失败')
         setMessageType('error')
       }
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [lotteryFetchTask, queryClient, selectedLottery])
+  }, [lotteryFetchTasks.dlt, queryClient])
+
+  useEffect(() => {
+    const task = lotteryFetchTasks.pl3
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryFetchTasks((previous) => ({ ...previous, pl3: nextTask }))
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`排列3数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'pl3'] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'pl3'] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'pl3'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '排列3数据更新失败')
+          setMessageType('error')
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取排列3抓取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [lotteryFetchTasks.pl3, queryClient])
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
-  const predictionRecords = predictionRecordsQuery.data?.records ?? EMPTY_RECORDS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
@@ -583,31 +549,13 @@ export function SettingsPage() {
     () => Object.fromEntries(permissions.map((permission) => [permission.permission_code, permission])),
     [permissions],
   )
-  const filteredPredictionRecords = useMemo(
-    () =>
-      predictionRecords.filter((record) => {
-        const matchesType = predictionRecordTypeFilter === 'all' || record.record_type === predictionRecordTypeFilter
-        const matchesPeriod =
-          !predictionRecordPeriodQuery || record.target_period.includes(predictionRecordPeriodQuery.trim())
-        return matchesType && matchesPeriod
-      }),
-    [predictionRecordPeriodQuery, predictionRecordTypeFilter, predictionRecords],
-  )
-  const predictionRecordSummary = useMemo(
-    () => ({
-      total: predictionRecords.length,
-      current: predictionRecords.filter((record) => record.record_type === 'current').length,
-      history: predictionRecords.filter((record) => record.record_type === 'history').length,
-    }),
-    [predictionRecords],
-  )
   const filteredScheduleTasks = useMemo(
     () => scheduleTasks.filter((task) => scheduleTaskFilter === 'all' || task.task_type === scheduleTaskFilter),
     [scheduleTaskFilter, scheduleTasks],
   )
   const selectedLotteryModels = useMemo(
-    () => models.filter((model) => (model.lottery_codes || [selectedLottery]).includes(scheduleForm.lottery_code)),
-    [models, scheduleForm.lottery_code, selectedLottery],
+    () => models.filter((model) => (model.lottery_codes || [DEFAULT_SETTINGS_LOTTERY]).includes(scheduleForm.lottery_code)),
+    [models, scheduleForm.lottery_code],
   )
   const sortedModels = useMemo(() => {
     const items = [...models]
@@ -688,7 +636,7 @@ export function SettingsPage() {
       setMessage(modelMode === 'create' ? '模型已创建。' : '模型已更新。')
       setMessageType('success')
       setModelModalOpen(false)
-      void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] })
+      void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型保存失败')
@@ -702,7 +650,7 @@ export function SettingsPage() {
       if (action.type === 'delete') return apiClient.deleteSettingsModel(action.modelCode)
       return apiClient.restoreSettingsModel(action.modelCode)
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings-models'] }),
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型操作失败')
       setMessageType('error')
@@ -752,7 +700,7 @@ export function SettingsPage() {
       setBulkEditForm(EMPTY_BULK_EDIT_FORM)
       setMessage(`批量${mapBulkActionLabel(variables.action)}完成：成功 ${result.processed_count}，跳过 ${result.skipped_count}，失败 ${result.failed_count}。`)
       setMessageType('success')
-      void queryClient.invalidateQueries({ queryKey: ['settings-models', selectedLottery] })
+      void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '批量模型操作失败')
@@ -760,15 +708,28 @@ export function SettingsPage() {
     },
   })
 
-  const fetchLotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory(selectedLottery),
+  const fetchDltLotteryMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory('dlt'),
     onSuccess: (task) => {
-      setLotteryFetchTask(task)
-      setMessage(`${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新任务已创建，正在后台执行。`)
+      setLotteryFetchTasks((previous) => ({ ...previous, dlt: task }))
+      setMessage('大乐透数据更新任务已创建，正在后台执行。')
       setMessageType('success')
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : `创建${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据更新任务失败`)
+      setMessage(error instanceof Error ? error.message : '创建大乐透数据更新任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const fetchPl3LotteryMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory('pl3'),
+    onSuccess: (task) => {
+      setLotteryFetchTasks((previous) => ({ ...previous, pl3: task }))
+      setMessage('排列3数据更新任务已创建，正在后台执行。')
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建排列3数据更新任务失败')
       setMessageType('error')
     },
   })
@@ -802,7 +763,7 @@ export function SettingsPage() {
         setMessage('定时任务已删除。')
         if (selectedScheduleTaskCode === variables.task.task_code) {
           setSelectedScheduleTaskCode(null)
-          setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+          setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
         }
       } else if (variables.type === 'toggle') {
         setMessage(`定时任务已${variables.task.is_active ? '停用' : '启用'}。`)
@@ -908,14 +869,14 @@ export function SettingsPage() {
   function openCreateModel() {
     setModelMode('create')
     setSelectedModelCode(null)
-    setModelForm({ ...EMPTY_MODEL_FORM, lottery_codes: [selectedLottery] })
+    setModelForm({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
     setModelModalOpen(true)
   }
 
   function openGenerateModel(modelCode: string, displayName: string) {
     setGenerationTask(null)
     setGenerationForm({
-      lotteryCode: selectedLottery,
+      lotteryCode: DEFAULT_SETTINGS_LOTTERY,
       modelCodes: [modelCode],
       displayName,
       mode: 'current',
@@ -929,7 +890,7 @@ export function SettingsPage() {
   function openBulkGenerateModels() {
     setGenerationTask(null)
     setGenerationForm({
-      lotteryCode: selectedLottery,
+      lotteryCode: DEFAULT_SETTINGS_LOTTERY,
       modelCodes: selectedModelCodes,
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
@@ -1081,7 +1042,7 @@ export function SettingsPage() {
 
   function openCreateScheduleTask() {
     setSelectedScheduleTaskCode(null)
-    setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+    setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
     setScheduleModalOpen(true)
   }
 
@@ -1107,7 +1068,7 @@ export function SettingsPage() {
   function closeScheduleModal() {
     setScheduleModalOpen(false)
     setSelectedScheduleTaskCode(null)
-    setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: selectedLottery })
+    setScheduleForm({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   }
 
   function toggleScheduleWeekday(weekday: number) {
@@ -1152,22 +1113,7 @@ export function SettingsPage() {
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Settings Center</p>
           <h2 className="hero-panel__title">设置中心</h2>
-          <p className="hero-panel__description">可修改基础信息，并按彩种维护模型、抓取与预测记录。</p>
-          <div className="lottery-switch" role="tablist" aria-label="彩种切换">
-            {(['dlt', 'pl3'] as LotteryCode[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={clsx('chip-button', selectedLottery === code && 'is-active')}
-                onClick={() => setSelectedLottery(code)}
-                aria-label={code === 'pl3' ? '排列3' : '大乐透'}
-                aria-pressed={selectedLottery === code}
-              >
-                <span className="chip-button__title">{code === 'pl3' ? '排列3' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'pl3' ? '彩种配置 / 记录管理' : '模型抓取 / 开奖维护'}</span>
-              </button>
-            ))}
-          </div>
+          <p className="hero-panel__description">综合管理模型、抓取任务、定时任务与账号配置，不再按彩种切换页面视图。</p>
           <div className="hero-panel__meta">
             <span>当前角色 {user?.role_name || '-'}</span>
             <span>权限数 {user?.permissions?.length || 0}</span>
@@ -1288,29 +1234,10 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard
                 title="模型管理"
-                subtitle="管理模型目录、Provider 连接与运行状态。"
+                subtitle="统一管理全部模型目录、彩种覆盖、Provider 连接与运行状态。"
                 actions={
                   <div className="toolbar-inline settings-model-toolbar">
-                    <div className="view-switch settings-model-tabs" role="tablist" aria-label="模型管理标签切换">
-                      <button
-                        className={clsx('view-switch__button settings-model-tabs__button', modelManagementTab === 'catalog' && 'is-active')}
-                        onClick={() => setModelManagementTab('catalog')}
-                        type="button"
-                      >
-                        <CatalogIcon />
-                        <span>模型列表</span>
-                      </button>
-                      <button
-                        className={clsx('view-switch__button settings-model-tabs__button', modelManagementTab === 'records' && 'is-active')}
-                        onClick={() => setModelManagementTab('records')}
-                        type="button"
-                      >
-                        <HistoryIcon />
-                        <span>预测记录</span>
-                      </button>
-                    </div>
-                    {modelManagementTab === 'catalog' ? (
-                      <div className="settings-model-toolbar__actions">
+                    <div className="settings-model-toolbar__actions">
                         <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="模型管理视图切换">
                           <IconButton
                             label="列表视图"
@@ -1325,7 +1252,7 @@ export function SettingsPage() {
                             onClick={() => setModelManagementView('card')}
                           />
                         </div>
-                        {generationTask && !generationModalOpen ? (
+                          {generationTask && !generationModalOpen ? (
                           <button
                             className="ghost-button settings-model-toolbar__resume-task"
                             type="button"
@@ -1393,12 +1320,10 @@ export function SettingsPage() {
                           ) : null}
                         </div>
                       </div>
-                    ) : null}
                   </div>
                 }
               >
-                {modelManagementTab === 'catalog' ? (
-                  modelManagementView === 'list' ? (
+                {modelManagementView === 'list' ? (
                   <div className="table-shell settings-model-table-shell">
                     <table className="history-table settings-model-table">
                       <thead>
@@ -1412,6 +1337,7 @@ export function SettingsPage() {
                             />
                           </th>
                           <th>模型名称</th>
+                          <th className="settings-model-table__compact-head">彩种</th>
                           <th className="settings-model-table__compact-head">Provider</th>
                           <th className="settings-model-table__compact-head">接口模型</th>
                           <th className="settings-model-table__compact-head">Tag</th>
@@ -1435,6 +1361,15 @@ export function SettingsPage() {
                               <div className="settings-model-table__title">
                                 <strong>{model.display_name}</strong>
                                 <span>{model.model_code}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="settings-model-table__tags">
+                                {(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map((code) => (
+                                  <span key={`${model.model_code}-${code}`} className="tag tag--muted settings-model-table__tag-compact">
+                                    {getLotteryLabel(code)}
+                                  </span>
+                                ))}
                               </div>
                             </td>
                             <td>
@@ -1574,6 +1509,7 @@ export function SettingsPage() {
                         </div>
                         <p className="settings-model-card-react__meta">{model.api_model_name}</p>
                         <div className="settings-model-card-react__facts">
+                          <span>{(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map(getLotteryLabel).join(' / ')}</span>
                           <span>{model.base_url}</span>
                           <span>{model.tags.join(', ') || '无标签'}</span>
                           <span>{formatDateTimeLocal(model.updated_at)}</span>
@@ -1581,147 +1517,57 @@ export function SettingsPage() {
                       </article>
                     ))}
                   </div>
-                  )
-                ) : (
-                  <>
-                    <section className="settings-profile-hero settings-records-hero">
-                      <div className="settings-profile-hero__main">
-                        <p className="settings-profile-hero__eyebrow">记录概览</p>
-                        <h2>预测记录</h2>
-                        <p className="settings-profile-hero__description">按期号快速检索当前期与历史预测记录，并查看每期的模型覆盖情况与开奖结果。</p>
-                      </div>
-                      <div className="settings-profile-summary">
-                        <article className="settings-profile-summary__item">
-                          <span>全部记录</span>
-                          <strong>{predictionRecordSummary.total}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>当前期</span>
-                          <strong>{predictionRecordSummary.current}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>历史</span>
-                          <strong>{predictionRecordSummary.history}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>筛选结果</span>
-                          <strong>{filteredPredictionRecords.length}</strong>
-                        </article>
-                      </div>
-                      <div className="history-toolbar settings-records-hero__toolbar">
-                        <div className="filter-chip-group">
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: 'current', label: '当前期' },
-                            { value: 'history', label: '历史' },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              className={clsx('filter-chip', predictionRecordTypeFilter === option.value && 'is-active')}
-                              onClick={() => setPredictionRecordTypeFilter(option.value as PredictionRecordTypeFilter)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          className="search-input"
-                          value={predictionRecordPeriodQuery}
-                          onChange={(event) => setPredictionRecordPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
-                          placeholder="输入期号过滤"
-                        />
-                      </div>
-                    </section>
-                    {filteredPredictionRecords.length ? (
-                      <div className="table-shell settings-model-table-shell">
-                        <table className="history-table settings-model-table">
-                          <thead>
-                            <tr>
-                              <th>记录类型</th>
-                              <th>期号</th>
-                              <th>预测日期</th>
-                              <th>开奖结果</th>
-                              <th>模型数</th>
-                              <th>状态</th>
-                              <th>操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredPredictionRecords.map((record) => (
-                              <tr key={`${record.record_type}-${record.target_period}`}>
-                                <td>{record.record_type === 'current' ? '当前期' : '历史'}</td>
-                                <td>{record.target_period}</td>
-                                <td>{record.prediction_date || '-'}</td>
-                                <td>
-                                  {record.actual_result ? (
-                                    <div className="settings-model-table__tags">
-                                      {record.actual_result.red_balls.map((ball) => <NumberBall key={`${record.target_period}-red-${ball}`} value={ball} color="red" size="sm" />)}
-                                      {record.actual_result.blue_balls.map((ball) => <NumberBall key={`${record.target_period}-blue-${ball}`} value={ball} color="blue" size="sm" />)}
-                                    </div>
-                                  ) : (
-                                    <span>待开奖</span>
-                                  )}
-                                </td>
-                                <td>{record.model_count}</td>
-                                <td>{record.status_label}</td>
-                                <td>
-                                  <button
-                                    className="ghost-button"
-                                    onClick={() => setSelectedPredictionRecord({ recordType: record.record_type, targetPeriod: record.target_period })}
-                                  >
-                                    查看详情
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="state-shell">没有符合当前筛选条件的预测记录。</div>
-                    )}
-                  </>
                 )}
               </StatusCard>
               {isSuperAdmin ? (
-                <StatusCard title="数据维护" subtitle={`手动抓取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}开奖历史数据并更新到数据库。`}>
-                  <section className="settings-profile-hero settings-maintenance-hero">
-                    <div className="settings-profile-hero__main">
-                      <p className="settings-profile-hero__eyebrow">数据维护</p>
-                      <h2>{selectedLottery === 'pl3' ? '排列3历史同步' : '大乐透历史同步'}</h2>
-                      <p className="settings-profile-hero__description">手动抓取开奖历史并写入数据库，用于更新首页统计、预测记录和后续模型分析。</p>
-                    </div>
-                    <div className="settings-profile-hero__badges">
-                      <span className="status-pill">
-                        {lotteryFetchTask ? `任务状态：${getTaskStatusLabel(lotteryFetchTask.status)}` : '尚未执行'}
-                      </span>
-                    </div>
-                    <div className="settings-profile-summary">
-                      <article className="settings-profile-summary__item">
-                        <span>抓取条数</span>
-                        <strong>{lotteryFetchTask?.progress_summary.fetched_count ?? 0}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>写入条数</span>
-                        <strong>{lotteryFetchTask?.progress_summary.saved_count ?? 0}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>最新期号</span>
-                        <strong>{lotteryFetchTask?.progress_summary.latest_period || '-'}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>创建时间</span>
-                        <strong>{lotteryFetchTask ? formatDateTimeLocal(lotteryFetchTask.created_at) : '-'}</strong>
-                      </article>
-                    </div>
-                    <div className="settings-maintenance-hero__actions">
-                      <button className="primary-button" onClick={() => fetchLotteryMutation.mutate()} disabled={fetchLotteryMutation.isPending || Boolean(lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))}>
-                        {fetchLotteryMutation.isPending || (lotteryFetchTask && ['queued', 'running'].includes(lotteryFetchTask.status))
-                          ? `正在获取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据...`
-                          : `获取${selectedLottery === 'pl3' ? '排列3' : '大乐透'}数据`}
-                      </button>
-                    </div>
-                  </section>
+                <StatusCard title="数据维护" subtitle="统一维护大乐透与排列3开奖历史数据，更新数据库后可供首页统计与任务使用。">
+                  <div className="settings-grid-react">
+                    {(['dlt', 'pl3'] as LotteryCode[]).map((lotteryCode) => {
+                      const task = lotteryFetchTasks[lotteryCode]
+                      const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : fetchDltLotteryMutation
+                      return (
+                        <section key={lotteryCode} className="settings-profile-hero settings-maintenance-hero">
+                          <div className="settings-profile-hero__main">
+                            <p className="settings-profile-hero__eyebrow">数据维护</p>
+                            <h2>{getLotteryLabel(lotteryCode)}历史同步</h2>
+                            <p className="settings-profile-hero__description">手动抓取开奖历史并写入数据库，用于更新首页统计、模型分析与预测相关任务。</p>
+                          </div>
+                          <div className="settings-profile-hero__badges">
+                            <span className="status-pill">{task ? `任务状态：${getTaskStatusLabel(task.status)}` : '尚未执行'}</span>
+                          </div>
+                          <div className="settings-profile-summary">
+                            <article className="settings-profile-summary__item">
+                              <span>抓取条数</span>
+                              <strong>{task?.progress_summary.fetched_count ?? 0}</strong>
+                            </article>
+                            <article className="settings-profile-summary__item">
+                              <span>写入条数</span>
+                              <strong>{task?.progress_summary.saved_count ?? 0}</strong>
+                            </article>
+                            <article className="settings-profile-summary__item">
+                              <span>最新期号</span>
+                              <strong>{task?.progress_summary.latest_period || '-'}</strong>
+                            </article>
+                            <article className="settings-profile-summary__item">
+                              <span>创建时间</span>
+                              <strong>{task ? formatDateTimeLocal(task.created_at) : '-'}</strong>
+                            </article>
+                          </div>
+                          <div className="settings-maintenance-hero__actions">
+                            <button
+                              className="primary-button"
+                              onClick={() => mutation.mutate()}
+                              disabled={mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))}
+                            >
+                              {mutation.isPending || (task && ['queued', 'running'].includes(task.status))
+                                ? `正在获取${getLotteryLabel(lotteryCode)}数据...`
+                                : `获取${getLotteryLabel(lotteryCode)}数据`}
+                            </button>
+                          </div>
+                        </section>
+                      )
+                    })}
+                  </div>
                 </StatusCard>
               ) : null}
             </div>
@@ -1729,7 +1575,7 @@ export function SettingsPage() {
 
           {activeTab === 'schedules' ? (
             <div className="page-section">
-              <StatusCard title="定时任务" subtitle="按彩种维护开奖抓取与预测生成任务，固定时间表与 Cron 默认按北京时间执行。">
+              <StatusCard title="定时任务" subtitle="综合维护开奖抓取与预测生成任务，固定时间表与 Cron 默认按北京时间执行。">
                 <div className="page-stack">
                   <div className="panel-card settings-schedule-list-card">
                     <div className="panel-card__header">
@@ -2229,6 +2075,31 @@ export function SettingsPage() {
                 <input type="checkbox" checked={modelForm.is_active} onChange={(event) => setModelForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
                 <span>启用模型</span>
               </label>
+              <div className="field">
+                <span>适用彩种</span>
+                <div className="filter-chip-group">
+                  {(['dlt', 'pl3'] as LotteryCode[]).map((code) => {
+                    const active = modelForm.lottery_codes.includes(code)
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        className={clsx('filter-chip', active && 'is-active')}
+                        onClick={() =>
+                          setModelForm((previous) => ({
+                            ...previous,
+                            lottery_codes: active
+                              ? previous.lottery_codes.filter((item) => item !== code)
+                              : [...previous.lottery_codes, code],
+                          }))
+                        }
+                      >
+                        {getLotteryLabel(code)}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
               <div className="form-actions">
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
               </div>
@@ -2343,7 +2214,6 @@ export function SettingsPage() {
                   value={scheduleForm.lottery_code}
                   onChange={(event) => {
                     const nextLottery = event.target.value as LotteryCode
-                    setSelectedLottery(nextLottery)
                     setScheduleForm((previous) => ({
                       ...previous,
                       lottery_code: nextLottery,
@@ -2612,73 +2482,6 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      {selectedPredictionRecord ? (
-        <div className="modal-shell" role="presentation" onClick={() => setSelectedPredictionRecord(null)}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="settings-form-grid">
-              <div className="modal-card__header">
-                <div>
-                  <p className="modal-card__eyebrow">预测记录详情</p>
-                  <h3>第 {selectedPredictionRecord.targetPeriod} 期</h3>
-                </div>
-                <button className="ghost-button" type="button" onClick={() => setSelectedPredictionRecord(null)}>关闭</button>
-              </div>
-              {predictionRecordDetailQuery.isLoading ? <div className="state-shell">正在加载预测详情...</div> : null}
-              {predictionRecordDetailQuery.error instanceof Error ? <div className="state-shell state-shell--error">详情加载失败：{predictionRecordDetailQuery.error.message}</div> : null}
-              {predictionRecordDetailQuery.data ? (
-                <>
-                  <div className="settings-model-card-react__facts">
-                    <span>记录类型：{predictionRecordDetailQuery.data.record_type === 'current' ? '当前期' : '历史'}</span>
-                    <span>预测日期：{predictionRecordDetailQuery.data.prediction_date || '-'}</span>
-                    <span>状态：{predictionRecordDetailQuery.data.record_type === 'current' ? '待开奖' : '已归档'}</span>
-                  </div>
-                  {predictionRecordDetailQuery.data.actual_result ? (
-                    <div className="number-row">
-                      {((predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'pl3'
-                        ? ((predictionRecordDetailQuery.data.actual_result.digits?.length
-                            ? predictionRecordDetailQuery.data.actual_result.digits
-                            : predictionRecordDetailQuery.data.actual_result.red_balls) || [])
-                        : predictionRecordDetailQuery.data.actual_result.red_balls
-                      ).map((ball) => (
-                        <NumberBall key={`detail-red-${ball}`} value={ball} color="red" />
-                      ))}
-                      {(predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'dlt' ? <span className="number-row__divider" /> : null}
-                      {(predictionRecordDetailQuery.data.actual_result.lottery_code || 'dlt') === 'dlt'
-                        ? predictionRecordDetailQuery.data.actual_result.blue_balls.map((ball) => (
-                            <NumberBall key={`detail-blue-${ball}`} value={ball} color="blue" />
-                          ))
-                        : null}
-                    </div>
-                  ) : null}
-                  <div className="history-record-card__detail-list">
-                    {predictionRecordDetailQuery.data.models.map((model) => (
-                      <section key={`${predictionRecordDetailQuery.data?.target_period}-${model.model_id}`} className="history-record-card__detail-model">
-                        <div className="history-record-card__detail-header">
-                          <div>
-                            <strong>{model.model_name}</strong>
-                            <p>{model.model_provider}</p>
-                          </div>
-                          <span>最佳命中 {model.best_hit_count || 0}</span>
-                        </div>
-                        <div className="settings-model-table__tags">
-                          {model.predictions.map((group) => (
-                            <span key={`${model.model_id}-${group.group_id}`} className="tag tag--muted">
-                              第{group.group_id}组{' '}
-                              {(group.play_type || (group.digits || []).length)
-                                ? `${group.play_type === 'group3' ? '组选3' : group.play_type === 'group6' ? '组选6' : '直选'} ${(group.digits?.length ? group.digits : group.red_balls).join(' ')}`
-                                : `${group.red_balls.join(' ')} | ${group.blue_balls.join(' ')}`}
-                            </span>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

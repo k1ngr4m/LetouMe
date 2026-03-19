@@ -600,7 +600,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="tab-strip">
+      <section className="tab-strip dashboard-tab-strip">
         <button
           className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')}
           onClick={() => navigate(getDashboardPath('prediction'))}

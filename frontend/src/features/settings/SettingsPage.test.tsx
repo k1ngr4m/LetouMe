@@ -105,6 +105,7 @@ describe('SettingsPage model management view switch', () => {
           base_url: 'https://api.deepseek.com',
           api_key: '',
           app_code: 'dlt',
+          lottery_codes: ['dlt', 'pl3'],
           temperature: null,
           is_active: true,
           is_deleted: false,
@@ -120,6 +121,7 @@ describe('SettingsPage model management view switch', () => {
           base_url: 'https://example.test',
           api_key: '',
           app_code: 'dlt',
+          lottery_codes: ['dlt'],
           temperature: null,
           is_active: true,
           is_deleted: false,
@@ -171,13 +173,16 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage()
 
+    expect(screen.queryByRole('button', { name: '大乐透' })).not.toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/models')
-    expect(screen.queryByRole('button', { name: '批量操作' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '预测记录' })).not.toBeInTheDocument()
     expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: '列表视图' })).toHaveClass('is-active')
     expect(screen.getByRole('columnheader', { name: '模型名称' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '彩种' })).toBeInTheDocument()
     expect(screen.getByText('DeepSeek-V3.2')).toBeInTheDocument()
+    expect(screen.getByText('排列3')).toBeInTheDocument()
     expect(screen.queryByText('https://api.deepseek.com')).not.toBeInTheDocument()
     const titleCells = screen.getAllByRole('row').slice(1).map((row) => row.textContent || '')
     expect(titleCells[0]).toContain('Claude-4.6')
@@ -267,119 +272,6 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByLabelText('结束期号')).toBeInTheDocument()
   })
 
-  it('shows mixed prediction records and opens detail modal', async () => {
-    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
-    apiClientMock.listUsers.mockResolvedValue({ users: [] })
-    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
-    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
-    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({
-      records: [
-        {
-          record_type: 'current',
-          target_period: '2026033',
-          prediction_date: '2026-03-16',
-          actual_result: null,
-          model_count: 2,
-          status_label: '待开奖',
-        },
-        {
-          record_type: 'history',
-          target_period: '2026032',
-          prediction_date: '2026-03-14',
-          actual_result: { period: '2026032', date: '2026-03-15', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] },
-          model_count: 3,
-          status_label: '已归档',
-        },
-      ],
-    })
-    apiClientMock.getSettingsPredictionRecordDetail.mockResolvedValue({
-      record_type: 'history',
-      target_period: '2026032',
-      prediction_date: '2026-03-14',
-      actual_result: { period: '2026032', date: '2026-03-15', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] },
-      models: [
-        {
-          model_id: 'deepseek-v3.2',
-          model_name: 'DeepSeek-V3.2',
-          model_provider: 'deepseek',
-          predictions: [
-            { group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] },
-            { group_id: 2, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['1', '1', '8'] },
-          ],
-          best_hit_count: 3,
-        },
-      ],
-    })
-
-    renderPage()
-
-    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '预测记录' }))
-
-    expect(await screen.findByRole('columnheader', { name: '记录类型' })).toBeInTheDocument()
-    expect(screen.getAllByText('当前期').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('历史').length).toBeGreaterThan(0)
-
-    await userEvent.click(screen.getAllByRole('button', { name: '查看详情' })[1])
-
-    expect(await screen.findByRole('heading', { name: '第 2026032 期' })).toBeInTheDocument()
-    expect(await screen.findByText('DeepSeek-V3.2')).toBeInTheDocument()
-    expect(await screen.findByText('第2组 组选3 01 01 08')).toBeInTheDocument()
-  })
-
-  it('filters prediction records by type and period', async () => {
-    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
-    apiClientMock.listUsers.mockResolvedValue({ users: [] })
-    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
-    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
-    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({
-      records: [
-        {
-          record_type: 'current',
-          target_period: '2026033',
-          prediction_date: '2026-03-16',
-          actual_result: null,
-          model_count: 2,
-          status_label: '待开奖',
-        },
-        {
-          record_type: 'history',
-          target_period: '2026032',
-          prediction_date: '2026-03-14',
-          actual_result: { period: '2026032', date: '2026-03-15', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] },
-          model_count: 3,
-          status_label: '已归档',
-        },
-      ],
-    })
-
-    renderPage()
-
-    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '预测记录' }))
-
-    expect(screen.getAllByText('当前期').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('历史').length).toBeGreaterThan(0)
-
-    await userEvent.click(screen.getByRole('button', { name: '历史' }))
-    expect(screen.getAllByRole('row')).toHaveLength(2)
-    expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
-
-    await userEvent.type(screen.getByPlaceholderText('输入期号过滤'), '2026031')
-    expect(screen.getByText('没有符合当前筛选条件的预测记录。')).toBeInTheDocument()
-
-    const input = screen.getByPlaceholderText('输入期号过滤')
-    await userEvent.clear(input)
-    await userEvent.type(input, '2026032')
-    expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
-    expect(screen.getAllByRole('row')).toHaveLength(2)
-
-    await userEvent.click(screen.getByRole('button', { name: '全部' }))
-    expect(screen.getAllByText('历史').length).toBeGreaterThan(1)
-  })
-
   it('shows lottery maintenance card and starts fetch task for super admin', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
@@ -420,10 +312,12 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     expect(screen.getByRole('heading', { name: '数据维护' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '获取大乐透数据' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '获取排列3数据' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '获取大乐透数据' }))
 
-    expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledTimes(1)
+    expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledWith('dlt')
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })
     expect(await screen.findByText('2026033')).toBeInTheDocument()
   })
