@@ -27,6 +27,7 @@ import {
   type BallStatItem,
   buildBlueFrequencyChart,
   buildOddEvenChart,
+  filterPredictionGroupsByPlayType,
   getPredictionPlayTypeLabel,
   buildRedFrequencyChart,
   resolveHistoryFallbackState,
@@ -35,6 +36,7 @@ import {
   getActualResult,
   type ModelScore,
   type ModelListScoreRange,
+  type PredictionPlayType,
   normalizeStrategyLabel,
   normalizePredictionsHistory,
 } from './lib/home'
@@ -60,6 +62,11 @@ const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> 
   { value: '31-60', label: '31-60 分' },
   { value: '61-80', label: '61-80 分' },
   { value: '81-100', label: '81-100 分' },
+]
+const PL3_PLAY_TYPE_OPTIONS: Array<{ value: PredictionPlayType; label: string }> = [
+  { value: 'direct', label: '直选' },
+  { value: 'group3', label: '组选3' },
+  { value: 'group6', label: '组选6' },
 ]
 
 function HomeSvgIcon({ children }: { children: ReactNode }) {
@@ -265,6 +272,8 @@ export function HomePage() {
   const [commonOnly, setCommonOnly] = useState(false)
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
+  const [summaryPlayTypeFilters, setSummaryPlayTypeFilters] = useState<PredictionPlayType[]>([])
+  const [historyPlayTypeFilters, setHistoryPlayTypeFilters] = useState<PredictionPlayType[]>([])
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
@@ -335,6 +344,8 @@ export function HomePage() {
     setLotteryPage(1)
     setSummaryStrategyFilters([])
     setHistoryStrategyFilters([])
+    setSummaryPlayTypeFilters([])
+    setHistoryPlayTypeFilters([])
   }, [selectedLottery])
 
   useEffect(() => {
@@ -457,14 +468,29 @@ export function HomePage() {
     })
   }, [historyStrategyOptions, predictionsHistory.isFetching])
 
+  const summaryFilteredModels = useMemo(
+    () =>
+      selectedLottery === 'pl3'
+        ? filteredModels
+            .map((model) => ({
+              ...model,
+              predictions: filterPredictionGroupsByPlayType(model.predictions || [], summaryPlayTypeFilters),
+            }))
+            .filter((model) => model.predictions.length > 0)
+        : filteredModels,
+    [filteredModels, selectedLottery, summaryPlayTypeFilters],
+  )
+
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
     historyPeriodQuery,
     commonOnly,
     weightedSummary,
     historyVisibleModelIds,
     summaryStrategyFilters,
+    summaryFilteredModels,
+    summaryPlayTypeFilters,
   )
-  const summaryModels = filteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
+  const summaryModels = summaryFilteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
@@ -476,6 +502,7 @@ export function HomePage() {
     () => sortModelsForScoreView(filteredModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [filteredModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
+  const summaryViewModels = modelListView === 'score' ? filteredModels : summaryFilteredModels
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || (!predictionsHistory.data && predictionsHistory.isLoading)
   const error =
@@ -540,6 +567,12 @@ export function HomePage() {
     )
   }
 
+  function toggleSummaryPlayTypeFilter(playType: PredictionPlayType) {
+    setSummaryPlayTypeFilters((previous) =>
+      previous.includes(playType) ? previous.filter((item) => item !== playType) : [...previous, playType],
+    )
+  }
+
   function updateHistoryStrategyFilters(updater: (previous: string[]) => string[]) {
     setHistoryPage(1)
     setHistoryStrategyFilters((previous) => updater(previous))
@@ -549,6 +582,13 @@ export function HomePage() {
     const normalized = normalizeStrategyLabel(strategy)
     updateHistoryStrategyFilters((previous) =>
       previous.includes(normalized) ? previous.filter((item) => item !== normalized) : [...previous, normalized],
+    )
+  }
+
+  function toggleHistoryPlayTypeFilter(playType: PredictionPlayType) {
+    setHistoryPage(1)
+    setHistoryPlayTypeFilters((previous) =>
+      previous.includes(playType) ? previous.filter((item) => item !== playType) : [...previous, playType],
     )
   }
 
@@ -701,10 +741,28 @@ export function HomePage() {
                   />
                 ) : null}
 
+                {selectedLottery === 'pl3' ? (
+                  <div className="history-strategy-filter">
+                    <span className="history-strategy-filter__label">玩法筛选</span>
+                    <div className="filter-chip-group">
+                      {PL3_PLAY_TYPE_OPTIONS.map((option) => (
+                        <button
+                          key={`summary-play-type-${option.value}`}
+                          className={clsx('filter-chip', summaryPlayTypeFilters.includes(option.value) && 'is-active')}
+                          onClick={() => toggleSummaryPlayTypeFilter(option.value)}
+                          type="button"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 {modelListView === 'card' ? (
                   <div className="model-list">
-                    {filteredModels.length ? (
-                      filteredModels.map((model) => (
+                    {summaryViewModels.length ? (
+                      summaryViewModels.map((model) => (
                         <ModelListCard
                           key={model.model_id}
                           model={model}
@@ -720,7 +778,9 @@ export function HomePage() {
                         />
                       ))
                     ) : (
-                      <div className="state-shell">没有符合当前筛选条件的模型。</div>
+                      <div className="state-shell">
+                        {selectedLottery === 'pl3' && summaryPlayTypeFilters.length ? '当前玩法筛选下没有可展示的预测号码。' : '没有符合当前筛选条件的模型。'}
+                      </div>
                     )}
                   </div>
                 ) : modelListView === 'score' ? (
@@ -742,7 +802,7 @@ export function HomePage() {
                   />
                 ) : (
                   <ModelListTable
-                    models={filteredModels}
+                    models={summaryViewModels}
                     modelScores={modelScores}
                     validPinnedModelIds={validPinnedModelIds}
                     actualResult={actualResult}
@@ -771,7 +831,7 @@ export function HomePage() {
                 }
               >
                 <div className="filter-chip-group">
-                  {filteredModels.map((model) => (
+                  {summaryFilteredModels.map((model) => (
                     <button
                       key={model.model_id}
                       className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) && 'is-active')}
@@ -781,6 +841,23 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
+                {selectedLottery === 'pl3' ? (
+                  <div className="history-strategy-filter">
+                    <span className="history-strategy-filter__label">玩法筛选</span>
+                    <div className="filter-chip-group">
+                      {PL3_PLAY_TYPE_OPTIONS.map((option) => (
+                        <button
+                          key={`summary-stat-play-type-${option.value}`}
+                          className={clsx('filter-chip', summaryPlayTypeFilters.includes(option.value) && 'is-active')}
+                          onClick={() => toggleSummaryPlayTypeFilter(option.value)}
+                          type="button"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {selectedLottery !== 'pl3' ? (
                   <div className="history-strategy-filter">
                     <span className="history-strategy-filter__label">方案筛选</span>
@@ -807,7 +884,7 @@ export function HomePage() {
                     )}
                   </div>
                 ) : null}
-                {!filteredModels.length ? (
+                {!summaryFilteredModels.length ? (
                   <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
                 ) : !selectedSummaryIds.length ? (
                   <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
@@ -941,6 +1018,23 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
+            {selectedLottery === 'pl3' ? (
+              <div className="history-strategy-filter">
+                <span className="history-strategy-filter__label">预测玩法筛选</span>
+                <div className="filter-chip-group">
+                  {PL3_PLAY_TYPE_OPTIONS.map((option) => (
+                    <button
+                      key={`history-play-type-${option.value}`}
+                      className={clsx('filter-chip', historyPlayTypeFilters.includes(option.value) && 'is-active')}
+                      onClick={() => toggleHistoryPlayTypeFilter(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {selectedLottery !== 'pl3' ? (
               <div className="history-strategy-filter">
                 <span className="history-strategy-filter__label">开奖方案筛选</span>
@@ -1008,6 +1102,7 @@ export function HomePage() {
                       lotteryCode={selectedLottery}
                       visibleModelIds={historyVisibleModelIds}
                       strategyFilters={historyStrategyFilters}
+                      playTypeFilters={historyPlayTypeFilters}
                     />
                   ))}
                 </div>
@@ -2456,11 +2551,13 @@ function HistoryRecordCard({
   lotteryCode,
   visibleModelIds,
   strategyFilters,
+  playTypeFilters,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
   visibleModelIds: string[]
   strategyFilters: string[]
+  playTypeFilters: PredictionPlayType[]
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const hasExpandedModels = expandedModelIds.length > 0
@@ -2488,6 +2585,10 @@ function HistoryRecordCard({
   const normalizedStrategyFilters = useMemo(
     () => strategyFilters.map((item) => normalizeStrategyLabel(item)),
     [strategyFilters],
+  )
+  const normalizedPlayTypeFilters = useMemo(
+    () => playTypeFilters,
+    [playTypeFilters],
   )
   const strategyFilterSet = useMemo(
     () => new Set(normalizedStrategyFilters),
@@ -2556,9 +2657,11 @@ function HistoryRecordCard({
           const detailId = `history-record-card-${record.target_period}-${model.model_id}-detail`
           const detailModelStrategies = new Set((detailModel?.predictions || []).map((group) => normalizeStrategyLabel(group.strategy)))
           const matchesAllStrategies = !normalizedStrategyFilters.length || normalizedStrategyFilters.every((strategy) => detailModelStrategies.has(strategy))
+          const playTypeFilteredPredictions = filterPredictionGroupsByPlayType(detailModel?.predictions || [], normalizedPlayTypeFilters)
           const filteredDetailPredictions = !normalizedStrategyFilters.length
-            ? (detailModel?.predictions || [])
-            : (detailModel?.predictions || []).filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+            ? playTypeFilteredPredictions
+            : playTypeFilteredPredictions.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+          const matchesPlayTypes = !normalizedPlayTypeFilters.length || filteredDetailPredictions.length > 0
           const filteredDetailBetCount = filteredDetailPredictions.length
           const filteredDetailWinningBetCount = filteredDetailPredictions.filter((group) => Number(group.prize_amount || 0) > 0).length
           const filteredDetailPrizeAmount = filteredDetailPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0)
@@ -2610,7 +2713,10 @@ function HistoryRecordCard({
                   {!detailQuery.isLoading && !detailQuery.error && detailModel && !matchesAllStrategies ? (
                     <div className="state-shell">该模型不满足所选方案组合。</div>
                   ) : null}
-                  {!detailQuery.isLoading && !detailQuery.error && detailModel && matchesAllStrategies ? (
+                  {!detailQuery.isLoading && !detailQuery.error && detailModel && matchesAllStrategies && !matchesPlayTypes ? (
+                    <div className="state-shell">该模型不满足所选玩法。</div>
+                  ) : null}
+                  {!detailQuery.isLoading && !detailQuery.error && detailModel && matchesAllStrategies && matchesPlayTypes ? (
                     <section className="history-record-card__detail-model">
                       <div className="history-record-card__detail-header">
                         <div className="history-record-card__detail-heading">

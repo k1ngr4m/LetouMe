@@ -42,6 +42,7 @@ export type BallStatItem = {
 }
 
 export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
+export type PredictionPlayType = 'direct' | 'group3' | 'group6'
 
 export type ModelListFilters = {
   nameQuery: string
@@ -80,6 +81,22 @@ export type PredictionHitComparison = {
 export function normalizeStrategyLabel(value?: string | null): string {
   const normalized = String(value || '').trim()
   return normalized || 'AI 组合策略'
+}
+
+export function normalizePredictionPlayType(value?: string | null): PredictionPlayType {
+  if (value === 'group3') return 'group3'
+  if (value === 'group6') return 'group6'
+  return 'direct'
+}
+
+export function groupMatchesPlayTypeFilters(group: PredictionGroup, playTypeFilters: PredictionPlayType[] = []) {
+  if (!playTypeFilters.length) return true
+  return playTypeFilters.includes(normalizePredictionPlayType(group.play_type))
+}
+
+export function filterPredictionGroupsByPlayType(groups: PredictionGroup[] = [], playTypeFilters: PredictionPlayType[] = []) {
+  if (!playTypeFilters.length) return groups
+  return groups.filter((group) => groupMatchesPlayTypeFilters(group, playTypeFilters))
 }
 
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
@@ -314,10 +331,10 @@ export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult:
   if (inferredLotteryCode !== 'pl3') {
     return '复式'
   }
-  if (group.play_type === 'group3') {
+  if (normalizePredictionPlayType(group.play_type) === 'group3') {
     return '组选3'
   }
-  if (group.play_type === 'group6') {
+  if (normalizePredictionPlayType(group.play_type) === 'group6') {
     return '组选6'
   }
   return '直选'
@@ -413,6 +430,7 @@ export function buildSummary(
   weighted: boolean,
   commonOnly: boolean,
   strategyFilters: string[] = [],
+  playTypeFilters: PredictionPlayType[] = [],
 ) {
   const normalizedStrategyFilters = strategyFilters.map(normalizeStrategyLabel)
   const strategyFilterSet = new Set(normalizedStrategyFilters)
@@ -424,6 +442,7 @@ export function buildSummary(
 
   for (const model of selectedModels) {
     let activeGroups = model.predictions || []
+    activeGroups = filterPredictionGroupsByPlayType(activeGroups, playTypeFilters)
     if (normalizedStrategyFilters.length) {
       const modelStrategies = new Set(activeGroups.map((group) => normalizeStrategyLabel(group.strategy)))
       if (!normalizedStrategyFilters.every((strategy) => modelStrategies.has(strategy))) {

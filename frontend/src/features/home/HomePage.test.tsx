@@ -106,6 +106,7 @@ vi.mock('./hooks/useHomeData', () => ({
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
+    const isPl3 = _lotteryCode === 'pl3'
     const [effectiveHistoryStrategyFilters, setEffectiveHistoryStrategyFilters] = useState(historyStrategyFilters)
     const [isHistoryFetching, setIsHistoryFetching] = useState(false)
 
@@ -226,6 +227,93 @@ vi.mock('./hooks/useHomeData', () => ({
       }),
       [filteredHistoryRecords.length, pagedHistoryRecords],
     )
+    const currentModels = isPl3
+      ? [
+          {
+            model_id: 'model-a',
+            model_name: '模型A',
+            model_provider: 'openai_compatible',
+            model_tags: ['reasoning'],
+            model_api_model: 'model-a-api',
+            predictions: [
+              { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
+              { group_id: 2, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] },
+              { group_id: 3, play_type: 'group6', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
+            ],
+          },
+          {
+            model_id: 'model-b',
+            model_name: '模型B',
+            model_provider: 'deepseek',
+            model_tags: ['fast'],
+            model_api_model: 'model-b-api',
+            predictions: [
+              { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['04', '05', '06'] },
+              { group_id: 2, play_type: 'group6', red_balls: [], blue_balls: [], digits: ['04', '05', '06'] },
+            ],
+          },
+        ]
+      : [
+          {
+            model_id: 'model-a',
+            model_name: '模型A',
+            model_provider: 'openai_compatible',
+            model_tags: ['reasoning'],
+            model_api_model: 'model-a-api',
+            predictions: Array.from({ length: 5 }, (_, index) => ({
+              group_id: index + 1,
+              strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
+              red_balls: ['01', '02', '03', '04', '05'],
+              blue_balls: ['06', '07'],
+            })),
+          },
+          {
+            model_id: 'model-b',
+            model_name: '模型B',
+            model_provider: 'deepseek',
+            model_tags: ['fast'],
+            model_api_model: 'model-b-api',
+            predictions: Array.from({ length: 5 }, (_, index) => ({
+              group_id: index + 1,
+              strategy: '冷号补位',
+              red_balls: ['08', '09', '10', '11', '12'],
+              blue_balls: ['01', '02'],
+            })),
+          },
+        ]
+    const lotteryHistoryData = isPl3
+      ? [
+          {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '01', '02'],
+            blue_balls: [],
+            digits: ['01', '01', '02'],
+            lottery_code: 'pl3',
+          },
+          {
+            period: '2026030',
+            date: '2026-03-08',
+            red_balls: ['03', '04', '05'],
+            blue_balls: [],
+            digits: ['03', '04', '05'],
+            lottery_code: 'pl3',
+          },
+        ]
+      : [
+          {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '02', '03', '04', '05'],
+            blue_balls: ['06', '07'],
+          },
+          {
+            period: '2026030',
+            date: '2026-03-08',
+            red_balls: ['08', '09', '10', '11', '12'],
+            blue_balls: ['01', '02'],
+          },
+        ]
     useEffect(() => {
       if (!simulateHistoryFilterLoading.current) {
         setEffectiveHistoryStrategyFilters(historyStrategyFilters)
@@ -247,54 +335,14 @@ vi.mock('./hooks/useHomeData', () => ({
         data: {
           prediction_date: '2026-03-12',
           target_period: '2026032',
-          models: [
-            {
-              model_id: 'model-a',
-              model_name: '模型A',
-              model_provider: 'openai_compatible',
-              model_tags: ['reasoning'],
-              model_api_model: 'model-a-api',
-              predictions: Array.from({ length: 5 }, (_, index) => ({
-                group_id: index + 1,
-                strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
-                red_balls: ['01', '02', '03', '04', '05'],
-                blue_balls: ['06', '07'],
-              })),
-            },
-            {
-              model_id: 'model-b',
-              model_name: '模型B',
-              model_provider: 'deepseek',
-              model_tags: ['fast'],
-              model_api_model: 'model-b-api',
-              predictions: Array.from({ length: 5 }, (_, index) => ({
-                group_id: index + 1,
-                strategy: '冷号补位',
-                red_balls: ['08', '09', '10', '11', '12'],
-                blue_balls: ['01', '02'],
-              })),
-            },
-          ],
+          models: currentModels,
         },
         isLoading: false,
         error: null,
       },
       lotteryCharts: {
         data: {
-          data: [
-            {
-              period: '2026031',
-              date: '2026-03-10',
-              red_balls: ['01', '02', '03', '04', '05'],
-              blue_balls: ['06', '07'],
-            },
-            {
-              period: '2026030',
-              date: '2026-03-08',
-              red_balls: ['08', '09', '10', '11', '12'],
-              blue_balls: ['01', '02'],
-            },
-          ],
+          data: lotteryHistoryData,
           next_draw: {
             next_date_display: '2026-03-15',
           },
@@ -1018,7 +1066,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
 
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
-    expect(await screen.findByText('直选')).toBeInTheDocument()
+    expect(await within(firstHistoryCard as HTMLElement).findByText('直选')).toBeInTheDocument()
 
     const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
     expect(detailSection).not.toBeNull()
@@ -1033,5 +1081,74 @@ describe('HomePage dashboard sidebar', () => {
     expect(oneDigits[1]).not.toHaveClass('is-hit')
     expect(oneDigits[1]).toHaveClass('number-ball--muted')
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
+  })
+
+  it('filters pl3 prediction groups by play type in overview views', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    expect(screen.getAllByText('玩法筛选').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('直选').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('组选3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('组选6').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getAllByRole('button', { name: '组选3' })[0])
+
+    const modelSection = screen.getByRole('heading', { name: '模型列表' }).closest('section')
+    expect(modelSection).not.toBeNull()
+    expect(within(modelSection as HTMLElement).getByText('G-2')).toBeInTheDocument()
+    expect(within(modelSection as HTMLElement).queryByText('G-3')).not.toBeInTheDocument()
+    expect(within(modelSection as HTMLElement).queryByText('G-1')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+    expect(screen.getByRole('button', { name: '评分视图' })).toHaveClass('is-active')
+    expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('模型B').length).toBeGreaterThan(0)
+  })
+
+  it('filters pl3 history detail groups by play type', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '01', '02'],
+            blue_balls: [],
+            digits: ['01', '01', '02'],
+            lottery_code: 'pl3',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 2,
+              predictions: [
+                { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '01', '02'] },
+                { group_id: 2, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] },
+                { group_id: 3, play_type: 'group6', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '组选6' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    expect(await within(firstHistoryCard as HTMLElement).findByText('组选6')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('组选3')).not.toBeInTheDocument()
   })
 })

@@ -5,6 +5,7 @@ import {
   buildSummary,
   filterHistoryRecords,
   filterModels,
+  type PredictionPlayType,
   type ModelListScoreRange,
   sortModels,
 } from '../lib/home'
@@ -92,9 +93,13 @@ export function useHomeModelFilters(
     weightedSummary: boolean,
     historyModelIdsOverride?: string[],
     summaryStrategyFilters: string[] = [],
+    summaryModelsOverride?: PredictionModel[],
+    summaryPlayTypeFilters: PredictionPlayType[] = [],
   ) {
-    const selectedSummaryIds = summarySelectedModelIds ?? filteredModelIds
-    const summary = buildSummary(filteredModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly, summaryStrategyFilters)
+    const summaryModels = summaryModelsOverride ?? filteredModels
+    const summaryModelIds = summaryModels.map((model) => model.model_id)
+    const selectedSummaryIds = (summarySelectedModelIds ?? summaryModelIds).filter((modelId) => summaryModelIds.includes(modelId))
+    const summary = buildSummary(summaryModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly, summaryStrategyFilters, summaryPlayTypeFilters)
     const historyModelIds = historyModelIdsOverride ?? filteredModelIds
     const filteredHistory = history ? filterHistoryRecords(history, historyModelIds, periodQuery) : []
     const historyHitTrend = buildHistoryHitTrend(filteredHistory, historyModelIds)
