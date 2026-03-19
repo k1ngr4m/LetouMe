@@ -1,19 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import clsx from 'clsx'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
@@ -66,6 +52,13 @@ const PL3_PLAY_TYPE_OPTIONS: Array<{ value: PredictionPlayType; label: string }>
   { value: 'group3', label: '组选3' },
   { value: 'group6', label: '组选6' },
 ]
+
+const AnalysisChartsPanel = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisChartsPanel })),
+)
+const HistoryHitTrendCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendCard })),
+)
 
 function HomeSvgIcon({ children }: { children: ReactNode }) {
   return (
@@ -905,87 +898,18 @@ export function HomePage() {
       ) : null}
 
       {activeTab === 'analysis' ? (
-        <div className="page-section chart-grid">
-          <ChartCard title="前区热号 Top 12">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={redChart}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="ball" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="后区热号 Top 12">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={blueChart}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="ball" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="奇偶结构走势">
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={oddEvenChart}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Area type="monotone" dataKey="odd" stackId="1" stroke="var(--red-500)" fill="rgba(215, 64, 90, 0.6)" />
-                <Area type="monotone" dataKey="even" stackId="1" stroke="var(--amber-500)" fill="rgba(242, 165, 79, 0.6)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="前区和值趋势">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={sumTrendChart}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </div>
+        <Suspense fallback={<div className="state-shell">正在加载分析图表...</div>}>
+          <AnalysisChartsPanel redChart={redChart} blueChart={blueChart} oddEvenChart={oddEvenChart} sumTrendChart={sumTrendChart} />
+        </Suspense>
       ) : null}
 
       {activeTab === 'simulation' ? <SimulationPlayground lotteryCode={selectedLottery} draws={chartDraws} targetPeriod={currentPredictions.data?.target_period || ''} /> : null}
 
       {activeTab === 'history' ? (
         <div className="page-section">
-          <ChartCard title="模型历史命中趋势">
-            {historyVisibleModels.length && historyHitTrend.length ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <LineChart data={historyHitTrend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="period" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Legend />
-                  {historyVisibleModels.map((model, index) => (
-                    <Line
-                      key={model.model_id}
-                      type="monotone"
-                      dataKey={model.model_id}
-                      name={model.model_name}
-                      stroke={getModelTrendColor(index)}
-                      strokeWidth={3}
-                      dot={{ r: 2 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
-            )}
-          </ChartCard>
+          <Suspense fallback={<div className="state-shell">正在加载历史图表...</div>}>
+            <HistoryHitTrendCard historyVisibleModels={historyVisibleModels} historyHitTrend={historyHitTrend} />
+          </Suspense>
 
           <StatusCard title="命中回溯" subtitle="按模型和期号筛选历史预测表现。">
             {isModelFilterOpen ? (
@@ -2115,17 +2039,6 @@ function SummaryHitTooltipBadge({
   )
 }
 
-function ChartCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="panel-card chart-card">
-      <div className="panel-card__header">
-        <h2 className="panel-card__title">{title}</h2>
-      </div>
-      {children}
-    </section>
-  )
-}
-
 function calculatePageForPageSize(currentPage: number, currentPageSize: number, nextPageSize: number) {
   const currentOffset = (currentPage - 1) * currentPageSize
   return Math.floor(currentOffset / nextPageSize) + 1
@@ -2180,20 +2093,6 @@ function PagerControls({
       </div>
     </div>
   )
-}
-
-function getModelTrendColor(index: number) {
-  const palette = [
-    '#f2a54f',
-    '#3d8df5',
-    '#d7405a',
-    '#3fc27d',
-    '#c084fc',
-    '#fb7185',
-    '#22d3ee',
-    '#f97316',
-  ]
-  return palette[index % palette.length]
 }
 
 export function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; compact?: boolean }) {
