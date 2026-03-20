@@ -369,19 +369,15 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [formOpen, setFormOpen] = useState(false)
-  const [ocrModalOpen, setOcrModalOpen] = useState(false)
-  const [ocrFile, setOcrFile] = useState<File | null>(null)
-  const [ocrPreviewUrl, setOcrPreviewUrl] = useState('')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
 
   useEffect(() => {
     return () => {
-      revokeObjectUrlIfNeeded(ocrPreviewUrl)
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
     }
-  }, [ocrPreviewUrl, form.ticketImagePreviewUrl])
+  }, [form.ticketImagePreviewUrl])
 
   const betsQuery = useQuery({
     queryKey: ['my-bets', lotteryCode],
@@ -415,11 +411,6 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     onSuccess: async () => {
       setMessage(editingRecord ? '投注已更新。' : '投注已添加。')
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-      if (ocrPreviewUrl) {
-        revokeObjectUrlIfNeeded(ocrPreviewUrl)
-        setOcrPreviewUrl('')
-      }
-      setOcrFile(null)
       setFormOpen(false)
       setEditingRecord(null)
       setForm(createDefaultFormState(targetPeriod, lotteryCode))
@@ -443,16 +434,15 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
   const ocrMutation = useMutation({
     mutationFn: async () => {
-      if (!ocrFile) throw new Error('请先选择图片')
-      return apiClient.recognizeMyBetByImage(lotteryCode, ocrFile)
+      if (!form.ticketImageFile || !form.ticketImagePreviewUrl) {
+        throw new Error('请先上传并缓存票据图片')
+      }
+      return apiClient.recognizeMyBetByImage(lotteryCode, form.ticketImageFile)
     },
     onSuccess: (draft) => {
-      setOcrModalOpen(false)
       setEditingRecord(null)
-      revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-      setForm(buildFormFromOCRDraft(lotteryCode, draft, ocrFile, ocrPreviewUrl))
-      setFormOpen(true)
       setMessage(draft.warnings.length ? draft.warnings.join('；') : 'OCR识别完成，请确认后保存。')
+      setForm((previous) => buildFormFromOCRDraft(lotteryCode, draft, previous.ticketImageFile, previous.ticketImagePreviewUrl))
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : 'OCR识别失败')
@@ -467,18 +457,17 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
 
-  function openCreateModal() {
+  function openCreateModal(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
     setEditingRecord(null)
     revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-    setForm(createDefaultFormState(targetPeriod, lotteryCode))
+    setForm({ ...createDefaultFormState(targetPeriod, lotteryCode), sourceType })
     setFormOpen(true)
-  }
-
-  function openOcrModal() {
-    setMessage(null)
-    clearOcrFile()
-    setOcrModalOpen(true)
+    if (focusImageInput) {
+      requestAnimationFrame(() => {
+        editImageInputRef.current?.focus()
+      })
+    }
   }
 
   function openEditModal(record: MyBetRecord) {
@@ -494,11 +483,6 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
     setFormOpen(false)
     setEditingRecord(null)
-  }
-
-  function closeOcrModal() {
-    if (ocrMutation.isPending) return
-    setOcrModalOpen(false)
   }
 
   function updateLine(index: number, updater: (line: EditableLine) => EditableLine) {
@@ -531,19 +515,6 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     saveMutation.mutate()
   }
 
-  function handleOcrFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] || null
-    setOcrFile(file)
-    revokeObjectUrlIfNeeded(ocrPreviewUrl)
-    setOcrPreviewUrl(file ? URL.createObjectURL(file) : '')
-  }
-
-  function clearOcrFile() {
-    setOcrFile(null)
-    revokeObjectUrlIfNeeded(ocrPreviewUrl)
-    setOcrPreviewUrl('')
-  }
-
   function handleEditImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] || null
     setForm((previous) => {
@@ -574,10 +545,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         subtitle="按当前账号和彩种隔离，支持手动录入、OCR识别、多注编辑和盈亏自动结算。"
         actions={
           <div className="toolbar-inline">
-            <button className="ghost-button" type="button" onClick={openOcrModal}>
-              图片识别添加
-            </button>
-            <button className="primary-button" type="button" onClick={openCreateModal}>
+            <button className="primary-button" type="button" onClick={() => openCreateModal()}>
               添加投注
             </button>
           </div>
@@ -664,52 +632,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
             ))}
           </div>
         ) : (
-          <div className="state-shell">当前彩种还没有投注记录，点击“图片识别添加”或“添加投注”开始录入。</div>
+          <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
         )}
       </StatusCard>
-
-      {ocrModalOpen ? (
-        <div className="modal-shell" role="presentation" onClick={closeOcrModal}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-card__header">
-              <div>
-                <p className="modal-card__eyebrow">OCR</p>
-                <h2>上传票据图片识别</h2>
-              </div>
-              <button className="ghost-button ghost-button--compact" type="button" onClick={closeOcrModal}>
-                关闭
-              </button>
-            </div>
-            <div className="settings-form-grid">
-              <label>
-                选择图片（单张，≤8MB）
-                <input type="file" accept="image/*" onChange={handleOcrFileChange} />
-              </label>
-            </div>
-            {ocrPreviewUrl ? (
-              <div className="my-bets-image-preview">
-                <img src={ocrPreviewUrl} alt="OCR票据预览" />
-                <div className="my-bets-image-preview__actions">
-                  <button className="ghost-button ghost-button--compact" type="button" onClick={clearOcrFile}>
-                    删除图片
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            <div className="simulation-summary-bar my-bets-form-summary">
-              <div className="simulation-summary-bar__meta">
-                <strong>{ocrFile ? ocrFile.name : '未选择文件'}</strong>
-                {/*<span>识别时仅调用百度OCR，保存投注时才上传图床。</span>*/}
-              </div>
-              <div className="simulation-summary-bar__actions">
-                <button className="primary-button" type="button" disabled={!ocrFile || ocrMutation.isPending} onClick={() => ocrMutation.mutate()}>
-                  {ocrMutation.isPending ? '识别中...' : '开始识别'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {formOpen ? (
         <div className="modal-shell" role="presentation" onClick={closeFormModal}>
@@ -751,10 +676,18 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 <div className="my-bets-image-uploader">
                   <div className="my-bets-image-uploader__header">
                     <strong>票据图片</strong>
-                    <span>OCR识别后图片先本地缓存，点击保存投注时再上传图床。</span>
+                    <span>图片先缓存本地，点击“开始OCR识别”后填充表单，保存投注时再上传图床。</span>
                   </div>
                   <div className="my-bets-image-uploader__actions">
                     <input ref={editImageInputRef} type="file" accept="image/*" onChange={handleEditImageChange} />
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={!form.ticketImageFile || !form.ticketImagePreviewUrl || ocrMutation.isPending}
+                      onClick={() => ocrMutation.mutate()}
+                    >
+                      {ocrMutation.isPending ? '识别中...' : '开始OCR识别'}
+                    </button>
                     <button className="ghost-button ghost-button--compact" type="button" onClick={clearEditImage} disabled={!form.ticketImagePreviewUrl && !form.ticketImageUrl}>
                       删除图片
                     </button>
