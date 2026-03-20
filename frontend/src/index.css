@@ -4355,3 +4355,81 @@ a {
     min-height: 4.2rem;
   }
 }
+
+.rules-page__pdf-shell {
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-color);
+}
+
+.rules-page__pdf-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: none;
+  background: var(--surface-color);
+}
+
+.rules-page__image-shell {
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
+  background: var(--surface-color);
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.rules-page__image {
+  width: min(100%, 860px);
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.rules-page__lottery-note {
+  margin-top: 0.8rem;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.rules-page__text-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.rules-page__chapter {
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+  background: var(--surface-color);
+}
+
+.rules-page__chapter h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+.rules-page__chapter p {
+  margin: 0.35rem 0;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.rules-page__prize-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.rules-page__prize-grid article {
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
+  padding: 0.8rem 0.95rem;
+  background: var(--surface-color);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.rules-page__prize-grid span {
+  color: var(--text-secondary);
+}

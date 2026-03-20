@@ -17,12 +17,17 @@ export type HomeDetailRouteState = {
   scrollY?: number
 }
 
+export type HomeRulesRouteState = {
+  lotteryCode?: 'dlt' | 'pl3'
+}
+
 export const HOME_TAB_PATHS: Record<HomeTab, string> = {
   prediction: '/dashboard/prediction',
   analysis: '/dashboard/analysis',
   history: '/dashboard/history',
   simulation: '/dashboard/simulation',
 }
+export const HOME_RULES_PATH = '/dashboard/rules'
 
 export function getDashboardPath(tab: HomeTab) {
   return HOME_TAB_PATHS[tab]

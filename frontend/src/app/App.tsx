@@ -5,7 +5,7 @@ import { AuthProvider } from '../shared/auth/AuthProvider'
 import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
-import { HOME_TAB_PATHS } from '../features/home/navigation'
+import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
@@ -20,6 +20,7 @@ const HomePage = lazy(() => import('../features/home/HomePage').then((module) =>
 const HomeModelDetailPage = lazy(() =>
   import('../features/home/HomeModelDetailPage').then((module) => ({ default: module.HomeModelDetailPage })),
 )
+const HomeRulesPage = lazy(() => import('../features/home/HomeRulesPage').then((module) => ({ default: module.HomeRulesPage })))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 
 function RouteLoadingFallback() {
@@ -83,6 +84,16 @@ export function App() {
                 <ProtectedRoute>
                   <AppShell>
                     <HomeModelDetailPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={HOME_RULES_PATH}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <HomeRulesPage />
                   </AppShell>
                 </ProtectedRoute>
               }

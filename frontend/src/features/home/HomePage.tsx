@@ -35,7 +35,7 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
-import { getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import { HOME_RULES_PATH, getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type HomeRulesRouteState, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 10
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -662,6 +662,12 @@ export function HomePage() {
           onClick={() => navigate(getDashboardPath('history'))}
         >
           历史回溯
+        </button>
+        <button
+          className="tab-strip__item"
+          onClick={() => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState })}
+        >
+          规则与奖金
         </button>
       </section>
 

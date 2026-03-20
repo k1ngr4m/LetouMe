@@ -399,6 +399,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
             }
           />
           <Route path="/dashboard/models/:modelId" element={<LocationDisplay />} />
+          <Route path="/dashboard/rules" element={<LocationDisplay />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -570,6 +571,14 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
+  })
+
+  it('navigates to rules page from tab strip', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '规则与奖金' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/rules')
   })
 
   it('shows strategy filters for dlt views', async () => {

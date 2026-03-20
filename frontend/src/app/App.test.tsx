@@ -12,6 +12,9 @@ vi.mock('../features/home/HomePage', () => ({
 vi.mock('../features/home/HomeModelDetailPage', () => ({
   HomeModelDetailPage: () => <div>Home Model Detail Page Mock</div>,
 }))
+vi.mock('../features/home/HomeRulesPage', () => ({
+  HomeRulesPage: () => <div>Home Rules Page Mock</div>,
+}))
 
 vi.mock('../features/landing/LandingPage', () => ({
   LandingPage: () => <div>Landing Page Mock</div>,
@@ -60,37 +63,42 @@ function renderApp(initialEntries: string[]) {
 }
 
 describe('App routing', () => {
-  it('renders landing route', () => {
+  it('renders landing route', async () => {
     renderApp(['/'])
-    expect(screen.getByText('Landing Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText('Landing Page Mock')).toBeInTheDocument()
   })
 
-  it('redirects dashboard route to prediction route', () => {
+  it('redirects dashboard route to prediction route', async () => {
     renderApp(['/dashboard'])
-    expect(screen.getByText('Home Page Mock')).toBeInTheDocument()
-    expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument()
+    expect(await screen.findByText('Home Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText(DISCLAIMER_TEXT)).toBeInTheDocument()
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
   })
 
-  it('renders dashboard model detail route', () => {
+  it('renders dashboard model detail route', async () => {
     renderApp(['/dashboard/models/model-a'])
-    expect(screen.getByText('Home Model Detail Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText('Home Model Detail Page Mock')).toBeInTheDocument()
   })
 
-  it('redirects settings route to profile route', () => {
+  it('renders dashboard rules route', async () => {
+    renderApp(['/dashboard/rules'])
+    expect(await screen.findByText('Home Rules Page Mock')).toBeInTheDocument()
+  })
+
+  it('redirects settings route to profile route', async () => {
     renderApp(['/settings'])
-    expect(screen.getByText('Settings Page Mock')).toBeInTheDocument()
-    expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument()
+    expect(await screen.findByText('Settings Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText(DISCLAIMER_TEXT)).toBeInTheDocument()
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
   })
 
-  it('renders login route', () => {
+  it('renders login route', async () => {
     renderApp(['/login'])
-    expect(screen.getByText('Login Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText('Login Page Mock')).toBeInTheDocument()
   })
 
-  it('renders register route', () => {
+  it('renders register route', async () => {
     renderApp(['/register'])
-    expect(screen.getByText('Register Page Mock')).toBeInTheDocument()
+    expect(await screen.findByText('Register Page Mock')).toBeInTheDocument()
   })
 })
