@@ -291,6 +291,12 @@ export type MyBetLine = {
   direct_tens: string[]
   direct_units: string[]
   group_numbers: string[]
+  hit_front_numbers?: string[]
+  hit_back_numbers?: string[]
+  hit_direct_hundreds?: string[]
+  hit_direct_tens?: string[]
+  hit_direct_units?: string[]
+  hit_group_numbers?: string[]
   multiplier: number
   is_append: boolean
   bet_count: number
@@ -324,6 +330,7 @@ export type MyBetRecord = {
   ocr_provider: string | null
   ocr_recognized_at: string | null
   ticket_purchased_at?: string | null
+  actual_result?: LotteryDraw | null
   lines: MyBetLine[]
   created_at: string
   updated_at: string
@@ -362,6 +369,11 @@ export type MyBetOCRDraftResponse = {
   ticket_purchased_at?: string | null
   lines: MyBetLine[]
   warnings: string[]
+}
+
+export type MyBetOCRImageUploadResponse = {
+  lottery_code: LotteryCode
+  ticket_image_url: string
 }
 
 export type SuccessResponse = {

@@ -4058,6 +4058,12 @@ a {
   justify-content: flex-start;
 }
 
+.my-bets-card__draw {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
 .my-bets-status {
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
@@ -4102,6 +4108,106 @@ a {
   margin-top: 0;
 }
 
+.my-bets-modal {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.my-bets-modal__section {
+  padding: 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.my-bets-image-uploader {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.my-bets-image-uploader__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.my-bets-image-uploader__header span,
+.my-bets-image-uploader__placeholder,
+.my-bets-picker__label {
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+.my-bets-image-uploader__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.my-bets-image-uploader__actions input[type='file'] {
+  max-width: 220px;
+}
+
+.my-bets-image-uploader__placeholder {
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 0.8rem;
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+}
+
+.my-bets-image-preview {
+  border-radius: 0.95rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.my-bets-image-preview img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.my-bets-image-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem;
+}
+
+.my-bets-picker {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.my-bets-picker__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.my-bets-picker__ball {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-1);
+  border-radius: 999px;
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.55rem;
+  font-size: 0.8rem;
+}
+
+.my-bets-picker__ball.is-red.is-selected {
+  background: rgba(231, 92, 105, 0.22);
+  border-color: rgba(231, 92, 105, 0.68);
+}
+
+.my-bets-picker__ball.is-blue.is-selected {
+  background: rgba(87, 154, 233, 0.24);
+  border-color: rgba(87, 154, 233, 0.68);
+}
+
 .is-profit {
   color: #6ed8a6;
 }
@@ -4119,6 +4225,33 @@ a {
 :root[data-theme='light'] .my-bets-line-card {
   border-color: rgba(133, 150, 178, 0.16);
   background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme='light'] .my-bets-modal__section {
+  border-color: rgba(133, 150, 178, 0.18);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme='light'] .my-bets-image-uploader__placeholder {
+  border-color: rgba(133, 150, 178, 0.24);
+}
+
+:root[data-theme='light'] .my-bets-image-preview {
+  border-color: rgba(133, 150, 178, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme='light'] .my-bets-picker__ball {
+  border-color: rgba(133, 150, 178, 0.24);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+:root[data-theme='light'] .my-bets-picker__ball.is-red.is-selected {
+  background: rgba(231, 92, 105, 0.16);
+}
+
+:root[data-theme='light'] .my-bets-picker__ball.is-blue.is-selected {
+  background: rgba(87, 154, 233, 0.18);
 }
 
 :root[data-theme='light'] .my-bets-status.is-pending {

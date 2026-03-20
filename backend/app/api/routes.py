@@ -74,6 +74,7 @@ from backend.app.schemas.responses import (
     MyBetRecordCreateResponse,
     MyBetRecordListResponse,
     MyBetOCRDraftResponse,
+    MyBetOCRImageUploadResponse,
     MyBetRecordUpdateResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
@@ -251,6 +252,28 @@ async def recognize_my_bet_ocr(
             raise ValueError("图片大小不能超过 8MB")
         filename = str(image.filename or "ticket.jpg")
         return my_bet_service.recognize_ticket_image(
+            lottery_code=lottery_code,
+            image_bytes=image_bytes,
+            filename=filename,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/my-bets/ocr/upload-image", response_model=MyBetOCRImageUploadResponse)
+async def upload_my_bet_ocr_image(
+    lottery_code: str = Form(default="dlt"),
+    image: UploadFile = File(...),
+    _: dict = Depends(require_current_user),
+) -> dict:
+    try:
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise ValueError("图片不能为空")
+        if len(image_bytes) > 8 * 1024 * 1024:
+            raise ValueError("图片大小不能超过 8MB")
+        filename = str(image.filename or "ticket.jpg")
+        return my_bet_service.upload_ticket_image(
             lottery_code=lottery_code,
             image_bytes=image_bytes,
             filename=filename,

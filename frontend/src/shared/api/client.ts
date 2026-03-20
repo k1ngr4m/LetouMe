@@ -11,6 +11,7 @@ import type {
   LoginPayload,
   MyBetRecordCreateResponse,
   MyBetOCRDraftResponse,
+  MyBetOCRImageUploadResponse,
   MyBetRecordListResponse,
   MyBetRecordPayload,
   MyBetRecordUpdatePayload,
@@ -238,6 +239,12 @@ export const apiClient = {
     formData.set('lottery_code', lotteryCode)
     formData.set('image', image)
     return requestFormData<MyBetOCRDraftResponse>('/api/my-bets/ocr/recognize', formData)
+  },
+  uploadMyBetOCRImage(lotteryCode: LotteryCode, image: File) {
+    const formData = new FormData()
+    formData.set('lottery_code', lotteryCode)
+    formData.set('image', image)
+    return requestFormData<MyBetOCRImageUploadResponse>('/api/my-bets/ocr/upload-image', formData)
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
     return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {

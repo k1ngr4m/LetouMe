@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { apiClient } from '../../shared/api/client'
@@ -26,6 +26,8 @@ type BetFormState = {
   targetPeriod: string
   sourceType: 'manual' | 'ocr'
   ticketImageUrl: string
+  ticketImageFile: File | null
+  ticketImagePreviewUrl: string
   ocrText: string
   ocrProvider: string | null
   ocrRecognizedAt: string | null
@@ -44,6 +46,9 @@ const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
   { value: 'group3', label: '组选3' },
   { value: 'group6', label: '组选6' },
 ]
+const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
+const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
+const pl3Pool = Array.from({ length: 10 }, (_, index) => String(index).padStart(2, '0'))
 
 function formatCurrency(value: number | undefined) {
   return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
@@ -91,6 +96,8 @@ function createDefaultFormState(targetPeriod: string, lotteryCode: LotteryCode):
     targetPeriod,
     sourceType: 'manual',
     ticketImageUrl: '',
+    ticketImageFile: null,
+    ticketImagePreviewUrl: '',
     ocrText: '',
     ocrProvider: null,
     ocrRecognizedAt: null,
@@ -150,6 +157,8 @@ function buildFormFromRecord(record: MyBetRecord): BetFormState {
     targetPeriod: record.target_period,
     sourceType: record.source_type || 'manual',
     ticketImageUrl: record.ticket_image_url || '',
+    ticketImageFile: null,
+    ticketImagePreviewUrl: record.ticket_image_url || '',
     ocrText: record.ocr_text || '',
     ocrProvider: record.ocr_provider || null,
     ocrRecognizedAt: record.ocr_recognized_at || null,
@@ -158,16 +167,35 @@ function buildFormFromRecord(record: MyBetRecord): BetFormState {
   }
 }
 
-function buildFormFromOCRDraft(lotteryCode: LotteryCode, draft: MyBetOCRDraftResponse): BetFormState {
+function buildFormFromOCRDraft(lotteryCode: LotteryCode, draft: MyBetOCRDraftResponse, imageFile: File | null, imagePreviewUrl: string): BetFormState {
   return {
     targetPeriod: draft.target_period || '',
     sourceType: 'ocr',
     ticketImageUrl: draft.ticket_image_url || '',
+    ticketImageFile: imageFile,
+    ticketImagePreviewUrl: imagePreviewUrl || draft.ticket_image_url || '',
     ocrText: draft.ocr_text || '',
     ocrProvider: draft.ocr_provider || 'baidu',
     ocrRecognizedAt: draft.ocr_recognized_at || null,
     ticketPurchasedAt: formatBeijingDateTimeInput(draft.ticket_purchased_at),
     lines: (draft.lines || []).map((line) => mapLineToEditable(lotteryCode, line)),
+  }
+}
+
+function togglePickFromInput(currentInput: string, value: string, maxCount: number) {
+  const current = splitNumbers(currentInput)
+  if (current.includes(value)) {
+    return current.filter((item) => item !== value).join(',')
+  }
+  if (current.length >= maxCount) {
+    return current.join(',')
+  }
+  return [...current, value].sort().join(',')
+}
+
+function revokeObjectUrlIfNeeded(value: string) {
+  if (value.startsWith('blob:')) {
+    URL.revokeObjectURL(value)
   }
 }
 
@@ -229,16 +257,51 @@ function formatPlayType(playType: string) {
   return '大乐透'
 }
 
-function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: LotteryCode) {
+function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
+  if (!record.actual_result) {
+    return <span className="my-bets-card__meta">待开奖，暂无开奖号码</span>
+  }
+  if (lotteryCode === 'dlt') {
+    return (
+      <div className="number-row number-row--tight">
+        {(record.actual_result.red_balls || []).map((ball) => (
+          <NumberBall key={`${record.id}-actual-front-${ball}`} value={ball} color="red" size="sm" />
+        ))}
+        <span className="number-row__divider" />
+        {(record.actual_result.blue_balls || []).map((ball) => (
+          <NumberBall key={`${record.id}-actual-back-${ball}`} value={ball} color="blue" size="sm" />
+        ))}
+      </div>
+    )
+  }
+  const digits = (record.actual_result.digits || record.actual_result.red_balls || []).slice(0, 3)
+  return (
+    <div className="number-row number-row--tight">
+      {digits.map((ball) => (
+        <NumberBall key={`${record.id}-actual-digit-${ball}`} value={ball} color="red" size="sm" />
+      ))}
+    </div>
+  )
+}
+
+function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: LotteryCode, hasActualResult: boolean) {
+  const hitFront = new Set(line.hit_front_numbers || [])
+  const hitBack = new Set(line.hit_back_numbers || [])
+  const hitHundreds = new Set(line.hit_direct_hundreds || [])
+  const hitTens = new Set(line.hit_direct_tens || [])
+  const hitUnits = new Set(line.hit_direct_units || [])
+  const hitGroups = new Set(line.hit_group_numbers || [])
+  const resolveTone = (isHit: boolean): 'default' | 'muted' => (hasActualResult && !isHit ? 'muted' : 'default')
+
   if (lotteryCode === 'dlt') {
     return (
       <div className="number-row number-row--tight">
         {(line.front_numbers || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-front-${ball}`} value={ball} color="red" size="sm" />
+          <NumberBall key={`${recordId}-line-${line.line_no}-front-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
         ))}
         <span className="number-row__divider" />
         {(line.back_numbers || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-back-${ball}`} value={ball} color="blue" size="sm" />
+          <NumberBall key={`${recordId}-line-${line.line_no}-back-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
         ))}
       </div>
     )
@@ -247,15 +310,15 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
     return (
       <div className="number-row number-row--tight">
         {(line.direct_hundreds || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-h-${ball}`} value={ball} color="red" size="sm" />
+          <NumberBall key={`${recordId}-line-${line.line_no}-h-${ball}`} value={ball} color="red" size="sm" isHit={hitHundreds.has(ball)} tone={resolveTone(hitHundreds.has(ball))} />
         ))}
         <span className="number-row__divider" />
         {(line.direct_tens || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-t-${ball}`} value={ball} color="red" size="sm" />
+          <NumberBall key={`${recordId}-line-${line.line_no}-t-${ball}`} value={ball} color="red" size="sm" isHit={hitTens.has(ball)} tone={resolveTone(hitTens.has(ball))} />
         ))}
         <span className="number-row__divider" />
         {(line.direct_units || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-u-${ball}`} value={ball} color="red" size="sm" />
+          <NumberBall key={`${recordId}-line-${line.line_no}-u-${ball}`} value={ball} color="red" size="sm" isHit={hitUnits.has(ball)} tone={resolveTone(hitUnits.has(ball))} />
         ))}
       </div>
     )
@@ -263,20 +326,62 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
   return (
     <div className="number-row number-row--tight">
       {(line.group_numbers || []).map((ball) => (
-        <NumberBall key={`${recordId}-line-${line.line_no}-g-${ball}`} value={ball} color="red" size="sm" />
+        <NumberBall key={`${recordId}-line-${line.line_no}-g-${ball}`} value={ball} color="red" size="sm" isHit={hitGroups.has(ball)} tone={resolveTone(hitGroups.has(ball))} />
       ))}
+    </div>
+  )
+}
+
+function BallPicker({
+  label,
+  numbers,
+  selectedInput,
+  onToggle,
+  color,
+}: {
+  label: string
+  numbers: string[]
+  selectedInput: string
+  onToggle: (value: string) => void
+  color: 'red' | 'blue'
+}) {
+  const selected = new Set(splitNumbers(selectedInput))
+  return (
+    <div className="my-bets-picker">
+      <span className="my-bets-picker__label">{label}</span>
+      <div className="my-bets-picker__grid">
+        {numbers.map((value) => (
+          <button
+            key={`${label}-${value}`}
+            type="button"
+            className={clsx('my-bets-picker__ball', `is-${color}`, selected.has(value) && 'is-selected')}
+            onClick={() => onToggle(value)}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
 
 export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: LotteryCode; targetPeriod: string }) {
   const queryClient = useQueryClient()
+  const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [ocrModalOpen, setOcrModalOpen] = useState(false)
   const [ocrFile, setOcrFile] = useState<File | null>(null)
+  const [ocrPreviewUrl, setOcrPreviewUrl] = useState('')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
+
+  useEffect(() => {
+    return () => {
+      revokeObjectUrlIfNeeded(ocrPreviewUrl)
+      revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
+    }
+  }, [ocrPreviewUrl, form.ticketImagePreviewUrl])
 
   const betsQuery = useQuery({
     queryKey: ['my-bets', lotteryCode],
@@ -285,11 +390,16 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      let ticketImageUrl = form.ticketImageUrl
+      if (form.sourceType === 'ocr' && form.ticketImageFile) {
+        const uploadResult = await apiClient.uploadMyBetOCRImage(lotteryCode, form.ticketImageFile)
+        ticketImageUrl = uploadResult.ticket_image_url || ''
+      }
       const payload: MyBetRecordPayload = {
         lottery_code: lotteryCode,
         target_period: form.targetPeriod.trim(),
         source_type: form.sourceType,
-        ticket_image_url: form.ticketImageUrl,
+        ticket_image_url: ticketImageUrl,
         ocr_text: form.ocrText,
         ocr_provider: form.ocrProvider,
         ocr_recognized_at: form.ocrRecognizedAt,
@@ -304,8 +414,15 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     },
     onSuccess: async () => {
       setMessage(editingRecord ? '投注已更新。' : '投注已添加。')
+      revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
+      if (ocrPreviewUrl) {
+        revokeObjectUrlIfNeeded(ocrPreviewUrl)
+        setOcrPreviewUrl('')
+      }
+      setOcrFile(null)
       setFormOpen(false)
       setEditingRecord(null)
+      setForm(createDefaultFormState(targetPeriod, lotteryCode))
       await queryClient.invalidateQueries({ queryKey: ['my-bets', lotteryCode] })
     },
     onError: (error) => {
@@ -331,9 +448,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     },
     onSuccess: (draft) => {
       setOcrModalOpen(false)
-      setOcrFile(null)
       setEditingRecord(null)
-      setForm(buildFormFromOCRDraft(lotteryCode, draft))
+      revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
+      setForm(buildFormFromOCRDraft(lotteryCode, draft, ocrFile, ocrPreviewUrl))
       setFormOpen(true)
       setMessage(draft.warnings.length ? draft.warnings.join('；') : 'OCR识别完成，请确认后保存。')
     },
@@ -353,21 +470,35 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   function openCreateModal() {
     setMessage(null)
     setEditingRecord(null)
+    revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
     setForm(createDefaultFormState(targetPeriod, lotteryCode))
     setFormOpen(true)
+  }
+
+  function openOcrModal() {
+    setMessage(null)
+    clearOcrFile()
+    setOcrModalOpen(true)
   }
 
   function openEditModal(record: MyBetRecord) {
     setMessage(null)
     setEditingRecord(record)
+    revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
     setForm(buildFormFromRecord(record))
     setFormOpen(true)
   }
 
   function closeFormModal() {
     if (saveMutation.isPending) return
+    revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
     setFormOpen(false)
     setEditingRecord(null)
+  }
+
+  function closeOcrModal() {
+    if (ocrMutation.isPending) return
+    setOcrModalOpen(false)
   }
 
   function updateLine(index: number, updater: (line: EditableLine) => EditableLine) {
@@ -403,6 +534,37 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   function handleOcrFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] || null
     setOcrFile(file)
+    revokeObjectUrlIfNeeded(ocrPreviewUrl)
+    setOcrPreviewUrl(file ? URL.createObjectURL(file) : '')
+  }
+
+  function clearOcrFile() {
+    setOcrFile(null)
+    revokeObjectUrlIfNeeded(ocrPreviewUrl)
+    setOcrPreviewUrl('')
+  }
+
+  function handleEditImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] || null
+    setForm((previous) => {
+      revokeObjectUrlIfNeeded(previous.ticketImagePreviewUrl)
+      return {
+        ...previous,
+        ticketImageFile: file,
+        ticketImageUrl: '',
+        ticketImagePreviewUrl: file ? URL.createObjectURL(file) : '',
+      }
+    })
+  }
+
+  function clearEditImage() {
+    setForm((previous) => {
+      revokeObjectUrlIfNeeded(previous.ticketImagePreviewUrl)
+      return { ...previous, ticketImageFile: null, ticketImageUrl: '', ticketImagePreviewUrl: '' }
+    })
+    if (editImageInputRef.current) {
+      editImageInputRef.current.value = ''
+    }
   }
 
   return (
@@ -412,7 +574,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         subtitle="按当前账号和彩种隔离，支持手动录入、OCR识别、多注编辑和盈亏自动结算。"
         actions={
           <div className="toolbar-inline">
-            <button className="ghost-button" type="button" onClick={() => setOcrModalOpen(true)}>
+            <button className="ghost-button" type="button" onClick={openOcrModal}>
               图片识别添加
             </button>
             <button className="primary-button" type="button" onClick={openCreateModal}>
@@ -460,6 +622,10 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                     </div>
                     <span className="my-bets-card__meta">{`投注时间：${formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}`}</span>
+                    <div className="my-bets-card__draw">
+                      <span className="my-bets-card__meta">开奖号码：</span>
+                      {renderActualResult(record, lotteryCode)}
+                    </div>
                   </div>
                   <div className="my-bets-card__actions">
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditModal(record)}>
@@ -476,7 +642,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                     {(record.lines || []).map((line) => (
                       <div key={`${record.id}-line-${line.line_no}`} className="my-bets-line-card">
                         <span className="my-bets-line-card__label">{`子注单 #${line.line_no} · ${formatPlayType(line.play_type)}`}</span>
-                        {renderLineNumbers(record.id, line, lotteryCode)}
+                        {renderLineNumbers(record.id, line, lotteryCode, Boolean(record.actual_result))}
                         <span className="my-bets-card__meta">{`${line.bet_count} 注 × ${line.multiplier} 倍${line.is_append ? '（追加）' : ''} · ${formatCurrency(line.amount)}`}</span>
                       </div>
                     ))}
@@ -503,14 +669,14 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
       </StatusCard>
 
       {ocrModalOpen ? (
-        <div className="modal-shell" role="presentation" onClick={() => setOcrModalOpen(false)}>
+        <div className="modal-shell" role="presentation" onClick={closeOcrModal}>
           <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div className="modal-card__header">
               <div>
                 <p className="modal-card__eyebrow">OCR</p>
                 <h2>上传票据图片识别</h2>
               </div>
-              <button className="ghost-button ghost-button--compact" type="button" onClick={() => setOcrModalOpen(false)}>
+              <button className="ghost-button ghost-button--compact" type="button" onClick={closeOcrModal}>
                 关闭
               </button>
             </div>
@@ -520,10 +686,20 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 <input type="file" accept="image/*" onChange={handleOcrFileChange} />
               </label>
             </div>
+            {ocrPreviewUrl ? (
+              <div className="my-bets-image-preview">
+                <img src={ocrPreviewUrl} alt="OCR票据预览" />
+                <div className="my-bets-image-preview__actions">
+                  <button className="ghost-button ghost-button--compact" type="button" onClick={clearOcrFile}>
+                    删除图片
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div className="simulation-summary-bar my-bets-form-summary">
               <div className="simulation-summary-bar__meta">
                 <strong>{ocrFile ? ocrFile.name : '未选择文件'}</strong>
-                <span>识别时会先上传图床，再调用百度OCR。</span>
+                {/*<span>识别时仅调用百度OCR，保存投注时才上传图床。</span>*/}
               </div>
               <div className="simulation-summary-bar__actions">
                 <button className="primary-button" type="button" disabled={!ocrFile || ocrMutation.isPending} onClick={() => ocrMutation.mutate()}>
@@ -538,7 +714,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
       {formOpen ? (
         <div className="modal-shell" role="presentation" onClick={closeFormModal}>
           <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <form className="settings-model-form" onSubmit={submitForm}>
+            <form className="settings-model-form my-bets-modal" onSubmit={submitForm}>
               <div className="modal-card__header">
                 <div>
                   <p className="modal-card__eyebrow">My Bets</p>
@@ -549,32 +725,54 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </button>
               </div>
 
-              <div className="settings-form-grid">
-                <label>
-                  目标期号
-                  <input value={form.targetPeriod} onChange={(event) => setForm((previous) => ({ ...previous, targetPeriod: event.target.value.replace(/[^\d]/g, '') }))} required />
-                </label>
-                <label>
-                  来源方式
-                  <input value={form.sourceType === 'ocr' ? 'OCR识别' : '手动录入'} disabled />
-                </label>
-              </div>
-              {form.ticketImageUrl ? (
-                <a className="my-bets-card__meta" href={form.ticketImageUrl} target="_blank" rel="noreferrer">
-                  查看OCR票据图片
-                </a>
-              ) : null}
-              <div className="settings-form-grid">
-                <label>
-                  购票时间（北京时间）
-                  <input
-                    type="datetime-local"
-                    step={60}
-                    value={form.ticketPurchasedAt}
-                    onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
-                  />
-                </label>
-              </div>
+              <section className="my-bets-modal__section">
+                <div className="settings-form-grid">
+                  <label>
+                    目标期号
+                    <input value={form.targetPeriod} onChange={(event) => setForm((previous) => ({ ...previous, targetPeriod: event.target.value.replace(/[^\d]/g, '') }))} required />
+                  </label>
+                  <label>
+                    来源方式
+                    <input value={form.sourceType === 'ocr' ? 'OCR识别' : '手动录入'} disabled />
+                  </label>
+                  <label>
+                    购票时间（北京时间）
+                    <input
+                      type="datetime-local"
+                      step={60}
+                      value={form.ticketPurchasedAt}
+                      onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="my-bets-modal__section">
+                <div className="my-bets-image-uploader">
+                  <div className="my-bets-image-uploader__header">
+                    <strong>票据图片</strong>
+                    <span>OCR识别后图片先本地缓存，点击保存投注时再上传图床。</span>
+                  </div>
+                  <div className="my-bets-image-uploader__actions">
+                    <input ref={editImageInputRef} type="file" accept="image/*" onChange={handleEditImageChange} />
+                    <button className="ghost-button ghost-button--compact" type="button" onClick={clearEditImage} disabled={!form.ticketImagePreviewUrl && !form.ticketImageUrl}>
+                      删除图片
+                    </button>
+                    {form.ticketImageUrl && !form.ticketImageFile ? (
+                      <a className="ghost-button ghost-button--compact" href={form.ticketImageUrl} target="_blank" rel="noreferrer">
+                        查看原图
+                      </a>
+                    ) : null}
+                  </div>
+                  {form.ticketImagePreviewUrl ? (
+                    <div className="my-bets-image-preview">
+                      <img src={form.ticketImagePreviewUrl} alt="票据预览" />
+                    </div>
+                  ) : (
+                    <div className="my-bets-image-uploader__placeholder">未选择图片</div>
+                  )}
+                </div>
+              </section>
 
               <div className="my-bets-editor-list">
                 {form.lines.map((line, index) => {
@@ -605,68 +803,122 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       ) : null}
 
                       {lotteryCode === 'dlt' ? (
-                        <div className="settings-form-grid">
-                          <label>
-                            前区号码（逗号分隔）
-                            <input
-                              value={line.frontNumbersInput}
-                              onChange={(event) => updateLine(index, (current) => ({ ...current, frontNumbersInput: normalizeDigitsInput(event.target.value) }))}
-                              placeholder="如 01,02,03,04,05"
-                            />
-                          </label>
-                          <label>
-                            后区号码（逗号分隔）
-                            <input
-                              value={line.backNumbersInput}
-                              onChange={(event) => updateLine(index, (current) => ({ ...current, backNumbersInput: normalizeDigitsInput(event.target.value) }))}
-                              placeholder="如 06,07"
-                            />
-                          </label>
-                          <label>
-                            倍数
-                            <input
-                              type="number"
-                              min={1}
-                              max={99}
-                              value={line.multiplier}
-                              onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))}
-                            />
-                          </label>
-                          <label className="toggle-chip">
-                            <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
-                            <span>追加投注</span>
-                          </label>
-                        </div>
+                        <>
+                          <BallPicker
+                            label="前区点击选号"
+                            numbers={dltFrontPool}
+                            selectedInput={line.frontNumbersInput}
+                            onToggle={(value) =>
+                              updateLine(index, (current) => ({ ...current, frontNumbersInput: togglePickFromInput(current.frontNumbersInput, value, dltFrontPool.length) }))
+                            }
+                            color="red"
+                          />
+                          <BallPicker
+                            label="后区点击选号"
+                            numbers={dltBackPool}
+                            selectedInput={line.backNumbersInput}
+                            onToggle={(value) =>
+                              updateLine(index, (current) => ({ ...current, backNumbersInput: togglePickFromInput(current.backNumbersInput, value, dltBackPool.length) }))
+                            }
+                            color="blue"
+                          />
+                          <div className="settings-form-grid">
+                            <label>
+                              前区号码（逗号分隔）
+                              <input
+                                value={line.frontNumbersInput}
+                                onChange={(event) => updateLine(index, (current) => ({ ...current, frontNumbersInput: normalizeDigitsInput(event.target.value) }))}
+                                placeholder="如 01,02,03,04,05"
+                              />
+                            </label>
+                            <label>
+                              后区号码（逗号分隔）
+                              <input
+                                value={line.backNumbersInput}
+                                onChange={(event) => updateLine(index, (current) => ({ ...current, backNumbersInput: normalizeDigitsInput(event.target.value) }))}
+                                placeholder="如 06,07"
+                              />
+                            </label>
+                            <label>
+                              倍数
+                              <input
+                                type="number"
+                                min={1}
+                                max={99}
+                                value={line.multiplier}
+                                onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))}
+                              />
+                            </label>
+                            <label className="toggle-chip">
+                              <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
+                              <span>追加投注</span>
+                            </label>
+                          </div>
+                        </>
                       ) : line.playType === 'direct' ? (
-                        <div className="settings-form-grid">
-                          <label>
-                            百位号码（逗号分隔）
-                            <input value={line.directHundredsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 0,1" />
-                          </label>
-                          <label>
-                            十位号码（逗号分隔）
-                            <input value={line.directTensInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTensInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 2,3" />
-                          </label>
-                          <label>
-                            个位号码（逗号分隔）
-                            <input value={line.directUnitsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 4,5" />
-                          </label>
-                          <label>
-                            倍数
-                            <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
-                          </label>
-                        </div>
+                        <>
+                          <BallPicker
+                            label="百位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directHundredsInput}
+                            onToggle={(value) =>
+                              updateLine(index, (current) => ({ ...current, directHundredsInput: togglePickFromInput(current.directHundredsInput, value, pl3Pool.length) }))
+                            }
+                            color="red"
+                          />
+                          <BallPicker
+                            label="十位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directTensInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directTensInput: togglePickFromInput(current.directTensInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <BallPicker
+                            label="个位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directUnitsInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsInput: togglePickFromInput(current.directUnitsInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <div className="settings-form-grid">
+                            <label>
+                              百位号码（逗号分隔）
+                              <input value={line.directHundredsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 00,01" />
+                            </label>
+                            <label>
+                              十位号码（逗号分隔）
+                              <input value={line.directTensInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTensInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 02,03" />
+                            </label>
+                            <label>
+                              个位号码（逗号分隔）
+                              <input value={line.directUnitsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 04,05" />
+                            </label>
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
+                            </label>
+                          </div>
+                        </>
                       ) : (
-                        <div className="settings-form-grid">
-                          <label>
-                            组选号码（逗号分隔）
-                            <input value={line.groupNumbersInput} onChange={(event) => updateLine(index, (current) => ({ ...current, groupNumbersInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 1,8,9" />
-                          </label>
-                          <label>
-                            倍数
-                            <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
-                          </label>
-                        </div>
+                        <>
+                          <BallPicker
+                            label="组选点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.groupNumbersInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, groupNumbersInput: togglePickFromInput(current.groupNumbersInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <div className="settings-form-grid">
+                            <label>
+                              组选号码（逗号分隔）
+                              <input value={line.groupNumbersInput} onChange={(event) => updateLine(index, (current) => ({ ...current, groupNumbersInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 01,08,09" />
+                            </label>
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
+                            </label>
+                          </div>
+                        </>
                       )}
                     </section>
                   )

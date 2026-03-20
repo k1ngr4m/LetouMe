@@ -29,8 +29,7 @@ class TicketOCRService:
 
     def recognize(self, *, lottery_code: str, image_bytes: bytes, filename: str) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
-        self._validate_settings()
-        image_url = self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code=normalized_code)
+        self._validate_baidu_settings()
         ocr_text = self._recognize_text_by_baidu(image_bytes=image_bytes)
         parsed = self._parse_ticket_text(ocr_text=ocr_text, lottery_code=normalized_code)
         lines = parsed.get("lines", [])
@@ -50,7 +49,7 @@ class TicketOCRService:
         )
         return {
             "lottery_code": normalized_code,
-            "ticket_image_url": image_url,
+            "ticket_image_url": "",
             "ocr_text": ocr_text,
             "ocr_provider": "baidu",
             "ocr_recognized_at": parsed.get("recognized_at"),
@@ -60,9 +59,17 @@ class TicketOCRService:
             "warnings": warnings,
         }
 
-    def _validate_settings(self) -> None:
+    def upload_image(self, *, lottery_code: str, image_bytes: bytes, filename: str) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        self._validate_imgloc_settings()
+        image_url = self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code=normalized_code)
+        return {"lottery_code": normalized_code, "ticket_image_url": image_url}
+
+    def _validate_baidu_settings(self) -> None:
         if not self.settings.baidu_ocr_api_key or not self.settings.baidu_ocr_secret_key:
             raise ValueError("未配置百度 OCR 密钥")
+
+    def _validate_imgloc_settings(self) -> None:
         if not self.settings.imgloc_api_key:
             raise ValueError("未配置 imgloc 图床密钥")
 

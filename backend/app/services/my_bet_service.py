@@ -96,6 +96,10 @@ class MyBetService:
             "warnings": warnings,
         }
 
+    def upload_ticket_image(self, *, lottery_code: str, image_bytes: bytes, filename: str) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        return self.ticket_ocr_service.upload_image(lottery_code=normalized_code, image_bytes=image_bytes, filename=filename)
+
     def _build_payload(self, payload: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         target_period = str(payload.get("target_period") or "").strip()
         if not target_period:
@@ -278,21 +282,51 @@ class MyBetService:
     def _calculate_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         target_period = str(record.get("target_period") or "")
         if not target_period:
-            return {"settlement_status": "pending", "winning_bet_count": 0, "prize_level": None, "prize_amount": 0, "net_profit": -int(record.get("amount") or 0), "settled_at": None}
+            return {
+                "settlement_status": "pending",
+                "winning_bet_count": 0,
+                "prize_level": None,
+                "prize_amount": 0,
+                "net_profit": -int(record.get("amount") or 0),
+                "settled_at": None,
+                "actual_result": None,
+                "lines": list(record.get("lines") or []),
+            }
         draw = self.lottery_repository.get_draw_by_period(target_period, lottery_code=lottery_code)
         if not draw:
-            return {"settlement_status": "pending", "winning_bet_count": 0, "prize_level": None, "prize_amount": 0, "net_profit": -int(record.get("amount") or 0), "settled_at": None}
+            return {
+                "settlement_status": "pending",
+                "winning_bet_count": 0,
+                "prize_level": None,
+                "prize_amount": 0,
+                "net_profit": -int(record.get("amount") or 0),
+                "settled_at": None,
+                "actual_result": None,
+                "lines": list(record.get("lines") or []),
+            }
 
         total_prize_amount = 0
         total_winning_bets = 0
         best_level: str | None = None
         level_order = self.DLT_PRIZE_LEVEL_ORDER if lottery_code == "dlt" else self.PL3_PRIZE_LEVEL_ORDER
         level_priority = {level: index for index, level in enumerate(level_order)}
+        lines_with_hits: list[dict[str, Any]] = []
 
         for line in record.get("lines", []):
             line_result = self._calculate_line_settlement(line=line, draw=draw, lottery_code=lottery_code)
             total_prize_amount += int(line_result.get("prize_amount") or 0)
             total_winning_bets += int(line_result.get("winning_bet_count") or 0)
+            lines_with_hits.append(
+                {
+                    **line,
+                    "hit_front_numbers": list(line_result.get("hit_front_numbers") or []),
+                    "hit_back_numbers": list(line_result.get("hit_back_numbers") or []),
+                    "hit_direct_hundreds": list(line_result.get("hit_direct_hundreds") or []),
+                    "hit_direct_tens": list(line_result.get("hit_direct_tens") or []),
+                    "hit_direct_units": list(line_result.get("hit_direct_units") or []),
+                    "hit_group_numbers": list(line_result.get("hit_group_numbers") or []),
+                }
+            )
             level = line_result.get("prize_level")
             if level and (best_level is None or level_priority.get(str(level), 999) < level_priority.get(str(best_level), 999)):
                 best_level = str(level)
@@ -303,6 +337,8 @@ class MyBetService:
             "prize_amount": total_prize_amount,
             "net_profit": total_prize_amount - int(record.get("amount") or 0),
             "settled_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code),
+            "lines": lines_with_hits,
         }
 
     def _calculate_line_settlement(self, *, line: dict[str, Any], draw: dict[str, Any], lottery_code: str) -> dict[str, Any]:
@@ -313,8 +349,12 @@ class MyBetService:
     def _calculate_dlt_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
         front_numbers = list(line.get("front_numbers") or [])
         back_numbers = list(line.get("back_numbers") or [])
-        red_hits = len([ball for ball in front_numbers if ball in (draw.get("red_balls") or [])])
-        blue_hits = len([ball for ball in back_numbers if ball in (draw.get("blue_balls") or [])])
+        draw_red_balls = list(draw.get("red_balls") or [])
+        draw_blue_balls = list(draw.get("blue_balls") or [])
+        front_hits = [ball for ball in front_numbers if ball in draw_red_balls]
+        back_hits = [ball for ball in back_numbers if ball in draw_blue_balls]
+        red_hits = len(front_hits)
+        blue_hits = len(back_hits)
         breakdown = self._calculate_dlt_prize_breakdown(len(front_numbers), len(back_numbers), red_hits, blue_hits)
         is_append = bool(line.get("is_append"))
         total_prize = 0
@@ -335,6 +375,12 @@ class MyBetService:
             "winning_bet_count": total_winning_bets,
             "prize_level": best_level,
             "prize_amount": total_prize,
+            "hit_front_numbers": front_hits,
+            "hit_back_numbers": back_hits,
+            "hit_direct_hundreds": [],
+            "hit_direct_tens": [],
+            "hit_direct_units": [],
+            "hit_group_numbers": [],
         }
 
     def _calculate_pl3_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
@@ -364,10 +410,32 @@ class MyBetService:
                 level = "组选6"
                 winning_count = 1
         per_bet_amount = PredictionService.PL3_FIXED_PRIZE_RULES.get(level or "", 0)
+        hit_hundreds = [item for item in list(line.get("direct_hundreds") or []) if len(digits) == 3 and item == digits[0]]
+        hit_tens = [item for item in list(line.get("direct_tens") or []) if len(digits) == 3 and item == digits[1]]
+        hit_units = [item for item in list(line.get("direct_units") or []) if len(digits) == 3 and item == digits[2]]
+        hit_groups = [item for item in list(line.get("group_numbers") or []) if item in digits]
         return {
             "winning_bet_count": winning_count,
             "prize_level": level,
             "prize_amount": winning_count * per_bet_amount * multiplier,
+            "hit_front_numbers": [],
+            "hit_back_numbers": [],
+            "hit_direct_hundreds": hit_hundreds,
+            "hit_direct_tens": hit_tens,
+            "hit_direct_units": hit_units,
+            "hit_group_numbers": hit_groups,
+        }
+
+    @staticmethod
+    def _serialize_actual_result(draw: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
+        digits = normalize_digit_balls(draw.get("digits", draw.get("red_balls", [])))
+        return {
+            "lottery_code": lottery_code,
+            "period": str(draw.get("period") or ""),
+            "date": str(draw.get("date") or ""),
+            "red_balls": sorted(set(normalize_digit_balls(draw.get("red_balls", [])))),
+            "blue_balls": sorted(set(normalize_digit_balls(draw.get("blue_balls", [])))),
+            "digits": digits[:3],
         }
 
     @staticmethod
@@ -479,6 +547,7 @@ class MyBetService:
             "ocr_provider": str(record.get("ocr_provider") or "") or None,
             "ocr_recognized_at": str(ocr_recognized_at or "") or None,
             "ticket_purchased_at": str(ticket_purchased_at or "") or None,
+            "actual_result": record.get("actual_result") if isinstance(record.get("actual_result"), dict) else None,
             "lines": lines,
             "created_at": created_at or "",
             "updated_at": updated_at or created_at or "",
@@ -504,6 +573,12 @@ class MyBetService:
             "direct_tens": normalize_numbers(line.get("direct_tens")),
             "direct_units": normalize_numbers(line.get("direct_units")),
             "group_numbers": normalize_numbers(line.get("group_numbers")),
+            "hit_front_numbers": normalize_numbers(line.get("hit_front_numbers")),
+            "hit_back_numbers": normalize_numbers(line.get("hit_back_numbers")),
+            "hit_direct_hundreds": normalize_numbers(line.get("hit_direct_hundreds")),
+            "hit_direct_tens": normalize_numbers(line.get("hit_direct_tens")),
+            "hit_direct_units": normalize_numbers(line.get("hit_direct_units")),
+            "hit_group_numbers": normalize_numbers(line.get("hit_group_numbers")),
             "multiplier": int(line.get("multiplier") or 1),
             "is_append": bool(line.get("is_append")),
             "bet_count": int(line.get("bet_count") or 0),

@@ -141,6 +141,7 @@ class MyBetRecordResponse(BaseModel):
     ocr_provider: str | None = None
     ocr_recognized_at: str | None = None
     ticket_purchased_at: str | None = None
+    actual_result: dict[str, Any] | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
     created_at: str
     updated_at: str
@@ -179,6 +180,11 @@ class MyBetOCRDraftResponse(BaseModel):
     ticket_purchased_at: str | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class MyBetOCRImageUploadResponse(BaseModel):
+    lottery_code: str = "dlt"
+    ticket_image_url: str
 
 
 class SuccessResponse(BaseModel):
