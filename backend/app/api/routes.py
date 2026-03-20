@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 
 from backend.app.auth import (
     AuthService,
@@ -73,6 +73,7 @@ from backend.app.schemas.responses import (
     LotteryHistoryResponse,
     MyBetRecordCreateResponse,
     MyBetRecordListResponse,
+    MyBetOCRDraftResponse,
     MyBetRecordUpdateResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
@@ -234,6 +235,28 @@ def create_my_bet(payload: MyBetRecordPayload, current_user: dict = Depends(requ
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"record": record}
+
+
+@router.post("/my-bets/ocr/recognize", response_model=MyBetOCRDraftResponse)
+async def recognize_my_bet_ocr(
+    lottery_code: str = Form(default="dlt"),
+    image: UploadFile = File(...),
+    _: dict = Depends(require_current_user),
+) -> dict:
+    try:
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise ValueError("图片不能为空")
+        if len(image_bytes) > 8 * 1024 * 1024:
+            raise ValueError("图片大小不能超过 8MB")
+        filename = str(image.filename or "ticket.jpg")
+        return my_bet_service.recognize_ticket_image(
+            lottery_code=lottery_code,
+            image_bytes=image_bytes,
+            filename=filename,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/my-bets/update", response_model=MyBetRecordUpdateResponse)

@@ -309,6 +309,46 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS my_bet_record_line (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        record_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        line_no INT NOT NULL DEFAULT 1,
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
+        multiplier INT NOT NULL DEFAULT 1,
+        is_append TINYINT(1) NOT NULL DEFAULT 0,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_my_bet_record_line_record FOREIGN KEY (record_id) REFERENCES my_bet_record(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_my_bet_record_line_no (record_id, line_no),
+        INDEX idx_my_bet_record_line_record (record_id, line_no)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS my_bet_record_meta (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        record_id BIGINT NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        source_type VARCHAR(32) NOT NULL DEFAULT 'manual',
+        ticket_image_url TEXT NULL,
+        ocr_text MEDIUMTEXT NULL,
+        ocr_provider VARCHAR(32) NULL,
+        ocr_recognized_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_my_bet_record_meta_record FOREIGN KEY (record_id) REFERENCES my_bet_record(id) ON DELETE CASCADE,
+        INDEX idx_my_bet_record_meta_lottery_created (lottery_code, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS app_role (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         role_code VARCHAR(64) NOT NULL UNIQUE,
@@ -555,6 +595,46 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
         INDEX idx_my_bet_record_user_period (user_id, lottery_code, target_period, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_my_bet_record_line (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        record_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        line_no INT NOT NULL DEFAULT 1,
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
+        multiplier INT NOT NULL DEFAULT 1,
+        is_append TINYINT(1) NOT NULL DEFAULT 0,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_my_bet_record_line_record FOREIGN KEY (record_id) REFERENCES {table_prefix}_my_bet_record(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_my_bet_record_line_no (record_id, line_no),
+        INDEX idx_my_bet_record_line_record (record_id, line_no)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_my_bet_record_meta (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        record_id BIGINT NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        source_type VARCHAR(32) NOT NULL DEFAULT 'manual',
+        ticket_image_url TEXT NULL,
+        ocr_text MEDIUMTEXT NULL,
+        ocr_provider VARCHAR(32) NULL,
+        ocr_recognized_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_my_bet_record_meta_record FOREIGN KEY (record_id) REFERENCES {table_prefix}_my_bet_record(id) ON DELETE CASCADE,
+        INDEX idx_my_bet_record_meta_lottery_created (lottery_code, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
 ]

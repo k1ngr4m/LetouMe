@@ -257,10 +257,43 @@ export type MyBetRecordPayload = {
   group_numbers?: string[]
   multiplier?: number
   is_append?: boolean
+  source_type?: 'manual' | 'ocr'
+  ticket_image_url?: string
+  ocr_text?: string
+  ocr_provider?: string | null
+  ocr_recognized_at?: string | null
+  lines?: MyBetLinePayload[]
 }
 
 export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
   record_id: number
+}
+
+export type MyBetLinePayload = {
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  front_numbers?: string[]
+  back_numbers?: string[]
+  direct_hundreds?: string[]
+  direct_tens?: string[]
+  direct_units?: string[]
+  group_numbers?: string[]
+  multiplier?: number
+  is_append?: boolean
+}
+
+export type MyBetLine = {
+  line_no: number
+  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  front_numbers: string[]
+  back_numbers: string[]
+  direct_hundreds: string[]
+  direct_tens: string[]
+  direct_units: string[]
+  group_numbers: string[]
+  multiplier: number
+  is_append: boolean
+  bet_count: number
+  amount: number
 }
 
 export type MyBetRecord = {
@@ -284,6 +317,12 @@ export type MyBetRecord = {
   prize_amount: number
   net_profit: number
   settled_at: string | null
+  source_type: 'manual' | 'ocr'
+  ticket_image_url: string
+  ocr_text: string
+  ocr_provider: string | null
+  ocr_recognized_at: string | null
+  lines: MyBetLine[]
   created_at: string
   updated_at: string
 }
@@ -308,6 +347,18 @@ export type MyBetRecordCreateResponse = {
 
 export type MyBetRecordUpdateResponse = {
   record: MyBetRecord
+}
+
+export type MyBetOCRDraftResponse = {
+  lottery_code: LotteryCode
+  target_period: string
+  source_type: 'ocr'
+  ticket_image_url: string
+  ocr_text: string
+  ocr_provider: string | null
+  ocr_recognized_at: string | null
+  lines: MyBetLine[]
+  warnings: string[]
 }
 
 export type SuccessResponse = {

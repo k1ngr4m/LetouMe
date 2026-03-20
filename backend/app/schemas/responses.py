@@ -135,6 +135,12 @@ class MyBetRecordResponse(BaseModel):
     prize_amount: int = 0
     net_profit: int = 0
     settled_at: str | None = None
+    source_type: str = "manual"
+    ticket_image_url: str = ""
+    ocr_text: str = ""
+    ocr_provider: str | None = None
+    ocr_recognized_at: str | None = None
+    lines: list[dict[str, Any]] = Field(default_factory=list)
     created_at: str
     updated_at: str
 
@@ -159,6 +165,18 @@ class MyBetRecordCreateResponse(BaseModel):
 
 class MyBetRecordUpdateResponse(BaseModel):
     record: MyBetRecordResponse
+
+
+class MyBetOCRDraftResponse(BaseModel):
+    lottery_code: str = "dlt"
+    target_period: str = ""
+    source_type: str = "ocr"
+    ticket_image_url: str = ""
+    ocr_text: str = ""
+    ocr_provider: str | None = None
+    ocr_recognized_at: str | None = None
+    lines: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class SuccessResponse(BaseModel):

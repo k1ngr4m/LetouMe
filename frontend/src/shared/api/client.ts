@@ -10,6 +10,7 @@ import type {
   GenerateSettingsModelPredictionsPayload,
   LoginPayload,
   MyBetRecordCreateResponse,
+  MyBetOCRDraftResponse,
   MyBetRecordListResponse,
   MyBetRecordPayload,
   MyBetRecordUpdatePayload,
@@ -92,6 +93,35 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
   appLogger.info('API request completed', {
     method,
+    path,
+    status: response.status,
+    duration_ms: Number((performance.now() - startedAt).toFixed(2)),
+  })
+  return data as T
+}
+
+async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+  const startedAt = performance.now()
+  appLogger.debug('API request started', { method: 'POST', path, payload: '[form-data]' })
+  const response = await fetch(buildUrl(path).toString(), {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = data && typeof data === 'object' && 'detail' in data ? data.detail : '请求失败'
+    appLogger.error('API request failed', {
+      method: 'POST',
+      path,
+      status: response.status,
+      duration_ms: Number((performance.now() - startedAt).toFixed(2)),
+      detail,
+    })
+    throw new Error(typeof detail === 'string' ? detail : '请求失败')
+  }
+  appLogger.info('API request completed', {
+    method: 'POST',
     path,
     status: response.status,
     duration_ms: Number((performance.now() - startedAt).toFixed(2)),
@@ -202,6 +232,12 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify({ record_id: recordId, lottery_code: lotteryCode }),
     })
+  },
+  recognizeMyBetByImage(lotteryCode: LotteryCode, image: File) {
+    const formData = new FormData()
+    formData.set('lottery_code', lotteryCode)
+    formData.set('image', image)
+    return requestFormData<MyBetOCRDraftResponse>('/api/my-bets/ocr/recognize', formData)
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
     return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {

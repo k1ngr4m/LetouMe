@@ -1386,28 +1386,24 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
     const dialog = await screen.findByRole('dialog')
-
-    const frontSection = within(dialog).getByRole('heading', { name: '前区号码' }).closest('.simulation-section')
-    const backSection = within(dialog).getByRole('heading', { name: '后区号码' }).closest('.simulation-section')
-    expect(frontSection).not.toBeNull()
-    expect(backSection).not.toBeNull()
-
-    for (const ball of ['01', '02', '03', '04', '05']) {
-      await userEvent.click(within(frontSection as HTMLElement).getByRole('button', { name: ball }))
-    }
-    for (const ball of ['06', '07']) {
-      await userEvent.click(within(backSection as HTMLElement).getByRole('button', { name: ball }))
-    }
+    await userEvent.clear(within(dialog).getByLabelText('前区号码（逗号分隔）'))
+    await userEvent.type(within(dialog).getByLabelText('前区号码（逗号分隔）', { exact: true }), '01,02,03,04,05')
+    await userEvent.clear(within(dialog).getByLabelText('后区号码（逗号分隔）'))
+    await userEvent.type(within(dialog).getByLabelText('后区号码（逗号分隔）', { exact: true }), '06,07')
     await userEvent.click(within(dialog).getByRole('button', { name: '添加投注' }))
 
     await waitFor(() =>
       expect(createMyBet).toHaveBeenCalledWith(
         expect.objectContaining({
           lottery_code: 'dlt',
-          play_type: 'dlt',
-          front_numbers: ['01', '02', '03', '04', '05'],
-          back_numbers: ['06', '07'],
           target_period: '2026032',
+          lines: [
+            expect.objectContaining({
+              play_type: 'dlt',
+              front_numbers: ['01', '02', '03', '04', '05'],
+              back_numbers: ['06', '07'],
+            }),
+          ],
         }),
       ),
     )

@@ -114,6 +114,18 @@ class MyBetRecordListPayload(BaseModel):
     lottery_code: str = "dlt"
 
 
+class MyBetLinePayload(BaseModel):
+    play_type: str | None = None
+    front_numbers: list[str] = Field(default_factory=list)
+    back_numbers: list[str] = Field(default_factory=list)
+    direct_hundreds: list[str] = Field(default_factory=list)
+    direct_tens: list[str] = Field(default_factory=list)
+    direct_units: list[str] = Field(default_factory=list)
+    group_numbers: list[str] = Field(default_factory=list)
+    multiplier: int = Field(default=1, ge=1, le=99)
+    is_append: bool = False
+
+
 class MyBetRecordPayload(BaseModel):
     lottery_code: str = "dlt"
     target_period: str
@@ -126,6 +138,12 @@ class MyBetRecordPayload(BaseModel):
     group_numbers: list[str] = Field(default_factory=list)
     multiplier: int = Field(default=1, ge=1, le=99)
     is_append: bool = False
+    source_type: str = "manual"
+    ticket_image_url: str = ""
+    ocr_text: str = ""
+    ocr_provider: str | None = None
+    ocr_recognized_at: str | None = None
+    lines: list[MyBetLinePayload] = Field(default_factory=list)
 
 
 class MyBetRecordUpdatePayload(MyBetRecordPayload):
