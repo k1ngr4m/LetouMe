@@ -35,7 +35,8 @@ class MyBetRepository:
                             meta.ticket_image_url,
                             meta.ocr_text,
                             meta.ocr_provider,
-                            meta.ocr_recognized_at
+                            meta.ocr_recognized_at,
+                            meta.ticket_purchased_at
                         FROM my_bet_record AS record
                         LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
                         WHERE record.user_id = ? AND record.lottery_code = ?
@@ -169,7 +170,8 @@ class MyBetRepository:
                             meta.ticket_image_url,
                             meta.ocr_text,
                             meta.ocr_provider,
-                            meta.ocr_recognized_at
+                            meta.ocr_recognized_at,
+                            meta.ticket_purchased_at
                         FROM my_bet_record AS record
                         LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
                         WHERE record.id = ? AND record.user_id = ? AND record.lottery_code = ?
@@ -253,15 +255,17 @@ class MyBetRepository:
                 ticket_image_url,
                 ocr_text,
                 ocr_provider,
-                ocr_recognized_at
+                ocr_recognized_at,
+                ticket_purchased_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 source_type = VALUES(source_type),
                 ticket_image_url = VALUES(ticket_image_url),
                 ocr_text = VALUES(ocr_text),
                 ocr_provider = VALUES(ocr_provider),
-                ocr_recognized_at = VALUES(ocr_recognized_at)
+                ocr_recognized_at = VALUES(ocr_recognized_at),
+                ticket_purchased_at = VALUES(ticket_purchased_at)
             """,
             (
                 record_id,
@@ -271,6 +275,7 @@ class MyBetRepository:
                 str(payload.get("ocr_text") or "") or None,
                 str(payload.get("ocr_provider") or "") or None,
                 MyBetRepository._normalize_datetime_value(payload.get("ocr_recognized_at")),
+                MyBetRepository._normalize_datetime_value(payload.get("ticket_purchased_at")),
             ),
         )
 

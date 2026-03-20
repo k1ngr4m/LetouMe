@@ -29,6 +29,7 @@ type BetFormState = {
   ocrText: string
   ocrProvider: string | null
   ocrRecognizedAt: string | null
+  ticketPurchasedAt: string
   lines: EditableLine[]
 }
 
@@ -93,8 +94,37 @@ function createDefaultFormState(targetPeriod: string, lotteryCode: LotteryCode):
     ocrText: '',
     ocrProvider: null,
     ocrRecognizedAt: null,
+    ticketPurchasedAt: '',
     lines: [createEmptyLine(lotteryCode)],
   }
+}
+
+function formatBeijingDateTimeInput(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const formatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(date)
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '--'
+  return `${pick('year')}-${pick('month')}-${pick('day')}T${pick('hour')}:${pick('minute')}`
+}
+
+function beijingInputToUtcIso(value: string) {
+  const text = value.trim()
+  if (!text) return null
+  const matched = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+  if (!matched) return null
+  const [, year, month, day, hour, minute] = matched
+  const utcMs = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour) - 8, Number(minute), 0)
+  return new Date(utcMs).toISOString().replace('.000Z', 'Z')
 }
 
 function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableLine {
@@ -123,6 +153,7 @@ function buildFormFromRecord(record: MyBetRecord): BetFormState {
     ocrText: record.ocr_text || '',
     ocrProvider: record.ocr_provider || null,
     ocrRecognizedAt: record.ocr_recognized_at || null,
+    ticketPurchasedAt: formatBeijingDateTimeInput(record.ticket_purchased_at),
     lines,
   }
 }
@@ -135,6 +166,7 @@ function buildFormFromOCRDraft(lotteryCode: LotteryCode, draft: MyBetOCRDraftRes
     ocrText: draft.ocr_text || '',
     ocrProvider: draft.ocr_provider || 'baidu',
     ocrRecognizedAt: draft.ocr_recognized_at || null,
+    ticketPurchasedAt: formatBeijingDateTimeInput(draft.ticket_purchased_at),
     lines: (draft.lines || []).map((line) => mapLineToEditable(lotteryCode, line)),
   }
 }
@@ -261,6 +293,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         ocr_text: form.ocrText,
         ocr_provider: form.ocrProvider,
         ocr_recognized_at: form.ocrRecognizedAt,
+        ticket_purchased_at: beijingInputToUtcIso(form.ticketPurchasedAt),
         lines: form.lines.map((line) => buildLinePayload(lotteryCode, line)),
       }
       if (editingRecord) {
@@ -426,7 +459,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       {record.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : null}
                       {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                     </div>
-                    <span className="my-bets-card__meta">{`投注时间：${formatDateTimeLocal(record.created_at)}`}</span>
+                    <span className="my-bets-card__meta">{`投注时间：${formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}`}</span>
                   </div>
                   <div className="my-bets-card__actions">
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditModal(record)}>
@@ -531,6 +564,17 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                   查看OCR票据图片
                 </a>
               ) : null}
+              <div className="settings-form-grid">
+                <label>
+                  购票时间（北京时间）
+                  <input
+                    type="datetime-local"
+                    step={60}
+                    value={form.ticketPurchasedAt}
+                    onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
+                  />
+                </label>
+              </div>
 
               <div className="my-bets-editor-list">
                 {form.lines.map((line, index) => {

@@ -262,6 +262,7 @@ export type MyBetRecordPayload = {
   ocr_text?: string
   ocr_provider?: string | null
   ocr_recognized_at?: string | null
+  ticket_purchased_at?: string | null
   lines?: MyBetLinePayload[]
 }
 
@@ -322,6 +323,7 @@ export type MyBetRecord = {
   ocr_text: string
   ocr_provider: string | null
   ocr_recognized_at: string | null
+  ticket_purchased_at?: string | null
   lines: MyBetLine[]
   created_at: string
   updated_at: string
@@ -357,6 +359,7 @@ export type MyBetOCRDraftResponse = {
   ocr_text: string
   ocr_provider: string | null
   ocr_recognized_at: string | null
+  ticket_purchased_at?: string | null
   lines: MyBetLine[]
   warnings: string[]
 }

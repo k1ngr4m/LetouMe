@@ -140,6 +140,7 @@ class MyBetRecordResponse(BaseModel):
     ocr_text: str = ""
     ocr_provider: str | None = None
     ocr_recognized_at: str | None = None
+    ticket_purchased_at: str | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
     created_at: str
     updated_at: str
@@ -175,6 +176,7 @@ class MyBetOCRDraftResponse(BaseModel):
     ocr_text: str = ""
     ocr_provider: str | None = None
     ocr_recognized_at: str | None = None
+    ticket_purchased_at: str | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

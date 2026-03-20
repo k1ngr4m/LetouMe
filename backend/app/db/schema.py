@@ -342,6 +342,7 @@ SCHEMA_STATEMENTS = [
         ocr_text MEDIUMTEXT NULL,
         ocr_provider VARCHAR(32) NULL,
         ocr_recognized_at DATETIME NULL,
+        ticket_purchased_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_my_bet_record_meta_record FOREIGN KEY (record_id) REFERENCES my_bet_record(id) ON DELETE CASCADE,
@@ -631,6 +632,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         ocr_text MEDIUMTEXT NULL,
         ocr_provider VARCHAR(32) NULL,
         ocr_recognized_at DATETIME NULL,
+        ticket_purchased_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_my_bet_record_meta_record FOREIGN KEY (record_id) REFERENCES {table_prefix}_my_bet_record(id) ON DELETE CASCADE,
@@ -717,8 +719,20 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "app_permission": {
         "permission_description": "ALTER TABLE app_permission ADD COLUMN permission_description TEXT NULL AFTER permission_name",
+    },
+    "my_bet_record_meta": {
+        "ticket_purchased_at": "ALTER TABLE my_bet_record_meta ADD COLUMN ticket_purchased_at DATETIME NULL AFTER ocr_recognized_at",
     }
 }
+
+for _lottery_code in SUPPORTED_LOTTERY_CODES:
+    _table_prefix = f"{_lottery_code}_"
+    SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record_meta"] = {
+        "ticket_purchased_at": (
+            f"ALTER TABLE {_table_prefix}my_bet_record_meta "
+            "ADD COLUMN ticket_purchased_at DATETIME NULL AFTER ocr_recognized_at"
+        ),
+    }
 
 _CREATE_TABLE_PATTERN = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?([a-zA-Z0-9_]+)`?", re.IGNORECASE)
 

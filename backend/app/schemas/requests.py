@@ -143,6 +143,7 @@ class MyBetRecordPayload(BaseModel):
     ocr_text: str = ""
     ocr_provider: str | None = None
     ocr_recognized_at: str | None = None
+    ticket_purchased_at: str | None = None
     lines: list[MyBetLinePayload] = Field(default_factory=list)
 
 

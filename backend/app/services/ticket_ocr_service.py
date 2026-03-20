@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import base64
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from math import comb
 from time import perf_counter
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -14,6 +15,9 @@ from backend.app.cache import runtime_cache
 from backend.app.config import Settings, load_settings
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
+
+BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
+UTC = timezone.utc
 
 
 class TicketOCRService:
@@ -50,6 +54,7 @@ class TicketOCRService:
             "ocr_text": ocr_text,
             "ocr_provider": "baidu",
             "ocr_recognized_at": parsed.get("recognized_at"),
+            "ticket_purchased_at": parsed.get("ticket_purchased_at"),
             "target_period": parsed.get("target_period", ""),
             "lines": lines,
             "warnings": warnings,
@@ -272,6 +277,7 @@ class TicketOCRService:
             warnings.append("未稳定识别到期号，请手动补录")
         return {
             "recognized_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ticket_purchased_at": self._extract_ticket_purchased_at(ocr_text=ocr_text),
             "target_period": target_period,
             "lines": lines,
             "warnings": warnings,
@@ -286,6 +292,43 @@ class TicketOCRService:
         if period_candidates:
             return sorted(period_candidates, key=len, reverse=True)[0]
         return ""
+
+    @staticmethod
+    def _extract_ticket_purchased_at(*, ocr_text: str) -> str | None:
+        compact_patterns = [
+            re.compile(r"(\d{2})[/-](\d{2})[/-](\d{2})\s*([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?!\d)"),
+            re.compile(r"(?<!\d)(20\d{2})[\/\.-](\d{1,2})[\/\.-](\d{1,2})\s*([01]?\d|2[0-3]):([0-5]\d):([0-5]\d)(?!\d)"),
+            re.compile(r"(?<!\d)(20\d{2})年(\d{1,2})月(\d{1,2})日\s*([01]?\d|2[0-3]):([0-5]\d):([0-5]\d)(?!\d)"),
+            re.compile(r"(?<!\d)(20\d{2})[\/\.-](\d{1,2})[\/\.-](\d{1,2})\s*([01]?\d|2[0-3]):([0-5]\d)(?!\d)"),
+            re.compile(r"(?<!\d)(20\d{2})年(\d{1,2})月(\d{1,2})日\s*([01]?\d|2[0-3]):([0-5]\d)(?!\d)"),
+        ]
+        for pattern in compact_patterns:
+            matched = pattern.search(ocr_text)
+            if not matched:
+                continue
+            values = matched.groups()
+            if len(values) == 6:
+                year, month, day, hour, minute, second = values
+            else:
+                year, month, day, hour, minute = values
+                second = "00"
+            try:
+                full_year = int(year)
+                if full_year < 100:
+                    full_year += 2000
+                parsed = datetime(
+                    year=full_year,
+                    month=int(month),
+                    day=int(day),
+                    hour=int(hour),
+                    minute=int(minute),
+                    second=int(second),
+                    tzinfo=BEIJING_TIMEZONE,
+                )
+            except ValueError:
+                continue
+            return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return None
 
     def _parse_pl3_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
         parsed_lines: list[dict[str, Any]] = []

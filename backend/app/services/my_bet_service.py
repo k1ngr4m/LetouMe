@@ -91,6 +91,7 @@ class MyBetService:
             "ocr_text": str(draft.get("ocr_text") or ""),
             "ocr_provider": str(draft.get("ocr_provider") or "baidu"),
             "ocr_recognized_at": str(draft.get("ocr_recognized_at") or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "ticket_purchased_at": str(draft.get("ticket_purchased_at") or "") or None,
             "lines": serialized_lines,
             "warnings": warnings,
         }
@@ -135,6 +136,7 @@ class MyBetService:
             "ocr_text": str(payload.get("ocr_text") or ""),
             "ocr_provider": str(payload.get("ocr_provider") or "") or None,
             "ocr_recognized_at": str(payload.get("ocr_recognized_at") or "") or None,
+            "ticket_purchased_at": str(payload.get("ticket_purchased_at") or "") or None,
             "lines": built_lines,
         }
 
@@ -425,12 +427,15 @@ class MyBetService:
         created_at = record.get("created_at")
         updated_at = record.get("updated_at")
         ocr_recognized_at = record.get("ocr_recognized_at")
+        ticket_purchased_at = record.get("ticket_purchased_at")
         if isinstance(created_at, datetime):
             created_at = created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
         if isinstance(updated_at, datetime):
             updated_at = updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
         if isinstance(ocr_recognized_at, datetime):
             ocr_recognized_at = ocr_recognized_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if isinstance(ticket_purchased_at, datetime):
+            ticket_purchased_at = ticket_purchased_at.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         raw_lines = record.get("lines") if isinstance(record.get("lines"), list) else []
         lines = [MyBetService._serialize_line(item) for item in raw_lines]
@@ -473,6 +478,7 @@ class MyBetService:
             "ocr_text": str(record.get("ocr_text") or ""),
             "ocr_provider": str(record.get("ocr_provider") or "") or None,
             "ocr_recognized_at": str(ocr_recognized_at or "") or None,
+            "ticket_purchased_at": str(ticket_purchased_at or "") or None,
             "lines": lines,
             "created_at": created_at or "",
             "updated_at": updated_at or created_at or "",
