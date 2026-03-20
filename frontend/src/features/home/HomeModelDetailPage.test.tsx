@@ -83,6 +83,9 @@ vi.mock('./hooks/useHomeData', () => ({
                 bets: 40,
                 hit_rate_by_period: 0.625,
                 hit_rate_by_bet: 0.25,
+                cost_amount: 80,
+                prize_amount: 109,
+                net_profit: 29,
                 roi: 0.36,
                 avg_period_roi: 0.12,
                 best_period: {
@@ -121,6 +124,9 @@ vi.mock('./hooks/useHomeData', () => ({
                 bets: 60,
                 hit_rate_by_period: 0.58,
                 hit_rate_by_bet: 0.22,
+                cost_amount: 120,
+                prize_amount: 156,
+                net_profit: 36,
                 roi: 0.3,
                 avg_period_roi: 0.11,
                 best_period: {
@@ -230,6 +236,8 @@ describe('HomeModelDetailPage', () => {
     expect(screen.getByText('综合分')).toBeInTheDocument()
     expect(screen.getByText('能力上限')).toBeInTheDocument()
     expect(screen.getByText('能力下限')).toBeInTheDocument()
+    expect(screen.getByText('大乐透近期净盈亏 29 元')).toBeInTheDocument()
+    expect(screen.getByText('大乐透长期净盈亏 36 元')).toBeInTheDocument()
     expect(screen.getByText('本期预测组')).toBeInTheDocument()
     expect(screen.getAllByText('综合策略').length).toBeGreaterThan(0)
   })

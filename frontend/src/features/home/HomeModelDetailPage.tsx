@@ -13,8 +13,9 @@ const LOTTERY_PAGE_SIZE = 10
 export function HomeModelDetailPage() {
   const navigate = useNavigate()
   const { modelId = '' } = useParams()
+  const selectedLottery = loadSelectedLottery()
 
-  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(loadSelectedLottery(), 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
+  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(selectedLottery, 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
     enableCurrentPredictions: true,
     enableLotteryCharts: true,
     enablePredictionsHistory: false,
@@ -115,7 +116,7 @@ export function HomeModelDetailPage() {
             <span>能力画像</span>
             <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
           </div>
-          <ModelScoreShowcase score={selectedScore} compact={false} />
+          <ModelScoreShowcase score={selectedScore} compact={false} lotteryCode={selectedLottery} />
         </section>
       ) : null}
 

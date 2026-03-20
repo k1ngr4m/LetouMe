@@ -30,6 +30,9 @@ class ScoreWindowProfile(BaseModel):
     bets: int = 0
     hit_rate_by_period: float = 0
     hit_rate_by_bet: float = 0
+    cost_amount: int = 0
+    prize_amount: int = 0
+    net_profit: int = 0
     roi: float = 0
     avg_period_roi: float = 0
     best_period: ScoreSnapshot = Field(default_factory=ScoreSnapshot)

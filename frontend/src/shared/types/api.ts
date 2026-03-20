@@ -84,6 +84,9 @@ export type ScoreWindowProfile = {
   bets: number
   hit_rate_by_period: number
   hit_rate_by_bet: number
+  cost_amount: number
+  prize_amount: number
+  net_profit: number
   roi: number
   avg_period_roi: number
   best_period: ScoreSnapshot

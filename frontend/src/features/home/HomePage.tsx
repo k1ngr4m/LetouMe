@@ -2096,8 +2096,9 @@ function PagerControls({
   )
 }
 
-export function ModelScoreShowcase({ score, compact = false }: { score?: ModelScore; compact?: boolean }) {
+export function ModelScoreShowcase({ score, compact = false, lotteryCode = 'dlt' }: { score?: ModelScore; compact?: boolean; lotteryCode?: LotteryCode }) {
   if (!score) return null
+  const lotteryLabel = lotteryCode === 'pl3' ? '排列3' : '大乐透'
 
   const components = [
     { label: '收益', value: score.componentScores.profit || 0 },
@@ -2137,11 +2138,13 @@ export function ModelScoreShowcase({ score, compact = false }: { score?: ModelSc
         <div className="score-showcase__window">
           <span>近期 20 期</span>
           <strong>ROI {Math.round((score.recentWindow.roi || 0) * 100)}%</strong>
+          <small>{lotteryLabel}近期净盈亏 {formatCurrency(score.recentWindow.net_profit)}</small>
           <small>{score.recentWindow.periods} 期 / {score.recentWindow.bets} 注</small>
         </div>
         <div className="score-showcase__window">
           <span>长期全量</span>
           <strong>ROI {Math.round((score.longTermWindow.roi || 0) * 100)}%</strong>
+          <small>{lotteryLabel}长期净盈亏 {formatCurrency(score.longTermWindow.net_profit)}</small>
           <small>{score.sampleSize} 期 / {score.betSampleSize} 注</small>
         </div>
       </div>
