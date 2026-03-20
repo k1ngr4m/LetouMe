@@ -114,6 +114,53 @@ class SimulationTicketQuoteResponse(BaseModel):
     amount: int = 0
 
 
+class MyBetRecordResponse(BaseModel):
+    id: int
+    lottery_code: str = "dlt"
+    target_period: str
+    play_type: str = "dlt"
+    front_numbers: list[str] = Field(default_factory=list)
+    back_numbers: list[str] = Field(default_factory=list)
+    direct_hundreds: list[str] = Field(default_factory=list)
+    direct_tens: list[str] = Field(default_factory=list)
+    direct_units: list[str] = Field(default_factory=list)
+    group_numbers: list[str] = Field(default_factory=list)
+    multiplier: int = 1
+    is_append: bool = False
+    bet_count: int = 0
+    amount: int = 0
+    settlement_status: str = "pending"
+    winning_bet_count: int = 0
+    prize_level: str | None = None
+    prize_amount: int = 0
+    net_profit: int = 0
+    settled_at: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class MyBetSummaryResponse(BaseModel):
+    total_count: int = 0
+    total_amount: int = 0
+    total_prize_amount: int = 0
+    total_net_profit: int = 0
+    settled_count: int = 0
+    pending_count: int = 0
+
+
+class MyBetRecordListResponse(BaseModel):
+    records: list[MyBetRecordResponse] = Field(default_factory=list)
+    summary: MyBetSummaryResponse = Field(default_factory=MyBetSummaryResponse)
+
+
+class MyBetRecordCreateResponse(BaseModel):
+    record: MyBetRecordResponse
+
+
+class MyBetRecordUpdateResponse(BaseModel):
+    record: MyBetRecordResponse
+
+
 class SuccessResponse(BaseModel):
     success: bool = True
 

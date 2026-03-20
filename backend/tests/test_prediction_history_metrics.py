@@ -312,6 +312,7 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(model["bet_count"], 3)
         self.assertEqual(model["prize_amount"], 346)
         self.assertEqual(record["period_summary"]["total_prize_amount"], 346)
+        self.assertEqual(payload["strategy_options"], [])
 
     def test_pl3_history_best_hit_count_uses_new_group_rule(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
@@ -333,6 +334,21 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(model["bet_count"], 1)
         self.assertEqual(model["best_hit_count"], 1)
+
+    def test_pl3_history_list_ignores_strategy_filters(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
+
+        payload = service.get_history_list_payload(
+            limit=5,
+            offset=0,
+            lottery_code="pl3",
+            strategy_filters=["AI 组合策略"],
+        )
+
+        self.assertEqual(payload["total_count"], 1)
+        self.assertEqual(payload["strategy_options"], [])
+        model = payload["predictions_history"][0]["models"][0]
+        self.assertEqual(model["bet_count"], 3)
 
     def test_pl3_group6_trend_hit_count_ignores_position(self) -> None:
         hit_count = self.service._calculate_pl3_trend_hit_count(

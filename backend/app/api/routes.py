@@ -39,6 +39,10 @@ from backend.app.schemas.requests import (
     BulkModelActionPayload,
     GenerateModelPredictionsPayload,
     ModelCodePayload,
+    MyBetRecordDeletePayload,
+    MyBetRecordListPayload,
+    MyBetRecordPayload,
+    MyBetRecordUpdatePayload,
     ModelListPayload,
     ModelStatusUpdatePayload,
     ModelUpdatePayload,
@@ -67,6 +71,9 @@ from backend.app.schemas.responses import (
     CurrentPredictionsResponse,
     LotteryFetchTaskResponse,
     LotteryHistoryResponse,
+    MyBetRecordCreateResponse,
+    MyBetRecordListResponse,
+    MyBetRecordUpdateResponse,
     PredictionGenerationTaskResponse,
     PredictionsHistoryResponse,
     ScheduleTaskListResponse,
@@ -87,6 +94,7 @@ from backend.app.services.prediction_generation_service import PredictionGenerat
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
 from backend.app.services.prediction_service import PredictionService
 from backend.app.services.schedule_service import schedule_service
+from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.simulation_ticket_service import SimulationTicketService
 
 
@@ -96,6 +104,7 @@ prediction_service = PredictionService()
 model_service = ModelService()
 prediction_generation_service = PredictionGenerationService()
 simulation_ticket_service = SimulationTicketService()
+my_bet_service = MyBetService()
 
 
 @router.post("/auth/login", response_model=CurrentUserResponse)
@@ -210,6 +219,40 @@ def delete_simulation_ticket(payload: SimulationTicketDeletePayload, current_use
         simulation_ticket_service.delete_ticket(int(current_user["id"]), payload.ticket_id, lottery_code=payload.lottery_code)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="方案不存在") from exc
+    return {"success": True}
+
+
+@router.post("/my-bets/list", response_model=MyBetRecordListResponse)
+def list_my_bets(payload: MyBetRecordListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return my_bet_service.list_records(int(current_user["id"]), lottery_code=payload.lottery_code)
+
+
+@router.post("/my-bets/create", response_model=MyBetRecordCreateResponse)
+def create_my_bet(payload: MyBetRecordPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        record = my_bet_service.create_record(int(current_user["id"]), payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"record": record}
+
+
+@router.post("/my-bets/update", response_model=MyBetRecordUpdateResponse)
+def update_my_bet(payload: MyBetRecordUpdatePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        record = my_bet_service.update_record(int(current_user["id"]), payload.record_id, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="投注记录不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"record": record}
+
+
+@router.post("/my-bets/delete", response_model=SuccessResponse)
+def delete_my_bet(payload: MyBetRecordDeletePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        my_bet_service.delete_record(int(current_user["id"]), payload.record_id, lottery_code=payload.lottery_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="投注记录不存在") from exc
     return {"success": True}
 
 

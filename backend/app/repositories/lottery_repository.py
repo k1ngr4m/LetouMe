@@ -80,8 +80,9 @@ class LotteryRepository:
                     rows = cursor.fetchall()
                     result_ids = [row["draw_result_id"] for row in rows if row.get("draw_result_id")]
                     numbers_by_result = self._fetch_draw_numbers(cursor, result_ids)
+                    prizes_by_result = self._fetch_draw_prizes(cursor, result_ids)
 
-        return [self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], [])) for row in rows]
+        return [self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], [])) for row in rows]
 
     def count_draws(self, lottery_code: str = "dlt") -> int:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -125,7 +126,8 @@ class LotteryRepository:
                     if not row or not row.get("draw_result_id"):
                         return None
                     numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
-        return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []))
+                    prizes_by_result = self._fetch_draw_prizes(cursor, [row["draw_result_id"]])
+        return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], []))
 
     def get_latest_draw(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         draws = self.list_draws(limit=1, lottery_code=lottery_code)
@@ -225,7 +227,33 @@ class LotteryRepository:
         return numbers_by_result
 
     @staticmethod
-    def _to_draw_dict(row: dict[str, Any], numbers: list[dict[str, Any]]) -> dict[str, Any]:
+    def _fetch_draw_prizes(cursor, draw_result_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+        if not draw_result_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in draw_result_ids)
+        cursor.execute(
+            f"""
+            SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
+            FROM draw_result_prize
+            WHERE draw_result_id IN ({placeholders})
+            """,
+            tuple(draw_result_ids),
+        )
+        prizes_by_result: dict[int, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            prizes_by_result.setdefault(row["draw_result_id"], []).append(
+                {
+                    "prize_level": str(row.get("prize_level") or ""),
+                    "prize_type": str(row.get("prize_type") or "basic"),
+                    "winner_count": int(row.get("winner_count") or 0),
+                    "prize_amount": int(row.get("prize_amount") or 0),
+                    "total_amount": int(row.get("total_amount") or 0),
+                }
+            )
+        return prizes_by_result
+
+    @staticmethod
+    def _to_draw_dict(row: dict[str, Any], numbers: list[dict[str, Any]], prizes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         lottery_code = normalize_lottery_code(row.get("lottery_code") or "dlt")
         red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
         blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
@@ -243,6 +271,7 @@ class LotteryRepository:
             "red_balls": red_balls,
             "blue_balls": blue_balls,
             "digits": digits,
+            "prize_breakdown": list(prizes or []),
             "date": draw_date,
             "updated_at": updated_at,
         }

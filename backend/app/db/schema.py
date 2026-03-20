@@ -286,6 +286,29 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS my_bet_record (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        target_period VARCHAR(32) NOT NULL,
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
+        multiplier INT NOT NULL DEFAULT 1,
+        is_append TINYINT(1) NOT NULL DEFAULT 0,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_my_bet_record_user_period (user_id, lottery_code, target_period, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS app_role (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         role_code VARCHAR(64) NOT NULL UNIQUE,
@@ -509,6 +532,29 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_simulation_ticket_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
         INDEX idx_simulation_ticket_user_created (user_id, lottery_code, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS {table_prefix}_my_bet_record (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT '{lottery_code}',
+        target_period VARCHAR(32) NOT NULL,
+        play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
+        front_numbers VARCHAR(255) NOT NULL,
+        back_numbers VARCHAR(255) NOT NULL,
+        direct_hundreds VARCHAR(255) NULL,
+        direct_tens VARCHAR(255) NULL,
+        direct_units VARCHAR(255) NULL,
+        group_numbers VARCHAR(255) NULL,
+        multiplier INT NOT NULL DEFAULT 1,
+        is_append TINYINT(1) NOT NULL DEFAULT 0,
+        bet_count INT NOT NULL DEFAULT 0,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_{fk_prefix}_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_my_bet_record_user_period (user_id, lottery_code, target_period, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
 ]

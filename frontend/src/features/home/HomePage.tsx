@@ -59,6 +59,7 @@ const AnalysisChartsPanel = lazy(() =>
 const HistoryHitTrendCard = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendCard })),
 )
+const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ default: module.MyBetsPanel })))
 
 function HomeSvgIcon({ children }: { children: ReactNode }) {
   return (
@@ -669,6 +670,12 @@ export function HomePage() {
         >
           规则与奖金
         </button>
+        <button
+          className={clsx('tab-strip__item', activeTab === 'my-bets' && 'is-active')}
+          onClick={() => navigate(getDashboardPath('my-bets'))}
+        >
+          我的投注
+        </button>
       </section>
 
       {activeTab === 'prediction' ? (
@@ -1107,6 +1114,12 @@ export function HomePage() {
             />
           </StatusCard>
         </div>
+      ) : null}
+
+      {activeTab === 'my-bets' ? (
+        <Suspense fallback={<div className="state-shell">正在加载投注面板...</div>}>
+          <MyBetsPanel lotteryCode={selectedLottery} targetPeriod={currentPredictions.data?.target_period || ''} />
+        </Suspense>
       ) : null}
     </div>
   )

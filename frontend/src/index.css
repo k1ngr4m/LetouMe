@@ -3986,6 +3986,134 @@ a {
   background: rgba(122, 171, 244, 0.14);
 }
 
+.my-bets-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.my-bets-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.my-bets-summary-card,
+.my-bets-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.my-bets-summary-card {
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.my-bets-summary-card span,
+.my-bets-summary-card small,
+.my-bets-card__meta,
+.my-bets-card__metrics {
+  color: var(--text-2);
+}
+
+.my-bets-list {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.my-bets-card {
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.my-bets-card__header,
+.my-bets-card__actions,
+.my-bets-card__title-row,
+.my-bets-card__metrics {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.my-bets-card__header {
+  align-items: flex-start;
+}
+
+.my-bets-card__actions {
+  justify-content: flex-end;
+}
+
+.my-bets-card__title-row {
+  justify-content: flex-start;
+}
+
+.my-bets-status {
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+.my-bets-status.is-pending {
+  background: rgba(237, 183, 87, 0.18);
+  color: #f1cb84;
+}
+
+.my-bets-status.is-settled {
+  background: rgba(80, 194, 143, 0.16);
+  color: #98e2bd;
+}
+
+.my-bets-card__numbers {
+  overflow-x: auto;
+}
+
+.my-bets-card__metrics {
+  font-size: 0.88rem;
+  justify-content: flex-start;
+}
+
+.my-bets-form-summary {
+  margin-top: 0;
+}
+
+.is-profit {
+  color: #6ed8a6;
+}
+
+.is-loss {
+  color: #f192a3;
+}
+
+:root[data-theme='light'] .my-bets-summary-card,
+:root[data-theme='light'] .my-bets-card {
+  border-color: rgba(133, 150, 178, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme='light'] .my-bets-status.is-pending {
+  background: rgba(245, 205, 132, 0.28);
+  color: #9f6d13;
+}
+
+:root[data-theme='light'] .my-bets-status.is-settled {
+  background: rgba(113, 209, 166, 0.28);
+  color: #1c7a53;
+}
+
+:root[data-theme='light'] .is-profit {
+  color: #197451;
+}
+
+:root[data-theme='light'] .is-loss {
+  color: #ba3e52;
+}
+
 .settings-side-stack {
   display: grid;
   gap: 1rem;
@@ -4092,6 +4220,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .my-bets-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .summary-columns,
   .chart-grid,
   .model-grid,
@@ -4180,7 +4312,7 @@ a {
   .dashboard-tab-strip {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-self: stretch;
   }
 
@@ -4209,6 +4341,7 @@ a {
   .settings-grid-react,
   .form-grid,
   .settings-overview-grid,
+  .my-bets-summary-grid,
   .form-section__grid,
   .dashboard-layout,
   .settings-center-layout,

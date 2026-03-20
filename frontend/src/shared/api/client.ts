@@ -9,6 +9,11 @@ import type {
   CurrentPredictionsResponse,
   GenerateSettingsModelPredictionsPayload,
   LoginPayload,
+  MyBetRecordCreateResponse,
+  MyBetRecordListResponse,
+  MyBetRecordPayload,
+  MyBetRecordUpdatePayload,
+  MyBetRecordUpdateResponse,
   LotteryHistoryResponse,
   LotteryFetchTask,
   PasswordChangePayload,
@@ -166,6 +171,36 @@ export const apiClient = {
     return requestJson<SimulationTicketListResponse>('/api/simulation/tickets/list', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: lotteryCode }),
+    })
+  },
+  getMyBets(lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<MyBetRecordListResponse>('/api/my-bets/list', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: lotteryCode }),
+    })
+  },
+  createMyBet(payload: MyBetRecordPayload) {
+    return requestJson<MyBetRecordCreateResponse>('/api/my-bets/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        lottery_code: payload.lottery_code || 'dlt',
+        ...payload,
+      }),
+    })
+  },
+  updateMyBet(payload: MyBetRecordUpdatePayload) {
+    return requestJson<MyBetRecordUpdateResponse>('/api/my-bets/update', {
+      method: 'POST',
+      body: JSON.stringify({
+        lottery_code: payload.lottery_code || 'dlt',
+        ...payload,
+      }),
+    })
+  },
+  deleteMyBet(recordId: number, lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<SuccessResponse>('/api/my-bets/delete', {
+      method: 'POST',
+      body: JSON.stringify({ record_id: recordId, lottery_code: lotteryCode }),
     })
   },
   createSimulationTicket(payload: SimulationTicketPayload) {

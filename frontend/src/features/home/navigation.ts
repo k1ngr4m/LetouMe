@@ -1,4 +1,4 @@
-export type HomeTab = 'prediction' | 'analysis' | 'history' | 'simulation'
+export type HomeTab = 'prediction' | 'analysis' | 'history' | 'simulation' | 'my-bets'
 export type HomeModelView = 'card' | 'list' | 'score'
 export type ScoreViewSortKey =
   | 'overallScore'
@@ -26,6 +26,7 @@ export const HOME_TAB_PATHS: Record<HomeTab, string> = {
   analysis: '/dashboard/analysis',
   history: '/dashboard/history',
   simulation: '/dashboard/simulation',
+  'my-bets': '/dashboard/my-bets',
 }
 export const HOME_RULES_PATH = '/dashboard/rules'
 

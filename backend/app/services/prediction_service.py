@@ -135,6 +135,8 @@ class PredictionService:
     ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
+        if normalized_code == "pl3":
+            normalized_strategy_filters = []
         normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
         normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
         if normalized_strategy_match_mode != "all":
@@ -448,7 +450,10 @@ class PredictionService:
         strategy_match_mode: str = "all",
     ) -> dict[str, Any]:
         started_at = perf_counter()
+        normalized_code = normalize_lottery_code(lottery_code)
         normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
+        if normalized_code == "pl3":
+            normalized_strategy_filters = []
         normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
         normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
         db_metrics: dict[str, Any] = {}
@@ -486,11 +491,11 @@ class PredictionService:
             filtered_total_count = self.prediction_repository.count_history_records(lottery_code=lottery_code)
         score_profiles = self._build_score_profiles(records)
         payload = {
-            "lottery_code": normalize_lottery_code(lottery_code),
+            "lottery_code": normalized_code,
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": filtered_total_count,
             "model_stats": self._build_model_stats(records, score_profiles),
-            "strategy_options": self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
+            "strategy_options": [] if normalized_code == "pl3" else self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
         }
         aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
         total_duration_ms = round((perf_counter() - started_at) * 1000, 2)

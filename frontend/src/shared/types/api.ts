@@ -245,6 +245,71 @@ export type SimulationTicketQuoteResponse = {
   amount: number
 }
 
+export type MyBetRecordPayload = {
+  lottery_code?: LotteryCode
+  target_period: string
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  front_numbers?: string[]
+  back_numbers?: string[]
+  direct_hundreds?: string[]
+  direct_tens?: string[]
+  direct_units?: string[]
+  group_numbers?: string[]
+  multiplier?: number
+  is_append?: boolean
+}
+
+export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
+  record_id: number
+}
+
+export type MyBetRecord = {
+  id: number
+  lottery_code: LotteryCode
+  target_period: string
+  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  front_numbers: string[]
+  back_numbers: string[]
+  direct_hundreds: string[]
+  direct_tens: string[]
+  direct_units: string[]
+  group_numbers: string[]
+  multiplier: number
+  is_append: boolean
+  bet_count: number
+  amount: number
+  settlement_status: 'pending' | 'settled'
+  winning_bet_count: number
+  prize_level: string | null
+  prize_amount: number
+  net_profit: number
+  settled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type MyBetSummary = {
+  total_count: number
+  total_amount: number
+  total_prize_amount: number
+  total_net_profit: number
+  settled_count: number
+  pending_count: number
+}
+
+export type MyBetRecordListResponse = {
+  records: MyBetRecord[]
+  summary: MyBetSummary
+}
+
+export type MyBetRecordCreateResponse = {
+  record: MyBetRecord
+}
+
+export type MyBetRecordUpdateResponse = {
+  record: MyBetRecord
+}
+
 export type SuccessResponse = {
   success: boolean
 }

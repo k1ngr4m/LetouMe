@@ -6,12 +6,27 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
-const { createSimulationTicket, deleteSimulationTicket, getPredictionsHistoryDetail, getSimulationTickets, quoteSimulationTicket, simulateHistoryFilterLoading } = vi.hoisted(() => ({
+const {
+  createMyBet,
+  createSimulationTicket,
+  deleteMyBet,
+  deleteSimulationTicket,
+  getMyBets,
+  getPredictionsHistoryDetail,
+  getSimulationTickets,
+  quoteSimulationTicket,
+  updateMyBet,
+  simulateHistoryFilterLoading,
+} = vi.hoisted(() => ({
+  createMyBet: vi.fn(),
   createSimulationTicket: vi.fn(),
+  deleteMyBet: vi.fn(),
   deleteSimulationTicket: vi.fn(),
+  getMyBets: vi.fn(),
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
 }))
 
@@ -91,11 +106,15 @@ const SECOND_HISTORY_RECORD = {
 
 vi.mock('../../shared/api/client', () => ({
   apiClient: {
+    createMyBet,
     createSimulationTicket,
+    deleteMyBet,
     deleteSimulationTicket,
+    getMyBets,
     getPredictionsHistoryDetail,
     getSimulationTickets,
     quoteSimulationTicket,
+    updateMyBet,
   },
 }))
 
@@ -407,7 +426,101 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
+  getMyBets.mockReset()
+  getMyBets.mockResolvedValue({
+    records: [
+      {
+        id: 1,
+        lottery_code: 'dlt',
+        target_period: '2026032',
+        play_type: 'dlt',
+        front_numbers: ['01', '02', '03', '04', '05'],
+        back_numbers: ['06', '07'],
+        direct_hundreds: [],
+        direct_tens: [],
+        direct_units: [],
+        group_numbers: [],
+        multiplier: 1,
+        is_append: false,
+        bet_count: 1,
+        amount: 2,
+        settlement_status: 'pending',
+        winning_bet_count: 0,
+        prize_level: null,
+        prize_amount: 0,
+        net_profit: -2,
+        settled_at: null,
+        created_at: '2026-03-18T00:00:00Z',
+        updated_at: '2026-03-18T00:00:00Z',
+      },
+    ],
+    summary: {
+      total_count: 1,
+      total_amount: 2,
+      total_prize_amount: 0,
+      total_net_profit: -2,
+      settled_count: 0,
+      pending_count: 1,
+    },
+  })
+  createMyBet.mockReset()
+  createMyBet.mockResolvedValue({
+    record: {
+      id: 2,
+      lottery_code: 'dlt',
+      target_period: '2026033',
+      play_type: 'dlt',
+      front_numbers: ['01', '02', '03', '04', '05'],
+      back_numbers: ['06', '07'],
+      direct_hundreds: [],
+      direct_tens: [],
+      direct_units: [],
+      group_numbers: [],
+      multiplier: 1,
+      is_append: false,
+      bet_count: 1,
+      amount: 2,
+      settlement_status: 'pending',
+      winning_bet_count: 0,
+      prize_level: null,
+      prize_amount: 0,
+      net_profit: -2,
+      settled_at: null,
+      created_at: '2026-03-18T00:00:00Z',
+      updated_at: '2026-03-18T00:00:00Z',
+    },
+  })
+  updateMyBet.mockReset()
+  updateMyBet.mockResolvedValue({
+    record: {
+      id: 1,
+      lottery_code: 'dlt',
+      target_period: '2026032',
+      play_type: 'dlt',
+      front_numbers: ['01', '02', '03', '04', '05'],
+      back_numbers: ['06', '07'],
+      direct_hundreds: [],
+      direct_tens: [],
+      direct_units: [],
+      group_numbers: [],
+      multiplier: 2,
+      is_append: false,
+      bet_count: 1,
+      amount: 4,
+      settlement_status: 'pending',
+      winning_bet_count: 0,
+      prize_level: null,
+      prize_amount: 0,
+      net_profit: -4,
+      settled_at: null,
+      created_at: '2026-03-18T00:00:00Z',
+      updated_at: '2026-03-18T00:00:00Z',
+    },
+  })
+  deleteMyBet.mockReset()
+  deleteMyBet.mockResolvedValue({ success: true })
   createSimulationTicket.mockReset()
   createSimulationTicket.mockResolvedValue({
     ticket: {
@@ -1254,5 +1367,49 @@ describe('HomePage dashboard sidebar', () => {
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
     expect(await within(firstHistoryCard as HTMLElement).findByText('组选6')).toBeInTheDocument()
     expect(within(firstHistoryCard as HTMLElement).queryByText('组选3')).not.toBeInTheDocument()
+  })
+
+  it('navigates to my-bets tab from dashboard strip', async () => {
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '我的投注' }))
+    expect(await screen.findByText('我的投注')).toBeInTheDocument()
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/my-bets')
+  })
+
+  it('supports create and delete on my-bets tab', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByText('我的投注')
+    expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
+
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const dialog = await screen.findByRole('dialog')
+
+    const frontSection = within(dialog).getByRole('heading', { name: '前区号码' }).closest('.simulation-section')
+    const backSection = within(dialog).getByRole('heading', { name: '后区号码' }).closest('.simulation-section')
+    expect(frontSection).not.toBeNull()
+    expect(backSection).not.toBeNull()
+
+    for (const ball of ['01', '02', '03', '04', '05']) {
+      await userEvent.click(within(frontSection as HTMLElement).getByRole('button', { name: ball }))
+    }
+    for (const ball of ['06', '07']) {
+      await userEvent.click(within(backSection as HTMLElement).getByRole('button', { name: ball }))
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: '添加投注' }))
+
+    await waitFor(() =>
+      expect(createMyBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'dlt',
+          play_type: 'dlt',
+          front_numbers: ['01', '02', '03', '04', '05'],
+          back_numbers: ['06', '07'],
+          target_period: '2026032',
+        }),
+      ),
+    )
   })
 })

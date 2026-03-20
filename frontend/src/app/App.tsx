@@ -79,6 +79,16 @@ export function App() {
               }
             />
             <Route
+              path={HOME_TAB_PATHS['my-bets']}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <HomePage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard/models/:modelId"
               element={
                 <ProtectedRoute>

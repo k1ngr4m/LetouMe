@@ -21,6 +21,7 @@ LOTTERY_SCOPED_TABLES = (
     "prediction_hit_number",
     "model_batch_summary",
     "simulation_ticket",
+    "my_bet_record",
 )
 
 _lottery_scope: ContextVar[str | None] = ContextVar("lottery_scope", default=None)
