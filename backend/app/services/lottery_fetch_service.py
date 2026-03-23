@@ -135,13 +135,15 @@ class LotteryFetchService:
                 continue
             try:
                 period = cols[0].text.strip()
+                detail_payload = self.fetch_draw_detail(period)
                 data_list.append(
                     {
                         "period": period,
                         "red_balls": [cols[i].text.strip() for i in range(1, 6)],
                         "blue_balls": [cols[i].text.strip() for i in range(6, 8)],
                         "date": cols[-1].text.strip() if len(cols) > 8 else "",
-                        "prize_breakdown": self.fetch_prize_breakdown(period),
+                        "prize_breakdown": detail_payload["prize_breakdown"],
+                        "jackpot_pool_balance": detail_payload["jackpot_pool_balance"],
                     }
                 )
             except Exception as exc:
@@ -197,16 +199,22 @@ class LotteryFetchService:
         return data_list
 
     def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
+        return self.fetch_draw_detail(period)["prize_breakdown"]
+
+    def fetch_draw_detail(self, period: str) -> dict[str, Any]:
         if self.lottery_code == "pl3":
-            return build_pl3_prize_breakdown()
+            return {"prize_breakdown": build_pl3_prize_breakdown(), "jackpot_pool_balance": 0}
         if self.lottery_code == "pl5":
-            return build_pl5_prize_breakdown()
+            return {"prize_breakdown": build_pl5_prize_breakdown(), "jackpot_pool_balance": 0}
         detail_url = self.DETAIL_URL_TEMPLATE.format(period=period)
         soup = self.fetch_page(detail_url, retry=2)
         if not soup:
-            return self.build_fallback_prize_breakdown()
+            return {"prize_breakdown": self.build_fallback_prize_breakdown(), "jackpot_pool_balance": 0}
         parsed = self.parse_prize_breakdown(soup)
-        return parsed or self.build_fallback_prize_breakdown()
+        return {
+            "prize_breakdown": parsed or self.build_fallback_prize_breakdown(),
+            "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+        }
 
     def parse_prize_breakdown(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         for table in soup.find_all("table"):
@@ -253,9 +261,34 @@ class LotteryFetchService:
             for prize_level, prize_amount in self.FIXED_PRIZE_RULES.items()
         ]
 
+    @classmethod
+    def parse_jackpot_pool_balance(cls, soup: BeautifulSoup) -> int:
+        text_content = soup.get_text(" ", strip=True).replace("\xa0", " ")
+        keyword_pattern = re.compile(r"(?:奖池(?:资金)?(?:余额|累计金额|金额)?|滚存(?:金额)?)")
+        amount_pattern = re.compile(r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*(亿|万|元)")
+        for keyword_match in keyword_pattern.finditer(text_content):
+            scope = text_content[keyword_match.end() : keyword_match.end() + 48]
+            amount_match = amount_pattern.search(scope)
+            if not amount_match:
+                continue
+            amount = cls.parse_money_value(f"{amount_match.group(1)}{amount_match.group(2)}")
+            if amount > 0:
+                return amount
+        return 0
+
     @staticmethod
     def parse_money_value(value: str) -> int:
-        text = str(value or "").strip().replace(",", "")
+        text = (
+            str(value or "")
+            .strip()
+            .replace(",", "")
+            .replace("，", "")
+            .replace("人民币", "")
+            .replace(" ", "")
+            .replace("　", "")
+        )
+        if text.endswith("元"):
+            text = text[:-1]
         if not text or text == "---":
             return 0
         unit = 1

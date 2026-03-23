@@ -58,7 +58,8 @@ class LotteryRepository:
                 di.lottery_code,
                 di.draw_date,
                 di.updated_at,
-                dr.id AS draw_result_id
+                dr.id AS draw_result_id,
+                dr.jackpot_pool_balance
             FROM draw_issue di
             LEFT JOIN draw_result dr ON dr.issue_id = di.id
             WHERE dr.id IS NOT NULL
@@ -114,7 +115,8 @@ class LotteryRepository:
                             di.lottery_code,
                             di.draw_date,
                             di.updated_at,
-                            dr.id AS draw_result_id
+                            dr.id AS draw_result_id,
+                            dr.jackpot_pool_balance
                         FROM draw_issue di
                         LEFT JOIN draw_result dr ON dr.issue_id = di.id
                         WHERE di.issue_no = ? AND di.lottery_code = ?
@@ -132,6 +134,37 @@ class LotteryRepository:
     def get_latest_draw(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         draws = self.list_draws(limit=1, lottery_code=lottery_code)
         return draws[0] if draws else None
+
+    def get_previous_draw_by_period(self, period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        stored_period = storage_issue_no(normalized_code, period)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            di.id AS issue_id,
+                            di.issue_no AS period,
+                            di.lottery_code,
+                            di.draw_date,
+                            di.updated_at,
+                            dr.id AS draw_result_id,
+                            dr.jackpot_pool_balance
+                        FROM draw_issue di
+                        LEFT JOIN draw_result dr ON dr.issue_id = di.id
+                        WHERE di.issue_no < ? AND di.lottery_code = ? AND dr.id IS NOT NULL
+                        ORDER BY di.issue_no DESC
+                        LIMIT 1
+                        """,
+                        (stored_period, normalized_code),
+                    )
+                    row = cursor.fetchone()
+                    if not row or not row.get("draw_result_id"):
+                        return None
+                    numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
+                    prizes_by_result = self._fetch_draw_prizes(cursor, [row["draw_result_id"]])
+        return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], []))
 
     def _upsert_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> None:
         period = str(draw["period"])
@@ -165,11 +198,13 @@ class LotteryRepository:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO draw_result (issue_id)
-                VALUES (?)
-                ON DUPLICATE KEY UPDATE issue_id = VALUES(issue_id)
+                INSERT INTO draw_result (issue_id, jackpot_pool_balance)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE
+                    issue_id = VALUES(issue_id),
+                    jackpot_pool_balance = VALUES(jackpot_pool_balance)
                 """,
-                (issue_id,),
+                (issue_id, int(draw.get("jackpot_pool_balance") or 0)),
             )
             cursor.execute("SELECT id FROM draw_result WHERE issue_id = ?", (issue_id,))
             draw_result_id = cursor.fetchone()["id"]
@@ -196,6 +231,10 @@ class LotteryRepository:
                         total_amount
                     )
                     VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        winner_count = VALUES(winner_count),
+                        prize_amount = VALUES(prize_amount),
+                        total_amount = VALUES(total_amount)
                     """,
                     (
                         draw_result_id,
@@ -271,6 +310,7 @@ class LotteryRepository:
             "red_balls": red_balls,
             "blue_balls": blue_balls,
             "digits": digits,
+            "jackpot_pool_balance": int(row.get("jackpot_pool_balance") or 0),
             "prize_breakdown": list(prizes or []),
             "date": draw_date,
             "updated_at": updated_at,

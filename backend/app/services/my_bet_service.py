@@ -349,6 +349,12 @@ class MyBetService:
                 "actual_result": None,
                 "lines": list(record.get("lines") or []),
             }
+        if lottery_code == "dlt":
+            previous_draw = self.lottery_repository.get_previous_draw_by_period(target_period, lottery_code=lottery_code)
+            draw = {
+                **draw,
+                "previous_jackpot_pool": int(previous_draw.get("jackpot_pool_balance") or 0) if previous_draw else 0,
+            }
 
         total_prize_amount = 0
         total_winning_bets = 0
@@ -388,7 +394,7 @@ class MyBetService:
             "prize_amount": total_prize_amount,
             "net_profit": total_prize_amount - int(record.get("amount") or 0),
             "settled_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code),
+            "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code, target_period=target_period),
             "lines": lines_with_hits,
         }
 
@@ -517,15 +523,17 @@ class MyBetService:
         }
 
     @staticmethod
-    def _serialize_actual_result(draw: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
+    def _serialize_actual_result(draw: dict[str, Any], *, lottery_code: str, target_period: str = "") -> dict[str, Any]:
         digits = normalize_digit_balls(draw.get("digits", draw.get("red_balls", [])))
         return {
             "lottery_code": lottery_code,
-            "period": str(draw.get("period") or ""),
+            "period": str(draw.get("period") or target_period),
             "date": str(draw.get("date") or ""),
             "red_balls": sorted(set(normalize_digit_balls(draw.get("red_balls", [])))),
             "blue_balls": sorted(set(normalize_digit_balls(draw.get("blue_balls", [])))),
             "digits": digits[:5] if lottery_code == "pl5" else digits[:3],
+            "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
+            "previous_jackpot_pool": int(draw.get("previous_jackpot_pool") or 0),
         }
 
     @staticmethod

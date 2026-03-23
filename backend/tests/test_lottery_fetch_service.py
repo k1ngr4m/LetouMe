@@ -37,8 +37,23 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
     def test_parse_money_value_supports_wan_and_yi(self) -> None:
         self.assertEqual(LotteryFetchService.parse_money_value("1.90亿"), 190000000)
+        self.assertEqual(LotteryFetchService.parse_money_value("8.34 亿"), 834000000)
         self.assertEqual(LotteryFetchService.parse_money_value("7,654,708"), 7654708)
         self.assertEqual(LotteryFetchService.parse_money_value("3.5万"), 35000)
+        self.assertEqual(LotteryFetchService.parse_money_value("12,345,678元"), 12345678)
+
+    def test_parse_jackpot_pool_balance_extracts_amount(self) -> None:
+        html = """
+        <div class="kj_tablelist02">
+          <p>奖池滚存 8.34 亿</p>
+        </div>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        soup = BeautifulSoup(html, "html.parser")
+
+        jackpot_pool = service.parse_jackpot_pool_balance(soup)
+
+        self.assertEqual(jackpot_pool, 834000000)
 
     def test_parse_pl5_data_from_datachart_table(self) -> None:
         html = """
@@ -119,6 +134,36 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
         fetch_page_call_args = service.fetch_page.call_args
         self.assertEqual(fetch_page_call_args.args[0], "https://example.com?limit=30")
+
+    def test_parse_lottery_data_for_dlt_contains_jackpot_pool_balance(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr>
+              <td>25001</td>
+              <td>01</td><td>02</td><td>03</td><td>04</td><td>05</td>
+              <td>06</td><td>07</td>
+              <td>2026-01-01</td>
+            </tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        service.logger = Mock()
+        service.fetch_draw_detail = Mock(
+            return_value={
+                "prize_breakdown": [{"prize_level": "三等奖", "prize_type": "basic", "winner_count": 1, "prize_amount": 10000, "total_amount": 10000}],
+                "jackpot_pool_balance": 1880000000,
+            }
+        )
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lottery_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "25001")
+        self.assertEqual(data[0]["jackpot_pool_balance"], 1880000000)
 
 
 if __name__ == "__main__":

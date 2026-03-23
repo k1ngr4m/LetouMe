@@ -25,6 +25,7 @@ SCHEMA_STATEMENTS = [
         issue_id BIGINT NOT NULL UNIQUE,
         red_hit_count_rule INT NOT NULL DEFAULT 5,
         blue_hit_count_rule INT NOT NULL DEFAULT 2,
+        jackpot_pool_balance BIGINT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_draw_result_issue FOREIGN KEY (issue_id) REFERENCES draw_issue(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -433,6 +434,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         issue_id BIGINT NOT NULL UNIQUE,
         red_hit_count_rule INT NOT NULL DEFAULT 5,
         blue_hit_count_rule INT NOT NULL DEFAULT 2,
+        jackpot_pool_balance BIGINT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_draw_result_issue FOREIGN KEY (issue_id) REFERENCES {table_prefix}_draw_issue(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -715,6 +717,9 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     "draw_issue": {
         "lottery_code": "ALTER TABLE draw_issue ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER issue_no",
     },
+    "draw_result": {
+        "jackpot_pool_balance": "ALTER TABLE draw_result ADD COLUMN jackpot_pool_balance BIGINT NOT NULL DEFAULT 0 AFTER blue_hit_count_rule",
+    },
     "prediction_batch": {
         "lottery_code": "ALTER TABLE prediction_batch ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER target_issue_id",
     },
@@ -749,6 +754,12 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
 
 for _lottery_code in SUPPORTED_LOTTERY_CODES:
     _table_prefix = f"{_lottery_code}_"
+    SCHEMA_MIGRATIONS[f"{_table_prefix}draw_result"] = {
+        "jackpot_pool_balance": (
+            f"ALTER TABLE {_table_prefix}draw_result "
+            "ADD COLUMN jackpot_pool_balance BIGINT NOT NULL DEFAULT 0 AFTER blue_hit_count_rule"
+        ),
+    }
     SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record_meta"] = {
         "ticket_purchased_at": (
             f"ALTER TABLE {_table_prefix}my_bet_record_meta "

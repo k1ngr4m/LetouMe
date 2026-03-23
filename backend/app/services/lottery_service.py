@@ -33,6 +33,8 @@ class LotteryService:
             "blue_ball": blue_balls[0] if blue_balls else None,
             "digits": normalize_digit_balls(draw.get("digits", [])),
             "date": draw.get("date", ""),
+            "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
+            "prize_breakdown": list(draw.get("prize_breakdown") or []),
         }
         return payload
 
@@ -81,6 +83,15 @@ class LotteryService:
             f"lottery:{normalized_code}:period:{period}",
             ttl_seconds=120,
             loader=lambda: self.repository.get_draw_by_period(period, lottery_code=normalized_code),
+        )
+        return self.normalize_draw(draw, normalized_code) if draw else None
+
+    def get_previous_draw_by_period(self, period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        draw = runtime_cache.get_or_set(
+            f"lottery:{normalized_code}:period:{period}:previous",
+            ttl_seconds=120,
+            loader=lambda: self.repository.get_previous_draw_by_period(period, lottery_code=normalized_code),
         )
         return self.normalize_draw(draw, normalized_code) if draw else None
 

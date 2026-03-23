@@ -529,11 +529,13 @@ class PredictionRepository:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO draw_result (issue_id)
-                VALUES (?)
-                ON DUPLICATE KEY UPDATE issue_id = VALUES(issue_id)
+                INSERT INTO draw_result (issue_id, jackpot_pool_balance)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE
+                    issue_id = VALUES(issue_id),
+                    jackpot_pool_balance = VALUES(jackpot_pool_balance)
                 """,
-                (issue_id,),
+                (issue_id, int(actual_result.get("jackpot_pool_balance") or 0)),
             )
             cursor.execute("SELECT id FROM draw_result WHERE issue_id = ?", (issue_id,))
             draw_result_id = int(cursor.fetchone()["id"])
@@ -561,6 +563,10 @@ class PredictionRepository:
                             total_amount
                         )
                         VALUES (?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            winner_count = VALUES(winner_count),
+                            prize_amount = VALUES(prize_amount),
+                            total_amount = VALUES(total_amount)
                         """,
                         (
                             draw_result_id,
@@ -1085,7 +1091,7 @@ class PredictionRepository:
         placeholders = ", ".join("?" for _ in target_issue_ids)
         cursor.execute(
             """
-            SELECT dr.id AS draw_result_id, dr.issue_id, di.issue_no AS period, di.draw_date, di.lottery_code
+            SELECT dr.id AS draw_result_id, dr.issue_id, dr.jackpot_pool_balance, di.issue_no AS period, di.draw_date, di.lottery_code
             FROM draw_result dr
             INNER JOIN draw_issue di ON di.id = dr.issue_id
             WHERE dr.issue_id IN ("""
@@ -1148,6 +1154,7 @@ class PredictionRepository:
                 "blue_balls": blue_balls,
                 "blue_ball": blue_balls[0] if blue_balls else None,
                 "digits": digits,
+                "jackpot_pool_balance": int(row.get("jackpot_pool_balance") or 0),
                 "prize_breakdown": prizes_by_result.get(int(row["draw_result_id"]), []),
             }
         return result
