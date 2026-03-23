@@ -311,6 +311,7 @@ export function HomePage() {
     availableTags,
     filteredModels,
     filteredModelIds,
+    summarySelectedModelIds,
     toggleModelProvider,
     toggleModelTag,
     clearModelFilters,
@@ -727,6 +728,11 @@ export function HomePage() {
                     filteredCount={filteredModels.length}
                     totalCount={orderedModels.length}
                     onClear={clearModelFilters}
+                    modelCandidates={orderedModels}
+                    selectedModelIds={(summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
+                      orderedModels.some((model) => model.model_id === modelId),
+                    )}
+                    onToggleSelectedModel={toggleSummaryModel}
                     availableProviders={availableProviders}
                     selectedProviders={selectedProviders}
                     onToggleProvider={toggleModelProvider}
@@ -900,6 +906,11 @@ export function HomePage() {
                 filteredCount={filteredModels.length}
                 totalCount={orderedModels.length}
                 onClear={clearModelFilters}
+                modelCandidates={orderedModels}
+                selectedModelIds={(summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
+                  orderedModels.some((model) => model.model_id === modelId),
+                )}
+                onToggleSelectedModel={toggleSummaryModel}
                 availableProviders={availableProviders}
                 selectedProviders={selectedProviders}
                 onToggleProvider={toggleModelProvider}
@@ -2505,6 +2516,9 @@ function ModelFilterPanel({
   filteredCount,
   totalCount,
   onClear,
+  modelCandidates,
+  selectedModelIds,
+  onToggleSelectedModel,
   availableProviders,
   selectedProviders,
   onToggleProvider,
@@ -2519,6 +2533,9 @@ function ModelFilterPanel({
   filteredCount: number
   totalCount: number
   onClear: () => void
+  modelCandidates: PredictionModel[]
+  selectedModelIds: string[]
+  onToggleSelectedModel: (modelId: string) => void
   availableProviders: string[]
   selectedProviders: string[]
   onToggleProvider: (provider: string) => void
@@ -2528,6 +2545,20 @@ function ModelFilterPanel({
   selectedScoreRange: ModelListScoreRange
   onSelectScoreRange: (value: ModelListScoreRange) => void
 }) {
+  const selectedModels = useMemo(() => modelCandidates, [modelCandidates])
+  const normalizedQuery = modelNameQuery.trim().toLowerCase()
+  const matchedModels = useMemo(
+    () =>
+      normalizedQuery
+        ? modelCandidates.filter((model) => {
+            const modelName = (model.model_name || '').toLowerCase()
+            const modelId = (model.model_id || '').toLowerCase()
+            return modelName.includes(normalizedQuery) || modelId.includes(normalizedQuery)
+          })
+        : [],
+    [modelCandidates, normalizedQuery],
+  )
+
   return (
     <div className="model-filter-panel">
       <div className="model-filter-panel__top">
@@ -2547,6 +2578,50 @@ function ModelFilterPanel({
           <button className="icon-button model-filter-panel__clear-button" onClick={onClear} aria-label="清空筛选" title="清空筛选" type="button">
             <HomeResetIcon />
           </button>
+        </div>
+      </div>
+
+      <div className="model-filter-panel__group">
+        <strong>已选中模型</strong>
+        <div className="filter-chip-group">
+          {selectedModels.length ? (
+            selectedModels.map((model) => (
+              <button
+                key={`selected-model-${model.model_id}`}
+                className={clsx('filter-chip', selectedModelIds.includes(model.model_id) ? 'is-active' : 'is-inactive')}
+                type="button"
+                onClick={() => onToggleSelectedModel(model.model_id)}
+              >
+                {model.model_name}
+              </button>
+            ))
+          ) : (
+            <span className="model-filter-panel__empty">暂无已选模型</span>
+          )}
+        </div>
+      </div>
+
+      <div className="model-filter-panel__group">
+        <strong>搜索匹配模型</strong>
+        <div className="filter-chip-group">
+          {normalizedQuery ? (
+            matchedModels.length ? (
+              matchedModels.map((model) => (
+                <button
+                  key={`matched-model-${model.model_id}`}
+                  className={clsx('filter-chip', selectedModelIds.includes(model.model_id) && 'is-active')}
+                  type="button"
+                  onClick={() => onToggleSelectedModel(model.model_id)}
+                >
+                  {model.model_name}
+                </button>
+              ))
+            ) : (
+              <span className="model-filter-panel__empty">无匹配模型</span>
+            )
+          ) : (
+            <span className="model-filter-panel__empty">输入关键词后展示匹配模型</span>
+          )}
         </div>
       </div>
 

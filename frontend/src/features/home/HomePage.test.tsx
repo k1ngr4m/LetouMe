@@ -654,6 +654,31 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByText('模型B').length).toBeGreaterThan(0)
   })
 
+  it('supports fuzzy-search selection and selected model chips in filter panel', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '筛选' }))
+    const filterPanel = screen.getByText('名称搜索').closest('.model-filter-panel')
+    expect(filterPanel).not.toBeNull()
+    await userEvent.click(within(filterPanel as HTMLElement).getByRole('button', { name: '清空筛选' }))
+    const modelAButtonsAfterClear = within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })
+    expect(modelAButtonsAfterClear.length).toBeGreaterThan(0)
+    expect(modelAButtonsAfterClear[0]).toHaveClass('is-inactive')
+
+    await userEvent.type(within(filterPanel as HTMLElement).getByPlaceholderText('按模型名称或ID筛选'), '型a')
+    const matchedModelAButton = within(filterPanel as HTMLElement)
+      .getAllByRole('button', { name: '模型A' })
+      .find((button) => !button.classList.contains('is-inactive'))
+    expect(matchedModelAButton).toBeDefined()
+    await userEvent.click(matchedModelAButton as HTMLElement)
+    const modelAButtonsAfterSelect = within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })
+    expect(modelAButtonsAfterSelect.some((button) => button.classList.contains('is-active'))).toBe(true)
+
+    await userEvent.click(within(filterPanel as HTMLElement).getByRole('button', { name: '清空筛选' }))
+    const modelAButtonsAfterSecondClear = within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })
+    expect(modelAButtonsAfterSecondClear.some((button) => button.classList.contains('is-inactive'))).toBe(true)
+  })
+
   it('switches model overview across list, card and score views', async () => {
     renderPage()
 
@@ -1358,10 +1383,12 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
+    const historyRecords = (historySection as HTMLElement).querySelector('.history-card-list__records')
+    expect(historyRecords).not.toBeNull()
 
     expect(screen.getByText('已显示 1 / 2 个模型')).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
-    expect(screen.queryByText('模型B')).not.toBeInTheDocument()
+    expect(within(historyRecords as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
 
     const firstHistoryCard = within(historySection as HTMLElement).getByText('第 2026031 期').closest('.history-record-card')
@@ -1371,7 +1398,7 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型A' })).toBeInTheDocument()
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
-    expect(screen.queryByText('模型B')).not.toBeInTheDocument()
+    expect(within(historyRecords as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
     expect(screen.getByText('G-1').closest('.prediction-group-card')).toHaveClass('is-compact')
     const descFallback = within(firstHistoryCard as HTMLElement).getByText('暂无说明')
     expect(descFallback).toHaveClass('prediction-group-card__desc--compact')

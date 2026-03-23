@@ -1154,6 +1154,13 @@ a {
   border-color: rgba(241, 178, 76, 0.2);
 }
 
+.model-filter-panel .filter-chip.is-inactive {
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+  opacity: 0.75;
+}
+
 .model-filter-panel__empty {
   color: var(--text-2);
   font-size: 0.84rem;

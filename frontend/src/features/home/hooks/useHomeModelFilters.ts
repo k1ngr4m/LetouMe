@@ -87,6 +87,7 @@ export function useHomeModelFilters(
     setSelectedProviders([])
     setSelectedTags([])
     setSelectedScoreRange('all')
+    setSummarySelectedModelIds([])
   }
 
   function toggleSummaryModel(modelId: string) {
@@ -139,6 +140,8 @@ export function useHomeModelFilters(
     availableTags,
     filteredModels,
     filteredModelIds,
+    summarySelectedModelIds,
+    setSummarySelectedModelIds,
     toggleModelProvider,
     toggleModelTag,
     clearModelFilters,
