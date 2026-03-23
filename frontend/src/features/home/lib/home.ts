@@ -519,6 +519,17 @@ export function buildSummary(
         })
         continue
       }
+      if (inferredLotteryCode === 'pl3') {
+        const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 3)
+        digits.forEach((digit, index) => {
+          const current = positionMaps[index].get(digit) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          positionMaps[index].set(digit, current)
+          positionSeen[index].add(digit)
+        })
+        continue
+      }
       for (const red of group.red_balls) {
         const current = redMap.get(red) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
         current.appearanceCount += 1

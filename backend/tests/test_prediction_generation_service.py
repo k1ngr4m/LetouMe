@@ -80,14 +80,47 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         template = PredictionGenerationService._load_prompt_template("pl3")
         required_phrases = [
             "必须正好输出 5 组",
-            "`play_type` 只能是 `direct`、`group3`、`group6`",
+            "`play_type` 只能是 `direct`",
             "`digits` 必须是长度为 3 的数组",
-            "group3",
-            "group6",
+            "禁止生成或提及组选",
             "只输出纯 JSON",
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
+
+    def test_validate_prediction_pl3_requires_direct_and_three_digits(self) -> None:
+        service = PredictionGenerationService()
+        valid_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct", "digits": ["0", "1", "2"]},
+                {"group_id": 2, "play_type": "direct", "digits": ["3", "4", "5"]},
+                {"group_id": 3, "play_type": "direct", "digits": ["6", "7", "8"]},
+                {"group_id": 4, "play_type": "direct", "digits": ["9", "0", "1"]},
+                {"group_id": 5, "play_type": "direct", "digits": ["2", "3", "4"]},
+            ]
+        }
+        invalid_play_type_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct", "digits": ["0", "1", "2"]},
+                {"group_id": 2, "play_type": "group3", "digits": ["3", "3", "5"]},
+                {"group_id": 3, "play_type": "direct", "digits": ["6", "7", "8"]},
+                {"group_id": 4, "play_type": "direct", "digits": ["9", "0", "1"]},
+                {"group_id": 5, "play_type": "direct", "digits": ["2", "3", "4"]},
+            ]
+        }
+        invalid_digits_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct", "digits": ["0", "1"]},
+                {"group_id": 2, "play_type": "direct", "digits": ["3", "4", "5"]},
+                {"group_id": 3, "play_type": "direct", "digits": ["6", "7", "8"]},
+                {"group_id": 4, "play_type": "direct", "digits": ["9", "0", "1"]},
+                {"group_id": 5, "play_type": "direct", "digits": ["2", "3", "4"]},
+            ]
+        }
+
+        self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="pl3"))
+        self.assertFalse(service._validate_prediction(invalid_play_type_prediction, lottery_code="pl3"))
+        self.assertFalse(service._validate_prediction(invalid_digits_prediction, lottery_code="pl3"))
 
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")

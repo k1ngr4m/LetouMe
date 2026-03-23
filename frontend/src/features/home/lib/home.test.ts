@@ -188,6 +188,48 @@ describe('buildSummary', () => {
     expect(result.red).toEqual([])
     expect(result.blue).toEqual([])
   })
+
+  it('builds pl3 summary by three positions', () => {
+    const result = buildSummary(
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          predictions: [
+            { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
+            { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '04', '05'] },
+          ],
+        },
+        {
+          model_id: 'm2',
+          model_name: 'Model 2',
+          model_provider: 'gemini',
+          predictions: [
+            { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['06', '02', '03'] },
+          ],
+        },
+      ],
+      {},
+      ['m1', 'm2'],
+      false,
+      false,
+    )
+
+    expect(result.positions[0][0]).toMatchObject({
+      ball: '01',
+      appearanceCount: 2,
+      totalGroupCount: 3,
+    })
+    expect(result.positions[1][0]).toMatchObject({
+      ball: '02',
+      appearanceCount: 2,
+      matchedModelCount: 2,
+    })
+    expect(result.positions[2].map((item) => item.ball)).toContain('03')
+    expect(result.red).toEqual([])
+    expect(result.blue).toEqual([])
+  })
 })
 
 describe('filterModels', () => {

@@ -983,13 +983,9 @@ class PredictionGenerationService:
             if normalized_code == "pl3":
                 play_type = str(group.get("play_type") or "").strip().lower()
                 digits = normalize_digit_balls(group.get("digits", []))
-                if play_type not in {"direct", "group3", "group6"}:
+                if play_type != "direct":
                     return False
                 if len(digits) != 3:
-                    return False
-                if play_type == "group3" and len(set(digits)) != 2:
-                    return False
-                if play_type == "group6" and len(set(digits)) != 3:
                     return False
                 continue
             if normalized_code == "pl5":

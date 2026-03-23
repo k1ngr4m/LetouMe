@@ -47,12 +47,6 @@ const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> 
   { value: '61-80', label: '61-80 分' },
   { value: '81-100', label: '81-100 分' },
 ]
-const PL3_PLAY_TYPE_OPTIONS: Array<{ value: PredictionPlayType; label: string }> = [
-  { value: 'direct', label: '直选' },
-  { value: 'group3', label: '组选3' },
-  { value: 'group6', label: '组选6' },
-]
-
 const AnalysisChartsPanel = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.AnalysisChartsPanel })),
 )
@@ -264,8 +258,14 @@ export function HomePage() {
   const [commonOnly, setCommonOnly] = useState(false)
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
-  const [summaryPlayTypeFilters, setSummaryPlayTypeFilters] = useState<PredictionPlayType[]>([])
-  const [historyPlayTypeFilters, setHistoryPlayTypeFilters] = useState<PredictionPlayType[]>([])
+  const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
+    () => (selectedLottery === 'pl3' ? ['direct'] : []),
+    [selectedLottery],
+  )
+  const historyPlayTypeFilters = useMemo<PredictionPlayType[]>(
+    () => (selectedLottery === 'pl3' ? ['direct'] : []),
+    [selectedLottery],
+  )
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
@@ -343,8 +343,6 @@ export function HomePage() {
     setLotteryPage(1)
     setSummaryStrategyFilters([])
     setHistoryStrategyFilters([])
-    setSummaryPlayTypeFilters([])
-    setHistoryPlayTypeFilters([])
   }, [selectedLottery])
 
   useEffect(() => {
@@ -469,7 +467,7 @@ export function HomePage() {
 
   const summaryFilteredModels = useMemo(
     () =>
-      selectedLottery === 'pl3'
+      summaryPlayTypeFilters.length
         ? filteredModels
             .map((model) => ({
               ...model,
@@ -477,7 +475,7 @@ export function HomePage() {
             }))
             .filter((model) => model.predictions.length > 0)
         : filteredModels,
-    [filteredModels, selectedLottery, summaryPlayTypeFilters],
+    [filteredModels, summaryPlayTypeFilters],
   )
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
@@ -566,12 +564,6 @@ export function HomePage() {
     )
   }
 
-  function toggleSummaryPlayTypeFilter(playType: PredictionPlayType) {
-    setSummaryPlayTypeFilters((previous) =>
-      previous.includes(playType) ? previous.filter((item) => item !== playType) : [...previous, playType],
-    )
-  }
-
   function updateHistoryStrategyFilters(updater: (previous: string[]) => string[]) {
     setHistoryPage(1)
     setHistoryStrategyFilters((previous) => updater(previous))
@@ -581,13 +573,6 @@ export function HomePage() {
     const normalized = normalizeStrategyLabel(strategy)
     updateHistoryStrategyFilters((previous) =>
       previous.includes(normalized) ? previous.filter((item) => item !== normalized) : [...previous, normalized],
-    )
-  }
-
-  function toggleHistoryPlayTypeFilter(playType: PredictionPlayType) {
-    setHistoryPage(1)
-    setHistoryPlayTypeFilters((previous) =>
-      previous.includes(playType) ? previous.filter((item) => item !== playType) : [...previous, playType],
     )
   }
 
@@ -607,7 +592,7 @@ export function HomePage() {
                 aria-pressed={selectedLottery === code}
               >
                 <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : code === 'pl3' ? '直选 / 组选玩法' : '仅直选定位玩法'}</span>
+                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : '仅直选定位玩法'}</span>
               </button>
             ))}
           </div>
@@ -752,24 +737,6 @@ export function HomePage() {
                   />
                 ) : null}
 
-                {selectedLottery === 'pl3' ? (
-                  <div className="history-strategy-filter">
-                    <span className="history-strategy-filter__label">玩法筛选</span>
-                    <div className="filter-chip-group">
-                      {PL3_PLAY_TYPE_OPTIONS.map((option) => (
-                        <button
-                          key={`summary-play-type-${option.value}`}
-                          className={clsx('filter-chip', summaryPlayTypeFilters.includes(option.value) && 'is-active')}
-                          onClick={() => toggleSummaryPlayTypeFilter(option.value)}
-                          type="button"
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
                 {modelListView === 'card' ? (
                   <div className="model-list">
                     {summaryViewModels.length ? (
@@ -789,9 +756,7 @@ export function HomePage() {
                         />
                       ))
                     ) : (
-                      <div className="state-shell">
-                        {selectedLottery === 'pl3' && summaryPlayTypeFilters.length ? '当前玩法筛选下没有可展示的预测号码。' : '没有符合当前筛选条件的模型。'}
-                      </div>
+                      <div className="state-shell">没有符合当前筛选条件的模型。</div>
                     )}
                   </div>
                 ) : modelListView === 'score' ? (
@@ -852,23 +817,6 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
-                {selectedLottery === 'pl3' ? (
-                  <div className="history-strategy-filter">
-                    <span className="history-strategy-filter__label">玩法筛选</span>
-                    <div className="filter-chip-group">
-                      {PL3_PLAY_TYPE_OPTIONS.map((option) => (
-                        <button
-                          key={`summary-stat-play-type-${option.value}`}
-                          className={clsx('filter-chip', summaryPlayTypeFilters.includes(option.value) && 'is-active')}
-                          onClick={() => toggleSummaryPlayTypeFilter(option.value)}
-                          type="button"
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
                 {selectedLottery === 'dlt' ? (
                   <div className="history-strategy-filter">
                     <span className="history-strategy-filter__label">方案筛选</span>
@@ -908,6 +856,12 @@ export function HomePage() {
                         <SummaryList title="第三位（百位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
                         <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
                         <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
+                      </>
+                    ) : selectedLottery === 'pl3' ? (
+                      <>
+                        <SummaryList title="第一位（百位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第二位（十位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第三位（个位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
                       </>
                     ) : (
                       <>
@@ -972,23 +926,6 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
-            {selectedLottery === 'pl3' ? (
-              <div className="history-strategy-filter">
-                <span className="history-strategy-filter__label">预测玩法筛选</span>
-                <div className="filter-chip-group">
-                  {PL3_PLAY_TYPE_OPTIONS.map((option) => (
-                    <button
-                      key={`history-play-type-${option.value}`}
-                      className={clsx('filter-chip', historyPlayTypeFilters.includes(option.value) && 'is-active')}
-                      onClick={() => toggleHistoryPlayTypeFilter(option.value)}
-                      type="button"
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
                 {selectedLottery === 'dlt' ? (
               <div className="history-strategy-filter">
                 <span className="history-strategy-filter__label">开奖方案筛选</span>
