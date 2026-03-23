@@ -2097,12 +2097,14 @@ function PredictionNumberRow({
   compact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
-  const isPl3Group = getPredictionPlayTypeLabel(group, actualResult) !== '复式'
-  const pl3Digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).slice(0, 3)
-  if (isPl3Group) {
+  const inferredLotteryCode =
+    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const digitLength = inferredLotteryCode === 'pl5' ? 5 : 3
+  const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).slice(0, digitLength)
+  if (inferredLotteryCode === 'pl3' || inferredLotteryCode === 'pl5') {
     return (
       <div className={clsx('number-row', compact && 'number-row--compact')}>
-        {pl3Digits.map((digit, index) => {
+        {digits.map((digit, index) => {
           const isHit = Boolean((hit?.digitHitIndexes || []).includes(index))
           return (
             <NumberBall

@@ -258,7 +258,7 @@ class ModelSettingsApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["task_id"], "lottery-task-1")
-        create_task.assert_called_once()
+        create_task.assert_called_once_with("dlt", limit=30)
 
     def test_schedule_task_endpoints(self) -> None:
         with (

@@ -1300,6 +1300,61 @@ describe('HomePage dashboard sidebar', () => {
     expect(eightDigits[1]).toHaveClass('number-ball--muted')
   })
 
+  it('renders five digits for pl5 prediction groups', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: [],
+            blue_balls: [],
+            digits: ['01', '02', '03', '04', '05'],
+            lottery_code: 'pl5',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 5,
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'direct',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: ['01', '02', '03', '04', '05'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl5'))
+
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
+    expect(groupCard).not.toBeNull()
+    expect(groupCard?.querySelectorAll('.number-ball').length).toBe(5)
+    expect(within(groupCard as HTMLElement).getByText('04')).toBeInTheDocument()
+    expect(within(groupCard as HTMLElement).getByText('05')).toBeInTheDocument()
+  })
+
   it('filters pl3 prediction groups by play type in overview views', async () => {
     renderPage()
 

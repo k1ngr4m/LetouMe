@@ -61,7 +61,7 @@ class LotteryFetchService:
         *,
         start: str | None = None,
         end: str | None = None,
-        limit: int | None = None,
+        limit: int | None = 30,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
         url = self.base_url

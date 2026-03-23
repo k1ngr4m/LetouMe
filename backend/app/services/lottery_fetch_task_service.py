@@ -9,7 +9,7 @@ class LotteryFetchTaskService:
         self.fetch_service = fetch_service
         self.runner = BackgroundTaskRunner("services.lottery_fetch_task")
 
-    def create_task(self, lottery_code: str = "dlt", *, limit: int | None = None, on_update=None) -> dict:
+    def create_task(self, lottery_code: str = "dlt", *, limit: int | None = 30, on_update=None) -> dict:
         fetch_service = self.fetch_service or LotteryFetchService(lottery_code=lottery_code)
         return self.runner.create_task(
             initial_task={

@@ -101,6 +101,25 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(result["fetched_count"], 2)
         self.assertEqual(result["saved_count"], 2)
 
+    def test_fetch_and_save_uses_default_limit_30(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.base_url = "https://example.com"
+        service.logger = Mock()
+        service.fetch_page = Mock(return_value=BeautifulSoup("<html></html>", "html.parser"))
+        service.parse_lottery_data = Mock(
+            return_value=[
+                {"period": "1", "digits": ["01", "02", "03", "04", "05"], "date": "2026-03-01", "prize_breakdown": []}
+            ]
+        )
+        service.lottery_service = Mock()
+        service.lottery_service.save_draws.return_value = [{"period": "1"}]
+
+        service.fetch_and_save()
+
+        fetch_page_call_args = service.fetch_page.call_args
+        self.assertEqual(fetch_page_call_args.args[0], "https://example.com?limit=30")
+
 
 if __name__ == "__main__":
     unittest.main()
