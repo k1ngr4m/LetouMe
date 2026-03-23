@@ -484,6 +484,7 @@ export function buildSummary(
   const selectedModels = models.filter((model) => selectedIds.includes(model.model_id))
   const redMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const blueMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const positionMaps = Array.from({ length: 5 }, () => new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>())
   let totalGroupCount = 0
   let selectedModelCount = 0
 
@@ -504,7 +505,20 @@ export function buildSummary(
     const weight = weighted ? (scores[model.model_id]?.overallScore || 0) / 100 || 1 : 1
     const redSeen = new Set<string>()
     const blueSeen = new Set<string>()
+    const positionSeen = Array.from({ length: 5 }, () => new Set<string>())
     for (const group of activeGroups) {
+      const inferredLotteryCode = ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+      if (inferredLotteryCode === 'pl5') {
+        const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 5)
+        digits.forEach((digit, index) => {
+          const current = positionMaps[index].get(digit) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          positionMaps[index].set(digit, current)
+          positionSeen[index].add(digit)
+        })
+        continue
+      }
       for (const red of group.red_balls) {
         const current = redMap.get(red) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
         current.appearanceCount += 1
@@ -522,6 +536,9 @@ export function buildSummary(
     }
     for (const red of redSeen) redMap.get(red)?.models.add(model.model_id)
     for (const blue of blueSeen) blueMap.get(blue)?.models.add(model.model_id)
+    positionSeen.forEach((seen, index) => {
+      for (const digit of seen) positionMaps[index].get(digit)?.models.add(model.model_id)
+    })
   }
 
   const modelCount = selectedModelCount
@@ -549,6 +566,7 @@ export function buildSummary(
   return {
     red: normalize(redMap),
     blue: normalize(blueMap),
+    positions: positionMaps.map((positionMap) => normalize(positionMap)),
   }
 }
 

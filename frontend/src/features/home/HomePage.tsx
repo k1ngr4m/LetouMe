@@ -901,8 +901,20 @@ export function HomePage() {
                   <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
                 ) : (
                   <div className="summary-columns">
-                    <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
-                    <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
+                    {selectedLottery === 'pl5' ? (
+                      <>
+                        <SummaryList title="第一位（万位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第二位（千位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第三位（百位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
+                      </>
+                    ) : (
+                      <>
+                        <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
+                        <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
+                      </>
+                    )}
                   </div>
                 )}
               </StatusCard>

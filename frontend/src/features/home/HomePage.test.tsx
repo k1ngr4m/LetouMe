@@ -129,6 +129,7 @@ vi.mock('./hooks/useHomeData', () => ({
     lotteryPageSize = 10,
   ) => {
     const isPl3 = _lotteryCode === 'pl3'
+    const isPl5 = _lotteryCode === 'pl5'
     const [effectiveHistoryStrategyFilters, setEffectiveHistoryStrategyFilters] = useState(historyStrategyFilters)
     const [isHistoryFetching, setIsHistoryFetching] = useState(false)
 
@@ -275,7 +276,40 @@ vi.mock('./hooks/useHomeData', () => ({
             ],
           },
         ]
-      : [
+      : isPl5
+        ? [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                play_type: 'direct',
+                strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
+                red_balls: [],
+                blue_balls: [],
+                digits: ['01', '02', '03', '04', '05'],
+              })),
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              model_tags: ['fast'],
+              model_api_model: 'model-b-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                play_type: 'direct',
+                strategy: '冷号补位',
+                red_balls: [],
+                blue_balls: [],
+                digits: ['06', '07', '08', '09', '00'],
+              })),
+            },
+          ]
+        : [
           {
             model_id: 'model-a',
             model_name: '模型A',
@@ -322,7 +356,26 @@ vi.mock('./hooks/useHomeData', () => ({
             lottery_code: 'pl3',
           },
         ]
-      : [
+      : isPl5
+        ? [
+            {
+              period: '2026031',
+              date: '2026-03-10',
+              red_balls: [],
+              blue_balls: [],
+              digits: ['01', '02', '03', '04', '05'],
+              lottery_code: 'pl5',
+            },
+            {
+              period: '2026030',
+              date: '2026-03-08',
+              red_balls: [],
+              blue_balls: [],
+              digits: ['06', '07', '08', '09', '00'],
+              lottery_code: 'pl5',
+            },
+          ]
+        : [
           {
             period: '2026031',
             date: '2026-03-10',
@@ -718,6 +771,22 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
     expect(within(summarySection as HTMLElement).getByText('当前筛选条件下没有可统计的模型。')).toBeInTheDocument()
+  })
+
+  it('shows five position summary columns for pl5', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+    expect(within(summarySection as HTMLElement).getByText('第一位（万位）统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第二位（千位）统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第三位（百位）统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第四位（十位）统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第五位（个位）统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
   })
 
   it('shows matched and unmatched models in summary tooltip', async () => {

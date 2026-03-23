@@ -143,6 +143,51 @@ describe('buildSummary', () => {
     expect(result.red[0].selectedModelCount).toBe(1)
     expect(result.red[0].totalGroupCount).toBe(2)
   })
+
+  it('builds pl5 summary by five positions', () => {
+    const result = buildSummary(
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          predictions: [
+            { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03', '04', '05'] },
+            { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '06', '03', '07', '08'] },
+          ],
+        },
+        {
+          model_id: 'm2',
+          model_name: 'Model 2',
+          model_provider: 'gemini',
+          predictions: [
+            { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['09', '02', '03', '00', '05'] },
+          ],
+        },
+      ],
+      {},
+      ['m1', 'm2'],
+      false,
+      false,
+    )
+
+    expect(result.positions).toHaveLength(5)
+    expect(result.positions[0][0]).toMatchObject({
+      ball: '01',
+      appearanceCount: 2,
+      totalGroupCount: 3,
+      matchedModelCount: 1,
+    })
+    expect(result.positions[1][0]).toMatchObject({
+      ball: '02',
+      appearanceCount: 2,
+      totalGroupCount: 3,
+      matchedModelCount: 2,
+    })
+    expect(result.positions[4].map((item) => item.ball)).toContain('05')
+    expect(result.red).toEqual([])
+    expect(result.blue).toEqual([])
+  })
 })
 
 describe('filterModels', () => {
