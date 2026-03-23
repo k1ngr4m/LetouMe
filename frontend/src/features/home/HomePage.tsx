@@ -324,6 +324,22 @@ export function HomePage() {
     selectedTags: [],
     selectedScoreRange: 'all',
   })
+  const effectiveSelectedModelIds = useMemo(() => {
+    const baseModelIds = filteredModelIds
+    const selectedModelIds = (summarySelectedModelIds ?? baseModelIds).filter((modelId) => baseModelIds.includes(modelId))
+    return selectedModelIds.length ? selectedModelIds : baseModelIds
+  }, [filteredModelIds, summarySelectedModelIds])
+  const effectiveSelectedModels = useMemo(
+    () => filteredModels.filter((model) => effectiveSelectedModelIds.includes(model.model_id)),
+    [effectiveSelectedModelIds, filteredModels],
+  )
+  const panelSelectedModelIds = useMemo(
+    () =>
+      (summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
+        orderedModels.some((model) => model.model_id === modelId),
+      ),
+    [filteredModelIds, orderedModels, summarySelectedModelIds],
+  )
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   useEffect(() => {
@@ -425,27 +441,27 @@ export function HomePage() {
     hasHistoryRecords: Boolean(history?.predictions_history?.length),
     hasManualModelFilter,
     hasCurrentModels: models.length > 0,
-    filteredModelIds,
+    filteredModelIds: effectiveSelectedModelIds,
     historyModelIds: historyAllModelRefs.map((item) => item.model_id),
     historyFallbackEnabled,
   })
   const historyVisibleModelIds = useMemo(
-    () => (useHistoryFallbackModels ? historyAllModelRefs.map((item) => item.model_id) : filteredModelIds),
-    [filteredModelIds, historyAllModelRefs, useHistoryFallbackModels],
+    () => (useHistoryFallbackModels ? historyAllModelRefs.map((item) => item.model_id) : effectiveSelectedModelIds),
+    [effectiveSelectedModelIds, historyAllModelRefs, useHistoryFallbackModels],
   )
   const historyVisibleModels = useMemo<HistoryModelRef[]>(
     () =>
       useHistoryFallbackModels
         ? historyAllModelRefs
-        : filteredModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name })),
-    [filteredModels, historyAllModelRefs, useHistoryFallbackModels],
+        : effectiveSelectedModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name })),
+    [effectiveSelectedModels, historyAllModelRefs, useHistoryFallbackModels],
   )
   const summaryStrategyOptions = useMemo(
     () =>
-      [...new Set(filteredModels.flatMap((model) => (model.predictions || []).map((group) => normalizeStrategyLabel(group.strategy))))].sort((left, right) =>
+      [...new Set(effectiveSelectedModels.flatMap((model) => (model.predictions || []).map((group) => normalizeStrategyLabel(group.strategy))))].sort((left, right) =>
         left.localeCompare(right),
       ),
-    [filteredModels],
+    [effectiveSelectedModels],
   )
   const historyStrategyOptions = useMemo(
     () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
@@ -470,14 +486,14 @@ export function HomePage() {
   const summaryFilteredModels = useMemo(
     () =>
       summaryPlayTypeFilters.length
-        ? filteredModels
+        ? effectiveSelectedModels
             .map((model) => ({
               ...model,
               predictions: filterPredictionGroupsByPlayType(model.predictions || [], summaryPlayTypeFilters),
             }))
             .filter((model) => model.predictions.length > 0)
-        : filteredModels,
-    [filteredModels, summaryPlayTypeFilters],
+        : effectiveSelectedModels,
+    [effectiveSelectedModels, summaryPlayTypeFilters],
   )
 
   const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
@@ -498,10 +514,10 @@ export function HomePage() {
   const oddEvenChart = buildOddEvenChart(chartDraws)
   const sumTrendChart = buildSumTrendChart(chartDraws)
   const scoreViewModels = useMemo(
-    () => sortModelsForScoreView(filteredModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
-    [filteredModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
+    () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
+    [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
-  const summaryViewModels = modelListView === 'score' ? filteredModels : summaryFilteredModels
+  const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summaryFilteredModels
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || (!predictionsHistory.data && predictionsHistory.isLoading)
   const error =
@@ -729,9 +745,7 @@ export function HomePage() {
                     totalCount={orderedModels.length}
                     onClear={clearModelFilters}
                     modelCandidates={orderedModels}
-                    selectedModelIds={(summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
-                      orderedModels.some((model) => model.model_id === modelId),
-                    )}
+                    selectedModelIds={panelSelectedModelIds}
                     onToggleSelectedModel={toggleSummaryModel}
                     availableProviders={availableProviders}
                     selectedProviders={selectedProviders}
@@ -907,9 +921,7 @@ export function HomePage() {
                 totalCount={orderedModels.length}
                 onClear={clearModelFilters}
                 modelCandidates={orderedModels}
-                selectedModelIds={(summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
-                  orderedModels.some((model) => model.model_id === modelId),
-                )}
+                selectedModelIds={panelSelectedModelIds}
                 onToggleSelectedModel={toggleSummaryModel}
                 availableProviders={availableProviders}
                 selectedProviders={selectedProviders}
