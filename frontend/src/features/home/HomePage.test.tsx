@@ -812,6 +812,8 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
+    expect(screen.getByText('命中趋势折线')).toBeInTheDocument()
+    expect(screen.getByText('命中堆叠柱形统计')).toBeInTheDocument()
 
     expect(within(historySection as HTMLElement).getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)

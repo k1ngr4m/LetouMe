@@ -117,30 +117,66 @@ export function AnalysisChartsPanel({
 }
 
 export function HistoryHitTrendCard({ historyVisibleModels, historyHitTrend }: { historyVisibleModels: HistoryModelRef[]; historyHitTrend: HistoryTrendItem[] }) {
+  const sortedTrendData = [...historyHitTrend].sort((left, right) => {
+    const leftPeriod = Number(left.period)
+    const rightPeriod = Number(right.period)
+    const leftIsNumber = Number.isFinite(leftPeriod)
+    const rightIsNumber = Number.isFinite(rightPeriod)
+    if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
+    return String(left.period || '').localeCompare(String(right.period || ''))
+  })
+
   return (
     <ChartCard title="模型历史命中趋势">
       {historyVisibleModels.length && historyHitTrend.length ? (
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={historyHitTrend}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="period" />
-            <YAxis allowDecimals={false} />
-            <Tooltip />
-            <Legend />
-            {historyVisibleModels.map((model, index) => (
-              <Line
-                key={model.model_id}
-                type="monotone"
-                dataKey={model.model_id}
-                name={model.model_name}
-                stroke={getModelTrendColor(index)}
-                strokeWidth={3}
-                dot={{ r: 2 }}
-                activeDot={{ r: 5 }}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="history-hit-trend__charts">
+          <div className="history-hit-trend__chart-shell">
+            <p className="history-hit-trend__chart-title">命中趋势折线</p>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={sortedTrendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                {historyVisibleModels.map((model, index) => (
+                  <Line
+                    key={model.model_id}
+                    type="monotone"
+                    dataKey={model.model_id}
+                    name={model.model_name}
+                    stroke={getModelTrendColor(index)}
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="history-hit-trend__chart-shell" aria-label="模型命中堆叠统计图">
+            <p className="history-hit-trend__chart-title">命中堆叠柱形统计</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={sortedTrendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                {historyVisibleModels.map((model, index) => (
+                  <Bar
+                    key={`stack-${model.model_id}`}
+                    dataKey={model.model_id}
+                    name={model.model_name}
+                    stackId="hitStack"
+                    fill={getModelTrendColor(index)}
+                    radius={[6, 6, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       ) : (
         <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
       )}

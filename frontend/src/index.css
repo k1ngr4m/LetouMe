@@ -2180,6 +2180,22 @@ a {
   min-height: 22rem;
 }
 
+.history-hit-trend__charts {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.history-hit-trend__chart-shell {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.history-hit-trend__chart-title {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
 .history-toolbar {
   justify-content: space-between;
   margin-bottom: 1rem;
