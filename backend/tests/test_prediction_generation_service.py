@@ -85,6 +85,39 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         for phrase in required_phrases:
             self.assertIn(phrase, template)
 
+    def test_pl5_prompt_template_can_be_formatted(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("pl5")
+        rendered = template.format(
+            target_period="26068",
+            target_date="2026年03月19日",
+            lottery_history=json.dumps(
+                [
+                    {"period": "26067", "date": "2026-03-18", "digits": ["0", "1", "2", "3", "4"]},
+                    {"period": "26066", "date": "2026-03-17", "digits": ["5", "6", "7", "8", "9"]},
+                ],
+                ensure_ascii=False,
+                indent=2,
+            ),
+            prediction_date="2026-03-18",
+            model_id="pl5_model_demo",
+            model_name="PL5 Demo Model",
+        )
+        self.assertIn("目标期号：26068", rendered)
+        self.assertIn("模型：PL5 Demo Model (pl5_model_demo)", rendered)
+        self.assertIn('"period": "26067"', rendered)
+
+    def test_pl5_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("pl5")
+        required_phrases = [
+            "必须正好输出 5 组",
+            "`play_type` 只能是 `direct`",
+            "`digits` 必须是长度为 5 的数组",
+            "只输出纯 JSON",
+            "输出前自检清单",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
     def test_generate_prediction_logs_response_summary(self) -> None:
         service = PredictionGenerationService()
         model = Mock()

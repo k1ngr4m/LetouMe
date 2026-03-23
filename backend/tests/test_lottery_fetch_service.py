@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import Mock
 
 from bs4 import BeautifulSoup
 
@@ -38,6 +39,42 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(LotteryFetchService.parse_money_value("1.90亿"), 190000000)
         self.assertEqual(LotteryFetchService.parse_money_value("7,654,708"), 7654708)
         self.assertEqual(LotteryFetchService.parse_money_value("3.5万"), 35000)
+
+    def test_parse_pl5_data_from_datachart_table(self) -> None:
+        html = """
+        <table>
+          <tbody id="tdata">
+            <tr><td>26071</td><td>5 5 1 5 3</td><td>2026-03-22</td></tr>
+            <tr><td>26070</td><td>0 1 2 3 4</td><td>2026-03-21</td></tr>
+            <tr><td>invalid</td><td>1 2 3 4 5</td><td>2026-03-20</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_pl5_data(soup)
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["period"], "26071")
+        self.assertEqual(data[0]["digits"], ["05", "05", "01", "05", "03"])
+        self.assertEqual(data[0]["date"], "2026-03-22")
+        self.assertEqual(data[1]["digits"], ["00", "01", "02", "03", "04"])
+
+    def test_fetch_page_sets_pl5_encoding_from_apparent_encoding(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        response = Mock(status_code=200, text="<html></html>", apparent_encoding="gb2312")
+        service.session = Mock()
+        service.session.get.return_value = response
+
+        soup = service.fetch_page("https://datachart.500.com/plw/history/inc/history.php", retry=1)
+
+        self.assertIsNotNone(soup)
+        self.assertEqual(response.encoding, "gb2312")
 
 
 if __name__ == "__main__":

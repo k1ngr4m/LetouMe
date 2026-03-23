@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -29,7 +30,9 @@ class LotteryFetchService:
         self.base_url = (
             "https://datachart.500.com/dlt/history/newinc/history.php"
             if self.lottery_code == "dlt"
-            else "https://www.500.com/kaijiang/p3/lskj/" if self.lottery_code == "pl3" else "https://www.500.com/kaijiang/plw/lskj/"
+            else "https://www.500.com/kaijiang/p3/lskj/"
+            if self.lottery_code == "pl3"
+            else "https://datachart.500.com/plw/history/inc/history.php"
         )
         self.headers = {
             "User-Agent": (
@@ -42,7 +45,9 @@ class LotteryFetchService:
             "Referer": (
                 "https://datachart.500.com/dlt/history/history.shtml"
                 if self.lottery_code == "dlt"
-                else "https://www.500.com/kaijiang/p3/lskj/" if self.lottery_code == "pl3" else "https://www.500.com/kaijiang/plw/lskj/"
+                else "https://www.500.com/kaijiang/p3/lskj/"
+                if self.lottery_code == "pl3"
+                else "https://datachart.500.com/plw/history/history.shtml"
             ),
         }
         self.session = requests.Session()
@@ -95,7 +100,10 @@ class LotteryFetchService:
                     extra={"context": {"attempt": attempt + 1, "retry": retry, "url": url}},
                 )
                 response = self.session.get(url, timeout=30)
-                response.encoding = "utf-8" if self.lottery_code == "pl3" else "utf-8"
+                if self.lottery_code == "pl5":
+                    response.encoding = response.apparent_encoding or "gb18030"
+                else:
+                    response.encoding = "utf-8"
                 if response.status_code == 200:
                     return BeautifulSoup(response.text, "html.parser")
                 self.logger.warning("Unexpected HTTP status", extra={"context": {"status_code": response.status_code}})
@@ -164,12 +172,12 @@ class LotteryFetchService:
         data_list: list[dict[str, Any]] = []
         for row in soup.find_all("tr"):
             cols = row.find_all("td")
-            if len(cols) < 3:
+            if len(cols) < 2:
                 continue
             period = cols[0].get_text(strip=True)
-            date = cols[1].get_text(strip=True)
-            digit_nodes = cols[2].select(".ball") or cols[2].find_all("span")
-            digits = [node.get_text(strip=True) for node in digit_nodes if node.get_text(strip=True)]
+            date = cols[-1].get_text(strip=True)
+            raw_digits_text = cols[1].get_text(" ", strip=True)
+            digits = re.findall(r"\d", raw_digits_text)
             if not period.isdigit() or len(digits) < 5:
                 continue
             data_list.append(
