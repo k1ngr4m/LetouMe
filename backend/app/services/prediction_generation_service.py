@@ -317,7 +317,6 @@ class PredictionGenerationService:
             raise ValueError("不支持的生成模式")
         if mode == "history" and (not start_period or not end_period):
             raise ValueError("历史重算必须提供开始期号和结束期号")
-        max_workers = self._normalize_bulk_parallelism(parallelism, selected_count=len(unique_codes))
 
         summary = {
             "mode": mode,
@@ -327,33 +326,35 @@ class PredictionGenerationService:
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
-            "parallelism": max_workers,
+            "parallelism": 1,
             "retry_per_model": MAX_BULK_RETRIES_PER_MODEL,
+            "task_total_count": 0,
+            "task_completed_count": 0,
+            "task_processed_count": 0,
+            "task_skipped_count": 0,
+            "task_failed_count": 0,
             "processed_models": [],
             "skipped_models": [],
             "failed_models": [],
             "failed_details": [],
         }
+        if mode == "history":
+            return self._generate_history_for_models_by_subtasks(
+                lottery_code=lottery_code,
+                unique_codes=unique_codes,
+                overwrite=overwrite,
+                parallelism=parallelism,
+                start_period=str(start_period or ""),
+                end_period=str(end_period or ""),
+                progress_callback=progress_callback,
+                summary=summary,
+            )
+
+        max_workers = self._normalize_bulk_parallelism(parallelism, selected_count=len(unique_codes))
+        summary["parallelism"] = max_workers
+        summary["task_total_count"] = len(unique_codes)
         outcomes: dict[str, dict[str, str]] = {}
         outcomes_lock = Lock()
-
-        def rebuild_summary_snapshot() -> dict[str, Any]:
-            processed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "processed"]
-            skipped_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "skipped"]
-            failed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "failed"]
-            failed_details = [
-                self._build_failed_detail(code, outcomes.get(code, {}).get("reason") or "未知错误")
-                for code in failed_models
-            ]
-            summary["processed_models"] = processed_models
-            summary["skipped_models"] = skipped_models
-            summary["failed_models"] = failed_models
-            summary["failed_details"] = failed_details
-            summary["processed_count"] = len(processed_models)
-            summary["skipped_count"] = len(skipped_models)
-            summary["failed_count"] = len(failed_models)
-            summary["completed_count"] = len(outcomes)
-            return dict(summary)
 
         def run_single_model(model_code: str) -> tuple[str, str]:
             attempts = MAX_BULK_RETRIES_PER_MODEL + 1
@@ -417,11 +418,265 @@ class PredictionGenerationService:
                     )
                 with outcomes_lock:
                     outcomes[model_code] = {"status": status, "reason": reason}
-                    snapshot = rebuild_summary_snapshot()
+                    snapshot = self._rebuild_bulk_summary_snapshot(
+                        summary=summary,
+                        unique_codes=unique_codes,
+                        outcomes=outcomes,
+                    )
                 if progress_callback:
                     progress_callback(snapshot)
 
         return summary
+
+    def _generate_history_for_models_by_subtasks(
+        self,
+        *,
+        lottery_code: str,
+        unique_codes: list[str],
+        overwrite: bool,
+        parallelism: int | None,
+        start_period: str,
+        end_period: str,
+        progress_callback: Callable[[dict[str, Any]], None] | None,
+        summary: dict[str, Any],
+    ) -> dict[str, Any]:
+        ensure_schema()
+        normalized_code = normalize_lottery_code(lottery_code)
+        start_value = int(start_period)
+        end_value = int(end_period)
+        if start_value > end_value:
+            raise ValueError("开始期号不能大于结束期号")
+        target_periods = [str(item) for item in range(start_value, end_value + 1)]
+        summary["task_total_count"] = len(unique_codes) * len(target_periods)
+        max_workers = self._normalize_bulk_parallelism(parallelism, selected_count=summary["task_total_count"])
+        summary["parallelism"] = max_workers
+
+        history_data = self._load_lottery_history(normalized_code)
+        period_map = self._build_period_map(history_data)
+        sorted_periods_desc = sorted((int(period), period) for period in period_map)
+        model_defs = {model_code: self._get_model_definition(model_code, lottery_code=normalized_code) for model_code in unique_codes}
+        prompt_templates = {model_code: self._load_prompt_template(normalized_code) for model_code in unique_codes}
+        history_context_map: dict[str, list[dict[str, Any]]] = {}
+        for period in target_periods:
+            period_int = int(period)
+            history_context_map[period] = [
+                period_map[history_period]
+                for period_int_value, history_period in sorted(sorted_periods_desc, reverse=True)
+                if period_int_value < period_int
+            ][:DEFAULT_CONTEXT_SIZE]
+
+        thread_local = local()
+        period_locks: dict[str, Lock] = {}
+        period_locks_lock = Lock()
+        outcomes_lock = Lock()
+        task_outcomes: dict[str, dict[str, str]] = {}
+        model_failed_reason: dict[str, str] = {}
+
+        def get_period_lock(period: str) -> Lock:
+            with period_locks_lock:
+                return period_locks.setdefault(period, Lock())
+
+        def get_thread_model(model_code: str) -> Any:
+            cached_models = getattr(thread_local, "bulk_history_models", None)
+            if cached_models is None:
+                cached_models = {}
+                thread_local.bulk_history_models = cached_models
+            if model_code in cached_models:
+                return cached_models[model_code]
+            prepared_model = self._prepare_model(model_defs[model_code])
+            cached_models[model_code] = prepared_model
+            return prepared_model
+
+        def run_subtask(model_code: str, target_period: str) -> tuple[str, str]:
+            task_key = f"{model_code}:{target_period}"
+            actual_result = period_map.get(target_period)
+            if not actual_result:
+                return task_key, "failed:目标期不存在开奖历史"
+            history_context = history_context_map.get(target_period) or []
+            if not history_context:
+                return task_key, "failed:历史上下文不足"
+
+            with get_period_lock(target_period):
+                current_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
+                current_model_map = {
+                    str(item.get("model_id") or ""): item
+                    for item in (current_record or {}).get("models", [])
+                    if item.get("model_id")
+                }
+                if model_code in current_model_map and not overwrite:
+                    return task_key, "skipped"
+
+            prediction_date = self._make_prediction_date(actual_result.get("date"))
+            try:
+                prediction = self._generate_prediction(
+                    model=get_thread_model(model_code),
+                    model_def=model_defs[model_code],
+                    lottery_code=normalized_code,
+                    prompt_template=prompt_templates[model_code],
+                    target_period=target_period,
+                    prediction_date=prediction_date,
+                    history_context=list(history_context),
+                )
+            except Exception as exc:
+                self.logger.exception(
+                    "Bulk historical prediction generation failed",
+                    extra={"context": {"target_period": target_period, "model_code": model_code}},
+                )
+                return task_key, f"failed:{str(exc) or '未知错误'}"
+
+            predictions_with_hits = []
+            for group in prediction.get("predictions", []):
+                group_payload = dict(group)
+                group_payload["hit_result"] = self.prediction_service.calculate_hit_result(group, actual_result, lottery_code=normalized_code)
+                predictions_with_hits.append(group_payload)
+            best_group = max(predictions_with_hits, key=lambda item: item["hit_result"]["total_hits"])
+
+            with get_period_lock(target_period):
+                current_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
+                current_model_map = {
+                    str(item.get("model_id") or ""): item
+                    for item in (current_record or {}).get("models", [])
+                    if item.get("model_id")
+                }
+                current_model_map[model_code] = {
+                    "model_id": prediction.get("model_id"),
+                    "model_name": prediction.get("model_name"),
+                    "model_provider": prediction.get("model_provider"),
+                    "model_version": prediction.get("model_version"),
+                    "model_tags": prediction.get("model_tags"),
+                    "model_api_model": prediction.get("model_api_model"),
+                    "predictions": predictions_with_hits,
+                    "best_group": best_group.get("group_id"),
+                    "best_hit_count": best_group["hit_result"]["total_hits"],
+                }
+                record = current_record or {
+                    "prediction_date": prediction_date,
+                    "lottery_code": normalized_code,
+                    "target_period": target_period,
+                    "actual_result": actual_result,
+                    "models": [],
+                }
+                record["prediction_date"] = prediction_date
+                record["actual_result"] = actual_result
+                record["models"] = list(current_model_map.values())
+                self.prediction_repository.upsert_history_record(record)
+                self.prediction_service._invalidate_prediction_cache(target_period=target_period, lottery_code=normalized_code)
+            return task_key, "processed"
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(run_subtask, model_code, target_period): (model_code, target_period)
+                for model_code in unique_codes
+                for target_period in target_periods
+            }
+            for future in as_completed(futures):
+                model_code, target_period = futures[future]
+                task_key = f"{model_code}:{target_period}"
+                try:
+                    task_key, outcome = future.result()
+                except Exception as exc:
+                    outcome = f"failed:{str(exc) or '未知错误'}"
+                    self.logger.exception(
+                        "Bulk history prediction worker crashed",
+                        extra={"context": {"target_period": target_period, "model_code": model_code}},
+                    )
+                with outcomes_lock:
+                    task_outcomes[task_key] = {"status": outcome.split(":", 1)[0], "reason": outcome.split(":", 1)[1] if ":" in outcome else ""}
+                    if outcome.startswith("failed:") and model_code not in model_failed_reason:
+                        model_failed_reason[model_code] = outcome.split(":", 1)[1] or "未知错误"
+                    snapshot = self._rebuild_bulk_history_summary_snapshot(
+                        summary=summary,
+                        unique_codes=unique_codes,
+                        target_periods=target_periods,
+                        task_outcomes=task_outcomes,
+                        model_failed_reason=model_failed_reason,
+                    )
+                if progress_callback:
+                    progress_callback(snapshot)
+        return summary
+
+    @staticmethod
+    def _rebuild_bulk_summary_snapshot(
+        *,
+        summary: dict[str, Any],
+        unique_codes: list[str],
+        outcomes: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        processed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "processed"]
+        skipped_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "skipped"]
+        failed_models = [code for code in unique_codes if outcomes.get(code, {}).get("status") == "failed"]
+        failed_details = [
+            PredictionGenerationService._build_failed_detail(code, outcomes.get(code, {}).get("reason") or "未知错误")
+            for code in failed_models
+        ]
+        summary["processed_models"] = processed_models
+        summary["skipped_models"] = skipped_models
+        summary["failed_models"] = failed_models
+        summary["failed_details"] = failed_details
+        summary["processed_count"] = len(processed_models)
+        summary["skipped_count"] = len(skipped_models)
+        summary["failed_count"] = len(failed_models)
+        summary["completed_count"] = len(outcomes)
+        summary["task_completed_count"] = len(outcomes)
+        summary["task_processed_count"] = len(processed_models)
+        summary["task_skipped_count"] = len(skipped_models)
+        summary["task_failed_count"] = len(failed_models)
+        return dict(summary)
+
+    @staticmethod
+    def _rebuild_bulk_history_summary_snapshot(
+        *,
+        summary: dict[str, Any],
+        unique_codes: list[str],
+        target_periods: list[str],
+        task_outcomes: dict[str, dict[str, str]],
+        model_failed_reason: dict[str, str],
+    ) -> dict[str, Any]:
+        processed_tasks = 0
+        skipped_tasks = 0
+        failed_tasks = 0
+        for outcome in task_outcomes.values():
+            status = outcome.get("status")
+            if status == "processed":
+                processed_tasks += 1
+            elif status == "skipped":
+                skipped_tasks += 1
+            else:
+                failed_tasks += 1
+        summary["task_completed_count"] = len(task_outcomes)
+        summary["task_processed_count"] = processed_tasks
+        summary["task_skipped_count"] = skipped_tasks
+        summary["task_failed_count"] = failed_tasks
+
+        processed_models: list[str] = []
+        skipped_models: list[str] = []
+        failed_models: list[str] = []
+        for model_code in unique_codes:
+            statuses = [
+                (task_outcomes.get(f"{model_code}:{period}") or {}).get("status")
+                for period in target_periods
+            ]
+            if not all(status is not None for status in statuses):
+                continue
+            if any(status == "failed" for status in statuses):
+                failed_models.append(model_code)
+            elif all(status == "skipped" for status in statuses):
+                skipped_models.append(model_code)
+            else:
+                processed_models.append(model_code)
+
+        summary["processed_models"] = processed_models
+        summary["skipped_models"] = skipped_models
+        summary["failed_models"] = failed_models
+        summary["processed_count"] = len(processed_models)
+        summary["skipped_count"] = len(skipped_models)
+        summary["failed_count"] = len(failed_models)
+        summary["completed_count"] = len(processed_models) + len(skipped_models) + len(failed_models)
+        summary["failed_details"] = [
+            PredictionGenerationService._build_failed_detail(model_code, model_failed_reason.get(model_code, "模型未生成结果"))
+            for model_code in failed_models
+        ]
+        return dict(summary)
 
     @staticmethod
     def _build_failed_detail(model_code: str, reason: str) -> dict[str, str]:

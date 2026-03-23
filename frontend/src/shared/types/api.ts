@@ -512,6 +512,11 @@ export type PredictionGenerationTask = {
     skipped_models?: string[]
     failed_models?: string[]
     failed_details?: PredictionGenerationFailureDetail[]
+    task_total_count?: number
+    task_completed_count?: number
+    task_processed_count?: number
+    task_skipped_count?: number
+    task_failed_count?: number
   }
   error_message?: string | null
 }

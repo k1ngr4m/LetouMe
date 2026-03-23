@@ -38,6 +38,10 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(summary["completed_count"], 3)
         self.assertEqual(summary["parallelism"], 1)
         self.assertEqual(summary["retry_per_model"], 1)
+        self.assertEqual(summary["task_total_count"], 3)
+        self.assertEqual(summary["task_completed_count"], 3)
+        self.assertEqual(summary["task_processed_count"], 2)
+        self.assertEqual(summary["task_failed_count"], 1)
         self.assertEqual(summary["processed_models"], ["model-a", "model-c"])
         self.assertEqual(summary["failed_models"], ["model-b"])
         self.assertEqual(
@@ -301,6 +305,98 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(summary["skipped_count"], 0)
         self.assertEqual(summary["failed_periods"], [])
         self.assertEqual(upsert_history_record_mock.call_count, 3)
+
+    def test_generate_for_models_history_parallelizes_by_model_and_period(self) -> None:
+        service = PredictionGenerationService()
+        captured_workers: dict[str, int] = {}
+
+        class InlineExecutor:
+            def __init__(self, *, max_workers: int) -> None:
+                captured_workers["max_workers"] = max_workers
+
+            def __enter__(self) -> "InlineExecutor":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+            def submit(self, fn, *args, **kwargs) -> Future:
+                future: Future = Future()
+                try:
+                    future.set_result(fn(*args, **kwargs))
+                except Exception as error:
+                    future.set_exception(error)
+                return future
+
+        def make_model_def(model_code: str) -> ModelDefinition:
+            return ModelDefinition(
+                id=model_code,
+                name=model_code,
+                provider="openai_compatible",
+                model_id=model_code,
+                api_model="gpt-4o-mini",
+            )
+
+        history_payload = {
+            "data": [
+                {"period": "26052", "date": "2026-03-18", "digits": ["1", "2", "3"], "lottery_code": "pl3"},
+                {"period": "26051", "date": "2026-03-17", "digits": ["2", "3", "4"], "lottery_code": "pl3"},
+                {"period": "26050", "date": "2026-03-16", "digits": ["3", "4", "5"], "lottery_code": "pl3"},
+                {"period": "26049", "date": "2026-03-15", "digits": ["4", "5", "6"], "lottery_code": "pl3"},
+            ]
+        }
+        generated_pairs: list[tuple[str, str]] = []
+
+        def fake_generate_prediction(*, model_def: ModelDefinition, target_period: str, **_: object) -> dict:
+            generated_pairs.append((model_def.model_id, target_period))
+            return {
+                "model_id": model_def.model_id,
+                "model_name": model_def.name,
+                "model_provider": model_def.provider,
+                "model_version": "",
+                "model_tags": [],
+                "model_api_model": model_def.api_model,
+                "predictions": [{"group_id": 1, "play_type": "group6", "digits": ["1", "2", "3"]}],
+            }
+
+        with (
+            patch("backend.app.services.prediction_generation_service.ThreadPoolExecutor", InlineExecutor),
+            patch("backend.app.services.prediction_generation_service.ensure_schema"),
+            patch.object(service, "_get_model_definition", side_effect=lambda model_code, lottery_code="dlt": make_model_def(model_code)),
+            patch.object(service, "_load_prompt_template", return_value="{}"),
+            patch.object(service, "_load_lottery_history", return_value=history_payload),
+            patch.object(service, "_prepare_model", return_value=object()),
+            patch.object(service, "_generate_prediction", side_effect=fake_generate_prediction),
+            patch.object(service.prediction_repository, "get_history_record_detail", return_value=None),
+            patch.object(service.prediction_repository, "upsert_history_record") as upsert_history_record_mock,
+            patch.object(service.prediction_service, "_invalidate_prediction_cache"),
+            patch.object(service.prediction_service, "calculate_hit_result", return_value={"total_hits": 2}),
+        ):
+            summary = service.generate_for_models(
+                lottery_code="pl3",
+                model_codes=["model-a", "model-b"],
+                mode="history",
+                overwrite=False,
+                parallelism=8,
+                start_period="26050",
+                end_period="26052",
+            )
+
+        self.assertEqual(captured_workers["max_workers"], 6)
+        self.assertEqual(summary["parallelism"], 6)
+        self.assertEqual(summary["selected_count"], 2)
+        self.assertEqual(summary["task_total_count"], 6)
+        self.assertEqual(summary["task_completed_count"], 6)
+        self.assertEqual(summary["task_processed_count"], 6)
+        self.assertEqual(summary["task_skipped_count"], 0)
+        self.assertEqual(summary["task_failed_count"], 0)
+        self.assertEqual(summary["processed_count"], 2)
+        self.assertEqual(summary["completed_count"], 2)
+        self.assertEqual(summary["failed_count"], 0)
+        self.assertEqual(summary["processed_models"], ["model-a", "model-b"])
+        self.assertEqual(summary["failed_models"], [])
+        self.assertEqual(upsert_history_record_mock.call_count, 6)
+        self.assertEqual(len(generated_pairs), 6)
 
 
 if __name__ == "__main__":

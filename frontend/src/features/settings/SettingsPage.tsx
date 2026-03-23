@@ -340,6 +340,7 @@ function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: ScheduleP
 
 function getGenerationTaskTotal(task: PredictionGenerationTask | null) {
   if (!task) return 0
+  if (typeof task.progress_summary.task_total_count === 'number') return task.progress_summary.task_total_count
   return task.progress_summary.selected_count ?? (
     task.progress_summary.processed_count +
     task.progress_summary.skipped_count +
@@ -349,6 +350,7 @@ function getGenerationTaskTotal(task: PredictionGenerationTask | null) {
 
 function getGenerationTaskCompleted(task: PredictionGenerationTask | null) {
   if (!task) return 0
+  if (typeof task.progress_summary.task_completed_count === 'number') return task.progress_summary.task_completed_count
   return task.progress_summary.completed_count ?? (
     task.progress_summary.processed_count +
     task.progress_summary.skipped_count +
@@ -618,6 +620,7 @@ export function SettingsPage() {
     [models],
   )
   const isBulkGenerationTask = generationTask?.model_code === '__bulk__'
+  const hasTaskGranularity = Boolean((generationTask?.progress_summary.task_total_count || 0) > 0)
   const generationTaskTotal = getGenerationTaskTotal(generationTask)
   const generationTaskCompleted = getGenerationTaskCompleted(generationTask)
   const generationProgressPercent = generationTaskTotal > 0 ? Math.min(100, Math.round((generationTaskCompleted / generationTaskTotal) * 100)) : 0
@@ -2517,7 +2520,7 @@ export function SettingsPage() {
                     <>
                       <div className="generation-task-panel__progress-meta">
                         <strong>{generationProgressPercent}%</strong>
-                        <span>{generationTaskCompleted} / {generationTaskTotal || generationForm.modelCodes.length} 个模型</span>
+                        <span>{generationTaskCompleted} / {generationTaskTotal || generationForm.modelCodes.length} 个{hasTaskGranularity ? '子任务' : '模型'}</span>
                       </div>
                       <div
                         className="generation-task-panel__progress-bar"
@@ -2531,7 +2534,7 @@ export function SettingsPage() {
                       <div className="generation-task-panel__stats">
                         <article>
                           <strong>{generationTaskTotal || generationForm.modelCodes.length}</strong>
-                          <span>总模型数</span>
+                          <span>{hasTaskGranularity ? '总子任务数' : '总模型数'}</span>
                         </article>
                         <article>
                           <strong>{generationTaskParallelism || '-'}</strong>
@@ -2549,6 +2552,22 @@ export function SettingsPage() {
                           <strong>{generationTask.progress_summary.failed_count}</strong>
                           <span>失败</span>
                         </article>
+                        {hasTaskGranularity ? (
+                          <>
+                            <article>
+                              <strong>{generationTask.progress_summary.task_processed_count || 0}</strong>
+                              <span>子任务成功</span>
+                            </article>
+                            <article>
+                              <strong>{generationTask.progress_summary.task_skipped_count || 0}</strong>
+                              <span>子任务跳过</span>
+                            </article>
+                            <article>
+                              <strong>{generationTask.progress_summary.task_failed_count || 0}</strong>
+                              <span>子任务失败</span>
+                            </article>
+                          </>
+                        ) : null}
                       </div>
                       {generationFailedDetails.length ? (
                         <div className="generation-task-panel__failures">
