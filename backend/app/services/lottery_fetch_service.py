@@ -61,6 +61,7 @@ class LotteryFetchService:
         *,
         start: str | None = None,
         end: str | None = None,
+        limit: int | None = None,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
         url = self.base_url
@@ -69,6 +70,8 @@ class LotteryFetchService:
             params.append(f"start={start}")
         if end:
             params.append(f"end={end}")
+        if limit is not None:
+            params.append(f"limit={max(1, int(limit))}")
         if params:
             url = f"{url}?{'&'.join(params)}"
 
@@ -79,6 +82,8 @@ class LotteryFetchService:
         lottery_data = self.parse_lottery_data(soup)
         if not lottery_data:
             raise ValueError("未解析到开奖数据")
+        if limit is not None:
+            lottery_data = lottery_data[: max(1, int(limit))]
 
         saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)

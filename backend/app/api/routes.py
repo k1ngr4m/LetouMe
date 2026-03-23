@@ -395,7 +395,7 @@ def get_settings_providers(_: dict = Depends(require_model_management_permission
 
 @router.post("/settings/lottery/fetch", response_model=LotteryFetchTaskResponse)
 def fetch_settings_lottery_history(payload: PaginationPayload, _: dict = Depends(require_super_admin)) -> dict:
-    return lottery_fetch_task_service.create_task(payload.lottery_code)
+    return lottery_fetch_task_service.create_task(payload.lottery_code, limit=payload.limit)
 
 
 @router.post("/settings/lottery/fetch/task-detail", response_model=LotteryFetchTaskResponse)
