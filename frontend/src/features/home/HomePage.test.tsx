@@ -1176,6 +1176,134 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getByText('deepseek')).toBeInTheDocument()
   })
 
+  it('supports one-click expand and collapse for all models in a record', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 3,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['01', '02', '03', '12', '15'],
+                  blue_balls: ['06', '10'],
+                },
+              ],
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              best_hit_count: 1,
+              predictions: [
+                {
+                  group_id: 1,
+                  red_balls: ['08', '09', '10', '11', '12'],
+                  blue_balls: ['01', '02'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开该期全部模型详情：第 2026031 期' }))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型A' })).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型B' })).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起该期全部模型详情：第 2026031 期' })).toBeInTheDocument()
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起该期全部模型详情：第 2026031 期' }))
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' })).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型B' })).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('openai_compatible')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('deepseek')).not.toBeInTheDocument()
+  })
+
+  it('shows period prediction summary only after clicking summary toggle', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 3,
+              predictions: [
+                { group_id: 1, red_balls: ['01', '02', '03', '12', '15'], blue_balls: ['06', '10'] },
+                { group_id: 2, red_balls: ['01', '08', '18', '28', '33'], blue_balls: ['02', '06'] },
+              ],
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              best_hit_count: 1,
+              predictions: [
+                { group_id: 1, red_balls: ['08', '09', '10', '11', '12'], blue_balls: ['01', '02'] },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '显示该期预测统计：第 2026031 期' }))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
+    expect(within(firstHistoryCard as HTMLElement).getByText('前区统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('后区统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '隐藏该期预测统计：第 2026031 期' })).toBeInTheDocument()
+    const periodSummary = (firstHistoryCard as HTMLElement).querySelector('.history-record-card__period-summary')
+    const modelsSection = (firstHistoryCard as HTMLElement).querySelector('.history-record-card__models')
+    expect(periodSummary).not.toBeNull()
+    expect(modelsSection).not.toBeNull()
+    expect(periodSummary?.compareDocumentPosition(modelsSection as Node)).toBe(Node.DOCUMENT_POSITION_PRECEDING)
+    expect(within(periodSummary as HTMLElement).getByText('06')).not.toHaveClass('number-ball--muted')
+    const tenBalls = within(periodSummary as HTMLElement).getAllByText('10')
+    expect(tenBalls.length).toBeGreaterThan(0)
+    expect(tenBalls.every((node) => node.classList.contains('number-ball--muted'))).toBe(true)
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '隐藏该期预测统计：第 2026031 期' }))
+    expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
+  })
+
   it('reuses shared model filters in history and trims record details', async () => {
     getPredictionsHistoryDetail.mockResolvedValue({
       predictions_history: [

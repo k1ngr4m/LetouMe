@@ -11,6 +11,7 @@ import { useHomeData } from './hooks/useHomeData'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import {
   type BallStatItem,
+  buildSummary,
   buildBlueFrequencyChart,
   buildOddEvenChart,
   filterPredictionGroupsByPlayType,
@@ -2104,20 +2105,24 @@ function SummaryList({
   items,
   color,
   models,
+  compact = false,
+  hitSet,
 }: {
   title: string
   items: BallStatItem[]
   color: 'red' | 'blue'
   models: PredictionModel[]
+  compact?: boolean
+  hitSet?: Set<string>
 }) {
   return (
-    <div className="summary-list">
+    <div className={clsx('summary-list', compact && 'summary-list--compact')}>
       <h3>{title}</h3>
       <div className="summary-list__items">
         {items.map((item) => (
           <article key={`${title}-${item.ball}`} className="ball-stat-card">
             <div className="ball-stat-card__ball">
-              <NumberBall value={item.ball} color={color} />
+              <NumberBall value={item.ball} color={color} tone={hitSet && !hitSet.has(item.ball) ? 'muted' : 'default'} />
             </div>
             <p className="ball-stat-card__appearance">
               出现 {item.appearanceCount}/{item.totalGroupCount}
@@ -2613,10 +2618,11 @@ function HistoryRecordCard({
   playTypeFilters: PredictionPlayType[]
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
+  const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
   const hasExpandedModels = expandedModelIds.length > 0
   const detailQuery = useQuery({
     queryKey: ['predictions-history-detail', lotteryCode, record.target_period],
-    enabled: hasExpandedModels,
+    enabled: hasExpandedModels || isPeriodSummaryOpen,
     queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period, lotteryCode)),
   })
   const detailRecord = detailQuery.data?.predictions_history?.[0]
@@ -2660,6 +2666,33 @@ function HistoryRecordCard({
     ? (record.actual_result?.red_balls || [])
     : (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
   const availableModelIds = useMemo(() => new Set(listModels.map((model) => model.model_id)), [listModels])
+  const allListModelIds = useMemo(() => listModels.map((model) => model.model_id), [listModels])
+  const areAllModelsExpanded = allListModelIds.length > 0 && allListModelIds.every((modelId) => expandedModelIds.includes(modelId))
+  const periodSummaryModels = detailRecord?.models || []
+  const periodSummaryModelIds = useMemo(() => periodSummaryModels.map((model) => model.model_id), [periodSummaryModels])
+  const periodPredictionSummary = useMemo(
+    () => buildSummary(periodSummaryModels, {}, periodSummaryModelIds, false, false, strategyFilters, playTypeFilters),
+    [periodSummaryModelIds, periodSummaryModels, playTypeFilters, strategyFilters],
+  )
+  const hasPeriodSummaryStats = useMemo(
+    () =>
+      periodPredictionSummary.red.length > 0 ||
+      periodPredictionSummary.blue.length > 0 ||
+      (periodPredictionSummary.positions || []).some((items) => items.length > 0),
+    [periodPredictionSummary],
+  )
+  const periodSummaryHitSets = useMemo(() => {
+    const redHits = new Set((record.actual_result?.red_balls || []).map((ball) => String(ball).padStart(2, '0')))
+    const blueHits = new Set((record.actual_result?.blue_balls || []).map((ball) => String(ball).padStart(2, '0')))
+    const digitSource = (record.actual_result?.digits?.length
+      ? record.actual_result.digits
+      : record.actual_result?.red_balls || []
+    ).map((ball) => String(ball).padStart(2, '0'))
+    const positionHits = Array.from({ length: 5 }, (_, index) =>
+      digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
+    )
+    return { redHits, blueHits, positionHits }
+  }, [record.actual_result])
 
   useEffect(() => {
     setExpandedModelIds((previous) => {
@@ -2674,6 +2707,14 @@ function HistoryRecordCard({
     )
   }
 
+  function toggleAllModelExpansion() {
+    setExpandedModelIds(areAllModelsExpanded ? [] : allListModelIds)
+  }
+
+  function togglePeriodSummary() {
+    setIsPeriodSummaryOpen((previous) => !previous)
+  }
+
   return (
     <article className="history-record-card">
       <div className="history-record-card__header">
@@ -2682,6 +2723,26 @@ function HistoryRecordCard({
           <h3>开奖回溯</h3>
         </div>
         <div className="history-record-card__actions">
+          {allListModelIds.length ? (
+            <button
+              type="button"
+              className="ghost-button ghost-button--compact history-record-card__bulk-toggle"
+              onClick={toggleAllModelExpansion}
+              aria-label={`${areAllModelsExpanded ? '收起该期全部模型详情' : '展开该期全部模型详情'}：第 ${record.target_period} 期`}
+              title={`${areAllModelsExpanded ? '收起该期全部模型详情' : '展开该期全部模型详情'}：第 ${record.target_period} 期`}
+            >
+              {areAllModelsExpanded ? '收起全部' : '展开全部'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="ghost-button ghost-button--compact history-record-card__bulk-toggle"
+            onClick={togglePeriodSummary}
+            aria-label={`${isPeriodSummaryOpen ? '隐藏该期预测统计' : '显示该期预测统计'}：第 ${record.target_period} 期`}
+            title={`${isPeriodSummaryOpen ? '隐藏该期预测统计' : '显示该期预测统计'}：第 ${record.target_period} 期`}
+          >
+            {isPeriodSummaryOpen ? '隐藏统计' : '显示统计'}
+          </button>
           <span className="history-record-card__date">{record.actual_result?.date || '-'}</span>
         </div>
       </div>
@@ -2813,6 +2874,44 @@ function HistoryRecordCard({
           )
         })}
       </div>
+      {isPeriodSummaryOpen ? (
+        <div className="history-record-card__period-summary">
+          {detailQuery.isLoading ? <div className="state-shell">正在加载该期预测统计...</div> : null}
+          {detailQuery.error instanceof Error ? (
+            <div className="state-shell state-shell--error">统计加载失败：{detailQuery.error.message}</div>
+          ) : null}
+          {!detailQuery.isLoading && !detailQuery.error && !detailRecord ? (
+            <div className="state-shell">暂无该期预测详情，无法统计。</div>
+          ) : null}
+          {!detailQuery.isLoading && !detailQuery.error && detailRecord && !hasPeriodSummaryStats ? (
+            <div className="state-shell">当前筛选条件下暂无可统计号码。</div>
+          ) : null}
+          {!detailQuery.isLoading && !detailQuery.error && detailRecord && hasPeriodSummaryStats ? (
+            <div className="summary-columns">
+              {lotteryCode === 'pl5' ? (
+                <>
+                  <SummaryList title="第一位（万位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+                  <SummaryList title="第二位（千位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+                  <SummaryList title="第三位（百位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+                  <SummaryList title="第四位（十位）统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
+                  <SummaryList title="第五位（个位）统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
+                </>
+              ) : lotteryCode === 'pl3' ? (
+                <>
+                  <SummaryList title="第一位（百位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+                  <SummaryList title="第二位（十位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+                  <SummaryList title="第三位（个位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+                </>
+              ) : (
+                <>
+                  <SummaryList title="前区统计" items={periodPredictionSummary.red} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                  <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   )
 }
