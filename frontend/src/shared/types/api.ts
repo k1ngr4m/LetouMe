@@ -1,4 +1,4 @@
-export type LotteryCode = 'dlt' | 'pl3'
+export type LotteryCode = 'dlt' | 'pl3' | 'pl5'
 
 export type LotteryDraw = {
   lottery_code?: LotteryCode
@@ -209,6 +209,8 @@ export type SimulationTicketPayload = {
   play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_ten_thousands?: string[]
+  direct_thousands?: string[]
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
@@ -221,6 +223,8 @@ export type SimulationTicketRecord = {
   play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_ten_thousands?: string[]
+  direct_thousands?: string[]
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
@@ -251,6 +255,8 @@ export type MyBetRecordPayload = {
   play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers?: string[]
   back_numbers?: string[]
+  direct_ten_thousands?: string[]
+  direct_thousands?: string[]
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
@@ -274,6 +280,8 @@ export type MyBetLinePayload = {
   play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers?: string[]
   back_numbers?: string[]
+  direct_ten_thousands?: string[]
+  direct_thousands?: string[]
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
@@ -287,12 +295,16 @@ export type MyBetLine = {
   play_type: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_ten_thousands: string[]
+  direct_thousands: string[]
   direct_hundreds: string[]
   direct_tens: string[]
   direct_units: string[]
   group_numbers: string[]
   hit_front_numbers?: string[]
   hit_back_numbers?: string[]
+  hit_direct_ten_thousands?: string[]
+  hit_direct_thousands?: string[]
   hit_direct_hundreds?: string[]
   hit_direct_tens?: string[]
   hit_direct_units?: string[]
@@ -310,6 +322,8 @@ export type MyBetRecord = {
   play_type: 'dlt' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  direct_ten_thousands: string[]
+  direct_thousands: string[]
   direct_hundreds: string[]
   direct_tens: string[]
   direct_units: string[]

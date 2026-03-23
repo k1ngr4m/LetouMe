@@ -21,6 +21,7 @@ from backend.core.model_factory import ModelFactory
 
 DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2.0.md"
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
+PL5_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl5_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
 DEFAULT_BULK_PARALLELISM = 3
 DEFAULT_SINGLE_MODEL_PARALLELISM = 3
@@ -497,7 +498,12 @@ class PredictionGenerationService:
 
     @staticmethod
     def _load_prompt_template(lottery_code: str = "dlt") -> str:
-        path = DEFAULT_PROMPT_PATH if normalize_lottery_code(lottery_code) == "dlt" else PL3_PROMPT_PATH
+        normalized_code = normalize_lottery_code(lottery_code)
+        path = DEFAULT_PROMPT_PATH
+        if normalized_code == "pl3":
+            path = PL3_PROMPT_PATH
+        elif normalized_code == "pl5":
+            path = PL5_PROMPT_PATH
         return path.read_text(encoding="utf-8")
 
     def _load_lottery_history(self, lottery_code: str = "dlt") -> dict[str, Any]:
@@ -729,6 +735,14 @@ class PredictionGenerationService:
                 if play_type == "group3" and len(set(digits)) != 2:
                     return False
                 if play_type == "group6" and len(set(digits)) != 3:
+                    return False
+                continue
+            if normalized_code == "pl5":
+                play_type = str(group.get("play_type") or "").strip().lower()
+                digits = normalize_digit_balls(group.get("digits", []))
+                if play_type != "direct":
+                    return False
+                if len(digits) != 5:
                     return False
                 continue
             red_balls = group.get("red_balls", [])

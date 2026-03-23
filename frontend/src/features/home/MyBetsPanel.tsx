@@ -14,6 +14,8 @@ type EditableLine = {
   playType: LinePlayType
   frontNumbersInput: string
   backNumbersInput: string
+  directTenThousandsInput: string
+  directThousandsInput: string
   directHundredsInput: string
   directTensInput: string
   directUnitsInput: string
@@ -82,6 +84,8 @@ function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
     playType: lotteryCode === 'dlt' ? 'dlt' : 'direct',
     frontNumbersInput: '',
     backNumbersInput: '',
+    directTenThousandsInput: '',
+    directThousandsInput: '',
     directHundredsInput: '',
     directTensInput: '',
     directUnitsInput: '',
@@ -139,6 +143,8 @@ function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableL
     playType: (lotteryCode === 'dlt' ? 'dlt' : line.play_type) as LinePlayType,
     frontNumbersInput: (line.front_numbers || []).join(','),
     backNumbersInput: (line.back_numbers || []).join(','),
+    directTenThousandsInput: (line.direct_ten_thousands || []).join(','),
+    directThousandsInput: (line.direct_thousands || []).join(','),
     directHundredsInput: (line.direct_hundreds || []).join(','),
     directTensInput: (line.direct_tens || []).join(','),
     directUnitsInput: (line.direct_units || []).join(','),
@@ -209,6 +215,17 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
     return { betCount, amount, valid: betCount > 0 }
   }
   if (line.playType === 'direct') {
+    if (lotteryCode === 'pl5') {
+      const tenThousands = splitNumbers(line.directTenThousandsInput)
+      const thousands = splitNumbers(line.directThousandsInput)
+      const hundreds = splitNumbers(line.directHundredsInput)
+      const tens = splitNumbers(line.directTensInput)
+      const units = splitNumbers(line.directUnitsInput)
+      const betCount = tenThousands.length && thousands.length && hundreds.length && tens.length && units.length
+        ? tenThousands.length * thousands.length * hundreds.length * tens.length * units.length
+        : 0
+      return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+    }
     const hundreds = splitNumbers(line.directHundredsInput)
     const tens = splitNumbers(line.directTensInput)
     const units = splitNumbers(line.directUnitsInput)
@@ -232,6 +249,18 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
     }
   }
   if (line.playType === 'direct') {
+    if (lotteryCode === 'pl5') {
+      return {
+        play_type: 'direct',
+        direct_ten_thousands: splitNumbers(line.directTenThousandsInput),
+        direct_thousands: splitNumbers(line.directThousandsInput),
+        direct_hundreds: splitNumbers(line.directHundredsInput),
+        direct_tens: splitNumbers(line.directTensInput),
+        direct_units: splitNumbers(line.directUnitsInput),
+        multiplier: normalizedMultiplier,
+        is_append: false,
+      }
+    }
     return {
       play_type: 'direct',
       direct_hundreds: splitNumbers(line.directHundredsInput),
@@ -274,7 +303,8 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
       </div>
     )
   }
-  const digits = (record.actual_result.digits || record.actual_result.red_balls || []).slice(0, 3)
+  const digitLength = lotteryCode === 'pl5' ? 5 : 3
+  const digits = (record.actual_result.digits || record.actual_result.red_balls || []).slice(0, digitLength)
   return (
     <div className="number-row number-row--tight">
       {digits.map((ball) => (
@@ -287,6 +317,8 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
 function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: LotteryCode, hasActualResult: boolean) {
   const hitFront = new Set(line.hit_front_numbers || [])
   const hitBack = new Set(line.hit_back_numbers || [])
+  const hitTenThousands = new Set(line.hit_direct_ten_thousands || [])
+  const hitThousands = new Set(line.hit_direct_thousands || [])
   const hitHundreds = new Set(line.hit_direct_hundreds || [])
   const hitTens = new Set(line.hit_direct_tens || [])
   const hitUnits = new Set(line.hit_direct_units || [])
@@ -307,6 +339,31 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
     )
   }
   if (line.play_type === 'direct') {
+    if (lotteryCode === 'pl5') {
+      return (
+        <div className="number-row number-row--tight">
+          {(line.direct_ten_thousands || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-tt-${ball}`} value={ball} color="red" size="sm" isHit={hitTenThousands.has(ball)} tone={resolveTone(hitTenThousands.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.direct_thousands || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-th-${ball}`} value={ball} color="red" size="sm" isHit={hitThousands.has(ball)} tone={resolveTone(hitThousands.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.direct_hundreds || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-h-${ball}`} value={ball} color="red" size="sm" isHit={hitHundreds.has(ball)} tone={resolveTone(hitHundreds.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.direct_tens || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-t-${ball}`} value={ball} color="red" size="sm" isHit={hitTens.has(ball)} tone={resolveTone(hitTens.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.direct_units || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-u-${ball}`} value={ball} color="red" size="sm" isHit={hitUnits.has(ball)} tone={resolveTone(hitUnits.has(ball))} />
+          ))}
+        </div>
+      )
+    }
     return (
       <div className="number-row number-row--tight">
         {(line.direct_hundreds || []).map((ball) => (
@@ -785,6 +842,74 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             <label className="toggle-chip">
                               <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
                               <span>追加投注</span>
+                            </label>
+                          </div>
+                        </>
+                      ) : lotteryCode === 'pl5' ? (
+                        <>
+                          <BallPicker
+                            label="万位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directTenThousandsInput}
+                            onToggle={(value) =>
+                              updateLine(index, (current) => ({ ...current, directTenThousandsInput: togglePickFromInput(current.directTenThousandsInput, value, pl3Pool.length) }))
+                            }
+                            color="red"
+                          />
+                          <BallPicker
+                            label="千位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directThousandsInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directThousandsInput: togglePickFromInput(current.directThousandsInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <BallPicker
+                            label="百位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directHundredsInput}
+                            onToggle={(value) =>
+                              updateLine(index, (current) => ({ ...current, directHundredsInput: togglePickFromInput(current.directHundredsInput, value, pl3Pool.length) }))
+                            }
+                            color="red"
+                          />
+                          <BallPicker
+                            label="十位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directTensInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directTensInput: togglePickFromInput(current.directTensInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <BallPicker
+                            label="个位点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directUnitsInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsInput: togglePickFromInput(current.directUnitsInput, value, pl3Pool.length) }))}
+                            color="red"
+                          />
+                          <div className="settings-form-grid">
+                            <label>
+                              万位号码（逗号分隔）
+                              <input value={line.directTenThousandsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTenThousandsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 00,01" />
+                            </label>
+                            <label>
+                              千位号码（逗号分隔）
+                              <input value={line.directThousandsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directThousandsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 02,03" />
+                            </label>
+                            <label>
+                              百位号码（逗号分隔）
+                              <input value={line.directHundredsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 04,05" />
+                            </label>
+                            <label>
+                              十位号码（逗号分隔）
+                              <input value={line.directTensInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTensInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 06,07" />
+                            </label>
+                            <label>
+                              个位号码（逗号分隔）
+                              <input value={line.directUnitsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 08,09" />
+                            </label>
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
                             </label>
                           </div>
                         </>

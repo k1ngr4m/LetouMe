@@ -75,6 +75,7 @@ export function HomeRulesPage() {
   const navigationState = location.state as HomeRulesRouteState | null
   const selectedLottery = useMemo<LotteryCode>(() => navigationState?.lotteryCode || loadSelectedLottery(), [navigationState?.lotteryCode])
   const isPl3 = selectedLottery === 'pl3'
+  const isPl5 = selectedLottery === 'pl5'
 
   return (
     <div className="page-stack rules-page">
@@ -82,16 +83,16 @@ export function HomeRulesPage() {
         <div className="panel-card__header">
           <div>
             <p className="modal-card__eyebrow">Game Rules</p>
-            <h2 className="panel-card__title">大乐透规则与奖金</h2>
+            <h2 className="panel-card__title">{isPl3 ? '排列3规则与奖金' : isPl5 ? '排列5规则与奖金' : '大乐透规则与奖金'}</h2>
           </div>
           <button className="ghost-button" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
             返回预测总览
           </button>
         </div>
-        <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : '大乐透'}</div>
+        <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : '大乐透'}</div>
       </section>
 
-      {!isPl3 ? (
+      {!isPl3 && !isPl5 ? (
         <>
           <StatusCard
             title="官方规则文档"
@@ -121,7 +122,7 @@ export function HomeRulesPage() {
             </div>
           </StatusCard>
         </>
-      ) : (
+      ) : isPl3 ? (
         <>
           <StatusCard title="排列3规则正文" subtitle="以下内容依据你提供的排列3规则原文整理，按章节完整展示。">
             <div className="rules-page__text-shell">
@@ -153,6 +154,23 @@ export function HomeRulesPage() {
             </div>
           </StatusCard>
         </>
+      ) : (
+        <StatusCard title="排列5规则摘要" subtitle="本页面先提供核心规则摘要，后续可补充完整规则正文。">
+          <div className="rules-page__text-shell">
+            <section className="rules-page__chapter">
+              <h3>核心规则</h3>
+              <p>排列5为 5 位数字定位玩法，号码范围为 00000-99999。</p>
+              <p>仅支持直选投注：投注号码与开奖号码数字相同且顺序一致即中奖。</p>
+              <p>每注金额 2 元，可进行多倍投注（具体倍数以销售终端规则为准）。</p>
+            </section>
+          </div>
+          <div className="rules-page__prize-grid">
+            <article>
+              <span>直选</span>
+              <strong>100000 元 / 注</strong>
+            </article>
+          </div>
+        </StatusCard>
       )}
     </div>
   )

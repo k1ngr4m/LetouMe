@@ -30,6 +30,9 @@ class PredictionService:
         "组选3": 346,
         "组选6": 173,
     }
+    PL5_FIXED_PRIZE_RULES = {
+        "直选": 100000,
+    }
 
     def __init__(
         self,
@@ -391,6 +394,20 @@ class PredictionService:
                 "total_hits": 3 if is_winning else 0,
                 "is_exact_match": is_winning,
             }
+        if normalized_code == "pl5":
+            actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+            digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
+            digit_hits = [digit for digit, actual in zip(digits, actual_digits) if digit == actual]
+            return {
+                "digit_hits": digit_hits,
+                "digit_hit_count": len(digit_hits),
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": len(digit_hits),
+                "is_exact_match": digits == actual_digits and len(digits) == 5,
+            }
 
         red_hits = [b for b in prediction_group["red_balls"] if b in actual_result["red_balls"]]
         blue_hits = [b for b in prediction_group["blue_balls"] if b in actual_result["blue_balls"]]
@@ -425,6 +442,12 @@ class PredictionService:
 
         return sum(1 for digit in digits if digit in actual_digit_set)
 
+    @staticmethod
+    def _calculate_pl5_trend_hit_count(prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> int:
+        actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+        digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
+        return sum(1 for digit, actual in zip(digits, actual_digits) if digit == actual)
+
     def _resolve_trend_hit_count(
         self,
         prediction_group: dict[str, Any],
@@ -436,6 +459,8 @@ class PredictionService:
         normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or actual_result.get("lottery_code"))
         if normalized_code == "pl3":
             return self._calculate_pl3_trend_hit_count(prediction_group, actual_result)
+        if normalized_code == "pl5":
+            return self._calculate_pl5_trend_hit_count(prediction_group, actual_result)
         if hit_result is not None:
             return int(hit_result.get("total_hits") or 0)
         return int(prediction_group.get("total_hits") or 0)
@@ -452,7 +477,7 @@ class PredictionService:
         started_at = perf_counter()
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
-        if normalized_code == "pl3":
+        if normalized_code in {"pl3", "pl5"}:
             normalized_strategy_filters = []
         normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
         normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
@@ -495,7 +520,7 @@ class PredictionService:
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": filtered_total_count,
             "model_stats": self._build_model_stats(records, score_profiles),
-            "strategy_options": [] if normalized_code == "pl3" else self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
+            "strategy_options": [] if normalized_code in {"pl3", "pl5"} else self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
         }
         aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
         total_duration_ms = round((perf_counter() - started_at) * 1000, 2)
@@ -575,7 +600,7 @@ class PredictionService:
             best_hit_count = 0
 
             for metric in group_metrics:
-                if lottery_code == "pl3":
+                if lottery_code in {"pl3", "pl5"}:
                     hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
                 else:
                     base_hit_result = {
@@ -1087,6 +1112,11 @@ class PredictionService:
             if len(set(digits)) == 3:
                 return "组选6"
             return None
+        if lottery_code == "pl5":
+            is_exact_match = hit_result.get("is_exact_match")
+            if is_exact_match is None:
+                is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 5
+            return "直选" if bool(is_exact_match) else None
         red_hit_count = int(hit_result.get("red_hit_count") or 0)
         blue_hit_count = int(hit_result.get("blue_hit_count") or 0)
         if red_hit_count == 5 and blue_hit_count == 2:
@@ -1125,6 +1155,8 @@ class PredictionService:
                     return {"amount": amount, "source": "official"}
         if normalize_lottery_code(actual_result.get("lottery_code") or "dlt") == "pl3" and prize_level in cls.PL3_FIXED_PRIZE_RULES:
             return {"amount": cls.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
+        if normalize_lottery_code(actual_result.get("lottery_code") or "dlt") == "pl5" and prize_level in cls.PL5_FIXED_PRIZE_RULES:
+            return {"amount": cls.PL5_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         if prize_level in cls.FIXED_PRIZE_RULES:
             return {"amount": cls.FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         return {"amount": 0, "source": "missing"}

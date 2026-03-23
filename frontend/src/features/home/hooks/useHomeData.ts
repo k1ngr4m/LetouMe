@@ -25,7 +25,7 @@ export function useHomeData(
     enablePagedLotteryHistory?: boolean
   },
 ) {
-  const effectiveHistoryStrategyFilters = lotteryCode === 'pl3' ? [] : historyStrategyFilters
+  const effectiveHistoryStrategyFilters = lotteryCode === 'pl3' || lotteryCode === 'pl5' ? [] : historyStrategyFilters
 
   const currentPredictions = useQuery({
     ...currentPredictionsQueryOptions(lotteryCode),

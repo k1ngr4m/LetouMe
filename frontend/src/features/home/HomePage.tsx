@@ -288,7 +288,7 @@ export function HomePage() {
       enablePagedLotteryHistory: activeTab === 'history',
     },
   )
-  const lotteryLabel = selectedLottery === 'pl3' ? '排列3' : '大乐透'
+  const lotteryLabel = selectedLottery === 'dlt' ? '大乐透' : selectedLottery === 'pl3' ? '排列3' : '排列5'
 
   const models = currentPredictions.data?.models || []
   const history = predictionsHistory.data
@@ -597,17 +597,17 @@ export function HomePage() {
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Prediction Command Center</p>
           <div className="lottery-switch" role="tablist" aria-label="彩种切换">
-            {(['dlt', 'pl3'] as LotteryCode[]).map((code) => (
+            {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
               <button
                 key={code}
                 type="button"
                 className={clsx('chip-button', selectedLottery === code && 'is-active')}
                 onClick={() => setSelectedLottery(code)}
-                aria-label={code === 'pl3' ? '排列3' : '大乐透'}
+                aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
                 aria-pressed={selectedLottery === code}
               >
-                <span className="chip-button__title">{code === 'pl3' ? '排列3' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'pl3' ? '直选 / 组选玩法' : '前区后区复式预测'}</span>
+                <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
+                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : code === 'pl3' ? '直选 / 组选玩法' : '仅直选定位玩法'}</span>
               </button>
             ))}
           </div>
@@ -869,7 +869,7 @@ export function HomePage() {
                     </div>
                   </div>
                 ) : null}
-                {selectedLottery !== 'pl3' ? (
+                {selectedLottery === 'dlt' ? (
                   <div className="history-strategy-filter">
                     <span className="history-strategy-filter__label">方案筛选</span>
                     {summaryStrategyOptions.length ? (
@@ -977,7 +977,7 @@ export function HomePage() {
                 </div>
               </div>
             ) : null}
-            {selectedLottery !== 'pl3' ? (
+                {selectedLottery === 'dlt' ? (
               <div className="history-strategy-filter">
                 <span className="history-strategy-filter__label">开奖方案筛选</span>
                 {historyStrategyOptions.length ? (
@@ -1003,7 +1003,7 @@ export function HomePage() {
                 )}
               </div>
             ) : null}
-            {selectedLottery !== 'pl3' && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
+            {selectedLottery === 'dlt' && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。
@@ -1076,7 +1076,7 @@ export function HomePage() {
                 </thead>
                 <tbody>
                   {pagedDraws.map((draw) => {
-                    const mainBalls = selectedLottery === 'pl3' ? (draw.digits?.length ? draw.digits : draw.red_balls) : draw.red_balls
+                    const mainBalls = selectedLottery === 'dlt' ? draw.red_balls : (draw.digits?.length ? draw.digits : draw.red_balls)
                     return (
                       <tr key={draw.period}>
                         <td>{draw.period}</td>
@@ -1130,6 +1130,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const [selectedFront, setSelectedFront] = useState<string[]>([])
   const [selectedBack, setSelectedBack] = useState<string[]>([])
   const [pl3PlayType, setPl3PlayType] = useState<'direct' | 'group3' | 'group6'>('direct')
+  const [selectedTenThousands, setSelectedTenThousands] = useState<string[]>([])
+  const [selectedThousands, setSelectedThousands] = useState<string[]>([])
   const [selectedHundreds, setSelectedHundreds] = useState<string[]>([])
   const [selectedTens, setSelectedTens] = useState<string[]>([])
   const [selectedUnits, setSelectedUnits] = useState<string[]>([])
@@ -1140,33 +1142,39 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const frontOptions = useMemo(() => buildBallRange(35), [])
   const backOptions = useMemo(() => buildBallRange(12), [])
   const digitOptions = useMemo(() => buildBallRange(10, 0), [])
-  const lotteryLabel = lotteryCode === 'pl3' ? '排列3' : '大乐透'
+  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+  const isPl3 = lotteryCode === 'pl3'
+  const isPl5 = lotteryCode === 'pl5'
   const playTypeLabel = pl3PlayType === 'direct' ? '直选' : pl3PlayType === 'group3' ? '组选3' : '组选6'
   const selection = useMemo<SimulationSelection>(() => {
-    const playType: SimulationPlayType = lotteryCode === 'dlt' ? 'dlt' : pl3PlayType
+    const playType: SimulationPlayType = lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType
     return {
       lotteryCode,
       playType,
       frontNumbers: selectedFront,
       backNumbers: selectedBack,
+      directTenThousands: selectedTenThousands,
+      directThousands: selectedThousands,
       directHundreds: selectedHundreds,
       directTens: selectedTens,
       directUnits: selectedUnits,
       groupNumbers: selectedGroupNumbers,
     }
-  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
   const simulationPayload = useMemo<SimulationTicketPayload>(
     () => ({
       lottery_code: lotteryCode,
-      play_type: lotteryCode === 'dlt' ? 'dlt' : pl3PlayType,
+      play_type: lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType,
       front_numbers: selectedFront,
       back_numbers: selectedBack,
+      direct_ten_thousands: selectedTenThousands,
+      direct_thousands: selectedThousands,
       direct_hundreds: selectedHundreds,
       direct_tens: selectedTens,
       direct_units: selectedUnits,
       group_numbers: selectedGroupNumbers,
     }),
-    [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
+    [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
   )
   const ticketsQuery = useQuery({
     queryKey: ['simulation-tickets', lotteryCode],
@@ -1204,13 +1212,15 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   useEffect(() => {
     setShowMatches(false)
     setMessage(null)
-  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
 
   useEffect(() => {
     if (lotteryCode === 'dlt') return
     setSelectedFront([])
     setSelectedBack([])
     setPl3PlayType('direct')
+    setSelectedTenThousands([])
+    setSelectedThousands([])
     setSelectedHundreds([])
     setSelectedTens([])
     setSelectedUnits([])
@@ -1222,8 +1232,17 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
 
-  function togglePositionSelection(value: string, position: 'hundreds' | 'tens' | 'units') {
-    const updater = position === 'hundreds' ? setSelectedHundreds : position === 'tens' ? setSelectedTens : setSelectedUnits
+  function togglePositionSelection(value: string, position: 'ten_thousands' | 'thousands' | 'hundreds' | 'tens' | 'units') {
+    const updater =
+      position === 'ten_thousands'
+        ? setSelectedTenThousands
+        : position === 'thousands'
+          ? setSelectedThousands
+          : position === 'hundreds'
+            ? setSelectedHundreds
+            : position === 'tens'
+              ? setSelectedTens
+              : setSelectedUnits
     updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
 
@@ -1232,9 +1251,11 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   }
 
   function handleRandomPick() {
-    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? 'dlt' : pl3PlayType)
+    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType)
     setSelectedFront(randomSelection.frontNumbers)
     setSelectedBack(randomSelection.backNumbers)
+    setSelectedTenThousands(randomSelection.directTenThousands)
+    setSelectedThousands(randomSelection.directThousands)
     setSelectedHundreds(randomSelection.directHundreds)
     setSelectedTens(randomSelection.directTens)
     setSelectedUnits(randomSelection.directUnits)
@@ -1245,6 +1266,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   function handleClear() {
     setSelectedFront([])
     setSelectedBack([])
+    setSelectedTenThousands([])
+    setSelectedThousands([])
     setSelectedHundreds([])
     setSelectedTens([])
     setSelectedUnits([])
@@ -1331,7 +1354,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 </div>
               </section>
             </>
-          ) : (
+          ) : isPl3 ? (
             <>
               <section className="simulation-section">
                 <div className="simulation-section__header">
@@ -1448,6 +1471,119 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 </section>
               )}
             </>
+          ) : (
+            <>
+              <section className="simulation-section">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Ten Thousands</p>
+                    <h3>万位选号</h3>
+                  </div>
+                  <span>至少 1 个</span>
+                </div>
+                <div className="simulation-ball-grid" aria-label="万位选号">
+                  {digitOptions.map((ball) => (
+                    <button
+                      key={`ten-thousands-${ball}`}
+                      type="button"
+                      className={clsx('simulation-ball', 'is-front', selectedTenThousands.includes(ball) && 'is-selected')}
+                      onClick={() => togglePositionSelection(ball, 'ten_thousands')}
+                      aria-label={`万位 ${ball}`}
+                    >
+                      {ball}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="simulation-section">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Thousands</p>
+                    <h3>千位选号</h3>
+                  </div>
+                  <span>至少 1 个</span>
+                </div>
+                <div className="simulation-ball-grid" aria-label="千位选号">
+                  {digitOptions.map((ball) => (
+                    <button
+                      key={`thousands-${ball}`}
+                      type="button"
+                      className={clsx('simulation-ball', 'is-front', selectedThousands.includes(ball) && 'is-selected')}
+                      onClick={() => togglePositionSelection(ball, 'thousands')}
+                      aria-label={`千位 ${ball}`}
+                    >
+                      {ball}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="simulation-section">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Hundreds</p>
+                    <h3>百位选号</h3>
+                  </div>
+                  <span>至少 1 个</span>
+                </div>
+                <div className="simulation-ball-grid" aria-label="百位选号">
+                  {digitOptions.map((ball) => (
+                    <button
+                      key={`hundreds-pl5-${ball}`}
+                      type="button"
+                      className={clsx('simulation-ball', 'is-front', selectedHundreds.includes(ball) && 'is-selected')}
+                      onClick={() => togglePositionSelection(ball, 'hundreds')}
+                      aria-label={`百位 ${ball}`}
+                    >
+                      {ball}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="simulation-section">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Tens</p>
+                    <h3>十位选号</h3>
+                  </div>
+                  <span>至少 1 个</span>
+                </div>
+                <div className="simulation-ball-grid" aria-label="十位选号">
+                  {digitOptions.map((ball) => (
+                    <button
+                      key={`tens-pl5-${ball}`}
+                      type="button"
+                      className={clsx('simulation-ball', 'is-front', selectedTens.includes(ball) && 'is-selected')}
+                      onClick={() => togglePositionSelection(ball, 'tens')}
+                      aria-label={`十位 ${ball}`}
+                    >
+                      {ball}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="simulation-section">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Units</p>
+                    <h3>个位选号</h3>
+                  </div>
+                  <span>至少 1 个</span>
+                </div>
+                <div className="simulation-ball-grid" aria-label="个位选号">
+                  {digitOptions.map((ball) => (
+                    <button
+                      key={`units-pl5-${ball}`}
+                      type="button"
+                      className={clsx('simulation-ball', 'is-front', selectedUnits.includes(ball) && 'is-selected')}
+                      onClick={() => togglePositionSelection(ball, 'units')}
+                      aria-label={`个位 ${ball}`}
+                    >
+                      {ball}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </>
           )}
         </div>
 
@@ -1468,19 +1604,27 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               </>
             ) : (
               <>
-                <span>{`当前玩法：${playTypeLabel}`}</span>
+                <span>{isPl3 ? `当前玩法：${playTypeLabel}` : '当前玩法：直选'}</span>
                 <div className="number-row number-row--tight">
-                  {(pl3PlayType === 'direct' ? selectedHundreds : selectedGroupNumbers).map((ball) => (
+                  {(isPl3 ? (pl3PlayType === 'direct' ? selectedHundreds : selectedGroupNumbers) : selectedTenThousands).map((ball) => (
                     <NumberBall key={`selected-a-${ball}`} value={ball} color="red" size="sm" />
                   ))}
-                  {pl3PlayType === 'direct' ? <span className="number-row__divider" /> : null}
-                  {pl3PlayType === 'direct'
-                    ? selectedTens.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="red" size="sm" />)
-                    : null}
-                  {pl3PlayType === 'direct' ? <span className="number-row__divider" /> : null}
-                  {pl3PlayType === 'direct'
-                    ? selectedUnits.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="red" size="sm" />)
-                    : null}
+                  {(isPl3 ? pl3PlayType === 'direct' : true) ? <span className="number-row__divider" /> : null}
+                  {isPl3
+                    ? pl3PlayType === 'direct'
+                      ? selectedTens.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="red" size="sm" />)
+                      : null
+                    : selectedThousands.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="red" size="sm" />)}
+                  {(isPl3 ? pl3PlayType === 'direct' : true) ? <span className="number-row__divider" /> : null}
+                  {isPl3
+                    ? pl3PlayType === 'direct'
+                      ? selectedUnits.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="red" size="sm" />)
+                      : null
+                    : selectedHundreds.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="red" size="sm" />)}
+                  {!isPl3 ? <span className="number-row__divider" /> : null}
+                  {!isPl3 ? selectedTens.map((ball) => <NumberBall key={`selected-d-${ball}`} value={ball} color="red" size="sm" />) : null}
+                  {!isPl3 ? <span className="number-row__divider" /> : null}
+                  {!isPl3 ? selectedUnits.map((ball) => <NumberBall key={`selected-e-${ball}`} value={ball} color="red" size="sm" />) : null}
                 </div>
               </>
             )}
@@ -1491,7 +1635,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               <span>
                 {lotteryCode === 'dlt'
                   ? '前区至少 5 个号码，后区至少 2 个号码后可投注。'
-                  : pl3PlayType === 'direct'
+                  : isPl5
+                    ? '直选需万位、千位、百位、十位、个位各至少 1 个号码。'
+                    : pl3PlayType === 'direct'
                     ? '直选需百位、十位、个位各至少 1 个号码。'
                     : pl3PlayType === 'group3'
                       ? '组选3至少选择 2 个号码。'
@@ -1636,6 +1782,28 @@ function SavedSimulationTicketCard({
               <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="blue" size="sm" />
             ))}
           </div>
+        ) : lotteryCode === 'pl5' ? (
+          <div className="number-row number-row--tight">
+            {(ticket.direct_ten_thousands || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-tt-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.direct_thousands || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-th-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.direct_hundreds || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.direct_tens || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.direct_units || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+          </div>
         ) : ticket.play_type === 'direct' ? (
           <div className="number-row number-row--tight">
             {(ticket.direct_hundreds || []).map((ball) => (
@@ -1659,7 +1827,7 @@ function SavedSimulationTicketCard({
         )}
       </div>
       <div className="simulation-saved-card__footer">
-        <span>{`${lotteryCode === 'dlt' ? '复式' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : '直选'} · ${ticket.bet_count} 注`}</span>
+        <span>{`${lotteryCode === 'dlt' ? '复式' : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : '直选'} · ${ticket.bet_count} 注`}</span>
         <span>{formatCurrency(ticket.amount)}</span>
       </div>
     </article>
@@ -2117,7 +2285,7 @@ function PagerControls({
 
 export function ModelScoreShowcase({ score, compact = false, lotteryCode = 'dlt' }: { score?: ModelScore; compact?: boolean; lotteryCode?: LotteryCode }) {
   if (!score) return null
-  const lotteryLabel = lotteryCode === 'pl3' ? '排列3' : '大乐透'
+  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
 
   const components = [
     { label: '收益', value: score.componentScores.profit || 0 },
@@ -2537,9 +2705,9 @@ function HistoryRecordCard({
     { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
   )
   const actualLotteryCode = record.actual_result?.lottery_code || 'dlt'
-  const actualMainBalls = actualLotteryCode === 'pl3'
-    ? (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
-    : (record.actual_result?.red_balls || [])
+  const actualMainBalls = actualLotteryCode === 'dlt'
+    ? (record.actual_result?.red_balls || [])
+    : (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
   const availableModelIds = useMemo(() => new Set(listModels.map((model) => model.model_id)), [listModels])
 
   useEffect(() => {

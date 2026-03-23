@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 
-SUPPORTED_LOTTERY_CODES = ("dlt", "pl3")
+SUPPORTED_LOTTERY_CODES = ("dlt", "pl3", "pl5")
 
 
 def normalize_lottery_code(value: str | None) -> str:
@@ -57,6 +57,12 @@ def build_pl3_prize_breakdown() -> list[dict[str, Any]]:
     ]
 
 
+def build_pl5_prize_breakdown() -> list[dict[str, Any]]:
+    return [
+        {"prize_level": "直选", "prize_type": "basic", "winner_count": 0, "prize_amount": 100000, "total_amount": 0},
+    ]
+
+
 @dataclass(frozen=True)
 class LotteryDefinition:
     code: str
@@ -73,6 +79,7 @@ class LotteryDefinition:
 LOTTERY_DEFINITIONS: dict[str, LotteryDefinition] = {
     "dlt": LotteryDefinition(code="dlt", name="大乐透", draw_time="21:25", ball_layout="dual"),
     "pl3": LotteryDefinition(code="pl3", name="排列3", draw_time="20:30", ball_layout="digit"),
+    "pl5": LotteryDefinition(code="pl5", name="排列5", draw_time="20:30", ball_layout="digit"),
 }
 
 

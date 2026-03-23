@@ -258,7 +258,7 @@ class LotteryRepository:
         red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
         blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
         digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
-        if lottery_code == "pl3" and not red_balls and digits:
+        if lottery_code in {"pl3", "pl5"} and not red_balls and digits:
             red_balls = list(digits)
         draw_date = row.get("draw_date") or ""
         updated_at = row.get("updated_at")

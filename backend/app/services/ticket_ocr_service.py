@@ -278,6 +278,8 @@ class TicketOCRService:
         lines: list[dict[str, Any]] = []
         if lottery_code == "pl3":
             lines = self._parse_pl3_lines(text_lines=text_lines)
+        elif lottery_code == "pl5":
+            lines = self._parse_pl5_lines(text_lines=text_lines)
         else:
             lines = self._parse_dlt_lines(text_lines=text_lines)
         if not target_period:
@@ -392,6 +394,34 @@ class TicketOCRService:
                             "amount": 2 * multiplier,
                         }
                     )
+        return parsed_lines
+
+    def _parse_pl5_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
+        parsed_lines: list[dict[str, Any]] = []
+        for line in text_lines:
+            multiplier = self._extract_multiplier(line)
+            number_tokens = re.findall(r"(?<!\d)(\d{5})(?!\d)", line)
+            if not number_tokens:
+                continue
+            for number_token in number_tokens:
+                digits = [f"{int(ch):02d}" for ch in number_token]
+                parsed_lines.append(
+                    {
+                        "play_type": "direct",
+                        "front_numbers": [],
+                        "back_numbers": [],
+                        "direct_ten_thousands": [digits[0]],
+                        "direct_thousands": [digits[1]],
+                        "direct_hundreds": [digits[2]],
+                        "direct_tens": [digits[3]],
+                        "direct_units": [digits[4]],
+                        "group_numbers": [],
+                        "multiplier": multiplier,
+                        "is_append": False,
+                        "bet_count": 1,
+                        "amount": 2 * multiplier,
+                    }
+                )
         return parsed_lines
 
     def _parse_dlt_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:

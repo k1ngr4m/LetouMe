@@ -25,6 +25,8 @@ export type SimulationSelection = {
   playType: SimulationPlayType
   frontNumbers: string[]
   backNumbers: string[]
+  directTenThousands: string[]
+  directThousands: string[]
   directHundreds: string[]
   directTens: string[]
   directUnits: string[]
@@ -50,6 +52,8 @@ export function normalizeSimulationTicket(ticket: SimulationTicketRecord): Simul
     play_type: ticket.play_type || 'dlt',
     front_numbers: (ticket.front_numbers || []).map(padBall).sort(),
     back_numbers: (ticket.back_numbers || []).map(padBall).sort(),
+    direct_ten_thousands: (ticket.direct_ten_thousands || []).map(padBall).sort(),
+    direct_thousands: (ticket.direct_thousands || []).map(padBall).sort(),
     direct_hundreds: (ticket.direct_hundreds || []).map(padBall).sort(),
     direct_tens: (ticket.direct_tens || []).map(padBall).sort(),
     direct_units: (ticket.direct_units || []).map(padBall).sort(),
@@ -70,6 +74,22 @@ export function calculateBetCount(selection: SimulationSelection) {
     const backCount = selection.backNumbers.length
     if (frontCount < 5 || backCount < 2) return 0
     return combination(frontCount, 5) * combination(backCount, 2)
+  }
+  if (selection.lotteryCode === 'pl5') {
+    if (
+      !selection.directTenThousands.length ||
+      !selection.directThousands.length ||
+      !selection.directHundreds.length ||
+      !selection.directTens.length ||
+      !selection.directUnits.length
+    ) return 0
+    return (
+      selection.directTenThousands.length *
+      selection.directThousands.length *
+      selection.directHundreds.length *
+      selection.directTens.length *
+      selection.directUnits.length
+    )
   }
   if (selection.playType === 'direct') {
     if (!selection.directHundreds.length || !selection.directTens.length || !selection.directUnits.length) return 0
@@ -97,6 +117,8 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       playType: 'dlt',
       frontNumbers: pickRandomBalls(buildBallRange(35), 5),
       backNumbers: pickRandomBalls(buildBallRange(12), 2),
+      directTenThousands: [],
+      directThousands: [],
       directHundreds: [],
       directTens: [],
       directUnits: [],
@@ -106,11 +128,27 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
 
   if (playType === 'direct') {
     const digits = buildBallRange(10, 0)
+    if (lotteryCode === 'pl5') {
+      return {
+        lotteryCode,
+        playType: 'direct',
+        frontNumbers: [],
+        backNumbers: [],
+        directTenThousands: pickRandomBalls(digits, 1),
+        directThousands: pickRandomBalls(digits, 1),
+        directHundreds: pickRandomBalls(digits, 1),
+        directTens: pickRandomBalls(digits, 1),
+        directUnits: pickRandomBalls(digits, 1),
+        groupNumbers: [],
+      }
+    }
     return {
       lotteryCode,
       playType,
       frontNumbers: [],
       backNumbers: [],
+      directTenThousands: [],
+      directThousands: [],
       directHundreds: pickRandomBalls(digits, 1),
       directTens: pickRandomBalls(digits, 1),
       directUnits: pickRandomBalls(digits, 1),
@@ -124,6 +162,8 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     playType,
     frontNumbers: [],
     backNumbers: [],
+    directTenThousands: [],
+    directThousands: [],
     directHundreds: [],
     directTens: [],
     directUnits: [],
@@ -135,7 +175,7 @@ export function buildSimulationMatches(selection: SimulationSelection, draws: Lo
   if (selection.lotteryCode === 'dlt') {
     return buildDltMatches(selection, draws, limit)
   }
-  return buildPl3Matches(selection, draws, limit)
+  return buildDigitMatches(selection, draws, limit)
 }
 
 function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
@@ -162,16 +202,23 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
     })
 }
 
-function buildPl3Matches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
+function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
   return draws
     .slice(0, limit)
     .map((draw) => {
-      const actualDigits = resolvePl3Digits(draw)
-      const directDigits = [selection.directHundreds, selection.directTens, selection.directUnits].map((values) => values.map(padBall))
+      const expectedLength = selection.lotteryCode === 'pl5' ? 5 : 3
+      const actualDigits = resolveDigits(draw, expectedLength)
+      const directDigits = (
+        selection.lotteryCode === 'pl5'
+          ? [selection.directTenThousands, selection.directThousands, selection.directHundreds, selection.directTens, selection.directUnits]
+          : [selection.directHundreds, selection.directTens, selection.directUnits]
+      ).map((values) => values.map(padBall))
       const digitHits = selection.playType === 'direct'
         ? actualDigits.filter((digit, index) => directDigits[index]?.includes(digit))
         : []
-      const winningPrizes = calculatePl3PrizeBreakdown(selection, actualDigits)
+      const winningPrizes = selection.lotteryCode === 'pl5'
+        ? calculatePl5PrizeBreakdown(selection, actualDigits)
+        : calculatePl3PrizeBreakdown(selection, actualDigits)
 
       return {
         period: draw.period,
@@ -249,11 +296,21 @@ function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits
   return []
 }
 
-function resolvePl3Digits(draw: LotteryDraw): string[] {
+function calculatePl5PrizeBreakdown(selection: SimulationSelection, actualDigits: string[]): SimulationMatchPrize[] {
+  const matched =
+    selection.directTenThousands.includes(actualDigits[0]) &&
+    selection.directThousands.includes(actualDigits[1]) &&
+    selection.directHundreds.includes(actualDigits[2]) &&
+    selection.directTens.includes(actualDigits[3]) &&
+    selection.directUnits.includes(actualDigits[4])
+  return matched ? [{ level: '直选', count: 1 }] : []
+}
+
+function resolveDigits(draw: LotteryDraw, expectedLength: number): string[] {
   if (draw.digits?.length) {
-    return draw.digits.map(padBall).slice(0, 3)
+    return draw.digits.map(padBall).slice(0, expectedLength)
   }
-  const redFallback = (draw.red_balls || []).map(padBall).slice(0, 3)
+  const redFallback = (draw.red_balls || []).map(padBall).slice(0, expectedLength)
   return redFallback
 }
 

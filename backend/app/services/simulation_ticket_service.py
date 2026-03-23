@@ -22,14 +22,24 @@ class SimulationTicketService:
 
     def create_ticket(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = normalize_lottery_code(payload.get("lottery_code"))
-        ticket_payload = self._build_dlt_ticket_payload(payload) if lottery_code == "dlt" else self._build_pl3_ticket_payload(payload)
+        if lottery_code == "dlt":
+            ticket_payload = self._build_dlt_ticket_payload(payload)
+        elif lottery_code == "pl3":
+            ticket_payload = self._build_pl3_ticket_payload(payload)
+        else:
+            ticket_payload = self._build_pl5_ticket_payload(payload)
         created = self.repository.create_ticket(user_id, {"lottery_code": lottery_code, **ticket_payload})
         return self._serialize_ticket(created)
 
     def quote_ticket(self, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = normalize_lottery_code(payload.get("lottery_code"))
         try:
-            ticket_payload = self._build_dlt_ticket_payload(payload) if lottery_code == "dlt" else self._build_pl3_ticket_payload(payload)
+            if lottery_code == "dlt":
+                ticket_payload = self._build_dlt_ticket_payload(payload)
+            elif lottery_code == "pl3":
+                ticket_payload = self._build_pl3_ticket_payload(payload)
+            else:
+                ticket_payload = self._build_pl5_ticket_payload(payload)
         except ValueError:
             return {
                 "lottery_code": lottery_code,
@@ -81,6 +91,8 @@ class SimulationTicketService:
             "direct_hundreds": None,
             "direct_tens": None,
             "direct_units": None,
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
             "group_numbers": None,
             "bet_count": bet_count,
             "amount": bet_count * 2,
@@ -102,6 +114,8 @@ class SimulationTicketService:
                 "play_type": "direct",
                 "front_numbers": "",
                 "back_numbers": "",
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
                 "direct_hundreds": ",".join(hundreds),
                 "direct_tens": ",".join(tens),
                 "direct_units": ",".join(units),
@@ -119,10 +133,38 @@ class SimulationTicketService:
             "play_type": play_type,
             "front_numbers": "",
             "back_numbers": "",
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
             "direct_hundreds": None,
             "direct_tens": None,
             "direct_units": None,
             "group_numbers": ",".join(group_numbers),
+            "bet_count": bet_count,
+            "amount": bet_count * 2,
+        }
+
+    def _build_pl5_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "").strip().lower()
+        if play_type != "direct":
+            raise ValueError("排列5玩法仅支持 direct")
+        ten_thousands = self._normalize_pl3_numbers(payload.get("direct_ten_thousands"))
+        thousands = self._normalize_pl3_numbers(payload.get("direct_thousands"))
+        hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
+        tens = self._normalize_pl3_numbers(payload.get("direct_tens"))
+        units = self._normalize_pl3_numbers(payload.get("direct_units"))
+        if not ten_thousands or not thousands or not hundreds or not tens or not units:
+            raise ValueError("直选需为万位、千位、百位、十位、个位各选择至少 1 个号码")
+        bet_count = len(ten_thousands) * len(thousands) * len(hundreds) * len(tens) * len(units)
+        return {
+            "play_type": "direct",
+            "front_numbers": "",
+            "back_numbers": "",
+            "direct_ten_thousands": ",".join(ten_thousands),
+            "direct_thousands": ",".join(thousands),
+            "direct_hundreds": ",".join(hundreds),
+            "direct_tens": ",".join(tens),
+            "direct_units": ",".join(units),
+            "group_numbers": None,
             "bet_count": bet_count,
             "amount": bet_count * 2,
         }
@@ -138,6 +180,8 @@ class SimulationTicketService:
             "play_type": str(ticket.get("play_type") or "dlt"),
             "front_numbers": [item for item in str(ticket.get("front_numbers") or "").split(",") if item],
             "back_numbers": [item for item in str(ticket.get("back_numbers") or "").split(",") if item],
+            "direct_ten_thousands": [item for item in str(ticket.get("direct_ten_thousands") or "").split(",") if item],
+            "direct_thousands": [item for item in str(ticket.get("direct_thousands") or "").split(",") if item],
             "direct_hundreds": [item for item in str(ticket.get("direct_hundreds") or "").split(",") if item],
             "direct_tens": [item for item in str(ticket.get("direct_tens") or "").split(",") if item],
             "direct_units": [item for item in str(ticket.get("direct_units") or "").split(",") if item],

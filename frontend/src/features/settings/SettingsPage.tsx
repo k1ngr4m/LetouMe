@@ -151,7 +151,7 @@ const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> 
 }
 
 function getLotteryLabel(lotteryCode: LotteryCode) {
-  return lotteryCode === 'pl3' ? '排列3' : '大乐透'
+  return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
 }
 
 function SvgIcon({ children }: { children: ReactNode }) {
@@ -380,7 +380,7 @@ export function SettingsPage() {
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
-  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null })
+  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null })
   const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
@@ -539,6 +539,32 @@ export function SettingsPage() {
     }, 1200)
     return () => window.clearTimeout(timer)
   }, [lotteryFetchTasks.pl3, queryClient])
+
+  useEffect(() => {
+    const task = lotteryFetchTasks.pl5
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryFetchTasks((previous) => ({ ...previous, pl5: nextTask }))
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`排列5数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'pl5'] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'pl5'] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'pl5'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '排列5数据更新失败')
+          setMessageType('error')
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取排列5抓取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [lotteryFetchTasks.pl5, queryClient])
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
@@ -745,6 +771,19 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建排列3数据更新任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const fetchPl5LotteryMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory('pl5'),
+    onSuccess: (task) => {
+      setLotteryFetchTasks((previous) => ({ ...previous, pl5: task }))
+      setMessage('排列5数据更新任务已创建，正在后台执行。')
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建排列5数据更新任务失败')
       setMessageType('error')
     },
   })
@@ -1569,11 +1608,11 @@ export function SettingsPage() {
                 )}
               </StatusCard>
               {isSuperAdmin ? (
-                <StatusCard title="数据维护" subtitle="统一维护大乐透与排列3开奖历史数据，更新数据库后可供首页统计与任务使用。">
+                <StatusCard title="数据维护" subtitle="统一维护大乐透、排列3与排列5开奖历史数据，更新数据库后可供首页统计与任务使用。">
                   <div className="settings-grid-react">
-                    {(['dlt', 'pl3'] as LotteryCode[]).map((lotteryCode) => {
+                    {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((lotteryCode) => {
                       const task = lotteryFetchTasks[lotteryCode]
-                      const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : fetchDltLotteryMutation
+                      const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : fetchDltLotteryMutation
                       return (
                         <section key={lotteryCode} className="settings-profile-hero settings-maintenance-hero">
                           <div className="settings-profile-hero__main">
@@ -1689,7 +1728,7 @@ export function SettingsPage() {
                                     <td>
                                       <span className="settings-model-table__chip">{getScheduleTaskTypeLabel(task.task_type)}</span>
                                     </td>
-                                    <td>{task.lottery_code === 'pl3' ? '排列3' : '大乐透'}</td>
+                                    <td>{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
                                     <td className="settings-schedule-table__models">
                                       {task.task_type === 'prediction_generate'
                                         ? task.model_codes.map((code) => modelNameMap[code] || code).join(' / ') || '-'
@@ -2127,7 +2166,7 @@ export function SettingsPage() {
               <div className="field">
                 <span>适用彩种</span>
                 <div className="filter-chip-group">
-                  {(['dlt', 'pl3'] as LotteryCode[]).map((code) => {
+                  {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => {
                     const active = modelForm.lottery_codes.includes(code)
                     return (
                       <button
@@ -2272,6 +2311,7 @@ export function SettingsPage() {
                 >
                   <option value="dlt">大乐透</option>
                   <option value="pl3">排列3</option>
+                  <option value="pl5">排列5</option>
                 </select>
               </label>
               <label className="field">
@@ -2403,7 +2443,7 @@ export function SettingsPage() {
                   <p className="modal-card__eyebrow">预测生成</p>
                   <h3>{generationDisplayName}</h3>
                   <p className="settings-inline-hint">
-                    当前生成彩种：{generationForm.lotteryCode === 'pl3' ? '排列3' : '大乐透'}
+                    当前生成彩种：{getLotteryLabel(generationForm.lotteryCode)}
                   </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
@@ -2413,6 +2453,7 @@ export function SettingsPage() {
                 <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as LotteryCode)}>
                   <option value="dlt">大乐透</option>
                   <option value="pl3">排列3</option>
+                  <option value="pl5">排列5</option>
                 </select>
               </label>
               {generationFilterNotice ? <div className="settings-inline-hint">{generationFilterNotice}</div> : null}

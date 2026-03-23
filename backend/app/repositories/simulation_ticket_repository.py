@@ -20,6 +20,8 @@ class SimulationTicketRepository:
                             play_type,
                             front_numbers,
                             back_numbers,
+                            direct_ten_thousands,
+                            direct_thousands,
                             direct_hundreds,
                             direct_tens,
                             direct_units,
@@ -48,6 +50,8 @@ class SimulationTicketRepository:
                             play_type,
                             front_numbers,
                             back_numbers,
+                            direct_ten_thousands,
+                            direct_thousands,
                             direct_hundreds,
                             direct_tens,
                             direct_units,
@@ -55,7 +59,7 @@ class SimulationTicketRepository:
                             bet_count,
                             amount
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
@@ -63,6 +67,8 @@ class SimulationTicketRepository:
                             payload.get("play_type", "dlt"),
                             payload["front_numbers"],
                             payload["back_numbers"],
+                            payload.get("direct_ten_thousands"),
+                            payload.get("direct_thousands"),
                             payload.get("direct_hundreds"),
                             payload.get("direct_tens"),
                             payload.get("direct_units"),
@@ -87,6 +93,8 @@ class SimulationTicketRepository:
                             play_type,
                             front_numbers,
                             back_numbers,
+                            direct_ten_thousands,
+                            direct_thousands,
                             direct_hundreds,
                             direct_tens,
                             direct_units,

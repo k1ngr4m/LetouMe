@@ -21,6 +21,8 @@ class MyBetRepository:
                             record.play_type,
                             record.front_numbers,
                             record.back_numbers,
+                            record.direct_ten_thousands,
+                            record.direct_thousands,
                             record.direct_hundreds,
                             record.direct_tens,
                             record.direct_units,
@@ -62,6 +64,8 @@ class MyBetRepository:
                             play_type,
                             front_numbers,
                             back_numbers,
+                            direct_ten_thousands,
+                            direct_thousands,
                             direct_hundreds,
                             direct_tens,
                             direct_units,
@@ -71,7 +75,7 @@ class MyBetRepository:
                             bet_count,
                             amount
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
@@ -80,6 +84,8 @@ class MyBetRepository:
                             str(payload.get("play_type") or "dlt"),
                             str(payload.get("front_numbers") or ""),
                             str(payload.get("back_numbers") or ""),
+                            payload.get("direct_ten_thousands"),
+                            payload.get("direct_thousands"),
                             payload.get("direct_hundreds"),
                             payload.get("direct_tens"),
                             payload.get("direct_units"),
@@ -108,6 +114,8 @@ class MyBetRepository:
                             play_type = ?,
                             front_numbers = ?,
                             back_numbers = ?,
+                            direct_ten_thousands = ?,
+                            direct_thousands = ?,
                             direct_hundreds = ?,
                             direct_tens = ?,
                             direct_units = ?,
@@ -123,6 +131,8 @@ class MyBetRepository:
                             str(payload.get("play_type") or "dlt"),
                             str(payload.get("front_numbers") or ""),
                             str(payload.get("back_numbers") or ""),
+                            payload.get("direct_ten_thousands"),
+                            payload.get("direct_thousands"),
                             payload.get("direct_hundreds"),
                             payload.get("direct_tens"),
                             payload.get("direct_units"),
@@ -156,6 +166,8 @@ class MyBetRepository:
                             record.play_type,
                             record.front_numbers,
                             record.back_numbers,
+                            record.direct_ten_thousands,
+                            record.direct_thousands,
                             record.direct_hundreds,
                             record.direct_tens,
                             record.direct_units,
@@ -212,6 +224,8 @@ class MyBetRepository:
                     play_type,
                     front_numbers,
                     back_numbers,
+                    direct_ten_thousands,
+                    direct_thousands,
                     direct_hundreds,
                     direct_tens,
                     direct_units,
@@ -221,7 +235,7 @@ class MyBetRepository:
                     bet_count,
                     amount
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record_id,
@@ -230,6 +244,8 @@ class MyBetRepository:
                     str(line.get("play_type") or "dlt"),
                     str(line.get("front_numbers") or ""),
                     str(line.get("back_numbers") or ""),
+                    line.get("direct_ten_thousands"),
+                    line.get("direct_thousands"),
                     line.get("direct_hundreds"),
                     line.get("direct_tens"),
                     line.get("direct_units"),
@@ -292,6 +308,8 @@ class MyBetRepository:
                 play_type,
                 front_numbers,
                 back_numbers,
+                direct_ten_thousands,
+                direct_thousands,
                 direct_hundreds,
                 direct_tens,
                 direct_units,

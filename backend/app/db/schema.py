@@ -273,6 +273,8 @@ SCHEMA_STATEMENTS = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -294,6 +296,8 @@ SCHEMA_STATEMENTS = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -317,6 +321,8 @@ SCHEMA_STATEMENTS = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -563,6 +569,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -584,6 +592,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -607,6 +617,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         play_type VARCHAR(32) NOT NULL DEFAULT 'dlt',
         front_numbers VARCHAR(255) NOT NULL,
         back_numbers VARCHAR(255) NOT NULL,
+        direct_ten_thousands VARCHAR(255) NULL,
+        direct_thousands VARCHAR(255) NULL,
         direct_hundreds VARCHAR(255) NULL,
         direct_tens VARCHAR(255) NULL,
         direct_units VARCHAR(255) NULL,
@@ -712,10 +724,20 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     "simulation_ticket": {
         "lottery_code": "ALTER TABLE simulation_ticket ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER user_id",
         "play_type": "ALTER TABLE simulation_ticket ADD COLUMN play_type VARCHAR(32) NOT NULL DEFAULT 'dlt' AFTER lottery_code",
+        "direct_ten_thousands": "ALTER TABLE simulation_ticket ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": "ALTER TABLE simulation_ticket ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
         "direct_hundreds": "ALTER TABLE simulation_ticket ADD COLUMN direct_hundreds VARCHAR(255) NULL AFTER back_numbers",
         "direct_tens": "ALTER TABLE simulation_ticket ADD COLUMN direct_tens VARCHAR(255) NULL AFTER direct_hundreds",
         "direct_units": "ALTER TABLE simulation_ticket ADD COLUMN direct_units VARCHAR(255) NULL AFTER direct_tens",
         "group_numbers": "ALTER TABLE simulation_ticket ADD COLUMN group_numbers VARCHAR(255) NULL AFTER direct_units",
+    },
+    "my_bet_record": {
+        "direct_ten_thousands": "ALTER TABLE my_bet_record ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": "ALTER TABLE my_bet_record ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+    },
+    "my_bet_record_line": {
+        "direct_ten_thousands": "ALTER TABLE my_bet_record_line ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": "ALTER TABLE my_bet_record_line ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
     },
     "app_permission": {
         "permission_description": "ALTER TABLE app_permission ADD COLUMN permission_description TEXT NULL AFTER permission_name",
@@ -732,6 +754,18 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
             f"ALTER TABLE {_table_prefix}my_bet_record_meta "
             "ADD COLUMN ticket_purchased_at DATETIME NULL AFTER ocr_recognized_at"
         ),
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}simulation_ticket"] = {
+        "direct_ten_thousands": f"ALTER TABLE {_table_prefix}simulation_ticket ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": f"ALTER TABLE {_table_prefix}simulation_ticket ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record"] = {
+        "direct_ten_thousands": f"ALTER TABLE {_table_prefix}my_bet_record ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": f"ALTER TABLE {_table_prefix}my_bet_record ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record_line"] = {
+        "direct_ten_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
+        "direct_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
     }
 
 _CREATE_TABLE_PATTERN = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?([a-zA-Z0-9_]+)`?", re.IGNORECASE)

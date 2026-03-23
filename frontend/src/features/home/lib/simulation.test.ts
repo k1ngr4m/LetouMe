@@ -7,6 +7,8 @@ function makeDltSelection(frontNumbers: string[], backNumbers: string[]): Simula
     playType: 'dlt',
     frontNumbers,
     backNumbers,
+    directTenThousands: [],
+    directThousands: [],
     directHundreds: [],
     directTens: [],
     directUnits: [],
@@ -40,6 +42,8 @@ describe('simulation helpers', () => {
         playType: 'direct',
         frontNumbers: [],
         backNumbers: [],
+        directTenThousands: [],
+        directThousands: [],
         directHundreds: ['00', '01'],
         directTens: ['02'],
         directUnits: ['03', '04'],
@@ -53,6 +57,8 @@ describe('simulation helpers', () => {
         playType: 'group3',
         frontNumbers: [],
         backNumbers: [],
+        directTenThousands: [],
+        directThousands: [],
         directHundreds: [],
         directTens: [],
         directUnits: [],
@@ -66,6 +72,8 @@ describe('simulation helpers', () => {
         playType: 'group6',
         frontNumbers: [],
         backNumbers: [],
+        directTenThousands: [],
+        directThousands: [],
         directHundreds: [],
         directTens: [],
         directUnits: [],
@@ -81,6 +89,8 @@ describe('simulation helpers', () => {
         playType: 'direct',
         frontNumbers: [],
         backNumbers: [],
+        directTenThousands: [],
+        directThousands: [],
         directHundreds: ['04'],
         directTens: ['05'],
         directUnits: ['06'],
@@ -98,6 +108,8 @@ describe('simulation helpers', () => {
         playType: 'group6',
         frontNumbers: [],
         backNumbers: [],
+        directTenThousands: [],
+        directThousands: [],
         directHundreds: [],
         directTens: [],
         directUnits: [],
@@ -107,5 +119,26 @@ describe('simulation helpers', () => {
       30,
     )
     expect(groupMatches[0].topPrizeLevel).toBe('组选6')
+  })
+
+  it('matches pl5 direct prize', () => {
+    const matches = buildSimulationMatches(
+      {
+        lotteryCode: 'pl5',
+        playType: 'direct',
+        frontNumbers: [],
+        backNumbers: [],
+        directTenThousands: ['01'],
+        directThousands: ['02'],
+        directHundreds: ['03'],
+        directTens: ['04'],
+        directUnits: ['05'],
+        groupNumbers: [],
+      },
+      [{ period: '26003', date: '2026-01-03', red_balls: ['01', '02', '03', '04', '05'], blue_balls: [] }],
+      30,
+    )
+    expect(matches[0].topPrizeLevel).toBe('直选')
+    expect(matches[0].digitHits).toEqual(['01', '02', '03', '04', '05'])
   })
 })

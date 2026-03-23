@@ -18,7 +18,7 @@ export type HomeDetailRouteState = {
 }
 
 export type HomeRulesRouteState = {
-  lotteryCode?: 'dlt' | 'pl3'
+  lotteryCode?: 'dlt' | 'pl3' | 'pl5'
 }
 
 export const HOME_TAB_PATHS: Record<HomeTab, string> = {

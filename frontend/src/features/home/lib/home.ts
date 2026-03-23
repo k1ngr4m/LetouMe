@@ -276,7 +276,8 @@ function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistory
 
 export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null): PredictionHitComparison | null {
   if (!actualResult) return null
-  const inferredLotteryCode = actualResult.lottery_code || (prediction.play_type || (prediction.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode =
+    actualResult.lottery_code || ((prediction.digits || []).length >= 5 ? 'pl5' : prediction.play_type || (prediction.digits || []).length ? 'pl3' : 'dlt')
   if (inferredLotteryCode === 'pl3') {
     const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || []).map(padBall).slice(0, 3)
     const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
@@ -336,6 +337,24 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
       totalHits: digitHits.length,
     }
   }
+  if (inferredLotteryCode === 'pl5') {
+    const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || []).map(padBall).slice(0, 5)
+    const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 5)
+    const digitHitIndexes = predictionDigits
+      .map((digit, index) => (digit === actualDigits[index] ? index : -1))
+      .filter((index) => index >= 0)
+    const digitHits = digitHitIndexes.map((index) => predictionDigits[index]).filter(Boolean)
+    return {
+      redHits: [],
+      redHitCount: 0,
+      blueHits: [],
+      blueHitCount: 0,
+      digitHits,
+      digitHitCount: digitHits.length,
+      digitHitIndexes,
+      totalHits: digitHits.length,
+    }
+  }
   const redHits = prediction.red_balls.filter((ball) => actualResult.red_balls.includes(ball))
   const blueHits = prediction.blue_balls.filter((ball) => actualResult.blue_balls.includes(ball))
   return {
@@ -351,7 +370,11 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
 }
 
 export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult: LotteryDraw | null = null): string {
-  const inferredLotteryCode = actualResult?.lottery_code || (group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode =
+    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  if (inferredLotteryCode === 'pl5') {
+    return '直选'
+  }
   if (inferredLotteryCode !== 'pl3') {
     return '复式'
   }
