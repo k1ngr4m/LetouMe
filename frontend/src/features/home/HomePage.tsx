@@ -2159,7 +2159,7 @@ function SummaryHitTooltipBadge({
       onBlur={() => setIsOpen(false)}
     >
       <button className="ball-stat-card__badge" type="button">
-        命中 {item.matchedModelCount} 个模型
+        命中 {item.matchedModelCount}/{item.selectedModelCount}
       </button>
       {isOpen ? (
         <div className="ball-stat-card__tooltip" role="tooltip">

@@ -795,7 +795,7 @@ describe('HomePage dashboard sidebar', () => {
     const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
     expect(summarySection).not.toBeNull()
 
-    const badge = within(summarySection as HTMLElement).getAllByRole('button', { name: '命中 1 个模型' })[0]
+    const badge = within(summarySection as HTMLElement).getAllByRole('button', { name: '命中 1/2' })[0]
     await userEvent.hover(badge)
 
     const tooltip = await screen.findByRole('tooltip')
