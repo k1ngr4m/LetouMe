@@ -3395,6 +3395,96 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.settings-table-scroll-shell {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.settings-schedule-table--task-list,
+.settings-maintenance-table--task-list {
+  width: max-content;
+  min-width: 100%;
+}
+
+.settings-schedule-table--task-list th,
+.settings-schedule-table--task-list td,
+.settings-maintenance-table--task-list th,
+.settings-maintenance-table--task-list td {
+  white-space: nowrap;
+}
+
+.settings-schedule-table__col-name {
+  width: 16rem;
+  min-width: 16rem;
+}
+
+.settings-schedule-table__col-type {
+  width: 6.6rem;
+  min-width: 6.6rem;
+}
+
+.settings-schedule-table__col-lottery {
+  width: 5.8rem;
+  min-width: 5.8rem;
+}
+
+.settings-schedule-table__col-models {
+  min-width: 10rem;
+}
+
+.settings-schedule-table__col-rule {
+  width: 15rem;
+  min-width: 15rem;
+}
+
+.settings-schedule-table__col-next-run {
+  width: 12rem;
+  min-width: 12rem;
+}
+
+.settings-schedule-table__col-status,
+.settings-schedule-table__col-enabled {
+  width: 9rem;
+  min-width: 9rem;
+}
+
+.settings-schedule-table__col-actions {
+  width: 12.4rem;
+  min-width: 12.4rem;
+}
+
+.settings-maintenance-table__col-lottery {
+  width: 6.2rem;
+  min-width: 6.2rem;
+}
+
+.settings-maintenance-table__col-status {
+  width: 9rem;
+  min-width: 9rem;
+}
+
+.settings-maintenance-table__col-metric {
+  width: 6.8rem;
+  min-width: 6.8rem;
+}
+
+.settings-maintenance-table__col-period {
+  width: 7.4rem;
+  min-width: 7.4rem;
+}
+
+.settings-maintenance-table__col-time {
+  width: 10.5rem;
+  min-width: 10.5rem;
+}
+
+.settings-maintenance-table__col-actions {
+  width: 8rem;
+  min-width: 8rem;
+}
+
 .settings-maintenance-pagination {
   display: inline-flex;
   gap: 0.5rem;

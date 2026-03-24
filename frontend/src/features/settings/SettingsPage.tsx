@@ -1720,17 +1720,17 @@ export function SettingsPage() {
                         <p className="panel-card__subtitle">每行对应一个彩种，支持立即执行，执行中会自动刷新状态。</p>
                       </div>
                     </div>
-                    <div className="table-shell settings-model-table-shell">
-                      <table className="history-table settings-model-table settings-schedule-table">
+                    <div className="table-shell settings-model-table-shell settings-table-scroll-shell">
+                      <table className="history-table settings-model-table settings-schedule-table settings-maintenance-table--task-list">
                         <thead>
                           <tr>
-                            <th>彩种</th>
-                            <th>状态</th>
-                            <th>抓取条数</th>
-                            <th>写入条数</th>
-                            <th>最新期号</th>
-                            <th>创建时间</th>
-                            <th>操作</th>
+                            <th className="settings-maintenance-table__col-lottery">彩种</th>
+                            <th className="settings-maintenance-table__col-status">状态</th>
+                            <th className="settings-maintenance-table__col-metric">抓取条数</th>
+                            <th className="settings-maintenance-table__col-metric">写入条数</th>
+                            <th className="settings-maintenance-table__col-period">最新期号</th>
+                            <th className="settings-maintenance-table__col-time">创建时间</th>
+                            <th className="settings-maintenance-table__col-actions">操作</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1740,17 +1740,17 @@ export function SettingsPage() {
                             const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
                             return (
                               <tr key={lotteryCode}>
-                                <td>{getLotteryLabel(lotteryCode)}</td>
-                                <td>
+                                <td className="settings-maintenance-table__col-lottery">{getLotteryLabel(lotteryCode)}</td>
+                                <td className="settings-maintenance-table__col-status">
                                   <span className={clsx('status-pill', task?.status === 'succeeded' && 'is-active', task?.status === 'failed' && 'is-deleted')}>
                                     {task ? getTaskStatusLabel(task.status) : '尚未执行'}
                                   </span>
                                 </td>
-                                <td>{task?.progress_summary.fetched_count ?? 0}</td>
-                                <td>{task?.progress_summary.saved_count ?? 0}</td>
-                                <td>{task?.progress_summary.latest_period || '-'}</td>
-                                <td>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
-                                <td>
+                                <td className="settings-maintenance-table__col-metric">{task?.progress_summary.fetched_count ?? 0}</td>
+                                <td className="settings-maintenance-table__col-metric">{task?.progress_summary.saved_count ?? 0}</td>
+                                <td className="settings-maintenance-table__col-period">{task?.progress_summary.latest_period || '-'}</td>
+                                <td className="settings-maintenance-table__col-time">{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
+                                <td className="settings-maintenance-table__col-actions">
                                   <button className="secondary-button" type="button" onClick={() => mutation.mutate()} disabled={running}>
                                     {running ? '执行中...' : '立即执行'}
                                   </button>
@@ -1892,19 +1892,19 @@ export function SettingsPage() {
                       <span>当前筛选 {filteredScheduleTasks.length} 条</span>
                     </div>
                     {filteredScheduleTasks.length ? (
-                      <div className="table-shell settings-model-table-shell">
-                        <table className="history-table settings-model-table settings-schedule-table">
+                      <div className="table-shell settings-model-table-shell settings-table-scroll-shell">
+                        <table className="history-table settings-model-table settings-schedule-table settings-schedule-table--task-list">
                           <thead>
                             <tr>
-                              <th>名称</th>
-                              <th>类型</th>
-                              <th>彩种</th>
-                              <th>模型</th>
-                              <th>规则</th>
-                              <th>下次执行（北京时间）</th>
-                              <th>最近状态</th>
-                              <th>启用</th>
-                              <th>操作</th>
+                              <th className="settings-schedule-table__col-name">名称</th>
+                              <th className="settings-schedule-table__col-type">类型</th>
+                              <th className="settings-schedule-table__col-lottery">彩种</th>
+                              <th className="settings-schedule-table__col-models">模型</th>
+                              <th className="settings-schedule-table__col-rule">规则</th>
+                              <th className="settings-schedule-table__col-next-run">下次执行（北京时间）</th>
+                              <th className="settings-schedule-table__col-status">最近状态</th>
+                              <th className="settings-schedule-table__col-enabled">启用</th>
+                              <th className="settings-schedule-table__col-actions">操作</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1926,27 +1926,27 @@ export function SettingsPage() {
                               return (
                                 <Fragment key={task.task_code}>
                                   <tr>
-                                    <td>
+                                    <td className="settings-schedule-table__col-name">
                                       <div className="settings-model-table__title settings-schedule-table__title">
                                         <strong>{task.task_name}</strong>
                                         <span>{task.task_code}</span>
                                       </div>
                                     </td>
-                                    <td>
+                                    <td className="settings-schedule-table__col-type">
                                       <span className="settings-model-table__chip">{getScheduleTaskTypeLabel(task.task_type)}</span>
                                     </td>
-                                    <td>{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
-                                    <td className="settings-schedule-table__models">
+                                    <td className="settings-schedule-table__col-lottery">{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
+                                    <td className="settings-schedule-table__models settings-schedule-table__col-models">
                                       {task.task_type === 'prediction_generate'
                                         ? task.model_codes.map((code) => modelNameMap[code] || code).join(' / ') || '-'
                                         : '-'}
                                     </td>
-                                    <td className="settings-schedule-table__rule">
+                                    <td className="settings-schedule-table__rule settings-schedule-table__col-rule">
                                       <strong>{task.rule_summary || '-'}</strong>
                                       <span>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
                                     </td>
-                                    <td>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
-                                    <td>
+                                    <td className="settings-schedule-table__col-next-run">{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
+                                    <td className="settings-schedule-table__col-status">
                                       <span
                                         className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${runStatusMeta.tone}`)}
                                         data-tooltip={statusTooltip}
@@ -1958,7 +1958,7 @@ export function SettingsPage() {
                                         <span>{runStatusMeta.label}</span>
                                       </span>
                                     </td>
-                                    <td>
+                                    <td className="settings-schedule-table__col-enabled">
                                       <span
                                         className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${enabledMeta.tone}`)}
                                         data-tooltip={enabledTooltip}
@@ -1970,7 +1970,7 @@ export function SettingsPage() {
                                         <span>{enabledMeta.label}</span>
                                       </span>
                                     </td>
-                                    <td>
+                                    <td className="settings-schedule-table__col-actions">
                                       <div className="settings-model-table__actions settings-schedule-actions">
                                         <IconButton
                                           label={`${isExpanded ? '收起详情' : '查看详情'}：${task.task_name}`}
