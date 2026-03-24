@@ -467,6 +467,7 @@ export type SettingsModelConnectivityTestPayload = {
   base_url?: string
   api_key?: string
   app_code?: string
+  temperature?: number
 }
 
 export type SettingsModelConnectivityTestResponse = {

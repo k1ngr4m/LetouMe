@@ -694,12 +694,42 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(screen.getByRole('button', { name: '新增模型' }))
 
     expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Temperature')).toHaveValue(0.3)
 
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'aimixhub')
     expect(screen.getByLabelText('APP Code')).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'deepseek')
     expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
+  })
+
+  it('passes manual temperature in model connectivity test', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.testSettingsModelConnectivity.mockResolvedValue({ ok: true, message: 'ok', duration_ms: 120 })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('button', { name: '新增模型' })
+    await userEvent.click(screen.getByRole('button', { name: '新增模型' }))
+    await userEvent.type(screen.getByLabelText('API 模型名'), 'deepseek-chat')
+    await userEvent.clear(screen.getByLabelText('Temperature'))
+    await userEvent.type(screen.getByLabelText('Temperature'), '0.9')
+    await userEvent.click(screen.getByRole('button', { name: '测试连通性' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.testSettingsModelConnectivity).toHaveBeenCalledWith(
+        expect.objectContaining({ temperature: 0.9 }),
+      ),
+    )
   })
 
   it('auto-removes incompatible models after generation lottery changes in bulk modal', async () => {

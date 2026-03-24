@@ -85,6 +85,7 @@ class ModelService:
         provider = str(payload.get("provider") or "").strip()
         api_model_name = str(payload.get("api_model_name") or "").strip()
         api_format = str(payload.get("api_format") or "").strip().lower() or None
+        temperature = self._normalize_temperature(payload.get("temperature"))
         if not provider:
             raise ValueError("Provider 不能为空")
         if not api_model_name:
@@ -101,6 +102,7 @@ class ModelService:
             api_key_value=str(payload.get("api_key") or "").strip(),
             base_url_value=str(payload.get("base_url") or "").strip(),
             app_code_value=str(payload.get("app_code") or "").strip(),
+            temperature=temperature,
         )
         model = ModelFactory().create(model_definition)
         ok, message = model.health_check()
@@ -214,6 +216,7 @@ class ModelService:
         normalized["base_url"] = str(payload.get("base_url") or "").strip()
         normalized["api_key"] = str(payload.get("api_key") or "").strip()
         normalized["app_code"] = str(payload.get("app_code") or "").strip()
+        normalized["temperature"] = ModelService._normalize_temperature(payload.get("temperature"))
         normalized["lottery_codes"] = [
             normalize_lottery_code(str(item))
             for item in (payload.get("lottery_codes") or ["dlt"])
@@ -221,6 +224,15 @@ class ModelService:
         ] or ["dlt"]
         normalized["is_active"] = bool(payload.get("is_active", True))
         return normalized
+
+    @staticmethod
+    def _normalize_temperature(value: Any) -> float:
+        if value is None or str(value).strip() == "":
+            return 0.3
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("temperature 必须是数字") from exc
 
     @staticmethod
     def _normalize_provider_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:

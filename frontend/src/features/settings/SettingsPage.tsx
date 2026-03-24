@@ -74,6 +74,7 @@ const EMPTY_MODEL_FORM: SettingsModelPayload = {
   base_url: '',
   api_key: '',
   app_code: '',
+  temperature: 0.3,
   is_active: true,
   lottery_codes: ['dlt'],
 }
@@ -943,7 +944,15 @@ export function SettingsPage() {
     },
   })
   const testModelConnectivityMutation = useMutation({
-    mutationFn: (payload: Pick<SettingsModelPayload, 'provider' | 'api_format' | 'api_model_name' | 'base_url' | 'api_key' | 'app_code'>) =>
+    mutationFn: (payload: {
+      provider: string
+      api_format?: string
+      api_model_name: string
+      base_url: string
+      api_key: string
+      app_code: string
+      temperature: number
+    }) =>
       apiClient.testSettingsModelConnectivity(payload),
     onSuccess: (result) => {
       setModelConnectivityResult({
@@ -1229,6 +1238,7 @@ export function SettingsPage() {
       provider: defaultProvider?.code || '',
       api_format: defaultProvider?.api_format || 'openai_compatible',
       base_url: defaultProvider?.base_url || '',
+      temperature: 0.3,
       lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
     })
     setModelConnectivityResult(null)
@@ -1438,6 +1448,7 @@ export function SettingsPage() {
       base_url: model.base_url,
       api_key: model.api_key,
       app_code: model.app_code,
+      temperature: model.temperature ?? 0.3,
       is_active: model.is_active,
       lottery_codes: model.lottery_codes,
     })
@@ -1477,6 +1488,7 @@ export function SettingsPage() {
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
       app_code: modelForm.app_code.trim(),
+      temperature: Number(modelForm.temperature ?? 0.3),
     })
   }
 
@@ -1489,6 +1501,7 @@ export function SettingsPage() {
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
       app_code: modelForm.app_code.trim(),
+      temperature: Number(modelForm.temperature ?? 0.3),
     })
   }
 
@@ -2872,6 +2885,16 @@ export function SettingsPage() {
                       <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
                     </label>
                   ) : null}
+                  <label className="field">
+                    <span>Temperature</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={modelForm.temperature ?? 0.3}
+                      onChange={(event) => setModelForm((previous) => ({ ...previous, temperature: Number(event.target.value) }))}
+                      required
+                    />
+                  </label>
                 </div>
                 <div className="model-config-modal__connectivity">
                   <button

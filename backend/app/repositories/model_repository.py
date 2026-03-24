@@ -88,10 +88,11 @@ class ModelRepository:
                         base_url,
                         api_key,
                         app_code,
+                        temperature,
                         is_deleted,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
                     (
                         model_code,
@@ -103,6 +104,7 @@ class ModelRepository:
                         self._normalize_base_url(payload.get("base_url"), str(provider_row.get("base_url") or ""), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
+                        float(payload.get("temperature")),
                         0,
                     ),
                 )
@@ -135,6 +137,7 @@ class ModelRepository:
                         base_url = ?,
                         api_key = ?,
                         app_code = ?,
+                        temperature = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE model_code = ?
                     """,
@@ -147,6 +150,7 @@ class ModelRepository:
                         self._normalize_base_url(payload.get("base_url"), str(provider_row.get("base_url") or ""), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
+                        float(payload.get("temperature")),
                         model_code,
                     ),
                 )
@@ -384,6 +388,7 @@ class ModelRepository:
                 am.base_url,
                 am.api_key,
                 am.app_code,
+                am.temperature,
                 am.is_active,
                 am.is_deleted,
                 am.updated_at
@@ -734,6 +739,7 @@ class ModelRepository:
             "base_url": row.get("base_url") or DEFAULT_BASE_URL,
             "api_key": row.get("api_key") or "",
             "app_code": row.get("app_code") or "",
+            "temperature": row.get("temperature"),
             "is_active": bool(row.get("is_active")),
             "is_deleted": bool(row.get("is_deleted")),
             "lottery_codes": lottery_codes or ["dlt"],
@@ -787,6 +793,10 @@ class ModelRepository:
             raise ValueError("不支持的接口格式")
         if not str(payload.get("api_model_name") or "").strip() and not str(payload.get("provider_model_id") or "").strip():
             raise ValueError("api_model_name 不能为空")
+        try:
+            float(payload.get("temperature"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("temperature 必须是数字") from exc
         lottery_codes = payload.get("lottery_codes")
         if lottery_codes is not None:
             normalized_lottery_codes = ModelRepository._normalize_lottery_codes(lottery_codes)

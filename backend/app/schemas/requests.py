@@ -46,6 +46,7 @@ class ModelConnectivityTestPayload(BaseModel):
     base_url: str | None = ""
     api_key: str | None = ""
     app_code: str | None = ""
+    temperature: float = 0.3
 
 
 class ProviderCreatePayload(ProviderSettingsPayload):
