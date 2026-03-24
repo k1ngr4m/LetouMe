@@ -133,6 +133,7 @@ class ModelService:
     def _invalidate_model_cache(model_code: str | None = None) -> None:
         runtime_cache.invalidate_prefix("models:list:")
         runtime_cache.delete("models:providers")
+        runtime_cache.invalidate_prefix("predictions:")
         if model_code:
             runtime_cache.delete(f"models:detail:{model_code}")
         else:

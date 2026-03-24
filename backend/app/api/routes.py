@@ -174,7 +174,7 @@ def get_lottery_history(payload: PaginationPayload, _: dict = Depends(require_cu
 
 @router.post("/predictions/current", response_model=CurrentPredictionsResponse)
 def get_current_predictions(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
-    return prediction_service.get_current_payload(lottery_code=payload.lottery_code)
+    return prediction_service.get_current_payload(lottery_code=payload.lottery_code, include_inactive_models=False)
 
 
 @router.post("/predictions/history/list", response_model=PredictionsHistoryListResponse)
@@ -186,12 +186,17 @@ def get_predictions_history_list(payload: PredictionsHistoryListPayload, _: dict
         strategy_filters=payload.strategy_filters,
         play_type_filters=payload.play_type_filters,
         strategy_match_mode=payload.strategy_match_mode,
+        include_inactive_models=False,
     )
 
 
 @router.post("/predictions/history/detail", response_model=PredictionsHistoryResponse)
 def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: dict = Depends(require_current_user)) -> dict:
-    record = prediction_service.get_history_detail_payload(payload.target_period, lottery_code=payload.lottery_code)
+    record = prediction_service.get_history_detail_payload(
+        payload.target_period,
+        lottery_code=payload.lottery_code,
+        include_inactive_models=False,
+    )
     if not record:
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])

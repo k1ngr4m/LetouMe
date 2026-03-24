@@ -152,6 +152,18 @@ class ModelRepository:
             for code in SUPPORTED_PROVIDERS
         ]
 
+    def list_active_model_codes(self) -> set[str]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT model_code
+                    FROM ai_model
+                    WHERE is_active = 1 AND is_deleted = 0
+                    """
+                )
+                return {str(row["model_code"]) for row in cursor.fetchall() if row.get("model_code")}
+
     def _update_flag(self, model_code: str, field_name: str, value: int) -> dict[str, Any]:
         with get_connection() as connection:
             with connection.cursor() as cursor:

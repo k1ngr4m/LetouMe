@@ -120,6 +120,32 @@ class _FakePredictionRepository:
     def list_history_strategy_options(self, lottery_code: str = "dlt") -> list[str]:
         return ["增强型热号追随者", "AI 组合策略", "冷号补位"]
 
+    def get_current_prediction(self, lottery_code: str = "dlt") -> dict:
+        return {
+            "lottery_code": lottery_code,
+            "prediction_date": "2026-03-12",
+            "target_period": "2026032",
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "model_name": "模型A",
+                    "model_provider": "openai",
+                    "predictions": [],
+                },
+                {
+                    "model_id": "model-b",
+                    "model_name": "模型B",
+                    "model_provider": "deepseek",
+                    "predictions": [],
+                },
+            ],
+        }
+
+    def get_current_prediction_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict:
+        payload = self.get_current_prediction(lottery_code=lottery_code)
+        payload["target_period"] = target_period
+        return payload
+
     def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict | None:
         return self.record if target_period == "2026031" else None
 
@@ -225,6 +251,14 @@ class _FakePl3PredictionRepository:
 
     def get_history_record_detail(self, target_period: str, lottery_code: str = "pl3") -> dict | None:
         return self.record if target_period == "26060" else None
+
+
+class _FakeModelRepository:
+    def __init__(self, active_model_codes: set[str]) -> None:
+        self.active_model_codes = active_model_codes
+
+    def list_active_model_codes(self) -> set[str]:
+        return set(self.active_model_codes)
 
 
 class PredictionHistoryMetricsTests(unittest.TestCase):
@@ -398,6 +432,39 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(hit_result["digit_hit_count"], 3)
         self.assertTrue(hit_result["is_exact_match"])
+
+    def test_current_payload_hides_inactive_models_when_requested(self) -> None:
+        service = PredictionService(
+            prediction_repository=_FakePredictionRepository(),
+            model_repository=_FakeModelRepository({"model-a"}),
+        )
+
+        payload = service.get_current_payload(include_inactive_models=False)
+
+        self.assertEqual([item["model_id"] for item in payload["models"]], ["model-a"])
+
+    def test_history_payload_hides_inactive_models_when_requested(self) -> None:
+        service = PredictionService(
+            prediction_repository=_FakePredictionRepository(),
+            model_repository=_FakeModelRepository({"model-a"}),
+        )
+
+        payload = service.get_history_list_payload(include_inactive_models=False)
+
+        self.assertEqual(payload["total_count"], 1)
+        self.assertEqual([item["model_id"] for item in payload["predictions_history"][0]["models"]], ["model-a"])
+        self.assertEqual([item["model_id"] for item in payload["model_stats"]], ["model-a"])
+        self.assertEqual(payload["strategy_options"], ["AI 组合策略", "增强型热号追随者"])
+
+    def test_history_detail_returns_none_when_only_inactive_models_remain(self) -> None:
+        service = PredictionService(
+            prediction_repository=_FakePredictionRepository(),
+            model_repository=_FakeModelRepository(set()),
+        )
+
+        payload = service.get_history_detail_payload("2026031", include_inactive_models=False)
+
+        self.assertIsNone(payload)
 
 
 if __name__ == "__main__":

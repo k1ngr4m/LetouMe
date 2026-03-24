@@ -13,6 +13,7 @@ from backend.app.dlt_rules import (
 )
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_digit_balls, normalize_group_digits, normalize_lottery_code
+from backend.app.repositories.model_repository import ModelRepository
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
 
@@ -35,9 +36,11 @@ class PredictionService:
         self,
         prediction_repository: PredictionRepository | None = None,
         lottery_service: LotteryService | None = None,
+        model_repository: ModelRepository | None = None,
     ) -> None:
         self.prediction_repository = prediction_repository or PredictionRepository()
         self.lottery_service = lottery_service or LotteryService()
+        self.model_repository = model_repository or ModelRepository()
         self.logger = get_logger("services.prediction")
 
     @staticmethod
@@ -69,25 +72,41 @@ class PredictionService:
             "predictions": normalized_predictions,
         }
 
-    def get_current_payload(self, lottery_code: str = "dlt") -> dict[str, Any]:
+    def get_current_payload(self, lottery_code: str = "dlt", include_inactive_models: bool = True) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
+        cache_scope = "all-models" if include_inactive_models else "active-models"
         payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:current:scored",
+            f"predictions:{normalized_code}:current:scored:{cache_scope}",
             ttl_seconds=60,
-            loader=lambda: self._build_current_payload(lottery_code=normalized_code),
+            loader=lambda: self._build_current_payload(lottery_code=normalized_code, include_inactive_models=include_inactive_models),
         )
         self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
         return payload
 
-    def get_current_payload_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any]:
+    def get_current_payload_by_period(
+        self,
+        target_period: str,
+        lottery_code: str = "dlt",
+        include_inactive_models: bool = True,
+    ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
+        cache_scope = "all-models" if include_inactive_models else "active-models"
         return runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:current:{target_period}:scored",
+            f"predictions:{normalized_code}:current:{target_period}:scored:{cache_scope}",
             ttl_seconds=60,
-            loader=lambda: self._build_current_payload(target_period=target_period, lottery_code=normalized_code),
+            loader=lambda: self._build_current_payload(
+                target_period=target_period,
+                lottery_code=normalized_code,
+                include_inactive_models=include_inactive_models,
+            ),
         )
 
-    def _build_current_payload(self, lottery_code: str = "dlt", target_period: str | None = None) -> dict[str, Any]:
+    def _build_current_payload(
+        self,
+        lottery_code: str = "dlt",
+        target_period: str | None = None,
+        include_inactive_models: bool = True,
+    ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         payload = (
             self.prediction_repository.get_current_prediction_by_period(target_period, lottery_code=normalized_code)
@@ -99,6 +118,12 @@ class PredictionService:
             "target_period": target_period or "",
             "models": [],
         }
+        active_model_codes = self._get_active_model_codes() if not include_inactive_models else None
+        models = (
+            self._filter_models_by_active_status(payload.get("models", []), active_model_codes or set())
+            if active_model_codes is not None
+            else list(payload.get("models", []))
+        )
         score_profiles = self._get_current_model_score_profiles(lottery_code=normalized_code)
         return {
             **payload,
@@ -108,7 +133,7 @@ class PredictionService:
                     **model,
                     "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
                 }
-                for model in payload.get("models", [])
+                for model in models
             ],
         }
 
@@ -132,6 +157,7 @@ class PredictionService:
         strategy_filters: list[str] | None = None,
         play_type_filters: list[str] | None = None,
         strategy_match_mode: str = "all",
+        include_inactive_models: bool = True,
     ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
@@ -143,8 +169,9 @@ class PredictionService:
             raise ValueError("不支持的方案筛选模式")
         strategy_cache_key = ",".join(normalized_strategy_filters) if normalized_strategy_filters else "-"
         play_type_cache_key = ",".join(normalized_play_type_filters) if normalized_play_type_filters else "-"
+        cache_scope = "all-models" if include_inactive_models else "active-models"
         payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:history:list:v2:{limit or 'all'}:{offset}:strategy:{strategy_cache_key}:play_type:{play_type_cache_key}:{normalized_strategy_match_mode}",
+            f"predictions:{normalized_code}:history:list:v2:{limit or 'all'}:{offset}:strategy:{strategy_cache_key}:play_type:{play_type_cache_key}:{normalized_strategy_match_mode}:{cache_scope}",
             ttl_seconds=60,
             loader=lambda: self._build_history_list_payload(
                 limit=limit,
@@ -153,6 +180,7 @@ class PredictionService:
                 strategy_filters=normalized_strategy_filters,
                 play_type_filters=normalized_play_type_filters,
                 strategy_match_mode=normalized_strategy_match_mode,
+                include_inactive_models=include_inactive_models,
             ),
         )
         self.logger.info(
@@ -170,14 +198,35 @@ class PredictionService:
         )
         return payload
 
-    def get_history_detail_payload(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
+    def get_history_detail_payload(
+        self,
+        target_period: str,
+        lottery_code: str = "dlt",
+        include_inactive_models: bool = True,
+    ) -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
+        cache_scope = "all-models" if include_inactive_models else "active-models"
         raw_payload = runtime_cache.get_or_set(
-            f"predictions:{normalized_code}:history:detail:{target_period}",
+            f"predictions:{normalized_code}:history:detail:{target_period}:{cache_scope}",
             ttl_seconds=60,
             loader=lambda: self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code),
         )
         payload = self._annotate_history_record(raw_payload) if raw_payload else None
+        active_model_codes = self._get_active_model_codes() if (payload and not include_inactive_models) else None
+        if payload and active_model_codes is not None:
+            models = self._filter_models_by_active_status(payload.get("models", []), active_model_codes)
+            if not models:
+                payload = None
+            else:
+                payload = {
+                    **payload,
+                    "models": models,
+                    "period_summary": {
+                        "total_bet_count": sum(int(model.get("bet_count") or 0) for model in models),
+                        "total_cost_amount": sum(int(model.get("cost_amount") or 0) for model in models),
+                        "total_prize_amount": sum(int(model.get("prize_amount") or 0) for model in models),
+                    },
+                }
         if payload:
             score_profiles = self._build_score_profiles([payload])
             payload = {
@@ -470,6 +519,7 @@ class PredictionService:
         strategy_filters: list[str] | None = None,
         play_type_filters: list[str] | None = None,
         strategy_match_mode: str = "all",
+        include_inactive_models: bool = True,
     ) -> dict[str, Any]:
         started_at = perf_counter()
         normalized_code = normalize_lottery_code(lottery_code)
@@ -479,7 +529,7 @@ class PredictionService:
         normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
         normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
         db_metrics: dict[str, Any] = {}
-        has_post_filters = bool(normalized_strategy_filters or normalized_play_type_filters)
+        has_post_filters = bool(normalized_strategy_filters or normalized_play_type_filters or (not include_inactive_models))
         fetch_limit = None if has_post_filters else limit
         fetch_offset = 0 if has_post_filters else offset
         if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
@@ -502,6 +552,15 @@ class PredictionService:
             )
             for record in summary_records
         ]
+        if not include_inactive_models:
+            active_model_codes = self._get_active_model_codes()
+            records = [
+                {
+                    **record,
+                    "models": self._filter_models_by_active_status(record.get("models", []), active_model_codes),
+                }
+                for record in records
+            ]
         records = [record for record in records if record.get("models")]
         if has_post_filters:
             filtered_total_count = len(records)
@@ -517,7 +576,11 @@ class PredictionService:
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": filtered_total_count,
             "model_stats": self._build_model_stats(records, score_profiles),
-            "strategy_options": [] if normalized_code in {"pl3", "pl5"} else self._list_history_strategy_options(lottery_code=lottery_code, records=summary_records),
+            "strategy_options": [] if normalized_code in {"pl3", "pl5"} else self._list_history_strategy_options(
+                lottery_code=lottery_code,
+                records=records,
+                prefer_records=not include_inactive_models,
+            ),
         }
         aggregate_duration_ms = round((perf_counter() - aggregate_started_at) * 1000, 2)
         total_duration_ms = round((perf_counter() - started_at) * 1000, 2)
@@ -1070,9 +1133,15 @@ class PredictionService:
         normalized = [str(value or "").strip().lower() for value in values]
         return [play_type for play_type in dict.fromkeys(normalized) if play_type in allowed_play_types]
 
-    def _list_history_strategy_options(self, *, lottery_code: str, records: list[dict[str, Any]]) -> list[str]:
+    def _list_history_strategy_options(
+        self,
+        *,
+        lottery_code: str,
+        records: list[dict[str, Any]],
+        prefer_records: bool = False,
+    ) -> list[str]:
         list_strategy_options = getattr(self.prediction_repository, "list_history_strategy_options", None)
-        if callable(list_strategy_options):
+        if callable(list_strategy_options) and not prefer_records:
             options = list_strategy_options(lottery_code=lottery_code)
             if isinstance(options, (list, tuple, set)):
                 normalized = [self._normalize_strategy_label(option) for option in options]
@@ -1084,6 +1153,13 @@ class PredictionService:
             for group in (model.get("group_metrics") or [])
         }
         return sorted(options)
+
+    @staticmethod
+    def _filter_models_by_active_status(models: list[dict[str, Any]], active_model_codes: set[str]) -> list[dict[str, Any]]:
+        return [model for model in models if str(model.get("model_id") or "") in active_model_codes]
+
+    def _get_active_model_codes(self) -> set[str]:
+        return self.model_repository.list_active_model_codes()
 
     @classmethod
     def resolve_prize_level(
