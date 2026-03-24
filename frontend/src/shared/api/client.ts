@@ -37,7 +37,9 @@ import type {
   SettingsModel,
   SettingsModelListResponse,
   SettingsModelPayload,
+  SettingsProvider,
   SettingsProviderListResponse,
+  SettingsProviderPayload,
   SimulationTicketCreateResponse,
   SimulationTicketQuoteResponse,
   SimulationTicketListResponse,
@@ -281,6 +283,30 @@ export const apiClient = {
     return requestJson<SettingsProviderListResponse>('/api/settings/providers/list', {
       method: 'POST',
       body: JSON.stringify({}),
+    })
+  },
+  getSettingsProvider(providerCode: string) {
+    return requestJson<SettingsProvider>('/api/settings/providers/detail', {
+      method: 'POST',
+      body: JSON.stringify({ provider_code: providerCode }),
+    })
+  },
+  createSettingsProvider(payload: SettingsProviderPayload) {
+    return requestJson<SettingsProvider>('/api/settings/providers/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  updateSettingsProvider(providerCode: string, payload: SettingsProviderPayload) {
+    return requestJson<SettingsProvider>('/api/settings/providers/update', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, provider_code: providerCode }),
+    })
+  },
+  deleteSettingsProvider(providerCode: string) {
+    return requestJson<SuccessResponse>('/api/settings/providers/delete', {
+      method: 'POST',
+      body: JSON.stringify({ provider_code: providerCode }),
     })
   },
   fetchSettingsLotteryHistory(lotteryCode: LotteryCode = 'dlt') {

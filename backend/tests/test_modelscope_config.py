@@ -72,10 +72,10 @@ class ModelScopeConfigTests(unittest.TestCase):
 
         self.assertEqual(chat_definition.provider, "deepseek")
         self.assertEqual(chat_definition.api_model, "deepseek-chat")
-        self.assertEqual(chat_definition.base_url(), "https://api.deepseek.com")
+        self.assertEqual(chat_definition.base_url(), "https://api.deepseek.com/v1")
         self.assertEqual(reasoner_definition.provider, "deepseek")
         self.assertEqual(reasoner_definition.api_model, "deepseek-reasoner")
-        self.assertEqual(reasoner_definition.base_url(), "https://api.deepseek.com")
+        self.assertEqual(reasoner_definition.base_url(), "https://api.deepseek.com/v1")
         self.assertFalse(reasoner_definition.is_active)
 
 

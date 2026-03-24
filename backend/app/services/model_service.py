@@ -26,7 +26,12 @@ class ModelService:
         return self._serialize_model(model) if model else None
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
-        created = self._serialize_model(self.repository.create_model(self._normalize_payload(payload, is_create=True)))
+        normalized = self._normalize_payload(payload, is_create=True)
+        if not normalized.get("model_code"):
+            provider_code = str(normalized.get("provider") or "").strip()
+            model_segment = str(normalized.get("api_model_name") or normalized.get("provider_model_name") or "").strip()
+            normalized["model_code"] = self._build_model_code(provider_code, model_segment)
+        created = self._serialize_model(self.repository.create_model(normalized))
         self._invalidate_model_cache()
         return created
 
@@ -52,8 +57,26 @@ class ModelService:
         self._invalidate_model_cache(model_code)
         return restored
 
-    def list_providers(self) -> list[dict[str, str]]:
+    def list_providers(self) -> list[dict[str, Any]]:
         return runtime_cache.get_or_set("models:providers", ttl_seconds=600, loader=self.repository.list_providers)
+
+    def get_provider(self, provider_code: str) -> dict[str, Any] | None:
+        return self.repository.get_provider(provider_code)
+
+    def create_provider(self, payload: dict[str, Any]) -> dict[str, Any]:
+        created = self.repository.create_provider(self._normalize_provider_payload(payload, is_create=True))
+        self._invalidate_model_cache()
+        return created
+
+    def update_provider(self, provider_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        updated = self.repository.update_provider(provider_code, self._normalize_provider_payload(payload, is_create=False))
+        self._invalidate_model_cache()
+        return updated
+
+    def delete_provider(self, provider_code: str) -> dict[str, Any]:
+        deleted = self.repository.delete_provider(provider_code)
+        self._invalidate_model_cache()
+        return deleted
 
     def bulk_action(self, model_codes: list[str], action: str, updates: dict[str, Any] | None = None) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
@@ -153,6 +176,10 @@ class ModelService:
             normalized["model_code"] = str(payload.get("model_code") or "").strip()
         normalized["display_name"] = str(payload.get("display_name") or "").strip()
         normalized["provider"] = str(payload.get("provider") or "").strip()
+        provider_model_id = payload.get("provider_model_id")
+        normalized["provider_model_id"] = int(provider_model_id) if str(provider_model_id or "").strip() else None
+        normalized["provider_model_name"] = str(payload.get("provider_model_name") or "").strip()
+        normalized["api_format"] = str(payload.get("api_format") or "openai_compatible").strip().lower()
         normalized["api_model_name"] = str(payload.get("api_model_name") or "").strip()
         normalized["version"] = str(payload.get("version") or "").strip()
         normalized["base_url"] = str(payload.get("base_url") or "").strip()
@@ -167,6 +194,29 @@ class ModelService:
         ] or ["dlt"]
         normalized["is_active"] = bool(payload.get("is_active", True))
         return normalized
+
+    @staticmethod
+    def _normalize_provider_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:
+        normalized = dict(payload)
+        if is_create:
+            normalized["code"] = str(payload.get("code") or "").strip()
+        normalized["name"] = str(payload.get("name") or "").strip()
+        normalized["api_format"] = str(payload.get("api_format") or "openai_compatible").strip().lower()
+        normalized["remark"] = str(payload.get("remark") or "").strip()
+        normalized["website_url"] = str(payload.get("website_url") or "").strip()
+        normalized["api_key"] = str(payload.get("api_key") or "").strip()
+        normalized["base_url"] = str(payload.get("base_url") or "").strip()
+        normalized["extra_options"] = payload.get("extra_options") or {}
+        normalized["model_configs"] = payload.get("model_configs") or []
+        return normalized
+
+    @staticmethod
+    def _build_model_code(provider_code: str, model_segment: str) -> str:
+        base = f"{provider_code}-{model_segment}".strip("-").lower()
+        cleaned = "".join(char if char.isalnum() or char in {"-", "_", "."} else "-" for char in base)
+        while "--" in cleaned:
+            cleaned = cleaned.replace("--", "-")
+        return cleaned.strip("-")
 
     @staticmethod
     def _normalize_bulk_updates(payload: dict[str, Any]) -> dict[str, Any]:

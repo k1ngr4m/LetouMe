@@ -400,6 +400,9 @@ export type SettingsModel = {
   model_code: string
   display_name: string
   provider: string
+  provider_model_id?: number | null
+  provider_model_name?: string
+  api_format?: string
   api_model_name: string
   version: string
   tags: string[]
@@ -418,8 +421,21 @@ export type SettingsModelListResponse = {
 }
 
 export type SettingsProvider = {
+  id?: number
   code: string
   name: string
+  api_format?: 'openai_responses' | 'openai_compatible' | 'anthropic' | 'amazon_bedrock' | 'google_gemini'
+  remark?: string
+  website_url?: string
+  api_key?: string
+  base_url?: string
+  extra_options?: Record<string, unknown>
+  is_system_preset?: boolean
+  model_configs?: Array<{
+    id: number
+    model_id: string
+    display_name: string
+  }>
 }
 
 export type SettingsProviderListResponse = {
@@ -430,6 +446,9 @@ export type SettingsModelPayload = {
   model_code?: string
   display_name: string
   provider: string
+  provider_model_id?: number | null
+  provider_model_name?: string
+  api_format?: string
   api_model_name: string
   version: string
   tags: string[]
@@ -439,6 +458,22 @@ export type SettingsModelPayload = {
   temperature: number | null
   is_active: boolean
   lottery_codes: LotteryCode[]
+}
+
+export type SettingsProviderPayload = {
+  code?: string
+  name: string
+  api_format: 'openai_responses' | 'openai_compatible' | 'anthropic' | 'amazon_bedrock' | 'google_gemini'
+  remark: string
+  website_url: string
+  api_key: string
+  base_url: string
+  extra_options: Record<string, unknown>
+  model_configs: Array<{
+    id?: number
+    model_id: string
+    display_name: string
+  }>
 }
 
 export type GenerateSettingsModelPredictionsPayload = {

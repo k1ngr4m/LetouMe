@@ -46,6 +46,9 @@ from backend.app.schemas.requests import (
     ModelListPayload,
     ModelStatusUpdatePayload,
     ModelUpdatePayload,
+    ProviderCodePayload,
+    ProviderCreatePayload,
+    ProviderUpdatePayload,
     LotteryFetchTaskPayload,
     MaintenanceRunLogListPayload,
     PasswordChangePayload,
@@ -398,6 +401,41 @@ def restore_settings_model(payload: ModelCodePayload, _: dict = Depends(require_
 @router.post("/settings/providers/list", response_model=ProviderListResponse)
 def get_settings_providers(_: dict = Depends(require_model_management_permission)) -> dict:
     return {"providers": model_service.list_providers()}
+
+
+@router.post("/settings/providers/detail")
+def get_settings_provider(payload: ProviderCodePayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    provider = model_service.get_provider(payload.provider_code)
+    if not provider:
+        raise HTTPException(status_code=404, detail="供应商不存在")
+    return provider
+
+
+@router.post("/settings/providers/create")
+def create_settings_provider(payload: ProviderCreatePayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        return model_service.create_provider(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/providers/update")
+def update_settings_provider(payload: ProviderUpdatePayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        return model_service.update_provider(payload.provider_code, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="供应商不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/providers/delete", response_model=SuccessResponse)
+def delete_settings_provider(payload: ProviderCodePayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        model_service.delete_provider(payload.provider_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="供应商不存在") from exc
+    return {"success": True}
 
 
 @router.post("/settings/lottery/fetch", response_model=LotteryFetchTaskResponse)

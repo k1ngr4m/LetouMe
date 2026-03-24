@@ -47,8 +47,31 @@ SCHEMA_STATEMENTS = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         provider_code VARCHAR(64) NOT NULL UNIQUE,
         provider_name VARCHAR(128) NOT NULL,
+        api_format VARCHAR(64) NOT NULL DEFAULT 'openai_compatible',
+        remark TEXT NULL,
+        website_url VARCHAR(512) NULL,
+        api_key TEXT NULL,
         base_url VARCHAR(512) NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        extra_options_json TEXT NULL,
+        is_system_preset TINYINT(1) NOT NULL DEFAULT 0,
+        is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS provider_model_config (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        provider_id BIGINT NOT NULL,
+        model_id VARCHAR(255) NOT NULL,
+        display_name VARCHAR(255) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_provider_model_config_provider FOREIGN KEY (provider_id) REFERENCES model_provider(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_provider_model_config_unique (provider_id, model_id),
+        INDEX idx_provider_model_config_provider_active (provider_id, is_deleted, sort_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -57,6 +80,7 @@ SCHEMA_STATEMENTS = [
         model_code VARCHAR(128) NOT NULL UNIQUE,
         display_name VARCHAR(255) NOT NULL,
         provider_id BIGINT NOT NULL,
+        provider_model_id BIGINT NULL,
         api_model_name VARCHAR(255) NULL,
         version VARCHAR(64) NULL,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -68,7 +92,9 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_ai_model_provider FOREIGN KEY (provider_id) REFERENCES model_provider(id),
+        CONSTRAINT fk_ai_model_provider_model FOREIGN KEY (provider_model_id) REFERENCES provider_model_config(id),
         INDEX idx_ai_model_provider_active (provider_id, is_active),
+        INDEX idx_ai_model_provider_model (provider_model_id),
         INDEX idx_ai_model_deleted_active (is_deleted, is_active)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -739,6 +765,19 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
 
 
 SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
+    "model_provider": {
+        "api_format": "ALTER TABLE model_provider ADD COLUMN api_format VARCHAR(64) NOT NULL DEFAULT 'openai_compatible' AFTER provider_name",
+        "remark": "ALTER TABLE model_provider ADD COLUMN remark TEXT NULL AFTER api_format",
+        "website_url": "ALTER TABLE model_provider ADD COLUMN website_url VARCHAR(512) NULL AFTER remark",
+        "api_key": "ALTER TABLE model_provider ADD COLUMN api_key TEXT NULL AFTER website_url",
+        "extra_options_json": "ALTER TABLE model_provider ADD COLUMN extra_options_json TEXT NULL AFTER base_url",
+        "is_system_preset": "ALTER TABLE model_provider ADD COLUMN is_system_preset TINYINT(1) NOT NULL DEFAULT 0 AFTER extra_options_json",
+        "is_deleted": "ALTER TABLE model_provider ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER is_system_preset",
+        "updated_at": "ALTER TABLE model_provider ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at",
+    },
+    "ai_model": {
+        "provider_model_id": "ALTER TABLE ai_model ADD COLUMN provider_model_id BIGINT NULL AFTER provider_id",
+    },
     "app_user": {
         "nickname": "ALTER TABLE app_user ADD COLUMN nickname VARCHAR(128) NULL AFTER username",
     },

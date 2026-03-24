@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Iterable, Mapping
@@ -11,13 +12,20 @@ from backend.app.lotteries import normalize_lottery_code
 
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 SUPPORTED_PROVIDERS = (
     "openai",
     "anthropic",
     "gemini",
     "deepseek",
     "openai_compatible",
+)
+SUPPORTED_API_FORMATS = (
+    "openai_responses",
+    "openai_compatible",
+    "anthropic",
+    "amazon_bedrock",
+    "google_gemini",
 )
 _bootstrap_ready = False
 _bootstrap_lock = Lock()
@@ -137,6 +145,7 @@ class ModelDefinition:
     provider: str
     model_id: str
     api_model: str
+    api_format: str | None = None
     api_key_value: str | None = None
     base_url_value: str | None = None
     app_code_value: str | None = None
@@ -357,7 +366,12 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
                     am.model_code,
                     am.display_name,
                     mp.provider_code,
+                    mp.api_format,
+                    mp.base_url AS provider_base_url,
+                    mp.api_key AS provider_api_key,
+                    mp.extra_options_json,
                     am.api_model_name,
+                    pmc.model_id AS provider_model_name,
                     am.version,
                     am.base_url,
                     am.api_key,
@@ -367,6 +381,7 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
                     am.is_deleted
                 FROM ai_model am
                 INNER JOIN model_provider mp ON mp.id = am.provider_id
+                LEFT JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
                 ORDER BY am.is_active DESC, am.model_code ASC
                 """
             )
@@ -384,10 +399,11 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             id=model_code,
             name=str(row["display_name"]),
             provider=str(row["provider_code"]),
+            api_format=str(row.get("api_format") or "openai_compatible"),
             model_id=model_code,
-            api_model=str(row.get("api_model_name") or model_code),
-            api_key_value=row.get("api_key"),
-            base_url_value=row.get("base_url"),
+            api_model=str(row.get("api_model_name") or row.get("provider_model_name") or model_code),
+            api_key_value=row.get("api_key") or row.get("provider_api_key"),
+            base_url_value=row.get("base_url") or row.get("provider_base_url"),
             app_code_value=row.get("app_code"),
             version=row.get("version"),
             tags=tags_by_code.get(model_code, []),
@@ -395,6 +411,7 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             lottery_codes=lotteries_by_code.get(model_code, ["dlt"]),
             is_active=bool(row.get("is_active")),
             is_deleted=bool(row.get("is_deleted")),
+            extra=_parse_extra_options(row.get("extra_options_json")),
         )
     return ModelRegistry(definitions=definitions)
 
@@ -438,3 +455,14 @@ def _fetch_lotteries(cursor, model_codes: list[str]) -> dict[str, list[str]]:
     for row in cursor.fetchall():
         result.setdefault(str(row["model_code"]), []).append(str(row["lottery_code"]))
     return result
+
+
+def _parse_extra_options(value: Any) -> dict[str, Any]:
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}

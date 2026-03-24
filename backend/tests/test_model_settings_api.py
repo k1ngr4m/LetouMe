@@ -46,7 +46,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         deepseek_chat = next(model for model in payload["models"] if model["model_code"] == "deepseek-v3.2")
         self.assertEqual(deepseek_chat["provider"], "deepseek")
         self.assertEqual(deepseek_chat["api_model_name"], "deepseek-chat")
-        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com")
+        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com/v1")
 
     def test_get_model_detail_serializes_updated_at(self) -> None:
         response = self.client.post("/api/settings/model/detail", json={"model_code": "claude-sonnet-4.6"})
@@ -60,6 +60,46 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         providers = response.json()["providers"]
         self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
+
+    def test_create_update_and_delete_provider(self) -> None:
+        create_response = self.client.post(
+            "/api/settings/providers/create",
+            json={
+                "code": "custom-provider",
+                "name": "Custom Provider",
+                "api_format": "openai_compatible",
+                "website_url": "https://example.test",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "test-key",
+                "remark": "test",
+                "extra_options": {"timeout": 30},
+                "model_configs": [{"model_id": "test-model", "display_name": "Test Model"}],
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_response.json()["code"], "custom-provider")
+
+        update_response = self.client.post(
+            "/api/settings/providers/update",
+            json={
+                "provider_code": "custom-provider",
+                "name": "Custom Provider Updated",
+                "api_format": "anthropic",
+                "website_url": "https://example.test",
+                "base_url": "https://api.example.test/v2",
+                "api_key": "test-key-2",
+                "remark": "updated",
+                "extra_options": {"timeout": 45},
+                "model_configs": [{"model_id": "test-model-2", "display_name": "Test Model 2"}],
+            },
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["name"], "Custom Provider Updated")
+        self.assertEqual(update_response.json()["api_format"], "anthropic")
+
+        delete_response = self.client.post("/api/settings/providers/delete", json={"provider_code": "custom-provider"})
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["success"])
 
     def test_create_update_and_soft_delete_model(self) -> None:
         create_response = self.client.post(

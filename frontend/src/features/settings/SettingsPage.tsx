@@ -25,6 +25,8 @@ import type {
   SchedulePresetType,
   SettingsModel,
   SettingsModelPayload,
+  SettingsProvider,
+  SettingsProviderPayload,
   LotteryCode,
 } from '../../shared/types/api'
 
@@ -68,7 +70,10 @@ function getSettingsTabFromPath(pathname: string): SettingsTab {
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
   display_name: '',
-  provider: 'openai_compatible',
+  provider: '',
+  provider_model_id: null,
+  provider_model_name: '',
+  api_format: 'openai_compatible',
   api_model_name: '',
   version: '',
   tags: [],
@@ -103,9 +108,21 @@ const EMPTY_GENERATION_FORM = {
   endPeriod: '',
 }
 
+const EMPTY_PROVIDER_FORM: SettingsProviderPayload = {
+  code: '',
+  name: '',
+  api_format: 'openai_compatible',
+  remark: '',
+  website_url: '',
+  api_key: '',
+  base_url: '',
+  extra_options: {},
+  model_configs: [],
+}
+
 const EMPTY_BULK_EDIT_FORM: BulkEditForm = {
   providerEnabled: false,
-  provider: 'openai_compatible',
+  provider: '',
   baseUrlEnabled: false,
   base_url: '',
   apiKeyEnabled: false,
@@ -134,7 +151,7 @@ const EMPTY_SCHEDULE_FORM: ScheduleForm = {
 const DEFAULT_SETTINGS_LOTTERY: LotteryCode = 'dlt'
 
 const EMPTY_MODELS: SettingsModel[] = []
-const EMPTY_PROVIDERS: Array<{ code: string; name: string }> = []
+const EMPTY_PROVIDERS: SettingsProvider[] = []
 const EMPTY_USERS: AuthUser[] = []
 const EMPTY_ROLES: RoleItem[] = []
 const EMPTY_PERMISSIONS: PermissionItem[] = []
@@ -532,6 +549,10 @@ export function SettingsPage() {
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
+  const [providerModalOpen, setProviderModalOpen] = useState(false)
+  const [providerMode, setProviderMode] = useState<'create' | 'edit'>('create')
+  const [selectedProviderCode, setSelectedProviderCode] = useState<string | null>(null)
+  const [providerForm, setProviderForm] = useState<SettingsProviderPayload>(EMPTY_PROVIDER_FORM)
   const [generationModalOpen, setGenerationModalOpen] = useState(false)
   const [generationForm, setGenerationForm] = useState(EMPTY_GENERATION_FORM)
   const [generationSourceModelCodes, setGenerationSourceModelCodes] = useState<string[]>([])
@@ -633,6 +654,21 @@ export function SettingsPage() {
   useEffect(() => {
     setMaintenanceLogOffset(0)
   }, [maintenanceLogFilter])
+
+  useEffect(() => {
+    if (!providers.length) return
+    setModelForm((previous) => {
+      if (previous.provider) return previous
+      const firstProvider = providers[0]
+      return {
+        ...previous,
+        provider: firstProvider.code,
+        api_format: firstProvider.api_format,
+        base_url: firstProvider.base_url || '',
+      }
+    })
+    setBulkEditForm((previous) => (previous.provider ? previous : { ...previous, provider: providers[0].code }))
+  }, [providers])
 
   useEffect(() => {
     saveSettingsTableColumnWidths('settings:schedules', scheduleColumnWidths)
@@ -768,6 +804,9 @@ export function SettingsPage() {
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
+  const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
+  const selectedProvider = providerMap[modelForm.provider]
+  const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -892,6 +931,23 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型保存失败')
+      setMessageType('error')
+    },
+  })
+
+  const saveProviderMutation = useMutation({
+    mutationFn: (payload: SettingsProviderPayload) =>
+      providerMode === 'create'
+        ? apiClient.createSettingsProvider(payload)
+        : apiClient.updateSettingsProvider(selectedProviderCode || '', payload),
+    onSuccess: () => {
+      setMessage(providerMode === 'create' ? '供应商已创建。' : '供应商已更新。')
+      setMessageType('success')
+      setProviderModalOpen(false)
+      void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '供应商保存失败')
       setMessageType('error')
     },
   })
@@ -1142,8 +1198,113 @@ export function SettingsPage() {
   function openCreateModel() {
     setModelMode('create')
     setSelectedModelCode(null)
-    setModelForm({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
+    const defaultProvider = providers[0]
+    setModelForm({
+      ...EMPTY_MODEL_FORM,
+      provider: defaultProvider?.code || '',
+      api_format: defaultProvider?.api_format || 'openai_compatible',
+      base_url: defaultProvider?.base_url || '',
+      lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
+    })
     setModelModalOpen(true)
+  }
+
+  function applyProviderPreset(preset: 'custom' | 'deepseek' | 'aimixhub') {
+    if (preset === 'custom') {
+      setProviderForm({
+        ...EMPTY_PROVIDER_FORM,
+        code: '',
+        name: '',
+        api_format: 'openai_compatible',
+      })
+      return
+    }
+    if (preset === 'deepseek') {
+      setProviderForm({
+        ...EMPTY_PROVIDER_FORM,
+        code: 'deepseek',
+        name: 'DeepSeek',
+        website_url: 'https://platform.deepseek.com',
+        api_format: 'openai_compatible',
+        base_url: 'https://api.deepseek.com/v1',
+        model_configs: [
+          { model_id: 'deepseek-chat', display_name: 'DeepSeek V3.2' },
+          { model_id: 'deepseek-reasoner', display_name: 'DeepSeek R1' },
+        ],
+      })
+      return
+    }
+    setProviderForm({
+      ...EMPTY_PROVIDER_FORM,
+      code: 'aimixhub',
+      name: 'AiMixHub',
+      website_url: 'https://aihubmix.com',
+      api_format: 'anthropic',
+      base_url: 'https://aihubmix.com/v1',
+      model_configs: [
+        { model_id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6' },
+        { model_id: 'claude-opus-4-6', display_name: 'Claude Opus 4.6' },
+      ],
+    })
+  }
+
+  function openCreateProvider() {
+    setProviderMode('create')
+    setSelectedProviderCode(null)
+    applyProviderPreset('custom')
+    setProviderModalOpen(true)
+  }
+
+  function openEditProvider(provider: SettingsProvider) {
+    setProviderMode('edit')
+    setSelectedProviderCode(provider.code)
+    setProviderForm({
+      code: provider.code,
+      name: provider.name,
+      api_format: provider.api_format,
+      remark: provider.remark || '',
+      website_url: provider.website_url || '',
+      api_key: provider.api_key || '',
+      base_url: provider.base_url || '',
+      extra_options: provider.extra_options || {},
+      model_configs: (provider.model_configs || []).map((model) => ({ id: model.id, model_id: model.model_id, display_name: model.display_name })),
+    })
+    setProviderModalOpen(true)
+  }
+
+  function addProviderModelConfig() {
+    setProviderForm((previous) => ({
+      ...previous,
+      model_configs: [...previous.model_configs, { model_id: '', display_name: '' }],
+    }))
+  }
+
+  function removeProviderModelConfig(index: number) {
+    setProviderForm((previous) => ({
+      ...previous,
+      model_configs: previous.model_configs.filter((_, itemIndex) => itemIndex !== index),
+    }))
+  }
+
+  function submitProviderForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const payload: SettingsProviderPayload = {
+      ...providerForm,
+      code: providerForm.code?.trim(),
+      name: providerForm.name.trim(),
+      remark: providerForm.remark.trim(),
+      website_url: providerForm.website_url.trim(),
+      api_key: providerForm.api_key.trim(),
+      base_url: providerForm.base_url.trim(),
+      model_configs: providerForm.model_configs
+        .map((model) => ({
+          id: model.id,
+          model_id: model.model_id.trim(),
+          display_name: model.display_name.trim(),
+        }))
+        .filter((model) => model.model_id),
+    }
+    saveProviderMutation.mutate(payload)
   }
 
   function openGenerateModel(modelCode: string, displayName: string) {
@@ -1244,6 +1405,9 @@ export function SettingsPage() {
       model_code: model.model_code,
       display_name: model.display_name,
       provider: model.provider,
+      provider_model_id: model.provider_model_id ?? null,
+      provider_model_name: model.provider_model_name || '',
+      api_format: model.api_format || providerMap[model.provider]?.api_format || 'openai_compatible',
       api_model_name: model.api_model_name,
       version: model.version,
       tags: model.tags,
@@ -1268,11 +1432,18 @@ export function SettingsPage() {
 
   function submitModelForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const modelCode = modelForm.model_code?.trim()
+    const autoModelCode = `${modelForm.provider}-${modelForm.api_model_name || modelForm.provider_model_name || ''}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-_.]+/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '')
     saveModelMutation.mutate({
       ...modelForm,
-      model_code: modelForm.model_code?.trim(),
+      model_code: modelCode || autoModelCode,
       display_name: modelForm.display_name.trim(),
       provider: modelForm.provider.trim(),
+      provider_model_name: modelForm.provider_model_name?.trim(),
       api_model_name: modelForm.api_model_name.trim(),
       version: modelForm.version.trim(),
       base_url: modelForm.base_url.trim(),
@@ -1317,6 +1488,31 @@ export function SettingsPage() {
       }
     }
     generatePredictionMutation.mutate()
+  }
+
+  function handleModelProviderChange(providerCode: string) {
+    const provider = providerMap[providerCode]
+    setModelForm((previous) => ({
+      ...previous,
+      provider: providerCode,
+      api_format: provider?.api_format || 'openai_compatible',
+      base_url: provider?.base_url || previous.base_url,
+      provider_model_id: null,
+      provider_model_name: '',
+      api_model_name: '',
+    }))
+  }
+
+  function handleProviderModelConfigChange(providerModelIdText: string) {
+    const providerModelId = Number(providerModelIdText)
+    const modelConfig = selectedProviderModelConfigs.find((item) => item.id === providerModelId)
+    setModelForm((previous) => ({
+      ...previous,
+      provider_model_id: Number.isFinite(providerModelId) ? providerModelId : null,
+      provider_model_name: modelConfig?.model_id || '',
+      api_model_name: modelConfig?.model_id || previous.api_model_name,
+      display_name: modelMode === 'create' && !previous.display_name ? (modelConfig?.display_name || previous.display_name) : previous.display_name,
+    }))
   }
 
   function handleGenerationLotteryChange(nextLottery: LotteryCode) {
@@ -1614,6 +1810,9 @@ export function SettingsPage() {
                         <button className="primary-button settings-model-toolbar__create settings-model-toolbar__create--compact" onClick={openCreateModel} aria-label="新增模型">
                           <PlusIcon />
                           <span>新增</span>
+                        </button>
+                        <button className="ghost-button settings-model-toolbar__create--compact" type="button" onClick={openCreateProvider}>
+                          供应商管理
                         </button>
                         {modelManagementView === 'list' && selectedModelCodes.length > 0 ? (
                           <>
@@ -2589,10 +2788,28 @@ export function SettingsPage() {
                   </label>
                   <label className="field">
                     <span>Provider</span>
-                    <select value={modelForm.provider} onChange={(event) => setModelForm((previous) => ({ ...previous, provider: event.target.value }))}>
+                    <select value={modelForm.provider} onChange={(event) => handleModelProviderChange(event.target.value)}>
                       {providers.map((provider) => (
                         <option key={provider.code} value={provider.code}>
                           {provider.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>接口格式</span>
+                    <input value={modelForm.api_format || selectedProvider?.api_format || ''} readOnly />
+                  </label>
+                  <label className="field">
+                    <span>供应商模型</span>
+                    <select
+                      value={modelForm.provider_model_id ? String(modelForm.provider_model_id) : ''}
+                      onChange={(event) => handleProviderModelConfigChange(event.target.value)}
+                    >
+                      <option value="">请选择供应商模型</option>
+                      {selectedProviderModelConfigs.map((modelConfig) => (
+                        <option key={modelConfig.id} value={modelConfig.id}>
+                          {modelConfig.display_name} ({modelConfig.model_id})
                         </option>
                       ))}
                     </select>
@@ -2688,6 +2905,141 @@ export function SettingsPage() {
               <div className="form-actions model-config-modal__actions">
                 <button className="ghost-button" type="button" onClick={() => setModelModalOpen(false)}>关闭</button>
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {providerModalOpen ? (
+        <div className="modal-shell" role="presentation" onClick={() => setProviderModalOpen(false)}>
+          <div className="modal-card modal-card--form model-config-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid model-config-modal__form" onSubmit={submitProviderForm}>
+              <div className="modal-card__header model-config-modal__header">
+                <div className="model-config-modal__header-main">
+                  <p className="modal-card__eyebrow">供应商管理</p>
+                  <h3>{providerMode === 'create' ? '新增供应商' : '编辑供应商'}</h3>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setProviderModalOpen(false)}>关闭</button>
+              </div>
+
+              <div className="toolbar-inline">
+                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('custom')}>自定义供应商</button>
+                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('deepseek')}>DeepSeek</button>
+                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('aimixhub')}>AiMixHub</button>
+              </div>
+
+              <label className="field">
+                <span>供应商标识</span>
+                <input
+                  value={providerForm.code || ''}
+                  onChange={(event) => setProviderForm((previous) => ({ ...previous, code: event.target.value }))}
+                  required
+                  disabled={providerMode === 'edit'}
+                />
+              </label>
+              <label className="field">
+                <span>供应商名称</span>
+                <input value={providerForm.name} onChange={(event) => setProviderForm((previous) => ({ ...previous, name: event.target.value }))} required />
+              </label>
+              <label className="field">
+                <span>官网链接</span>
+                <input value={providerForm.website_url} onChange={(event) => setProviderForm((previous) => ({ ...previous, website_url: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>接口格式</span>
+                <select
+                  value={providerForm.api_format}
+                  onChange={(event) => setProviderForm((previous) => ({ ...previous, api_format: event.target.value as SettingsProviderPayload['api_format'] }))}
+                >
+                  <option value="openai_responses">OpenAI Responses</option>
+                  <option value="openai_compatible">OpenAI Compatible</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="amazon_bedrock">Amazon Bedrock</option>
+                  <option value="google_gemini">Google(Gemini)</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>API Key</span>
+                <input value={providerForm.api_key} onChange={(event) => setProviderForm((previous) => ({ ...previous, api_key: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Base URL</span>
+                <input value={providerForm.base_url} onChange={(event) => setProviderForm((previous) => ({ ...previous, base_url: event.target.value }))} />
+              </label>
+              <label className="field model-config-modal__field--full">
+                <span>备注</span>
+                <input value={providerForm.remark} onChange={(event) => setProviderForm((previous) => ({ ...previous, remark: event.target.value }))} />
+              </label>
+
+              <div className="panel-card">
+                <div className="toolbar-inline" style={{ justifyContent: 'space-between' }}>
+                  <strong>模型配置</strong>
+                  <button className="ghost-button" type="button" onClick={addProviderModelConfig}>+ 添加模型</button>
+                </div>
+                {providerForm.model_configs.map((modelConfig, index) => (
+                  <div key={`${modelConfig.id || 'new'}-${index}`} className="model-config-modal__grid">
+                    <label className="field">
+                      <span>模型ID</span>
+                      <input
+                        value={modelConfig.model_id}
+                        onChange={(event) => setProviderForm((previous) => ({
+                          ...previous,
+                          model_configs: previous.model_configs.map((item, itemIndex) => itemIndex === index ? { ...item, model_id: event.target.value } : item),
+                        }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>显示名称</span>
+                      <input
+                        value={modelConfig.display_name}
+                        onChange={(event) => setProviderForm((previous) => ({
+                          ...previous,
+                          model_configs: previous.model_configs.map((item, itemIndex) => itemIndex === index ? { ...item, display_name: event.target.value } : item),
+                        }))}
+                      />
+                    </label>
+                    <button className="ghost-button" type="button" onClick={() => removeProviderModelConfig(index)}>删除</button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="panel-card">
+                <strong>现有供应商</strong>
+                <div className="toolbar-inline" style={{ flexWrap: 'wrap' }}>
+                  {providers.map((provider) => (
+                    <button key={provider.code} className="ghost-button" type="button" onClick={() => openEditProvider(provider)}>
+                      {provider.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-actions model-config-modal__actions">
+                <button className="ghost-button" type="button" onClick={() => setProviderModalOpen(false)}>关闭</button>
+                {providerMode === 'edit' ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      if (!selectedProviderCode) return
+                      apiClient.deleteSettingsProvider(selectedProviderCode)
+                        .then(() => {
+                          setMessage('供应商已删除。')
+                          setMessageType('success')
+                          setProviderModalOpen(false)
+                          void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
+                        })
+                        .catch((error) => {
+                          setMessage(error instanceof Error ? error.message : '删除供应商失败')
+                          setMessageType('error')
+                        })
+                    }}
+                  >
+                    删除
+                  </button>
+                ) : null}
+                <button className="primary-button" type="submit">{providerMode === 'create' ? '创建供应商' : '保存供应商'}</button>
               </div>
             </form>
           </div>

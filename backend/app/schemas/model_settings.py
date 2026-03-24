@@ -9,6 +9,9 @@ class ModelSettingsPayload(BaseModel):
     model_code: str | None = None
     display_name: str
     provider: str
+    provider_model_id: int | None = None
+    provider_model_name: str | None = ""
+    api_format: str | None = "openai_compatible"
     api_model_name: str
     version: str | None = ""
     tags: list[str] = Field(default_factory=list)
@@ -28,6 +31,9 @@ class ModelResponse(BaseModel):
     model_code: str
     display_name: str
     provider: str
+    provider_model_id: int | None = None
+    provider_model_name: str = ""
+    api_format: str = "openai_compatible"
     api_model_name: str
     version: str = ""
     tags: list[str] = Field(default_factory=list)
@@ -47,3 +53,21 @@ class ModelListResponse(BaseModel):
 
 class ProviderListResponse(BaseModel):
     providers: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ProviderModelConfigPayload(BaseModel):
+    id: int | None = None
+    model_id: str
+    display_name: str
+
+
+class ProviderSettingsPayload(BaseModel):
+    code: str | None = None
+    name: str
+    api_format: str = "openai_compatible"
+    remark: str | None = ""
+    website_url: str | None = ""
+    api_key: str | None = ""
+    base_url: str | None = ""
+    extra_options: dict[str, Any] = Field(default_factory=dict)
+    model_configs: list[ProviderModelConfigPayload] = Field(default_factory=list)

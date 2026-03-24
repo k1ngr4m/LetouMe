@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from backend.app.schemas.model_settings import ModelSettingsPayload
+from backend.app.schemas.model_settings import ModelSettingsPayload, ProviderSettingsPayload
 
 
 class PaginationPayload(BaseModel):
@@ -31,8 +31,20 @@ class ModelCodePayload(BaseModel):
     model_code: str
 
 
+class ProviderCodePayload(BaseModel):
+    provider_code: str
+
+
 class ModelUpdatePayload(ModelSettingsPayload):
     model_code: str
+
+
+class ProviderCreatePayload(ProviderSettingsPayload):
+    code: str
+
+
+class ProviderUpdatePayload(ProviderSettingsPayload):
+    provider_code: str
 
 
 class ModelStatusUpdatePayload(BaseModel):
