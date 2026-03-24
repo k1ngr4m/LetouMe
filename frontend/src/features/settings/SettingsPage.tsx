@@ -2524,99 +2524,130 @@ export function SettingsPage() {
 
       {modelModalOpen ? (
         <div className="modal-shell" role="presentation" onClick={() => setModelModalOpen(false)}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <form className="settings-form-grid" onSubmit={submitModelForm}>
-              <div className="modal-card__header">
-                <div>
+          <div className="modal-card modal-card--form model-config-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid model-config-modal__form" onSubmit={submitModelForm}>
+              <div className="modal-card__header model-config-modal__header">
+                <div className="model-config-modal__header-main">
                   <p className="modal-card__eyebrow">模型配置</p>
                   <h3>{modelMode === 'create' ? '新增模型' : '编辑模型'}</h3>
+                  <p className="model-config-modal__mode-tip">{modelMode === 'create' ? '创建新模型用于预测生成。' : '修改当前模型配置，不影响历史记录。'}</p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setModelModalOpen(false)}>关闭</button>
               </div>
-              <label className="field">
-                <span>模型编码</span>
-                <input value={modelForm.model_code || ''} onChange={(event) => setModelForm((previous) => ({ ...previous, model_code: event.target.value }))} required disabled={modelMode === 'edit'} />
-              </label>
-              <label className="field">
-                <span>显示名称</span>
-                <input value={modelForm.display_name} onChange={(event) => setModelForm((previous) => ({ ...previous, display_name: event.target.value }))} required />
-              </label>
-              <label className="field">
-                <span>Provider</span>
-                <select value={modelForm.provider} onChange={(event) => setModelForm((previous) => ({ ...previous, provider: event.target.value }))}>
-                  {providers.map((provider) => (
-                    <option key={provider.code} value={provider.code}>
-                      {provider.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>API 模型名</span>
-                <input value={modelForm.api_model_name} onChange={(event) => setModelForm((previous) => ({ ...previous, api_model_name: event.target.value }))} required />
-              </label>
-              <label className="field">
-                <span>版本</span>
-                <input value={modelForm.version} onChange={(event) => setModelForm((previous) => ({ ...previous, version: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>Base URL</span>
-                <input value={modelForm.base_url} onChange={(event) => setModelForm((previous) => ({ ...previous, base_url: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>API Key</span>
-                <input value={modelForm.api_key} onChange={(event) => setModelForm((previous) => ({ ...previous, api_key: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>APP Code</span>
-                <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>Temperature</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={modelForm.temperature ?? ''}
-                  onChange={(event) => setModelForm((previous) => ({ ...previous, temperature: event.target.value ? Number(event.target.value) : null }))}
-                />
-              </label>
-              <label className="field">
-                <span>标签</span>
-                <input
-                  value={modelForm.tags.join(',')}
-                  onChange={(event) => setModelForm((previous) => ({ ...previous, tags: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))}
-                />
-              </label>
-              <label className="toggle-chip">
-                <input type="checkbox" checked={modelForm.is_active} onChange={(event) => setModelForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
-                <span>启用模型</span>
-              </label>
-              <div className="field">
-                <span>适用彩种</span>
-                <div className="filter-chip-group">
-                  {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => {
-                    const active = modelForm.lottery_codes.includes(code)
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        className={clsx('filter-chip', active && 'is-active')}
-                        onClick={() =>
-                          setModelForm((previous) => ({
-                            ...previous,
-                            lottery_codes: active
-                              ? previous.lottery_codes.filter((item) => item !== code)
-                              : [...previous.lottery_codes, code],
-                          }))
-                        }
-                      >
-                        {getLotteryLabel(code)}
-                      </button>
-                    )
-                  })}
+              <section className="model-config-modal__section">
+                <div className="model-config-modal__section-title">
+                  <strong>基础信息</strong>
+                  <span>确定模型标识、展示名称和服务提供方。</span>
                 </div>
-              </div>
-              <div className="form-actions">
+                <div className="model-config-modal__grid">
+                  <label className="field">
+                    <span>模型编码</span>
+                    <input value={modelForm.model_code || ''} onChange={(event) => setModelForm((previous) => ({ ...previous, model_code: event.target.value }))} required disabled={modelMode === 'edit'} />
+                  </label>
+                  <label className="field">
+                    <span>显示名称</span>
+                    <input value={modelForm.display_name} onChange={(event) => setModelForm((previous) => ({ ...previous, display_name: event.target.value }))} required />
+                  </label>
+                  <label className="field">
+                    <span>Provider</span>
+                    <select value={modelForm.provider} onChange={(event) => setModelForm((previous) => ({ ...previous, provider: event.target.value }))}>
+                      {providers.map((provider) => (
+                        <option key={provider.code} value={provider.code}>
+                          {provider.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>API 模型名</span>
+                    <input value={modelForm.api_model_name} onChange={(event) => setModelForm((previous) => ({ ...previous, api_model_name: event.target.value }))} required />
+                  </label>
+                </div>
+              </section>
+
+              <section className="model-config-modal__section">
+                <div className="model-config-modal__section-title">
+                  <strong>连接与鉴权</strong>
+                  <span>维护接口地址和访问凭证，支持按模型独立配置。</span>
+                </div>
+                <div className="model-config-modal__grid">
+                  <label className="field model-config-modal__field--full">
+                    <span>Base URL</span>
+                    <input value={modelForm.base_url} onChange={(event) => setModelForm((previous) => ({ ...previous, base_url: event.target.value }))} />
+                  </label>
+                  <label className="field model-config-modal__field--full">
+                    <span>API Key</span>
+                    <input value={modelForm.api_key} onChange={(event) => setModelForm((previous) => ({ ...previous, api_key: event.target.value }))} />
+                  </label>
+                  <label className="field">
+                    <span>APP Code</span>
+                    <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="model-config-modal__section">
+                <div className="model-config-modal__section-title">
+                  <strong>高级参数</strong>
+                  <span>控制采样参数、标签与投放彩种。</span>
+                </div>
+                <div className="model-config-modal__grid">
+                  <label className="field">
+                    <span>版本</span>
+                    <input value={modelForm.version} onChange={(event) => setModelForm((previous) => ({ ...previous, version: event.target.value }))} />
+                  </label>
+                  <label className="field">
+                    <span>Temperature</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={modelForm.temperature ?? ''}
+                      onChange={(event) => setModelForm((previous) => ({ ...previous, temperature: event.target.value ? Number(event.target.value) : null }))}
+                    />
+                  </label>
+                  <label className="field model-config-modal__field--full">
+                    <span>标签</span>
+                    <input
+                      value={modelForm.tags.join(',')}
+                      onChange={(event) => setModelForm((previous) => ({ ...previous, tags: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))}
+                    />
+                  </label>
+                </div>
+                <div className="model-config-modal__toggles">
+                  <label className="toggle-chip model-config-modal__toggle">
+                    <input type="checkbox" checked={modelForm.is_active} onChange={(event) => setModelForm((previous) => ({ ...previous, is_active: event.target.checked }))} />
+                    <span>启用模型</span>
+                  </label>
+                  <div className="field model-config-modal__lottery-field">
+                    <span>适用彩种</span>
+                    <div className="filter-chip-group">
+                      {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => {
+                        const active = modelForm.lottery_codes.includes(code)
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            className={clsx('filter-chip', active && 'is-active')}
+                            onClick={() =>
+                              setModelForm((previous) => ({
+                                ...previous,
+                                lottery_codes: active
+                                  ? previous.lottery_codes.filter((item) => item !== code)
+                                  : [...previous.lottery_codes, code],
+                              }))
+                            }
+                          >
+                            {getLotteryLabel(code)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="form-actions model-config-modal__actions">
+                <button className="ghost-button" type="button" onClick={() => setModelModalOpen(false)}>关闭</button>
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
               </div>
             </form>
