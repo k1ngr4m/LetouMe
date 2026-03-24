@@ -6,6 +6,7 @@ import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
+import { loadSettingsTableColumnWidths, saveSettingsTableColumnWidths } from '../../shared/lib/storage'
 import type {
   AuthUser,
   BulkModelActionResult,
@@ -153,6 +154,53 @@ const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> 
   name_desc: { label: '名称 Z-A', hint: '按名称倒序排序' },
 }
 
+type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
+type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
+
+const SCHEDULE_COLUMN_DEFAULT_WIDTHS: Record<ScheduleColumnKey, number> = {
+  name: 260,
+  type: 108,
+  lottery: 96,
+  models: 188,
+  rule: 240,
+  next_run: 196,
+  status: 146,
+  enabled: 136,
+  actions: 210,
+}
+
+const MAINTENANCE_COLUMN_DEFAULT_WIDTHS: Record<MaintenanceColumnKey, number> = {
+  lottery: 110,
+  status: 142,
+  fetched: 118,
+  saved: 118,
+  period: 126,
+  created: 176,
+  actions: 132,
+}
+
+const SCHEDULE_COLUMN_MIN_WIDTHS: Record<ScheduleColumnKey, number> = {
+  name: 220,
+  type: 96,
+  lottery: 88,
+  models: 150,
+  rule: 210,
+  next_run: 168,
+  status: 126,
+  enabled: 126,
+  actions: 190,
+}
+
+const MAINTENANCE_COLUMN_MIN_WIDTHS: Record<MaintenanceColumnKey, number> = {
+  lottery: 96,
+  status: 126,
+  fetched: 104,
+  saved: 104,
+  period: 110,
+  created: 150,
+  actions: 118,
+}
+
 function getLotteryLabel(lotteryCode: LotteryCode) {
   return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
 }
@@ -297,6 +345,27 @@ function IconButton({
       aria-expanded={expanded}
     >
       {icon}
+    </button>
+  )
+}
+
+function ColumnResizeHandle({
+  label,
+  onMouseDown,
+}: {
+  label: string
+  onMouseDown: (event: MouseEvent<HTMLButtonElement>) => void
+}) {
+  return (
+    <button
+      type="button"
+      className="column-resize-handle"
+      aria-label={label}
+      title={label}
+      onMouseDown={onMouseDown}
+      onClick={(event) => event.preventDefault()}
+    >
+      <span aria-hidden="true" />
     </button>
   )
 }
@@ -451,6 +520,14 @@ export function SettingsPage() {
   const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null })
   const [maintenanceLogFilter, setMaintenanceLogFilter] = useState<MaintenanceLogFilter>('all')
   const [maintenanceLogOffset, setMaintenanceLogOffset] = useState(0)
+  const [scheduleColumnWidths, setScheduleColumnWidths] = useState<Record<ScheduleColumnKey, number>>(() => ({
+    ...SCHEDULE_COLUMN_DEFAULT_WIDTHS,
+    ...(loadSettingsTableColumnWidths('settings:schedules') as Partial<Record<ScheduleColumnKey, number>>),
+  }))
+  const [maintenanceColumnWidths, setMaintenanceColumnWidths] = useState<Record<MaintenanceColumnKey, number>>(() => ({
+    ...MAINTENANCE_COLUMN_DEFAULT_WIDTHS,
+    ...(loadSettingsTableColumnWidths('settings:maintenance') as Partial<Record<MaintenanceColumnKey, number>>),
+  }))
   const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
@@ -533,6 +610,14 @@ export function SettingsPage() {
   useEffect(() => {
     setMaintenanceLogOffset(0)
   }, [maintenanceLogFilter])
+
+  useEffect(() => {
+    saveSettingsTableColumnWidths('settings:schedules', scheduleColumnWidths)
+  }, [scheduleColumnWidths])
+
+  useEffect(() => {
+    saveSettingsTableColumnWidths('settings:maintenance', maintenanceColumnWidths)
+  }, [maintenanceColumnWidths])
 
   useEffect(() => {
     if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu) return undefined
@@ -1294,6 +1379,48 @@ export function SettingsPage() {
     return permissionMap[permissionCode]?.permission_name || permissionCode
   }
 
+  function startScheduleColumnResize(event: MouseEvent<HTMLButtonElement>, column: ScheduleColumnKey) {
+    event.preventDefault()
+    event.stopPropagation()
+    const startX = event.clientX
+    const baseWidth = scheduleColumnWidths[column]
+    const minWidth = SCHEDULE_COLUMN_MIN_WIDTHS[column]
+
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+      const nextWidth = Math.max(minWidth, baseWidth + moveEvent.clientX - startX)
+      setScheduleColumnWidths((previous) => ({ ...previous, [column]: Math.round(nextWidth) }))
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  function startMaintenanceColumnResize(event: MouseEvent<HTMLButtonElement>, column: MaintenanceColumnKey) {
+    event.preventDefault()
+    event.stopPropagation()
+    const startX = event.clientX
+    const baseWidth = maintenanceColumnWidths[column]
+    const minWidth = MAINTENANCE_COLUMN_MIN_WIDTHS[column]
+
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+      const nextWidth = Math.max(minWidth, baseWidth + moveEvent.clientX - startX)
+      setMaintenanceColumnWidths((previous) => ({ ...previous, [column]: Math.round(nextWidth) }))
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
   return (
     <div className="page-stack">
       <section className="hero-panel hero-panel--settings">
@@ -1724,13 +1851,34 @@ export function SettingsPage() {
                       <table className="history-table settings-model-table settings-schedule-table settings-maintenance-table--task-list">
                         <thead>
                           <tr>
-                            <th className="settings-maintenance-table__col-lottery">彩种</th>
-                            <th className="settings-maintenance-table__col-status">状态</th>
-                            <th className="settings-maintenance-table__col-metric">抓取条数</th>
-                            <th className="settings-maintenance-table__col-metric">写入条数</th>
-                            <th className="settings-maintenance-table__col-period">最新期号</th>
-                            <th className="settings-maintenance-table__col-time">创建时间</th>
-                            <th className="settings-maintenance-table__col-actions">操作</th>
+                            <th className="settings-maintenance-table__col-lottery is-resizable" style={{ width: maintenanceColumnWidths.lottery, minWidth: maintenanceColumnWidths.lottery }}>
+                              彩种
+                              <ColumnResizeHandle label="调整彩种列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'lottery')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-status is-resizable" style={{ width: maintenanceColumnWidths.status, minWidth: maintenanceColumnWidths.status }}>
+                              状态
+                              <ColumnResizeHandle label="调整状态列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'status')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-metric is-resizable" style={{ width: maintenanceColumnWidths.fetched, minWidth: maintenanceColumnWidths.fetched }}>
+                              抓取条数
+                              <ColumnResizeHandle label="调整抓取条数列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'fetched')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-metric is-resizable" style={{ width: maintenanceColumnWidths.saved, minWidth: maintenanceColumnWidths.saved }}>
+                              写入条数
+                              <ColumnResizeHandle label="调整写入条数列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'saved')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-period is-resizable" style={{ width: maintenanceColumnWidths.period, minWidth: maintenanceColumnWidths.period }}>
+                              最新期号
+                              <ColumnResizeHandle label="调整最新期号列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'period')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-time is-resizable" style={{ width: maintenanceColumnWidths.created, minWidth: maintenanceColumnWidths.created }}>
+                              创建时间
+                              <ColumnResizeHandle label="调整创建时间列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'created')} />
+                            </th>
+                            <th className="settings-maintenance-table__col-actions is-resizable" style={{ width: maintenanceColumnWidths.actions, minWidth: maintenanceColumnWidths.actions }}>
+                              操作
+                              <ColumnResizeHandle label="调整操作列宽" onMouseDown={(event) => startMaintenanceColumnResize(event, 'actions')} />
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1740,17 +1888,17 @@ export function SettingsPage() {
                             const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
                             return (
                               <tr key={lotteryCode}>
-                                <td className="settings-maintenance-table__col-lottery">{getLotteryLabel(lotteryCode)}</td>
-                                <td className="settings-maintenance-table__col-status">
+                                <td className="settings-maintenance-table__col-lottery" style={{ width: maintenanceColumnWidths.lottery, minWidth: maintenanceColumnWidths.lottery }}>{getLotteryLabel(lotteryCode)}</td>
+                                <td className="settings-maintenance-table__col-status" style={{ width: maintenanceColumnWidths.status, minWidth: maintenanceColumnWidths.status }}>
                                   <span className={clsx('status-pill', task?.status === 'succeeded' && 'is-active', task?.status === 'failed' && 'is-deleted')}>
                                     {task ? getTaskStatusLabel(task.status) : '尚未执行'}
                                   </span>
                                 </td>
-                                <td className="settings-maintenance-table__col-metric">{task?.progress_summary.fetched_count ?? 0}</td>
-                                <td className="settings-maintenance-table__col-metric">{task?.progress_summary.saved_count ?? 0}</td>
-                                <td className="settings-maintenance-table__col-period">{task?.progress_summary.latest_period || '-'}</td>
-                                <td className="settings-maintenance-table__col-time">{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
-                                <td className="settings-maintenance-table__col-actions">
+                                <td className="settings-maintenance-table__col-metric" style={{ width: maintenanceColumnWidths.fetched, minWidth: maintenanceColumnWidths.fetched }}>{task?.progress_summary.fetched_count ?? 0}</td>
+                                <td className="settings-maintenance-table__col-metric" style={{ width: maintenanceColumnWidths.saved, minWidth: maintenanceColumnWidths.saved }}>{task?.progress_summary.saved_count ?? 0}</td>
+                                <td className="settings-maintenance-table__col-period" style={{ width: maintenanceColumnWidths.period, minWidth: maintenanceColumnWidths.period }}>{task?.progress_summary.latest_period || '-'}</td>
+                                <td className="settings-maintenance-table__col-time" style={{ width: maintenanceColumnWidths.created, minWidth: maintenanceColumnWidths.created }}>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
+                                <td className="settings-maintenance-table__col-actions" style={{ width: maintenanceColumnWidths.actions, minWidth: maintenanceColumnWidths.actions }}>
                                   <button className="secondary-button" type="button" onClick={() => mutation.mutate()} disabled={running}>
                                     {running ? '执行中...' : '立即执行'}
                                   </button>
@@ -1896,15 +2044,42 @@ export function SettingsPage() {
                         <table className="history-table settings-model-table settings-schedule-table settings-schedule-table--task-list">
                           <thead>
                             <tr>
-                              <th className="settings-schedule-table__col-name">名称</th>
-                              <th className="settings-schedule-table__col-type">类型</th>
-                              <th className="settings-schedule-table__col-lottery">彩种</th>
-                              <th className="settings-schedule-table__col-models">模型</th>
-                              <th className="settings-schedule-table__col-rule">规则</th>
-                              <th className="settings-schedule-table__col-next-run">下次执行（北京时间）</th>
-                              <th className="settings-schedule-table__col-status">最近状态</th>
-                              <th className="settings-schedule-table__col-enabled">启用</th>
-                              <th className="settings-schedule-table__col-actions">操作</th>
+                              <th className="settings-schedule-table__col-name is-resizable" style={{ width: scheduleColumnWidths.name, minWidth: scheduleColumnWidths.name }}>
+                                名称
+                                <ColumnResizeHandle label="调整名称列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'name')} />
+                              </th>
+                              <th className="settings-schedule-table__col-type is-resizable" style={{ width: scheduleColumnWidths.type, minWidth: scheduleColumnWidths.type }}>
+                                类型
+                                <ColumnResizeHandle label="调整类型列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'type')} />
+                              </th>
+                              <th className="settings-schedule-table__col-lottery is-resizable" style={{ width: scheduleColumnWidths.lottery, minWidth: scheduleColumnWidths.lottery }}>
+                                彩种
+                                <ColumnResizeHandle label="调整彩种列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'lottery')} />
+                              </th>
+                              <th className="settings-schedule-table__col-models is-resizable" style={{ width: scheduleColumnWidths.models, minWidth: scheduleColumnWidths.models }}>
+                                模型
+                                <ColumnResizeHandle label="调整模型列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'models')} />
+                              </th>
+                              <th className="settings-schedule-table__col-rule is-resizable" style={{ width: scheduleColumnWidths.rule, minWidth: scheduleColumnWidths.rule }}>
+                                规则
+                                <ColumnResizeHandle label="调整规则列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'rule')} />
+                              </th>
+                              <th className="settings-schedule-table__col-next-run is-resizable" style={{ width: scheduleColumnWidths.next_run, minWidth: scheduleColumnWidths.next_run }}>
+                                下次执行（北京时间）
+                                <ColumnResizeHandle label="调整下次执行列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'next_run')} />
+                              </th>
+                              <th className="settings-schedule-table__col-status is-resizable" style={{ width: scheduleColumnWidths.status, minWidth: scheduleColumnWidths.status }}>
+                                最近状态
+                                <ColumnResizeHandle label="调整最近状态列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'status')} />
+                              </th>
+                              <th className="settings-schedule-table__col-enabled is-resizable" style={{ width: scheduleColumnWidths.enabled, minWidth: scheduleColumnWidths.enabled }}>
+                                启用
+                                <ColumnResizeHandle label="调整启用列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'enabled')} />
+                              </th>
+                              <th className="settings-schedule-table__col-actions is-resizable" style={{ width: scheduleColumnWidths.actions, minWidth: scheduleColumnWidths.actions }}>
+                                操作
+                                <ColumnResizeHandle label="调整操作列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'actions')} />
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1926,27 +2101,27 @@ export function SettingsPage() {
                               return (
                                 <Fragment key={task.task_code}>
                                   <tr>
-                                    <td className="settings-schedule-table__col-name">
+                                    <td className="settings-schedule-table__col-name" style={{ width: scheduleColumnWidths.name, minWidth: scheduleColumnWidths.name }}>
                                       <div className="settings-model-table__title settings-schedule-table__title">
                                         <strong>{task.task_name}</strong>
                                         <span>{task.task_code}</span>
                                       </div>
                                     </td>
-                                    <td className="settings-schedule-table__col-type">
+                                    <td className="settings-schedule-table__col-type" style={{ width: scheduleColumnWidths.type, minWidth: scheduleColumnWidths.type }}>
                                       <span className="settings-model-table__chip">{getScheduleTaskTypeLabel(task.task_type)}</span>
                                     </td>
-                                    <td className="settings-schedule-table__col-lottery">{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
-                                    <td className="settings-schedule-table__models settings-schedule-table__col-models">
+                                    <td className="settings-schedule-table__col-lottery" style={{ width: scheduleColumnWidths.lottery, minWidth: scheduleColumnWidths.lottery }}>{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
+                                    <td className="settings-schedule-table__models settings-schedule-table__col-models" style={{ width: scheduleColumnWidths.models, minWidth: scheduleColumnWidths.models }}>
                                       {task.task_type === 'prediction_generate'
                                         ? task.model_codes.map((code) => modelNameMap[code] || code).join(' / ') || '-'
                                         : '-'}
                                     </td>
-                                    <td className="settings-schedule-table__rule settings-schedule-table__col-rule">
+                                    <td className="settings-schedule-table__rule settings-schedule-table__col-rule" style={{ width: scheduleColumnWidths.rule, minWidth: scheduleColumnWidths.rule }}>
                                       <strong>{task.rule_summary || '-'}</strong>
                                       <span>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
                                     </td>
-                                    <td className="settings-schedule-table__col-next-run">{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
-                                    <td className="settings-schedule-table__col-status">
+                                    <td className="settings-schedule-table__col-next-run" style={{ width: scheduleColumnWidths.next_run, minWidth: scheduleColumnWidths.next_run }}>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
+                                    <td className="settings-schedule-table__col-status" style={{ width: scheduleColumnWidths.status, minWidth: scheduleColumnWidths.status }}>
                                       <span
                                         className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${runStatusMeta.tone}`)}
                                         data-tooltip={statusTooltip}
@@ -1958,7 +2133,7 @@ export function SettingsPage() {
                                         <span>{runStatusMeta.label}</span>
                                       </span>
                                     </td>
-                                    <td className="settings-schedule-table__col-enabled">
+                                    <td className="settings-schedule-table__col-enabled" style={{ width: scheduleColumnWidths.enabled, minWidth: scheduleColumnWidths.enabled }}>
                                       <span
                                         className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${enabledMeta.tone}`)}
                                         data-tooltip={enabledTooltip}
@@ -1970,7 +2145,7 @@ export function SettingsPage() {
                                         <span>{enabledMeta.label}</span>
                                       </span>
                                     </td>
-                                    <td className="settings-schedule-table__col-actions">
+                                    <td className="settings-schedule-table__col-actions" style={{ width: scheduleColumnWidths.actions, minWidth: scheduleColumnWidths.actions }}>
                                       <div className="settings-model-table__actions settings-schedule-actions">
                                         <IconButton
                                           label={`${isExpanded ? '收起详情' : '查看详情'}：${task.task_name}`}

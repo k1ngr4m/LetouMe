@@ -3415,6 +3415,16 @@ a {
   white-space: nowrap;
 }
 
+.settings-schedule-table--task-list .settings-schedule-table__col-models,
+.settings-schedule-table--task-list .settings-schedule-table__col-rule {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.settings-schedule-table--task-list .settings-schedule-table__col-models {
+  line-height: 1.35;
+}
+
 .settings-schedule-table__col-name {
   width: 16rem;
   min-width: 16rem;
@@ -3483,6 +3493,78 @@ a {
 .settings-maintenance-table__col-actions {
   width: 8rem;
   min-width: 8rem;
+}
+
+.settings-schedule-table--task-list .settings-schedule-table__col-name,
+.settings-schedule-table--task-list .settings-schedule-table__col-actions,
+.settings-maintenance-table--task-list .settings-maintenance-table__col-lottery,
+.settings-maintenance-table--task-list .settings-maintenance-table__col-actions {
+  position: sticky;
+  background: var(--panel-card-bg);
+}
+
+.settings-schedule-table--task-list .settings-schedule-table__col-name {
+  left: 0;
+  z-index: 4;
+}
+
+.settings-schedule-table--task-list .settings-schedule-table__col-actions {
+  right: 0;
+  z-index: 4;
+}
+
+.settings-maintenance-table--task-list .settings-maintenance-table__col-lottery {
+  left: 0;
+  z-index: 4;
+}
+
+.settings-maintenance-table--task-list .settings-maintenance-table__col-actions {
+  right: 0;
+  z-index: 4;
+}
+
+.settings-schedule-table--task-list th.settings-schedule-table__col-name,
+.settings-schedule-table--task-list th.settings-schedule-table__col-actions,
+.settings-maintenance-table--task-list th.settings-maintenance-table__col-lottery,
+.settings-maintenance-table--task-list th.settings-maintenance-table__col-actions {
+  z-index: 6;
+}
+
+.settings-schedule-table--task-list th.is-resizable,
+.settings-maintenance-table--task-list th.is-resizable {
+  position: relative;
+  padding-right: 1rem;
+}
+
+.column-resize-handle {
+  position: absolute;
+  top: 0.22rem;
+  right: 0;
+  width: 0.82rem;
+  height: calc(100% - 0.44rem);
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  cursor: col-resize;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.18s ease, background-color 0.18s ease;
+}
+
+.column-resize-handle span {
+  display: block;
+  width: 2px;
+  height: 70%;
+  margin: 0 auto;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.settings-schedule-table--task-list th.is-resizable:hover .column-resize-handle,
+.settings-maintenance-table--task-list th.is-resizable:hover .column-resize-handle,
+.column-resize-handle:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .settings-maintenance-pagination {
