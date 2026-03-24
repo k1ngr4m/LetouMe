@@ -130,6 +130,16 @@ export function App() {
               }
             />
             <Route
+              path="/settings/maintenance"
+              element={
+                <ProtectedRoute requiredPermission={MODEL_MANAGEMENT_PERMISSION}>
+                  <AppShell>
+                    <SettingsPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/settings/schedules"
               element={
                 <ProtectedRoute requiredPermission={SCHEDULE_MANAGEMENT_PERMISSION}>

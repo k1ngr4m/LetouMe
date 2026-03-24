@@ -50,6 +50,28 @@ class LotteryFetchTaskResponse(BaseModel):
     error_message: str | None = None
 
 
+class MaintenanceRunLogItemResponse(BaseModel):
+    id: int
+    task_id: str
+    lottery_code: str = "dlt"
+    trigger_type: str = "manual"
+    status: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    fetched_count: int = 0
+    saved_count: int = 0
+    latest_period: str | None = None
+    duration_ms: float = 0
+    error_message: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class MaintenanceRunLogListResponse(BaseModel):
+    logs: list[MaintenanceRunLogItemResponse] = Field(default_factory=list)
+    total_count: int = 0
+
+
 class BulkModelActionResponse(BaseModel):
     selected_count: int = 0
     processed_count: int = 0

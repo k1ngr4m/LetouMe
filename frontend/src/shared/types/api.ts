@@ -539,6 +539,28 @@ export type LotteryFetchTask = {
   error_message?: string | null
 }
 
+export type MaintenanceRunLog = {
+  id: number
+  task_id: string
+  lottery_code: LotteryCode
+  trigger_type: 'manual' | 'schedule'
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  started_at?: string | null
+  finished_at?: string | null
+  fetched_count: number
+  saved_count: number
+  latest_period?: string | null
+  duration_ms: number
+  error_message?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type MaintenanceRunLogListResponse = {
+  logs: MaintenanceRunLog[]
+  total_count: number
+}
+
 export type SettingsPredictionRecordSummary = {
   lottery_code?: LotteryCode
   record_type: 'current' | 'history'

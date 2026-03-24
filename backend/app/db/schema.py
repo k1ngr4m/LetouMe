@@ -411,6 +411,28 @@ SCHEMA_STATEMENTS = [
         INDEX idx_scheduled_task_next_run (is_active, next_run_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS maintenance_run_log (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        task_id VARCHAR(64) NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        trigger_type VARCHAR(16) NOT NULL DEFAULT 'manual',
+        status VARCHAR(32) NOT NULL,
+        started_at DATETIME NULL,
+        finished_at DATETIME NULL,
+        fetched_count INT NOT NULL DEFAULT 0,
+        saved_count INT NOT NULL DEFAULT 0,
+        latest_period VARCHAR(32) NULL,
+        duration_ms DOUBLE NOT NULL DEFAULT 0,
+        error_message TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_maintenance_run_log_task_id (task_id),
+        INDEX idx_maintenance_run_log_created (created_at),
+        INDEX idx_maintenance_run_log_lottery_created (lottery_code, created_at),
+        INDEX idx_maintenance_run_log_status_created (status, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [

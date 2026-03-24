@@ -3395,6 +3395,11 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.settings-maintenance-pagination {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
 .settings-schedule-table__title,
 .settings-schedule-table__rule {
   display: grid;

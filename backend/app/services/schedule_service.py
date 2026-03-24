@@ -115,7 +115,7 @@ class ScheduleService:
             )
 
         if task["task_type"] == "lottery_fetch":
-            lottery_fetch_task_service.create_task(task["lottery_code"], on_update=handle_update)
+            lottery_fetch_task_service.create_task(task["lottery_code"], trigger_type="schedule", on_update=handle_update)
             return
 
         model_codes = [str(code) for code in task.get("model_codes") or []]

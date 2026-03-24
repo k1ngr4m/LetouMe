@@ -260,6 +260,37 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "lottery-task-1")
         create_task.assert_called_once_with("dlt", limit=30)
 
+    def test_fetch_lottery_logs_endpoint_returns_list_payload(self) -> None:
+        with patch("backend.app.api.routes.lottery_fetch_task_service.list_logs") as list_logs:
+            list_logs.return_value = {
+                "logs": [
+                    {
+                        "id": 1,
+                        "task_id": "lottery-task-1",
+                        "lottery_code": "dlt",
+                        "trigger_type": "manual",
+                        "status": "succeeded",
+                        "started_at": "2026-03-16T00:00:01Z",
+                        "finished_at": "2026-03-16T00:00:03Z",
+                        "fetched_count": 30,
+                        "saved_count": 30,
+                        "latest_period": "26030",
+                        "duration_ms": 1234.5,
+                        "error_message": None,
+                        "created_at": "2026-03-16T00:00:00Z",
+                        "updated_at": "2026-03-16T00:00:03Z",
+                    }
+                ],
+                "total_count": 1,
+            }
+
+            response = self.client.post("/api/settings/lottery/fetch/logs", json={"lottery_code": "dlt", "limit": 20, "offset": 0})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total_count"], 1)
+        self.assertEqual(response.json()["logs"][0]["status"], "succeeded")
+        list_logs.assert_called_once_with(lottery_code="dlt", limit=20, offset=0)
+
     def test_schedule_task_endpoints(self) -> None:
         with (
             patch("backend.app.api.routes.schedule_service.list_tasks") as list_tasks,

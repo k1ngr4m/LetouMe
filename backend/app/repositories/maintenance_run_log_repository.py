@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from backend.app.db.connection import get_connection
+
+
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt in (DATETIME_FORMAT, "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _format_datetime(value: Any) -> str | None:
+    parsed = _parse_datetime(value)
+    return parsed.strftime(DATETIME_FORMAT) if parsed else None
+
+
+class MaintenanceRunLogRepository:
+    def create_log(
+        self,
+        *,
+        task_id: str,
+        lottery_code: str,
+        trigger_type: str,
+        status: str,
+        created_at: str | None = None,
+    ) -> dict[str, Any]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO maintenance_run_log (
+                        task_id,
+                        lottery_code,
+                        trigger_type,
+                        status,
+                        created_at
+                    )
+                    VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+                    ON DUPLICATE KEY UPDATE
+                        lottery_code = VALUES(lottery_code),
+                        trigger_type = VALUES(trigger_type),
+                        status = VALUES(status),
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (task_id, lottery_code, trigger_type, status, _parse_datetime(created_at)),
+                )
+        return self.get_by_task_id(task_id) or {}
+
+    def update_by_task_id(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        fields = {
+            "status": payload.get("status"),
+            "started_at": _parse_datetime(payload.get("started_at")),
+            "finished_at": _parse_datetime(payload.get("finished_at")),
+            "fetched_count": int(payload.get("fetched_count") or 0),
+            "saved_count": int(payload.get("saved_count") or 0),
+            "latest_period": payload.get("latest_period"),
+            "duration_ms": float(payload.get("duration_ms") or 0),
+            "error_message": payload.get("error_message"),
+        }
+        assignments = ", ".join(f"{column} = ?" for column in fields)
+        params = tuple(fields.values()) + (task_id,)
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    UPDATE maintenance_run_log
+                    SET {assignments},
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE task_id = ?
+                    """,
+                    params,
+                )
+                if cursor.rowcount == 0 and not self._exists_by_task_id(cursor, task_id):
+                    raise KeyError(task_id)
+        return self.get_by_task_id(task_id) or {}
+
+    @staticmethod
+    def _exists_by_task_id(cursor, task_id: str) -> bool:
+        cursor.execute("SELECT task_id FROM maintenance_run_log WHERE task_id = ? LIMIT 1", (task_id,))
+        return bool(cursor.fetchone())
+
+    def get_by_task_id(self, task_id: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM maintenance_run_log WHERE task_id = ?", (task_id,))
+                row = cursor.fetchone()
+        return self._serialize(row) if row else None
+
+    def list_logs(
+        self,
+        *,
+        lottery_code: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        conditions = []
+        params: list[Any] = []
+        if lottery_code:
+            conditions.append("lottery_code = ?")
+            params.append(lottery_code)
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(*) AS total_count
+                    FROM maintenance_run_log
+                    {where_clause}
+                    """,
+                    tuple(params),
+                )
+                total_count = int((cursor.fetchone() or {}).get("total_count") or 0)
+
+                cursor.execute(
+                    f"""
+                    SELECT *
+                    FROM maintenance_run_log
+                    {where_clause}
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    OFFSET ?
+                    """,
+                    tuple(params + [limit, offset]),
+                )
+                logs = [self._serialize(row) for row in cursor.fetchall()]
+        return {"logs": logs, "total_count": total_count}
+
+    def _serialize(self, row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": int(row["id"]),
+            "task_id": str(row["task_id"]),
+            "lottery_code": str(row.get("lottery_code") or "dlt"),
+            "trigger_type": str(row.get("trigger_type") or "manual"),
+            "status": str(row.get("status") or "queued"),
+            "started_at": _format_datetime(row.get("started_at")),
+            "finished_at": _format_datetime(row.get("finished_at")),
+            "fetched_count": int(row.get("fetched_count") or 0),
+            "saved_count": int(row.get("saved_count") or 0),
+            "latest_period": str(row["latest_period"]) if row.get("latest_period") else None,
+            "duration_ms": float(row.get("duration_ms") or 0),
+            "error_message": str(row["error_message"]) if row.get("error_message") else None,
+            "created_at": _format_datetime(row.get("created_at")),
+            "updated_at": _format_datetime(row.get("updated_at")),
+        }

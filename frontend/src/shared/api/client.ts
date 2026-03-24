@@ -18,6 +18,7 @@ import type {
   MyBetRecordUpdateResponse,
   LotteryHistoryResponse,
   LotteryFetchTask,
+  MaintenanceRunLogListResponse,
   PasswordChangePayload,
   PermissionListResponse,
   PermissionUpdatePayload,
@@ -292,6 +293,12 @@ export const apiClient = {
     return requestJson<LotteryFetchTask>('/api/settings/lottery/fetch/task-detail', {
       method: 'POST',
       body: JSON.stringify({ task_id: taskId }),
+    })
+  },
+  listMaintenanceRunLogs(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
+    return requestJson<MaintenanceRunLogListResponse>('/api/settings/lottery/fetch/logs', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
     })
   },
   createSettingsModel(payload: SettingsModelPayload) {

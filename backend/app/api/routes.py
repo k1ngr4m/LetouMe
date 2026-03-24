@@ -47,6 +47,7 @@ from backend.app.schemas.requests import (
     ModelStatusUpdatePayload,
     ModelUpdatePayload,
     LotteryFetchTaskPayload,
+    MaintenanceRunLogListPayload,
     PasswordChangePayload,
     PaginationPayload,
     PermissionUpdatePayload,
@@ -69,6 +70,7 @@ from backend.app.schemas.requests import (
 from backend.app.schemas.responses import (
     BulkModelActionResponse,
     CurrentPredictionsResponse,
+    MaintenanceRunLogListResponse,
     LotteryFetchTaskResponse,
     LotteryHistoryResponse,
     MyBetRecordCreateResponse,
@@ -407,6 +409,19 @@ def get_settings_lottery_fetch_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task
+
+
+@router.post("/settings/lottery/fetch/logs", response_model=MaintenanceRunLogListResponse)
+def list_settings_lottery_fetch_logs(
+    payload: MaintenanceRunLogListPayload,
+    _: dict = Depends(require_super_admin),
+) -> dict:
+    normalized_code = normalize_lottery_code(payload.lottery_code) if payload.lottery_code else None
+    return lottery_fetch_task_service.list_logs(
+        lottery_code=normalized_code,
+        limit=payload.limit,
+        offset=payload.offset,
+    )
 
 
 @router.post("/settings/schedules/list", response_model=ScheduleTaskListResponse)

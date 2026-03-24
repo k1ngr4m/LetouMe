@@ -9,6 +9,7 @@ import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/for
 import type {
   AuthUser,
   BulkModelActionResult,
+  MaintenanceRunLog,
   LotteryFetchTask,
   PasswordChangePayload,
   PermissionItem,
@@ -26,11 +27,12 @@ import type {
   LotteryCode,
 } from '../../shared/types/api'
 
-type SettingsTab = 'profile' | 'models' | 'schedules' | 'users' | 'roles'
+type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
+type MaintenanceLogFilter = 'all' | LotteryCode
 type BulkEditForm = {
   providerEnabled: boolean
   provider: string
@@ -50,6 +52,7 @@ type ScheduleForm = ScheduleTaskPayload
 const SETTINGS_TAB_PATHS: Record<SettingsTab, string> = {
   profile: '/settings/profile',
   models: '/settings/models',
+  maintenance: '/settings/maintenance',
   schedules: '/settings/schedules',
   users: '/settings/users',
   roles: '/settings/roles',
@@ -329,6 +332,10 @@ function getTaskStatusLabel(status: string) {
   return status
 }
 
+function getMaintenanceTriggerLabel(triggerType: string) {
+  return triggerType === 'schedule' ? '定时任务' : '手动执行'
+}
+
 function getScheduleTaskTypeLabel(taskType: ScheduleTaskType) {
   return taskType === 'lottery_fetch' ? '开奖抓取' : '预测生成'
 }
@@ -383,6 +390,8 @@ export function SettingsPage() {
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
   const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null })
+  const [maintenanceLogFilter, setMaintenanceLogFilter] = useState<MaintenanceLogFilter>('all')
+  const [maintenanceLogOffset, setMaintenanceLogOffset] = useState(0)
   const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
@@ -417,6 +426,15 @@ export function SettingsPage() {
     queryFn: () => apiClient.listScheduleTasks(),
     enabled: canManageSchedules,
   })
+  const maintenanceLogsQuery = useQuery({
+    queryKey: ['settings-maintenance-logs', maintenanceLogFilter, maintenanceLogOffset],
+    queryFn: () => apiClient.listMaintenanceRunLogs({
+      lottery_code: maintenanceLogFilter === 'all' ? undefined : maintenanceLogFilter,
+      limit: 20,
+      offset: maintenanceLogOffset,
+    }),
+    enabled: isSuperAdmin,
+  })
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => apiClient.listUsers(),
@@ -436,11 +454,12 @@ export function SettingsPage() {
   const availableTabs = useMemo(() => {
     const tabs: Array<{ id: SettingsTab; label: string }> = [{ id: 'profile', label: '基础信息' }]
     if (canManageModels) tabs.push({ id: 'models', label: '模型管理' })
+    if (isSuperAdmin) tabs.push({ id: 'maintenance', label: '数据维护' })
     if (canManageSchedules) tabs.push({ id: 'schedules', label: '定时任务' })
     if (canManageUsers) tabs.push({ id: 'users', label: '用户管理' })
     if (canManageRoles) tabs.push({ id: 'roles', label: '角色管理' })
     return tabs
-  }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers])
+  }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers, isSuperAdmin])
 
   useEffect(() => {
     if (!availableTabs.some((item) => item.id === activeTab)) {
@@ -451,6 +470,10 @@ export function SettingsPage() {
   useEffect(() => {
     setProfileNickname(user?.nickname || '')
   }, [user?.nickname])
+
+  useEffect(() => {
+    setMaintenanceLogOffset(0)
+  }, [maintenanceLogFilter])
 
   useEffect(() => {
     if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu) return undefined
@@ -504,9 +527,11 @@ export function SettingsPage() {
           void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'dlt'] })
           void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'dlt'] })
           void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'dlt'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (nextTask.status === 'failed') {
           setMessage(nextTask.error_message || '大乐透数据更新失败')
           setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '读取大乐透抓取任务状态失败')
@@ -530,9 +555,11 @@ export function SettingsPage() {
           void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'pl3'] })
           void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'pl3'] })
           void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'pl3'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (nextTask.status === 'failed') {
           setMessage(nextTask.error_message || '排列3数据更新失败')
           setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '读取排列3抓取任务状态失败')
@@ -556,9 +583,11 @@ export function SettingsPage() {
           void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'pl5'] })
           void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'pl5'] })
           void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'pl5'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (nextTask.status === 'failed') {
           setMessage(nextTask.error_message || '排列5数据更新失败')
           setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '读取排列5抓取任务状态失败')
@@ -574,6 +603,11 @@ export function SettingsPage() {
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
   const scheduleTasks = scheduleTasksQuery.data?.tasks ?? []
+  const maintenanceLogs = maintenanceLogsQuery.data?.logs ?? []
+  const maintenanceLogTotal = maintenanceLogsQuery.data?.total_count ?? 0
+  const maintenanceLogPageSize = 20
+  const maintenanceCanPrevPage = maintenanceLogOffset > 0
+  const maintenanceCanNextPage = maintenanceLogOffset + maintenanceLogs.length < maintenanceLogTotal
   const selectedRole = roles.find((role) => role.role_code === selectedRoleCode) || null
   const selectedScheduleTask = scheduleTasks.find((task) => task.task_code === selectedScheduleTaskCode) || null
   const permissionMap = useMemo(
@@ -758,6 +792,7 @@ export function SettingsPage() {
       setLotteryFetchTasks((previous) => ({ ...previous, dlt: task }))
       setMessage('大乐透数据更新任务已创建，正在后台执行。')
       setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建大乐透数据更新任务失败')
@@ -771,6 +806,7 @@ export function SettingsPage() {
       setLotteryFetchTasks((previous) => ({ ...previous, pl3: task }))
       setMessage('排列3数据更新任务已创建，正在后台执行。')
       setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建排列3数据更新任务失败')
@@ -784,6 +820,7 @@ export function SettingsPage() {
       setLotteryFetchTasks((previous) => ({ ...previous, pl5: task }))
       setMessage('排列5数据更新任务已创建，正在后台执行。')
       setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建排列5数据更新任务失败')
@@ -1610,57 +1647,152 @@ export function SettingsPage() {
                   </div>
                 )}
               </StatusCard>
-              {isSuperAdmin ? (
-                <StatusCard title="数据维护" subtitle="统一维护大乐透、排列3与排列5开奖历史数据，更新数据库后可供首页统计与任务使用。">
-                  <div className="settings-grid-react">
-                    {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((lotteryCode) => {
-                      const task = lotteryFetchTasks[lotteryCode]
-                      const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : fetchDltLotteryMutation
-                      return (
-                        <section key={lotteryCode} className="settings-profile-hero settings-maintenance-hero">
-                          <div className="settings-profile-hero__main">
-                            <p className="settings-profile-hero__eyebrow">数据维护</p>
-                            <h2>{getLotteryLabel(lotteryCode)}历史同步</h2>
-                            <p className="settings-profile-hero__description">手动抓取开奖历史并写入数据库，用于更新首页统计、模型分析与预测相关任务。</p>
-                          </div>
-                          <div className="settings-profile-hero__badges">
-                            <span className="status-pill">{task ? `任务状态：${getTaskStatusLabel(task.status)}` : '尚未执行'}</span>
-                          </div>
-                          <div className="settings-profile-summary">
-                            <article className="settings-profile-summary__item">
-                              <span>抓取条数</span>
-                              <strong>{task?.progress_summary.fetched_count ?? 0}</strong>
-                            </article>
-                            <article className="settings-profile-summary__item">
-                              <span>写入条数</span>
-                              <strong>{task?.progress_summary.saved_count ?? 0}</strong>
-                            </article>
-                            <article className="settings-profile-summary__item">
-                              <span>最新期号</span>
-                              <strong>{task?.progress_summary.latest_period || '-'}</strong>
-                            </article>
-                            <article className="settings-profile-summary__item">
-                              <span>创建时间</span>
-                              <strong>{task ? formatDateTimeLocal(task.created_at) : '-'}</strong>
-                            </article>
-                          </div>
-                          <div className="settings-maintenance-hero__actions">
-                            <button
-                              className="primary-button"
-                              onClick={() => mutation.mutate()}
-                              disabled={mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))}
-                            >
-                              {mutation.isPending || (task && ['queued', 'running'].includes(task.status))
-                                ? `正在获取${getLotteryLabel(lotteryCode)}数据...`
-                                : `获取${getLotteryLabel(lotteryCode)}数据`}
-                            </button>
-                          </div>
-                        </section>
-                      )
-                    })}
+            </div>
+          ) : null}
+
+          {activeTab === 'maintenance' ? (
+            <div className="page-section">
+              <StatusCard title="数据维护" subtitle="统一维护大乐透、排列3与排列5开奖历史数据，支持手动执行并记录运行日志。">
+                <div className="page-stack">
+                  <div className="panel-card settings-schedule-list-card">
+                    <div className="panel-card__header">
+                      <div>
+                        <h2 className="panel-card__title">维护列表</h2>
+                        <p className="panel-card__subtitle">每行对应一个彩种，支持立即执行，执行中会自动刷新状态。</p>
+                      </div>
+                    </div>
+                    <div className="table-shell settings-model-table-shell">
+                      <table className="history-table settings-model-table settings-schedule-table">
+                        <thead>
+                          <tr>
+                            <th>彩种</th>
+                            <th>状态</th>
+                            <th>抓取条数</th>
+                            <th>写入条数</th>
+                            <th>最新期号</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((lotteryCode) => {
+                            const task = lotteryFetchTasks[lotteryCode]
+                            const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : fetchDltLotteryMutation
+                            const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
+                            return (
+                              <tr key={lotteryCode}>
+                                <td>{getLotteryLabel(lotteryCode)}</td>
+                                <td>
+                                  <span className={clsx('status-pill', task?.status === 'succeeded' && 'is-active', task?.status === 'failed' && 'is-deleted')}>
+                                    {task ? getTaskStatusLabel(task.status) : '尚未执行'}
+                                  </span>
+                                </td>
+                                <td>{task?.progress_summary.fetched_count ?? 0}</td>
+                                <td>{task?.progress_summary.saved_count ?? 0}</td>
+                                <td>{task?.progress_summary.latest_period || '-'}</td>
+                                <td>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
+                                <td>
+                                  <button className="secondary-button" type="button" onClick={() => mutation.mutate()} disabled={running}>
+                                    {running ? '执行中...' : '立即执行'}
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </StatusCard>
-              ) : null}
+
+                  <div className="panel-card settings-schedule-list-card">
+                    <div className="panel-card__header">
+                      <div>
+                        <h2 className="panel-card__title">运行日志</h2>
+                        <p className="panel-card__subtitle">记录每次数据维护执行结果，包含状态、时间、统计与错误信息。</p>
+                      </div>
+                      <div className="settings-schedule-list-toolbar">
+                        <div className="filter-chip-group">
+                          {[
+                            { value: 'all', label: '全部' },
+                            { value: 'dlt', label: '大乐透' },
+                            { value: 'pl3', label: '排列3' },
+                            { value: 'pl5', label: '排列5' },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={clsx('filter-chip', maintenanceLogFilter === option.value && 'is-active')}
+                              onClick={() => setMaintenanceLogFilter(option.value as MaintenanceLogFilter)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="settings-schedule-list-summary">
+                      <span>总计 {maintenanceLogTotal} 条</span>
+                      <span>当前显示 {maintenanceLogs.length} 条</span>
+                    </div>
+                    <div className="table-shell settings-model-table-shell">
+                      <table className="history-table settings-model-table settings-schedule-table">
+                        <thead>
+                          <tr>
+                            <th>执行时间</th>
+                            <th>彩种</th>
+                            <th>触发方式</th>
+                            <th>状态</th>
+                            <th>抓取/写入</th>
+                            <th>最新期号</th>
+                            <th>错误信息</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {maintenanceLogsQuery.isLoading ? (
+                            <tr>
+                              <td colSpan={7}>日志加载中...</td>
+                            </tr>
+                          ) : maintenanceLogs.length ? (
+                            maintenanceLogs.map((item: MaintenanceRunLog) => (
+                              <tr key={item.id}>
+                                <td>
+                                  <strong>{formatDateTimeLocal(item.started_at || item.created_at)}</strong>
+                                  <span>{item.finished_at ? `结束：${formatDateTimeLocal(item.finished_at)}` : '-'}</span>
+                                </td>
+                                <td>{getLotteryLabel(item.lottery_code)}</td>
+                                <td>{getMaintenanceTriggerLabel(item.trigger_type)}</td>
+                                <td>
+                                  <span className={clsx('status-pill', item.status === 'succeeded' && 'is-active', item.status === 'failed' && 'is-deleted')}>
+                                    {getTaskStatusLabel(item.status)}
+                                  </span>
+                                </td>
+                                <td>{item.fetched_count} / {item.saved_count}</td>
+                                <td>{item.latest_period || '-'}</td>
+                                <td>{item.error_message || '-'}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7}>暂无日志</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="settings-schedule-list-summary">
+                      <span>当前第 {Math.floor(maintenanceLogOffset / maintenanceLogPageSize) + 1} 页</span>
+                      <span className="settings-maintenance-pagination">
+                        <button className="secondary-button" type="button" disabled={!maintenanceCanPrevPage} onClick={() => setMaintenanceLogOffset((value) => Math.max(0, value - maintenanceLogPageSize))}>
+                          上一页
+                        </button>
+                        <button className="secondary-button" type="button" disabled={!maintenanceCanNextPage} onClick={() => setMaintenanceLogOffset((value) => value + maintenanceLogPageSize)}>
+                          下一页
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </StatusCard>
             </div>
           ) : null}
 

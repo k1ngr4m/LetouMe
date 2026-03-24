@@ -25,6 +25,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     getPredictionGenerationTaskDetail: vi.fn(),
     fetchSettingsLotteryHistory: vi.fn(),
     getLotteryFetchTaskDetail: vi.fn(),
+    listMaintenanceRunLogs: vi.fn(),
     getSettingsPredictionRecords: vi.fn(),
     getSettingsPredictionRecordDetail: vi.fn(),
     createUser: vi.fn(),
@@ -90,6 +91,7 @@ describe('SettingsPage model management view switch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     apiClientMock.listScheduleTasks.mockResolvedValue({ tasks: [] })
+    apiClientMock.listMaintenanceRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
   })
 
   it('defaults to list view and can switch to card view', async () => {
@@ -412,7 +414,7 @@ describe('SettingsPage model management view switch', () => {
     )
   })
 
-  it('shows lottery maintenance card and starts fetch task for super admin', async () => {
+  it('shows maintenance list and starts fetch task for super admin', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
@@ -450,12 +452,12 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage()
 
-    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(await screen.findByRole('button', { name: '数据维护' }))
     expect(screen.getByRole('heading', { name: '数据维护' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '获取大乐透数据' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '获取排列3数据' })).toBeInTheDocument()
+    expect(screen.getAllByRole('columnheader', { name: '彩种' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: '立即执行' }).length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getByRole('button', { name: '获取大乐透数据' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '立即执行' })[0])
 
     expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledWith('dlt')
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })

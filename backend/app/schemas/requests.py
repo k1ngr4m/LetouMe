@@ -75,6 +75,12 @@ class LotteryFetchTaskPayload(BaseModel):
     lottery_code: str = "dlt"
 
 
+class MaintenanceRunLogListPayload(BaseModel):
+    lottery_code: str | None = None
+    limit: int = Field(default=20, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+
 class SettingsPredictionRecordDetailPayload(BaseModel):
     lottery_code: str = "dlt"
     record_type: str
