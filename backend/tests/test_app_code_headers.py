@@ -77,6 +77,26 @@ class AppCodeHeaderTests(unittest.TestCase):
         kwargs = client.chat.completions.create.call_args.kwargs
         self.assertNotIn("extra_headers", kwargs)
 
+    def test_request_uses_zero_temperature_by_default(self) -> None:
+        client = Mock()
+        client.chat.completions.create.return_value = Mock(
+            choices=[Mock(message=Mock(content='{"ok": true}'))]
+        )
+
+        model = DummyModel(
+            ModelDefinition(
+                **{
+                    **self.definition.__dict__,
+                    "temperature": None,
+                }
+            ),
+            client,
+        )
+        model.health_check()
+
+        kwargs = client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs["temperature"], 0)
+
     def test_predict_wraps_json_parse_error_with_response_preview(self) -> None:
         client = Mock()
         client.chat.completions.create.return_value = Mock(

@@ -814,6 +814,7 @@ export function SettingsPage() {
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
   const selectedProvider = providerMap[modelForm.provider]
   const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
+  const shouldShowModelAppCode = modelForm.provider === 'aimixhub'
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -2865,10 +2866,12 @@ export function SettingsPage() {
                     <span>API Key</span>
                     <input value={modelForm.api_key} onChange={(event) => setModelForm((previous) => ({ ...previous, api_key: event.target.value }))} />
                   </label>
-                  <label className="field">
-                    <span>APP Code</span>
-                    <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
-                  </label>
+                  {shouldShowModelAppCode ? (
+                    <label className="field">
+                      <span>APP Code</span>
+                      <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
+                    </label>
+                  ) : null}
                 </div>
                 <div className="model-config-modal__connectivity">
                   <button

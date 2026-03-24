@@ -674,6 +674,34 @@ describe('SettingsPage model management view switch', () => {
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
   })
 
+  it('shows APP Code only for AiMixHub provider in model modal', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'custom-provider', name: 'My Provider', is_system_preset: false, api_format: 'openai_compatible', base_url: '' },
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com/v1' },
+        { code: 'aimixhub', name: 'AiMixHub', is_system_preset: true, api_format: 'anthropic', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('button', { name: '新增模型' })
+    await userEvent.click(screen.getByRole('button', { name: '新增模型' }))
+
+    expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'aimixhub')
+    expect(screen.getByLabelText('APP Code')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'deepseek')
+    expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
+  })
+
   it('auto-removes incompatible models after generation lottery changes in bulk modal', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [

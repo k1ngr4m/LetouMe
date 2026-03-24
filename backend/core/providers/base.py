@@ -38,7 +38,7 @@ class BaseModel(ABC):
         if self.definition.temperature is not None:
             kwargs["temperature"] = self.definition.temperature
         else:
-            kwargs["temperature"] = 0.8
+            kwargs["temperature"] = 0
         app_code = self.definition.app_code()
         if app_code and self.definition.uses_aihubmix():
             kwargs["extra_headers"] = {"APP-Code": app_code}
