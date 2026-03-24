@@ -3418,6 +3418,132 @@ a {
   font-size: 0.82rem;
 }
 
+.schedule-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  padding: 0.34rem 0.68rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.schedule-status-pill__icon {
+  display: inline-flex;
+  width: 0.9rem;
+  height: 0.9rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-status-pill__icon svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.schedule-status-pill--success {
+  color: #11361f;
+  border-color: rgba(57, 193, 122, 0.45);
+  background: rgba(64, 201, 130, 0.9);
+}
+
+.schedule-status-pill--error {
+  color: #fff;
+  border-color: rgba(212, 82, 94, 0.5);
+  background: rgba(214, 84, 96, 0.9);
+}
+
+.schedule-status-pill--running {
+  color: #0a3247;
+  border-color: rgba(94, 191, 236, 0.48);
+  background: rgba(107, 205, 247, 0.9);
+}
+
+.schedule-status-pill--queued {
+  color: #3e2b00;
+  border-color: rgba(246, 188, 94, 0.5);
+  background: rgba(248, 197, 118, 0.9);
+}
+
+.schedule-status-pill--idle {
+  color: var(--text-2);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.schedule-status-pill--enabled {
+  color: #11361f;
+  border-color: rgba(57, 193, 122, 0.45);
+  background: rgba(64, 201, 130, 0.88);
+}
+
+.schedule-status-pill--disabled {
+  color: var(--text-2);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.lite-tooltip {
+  position: relative;
+}
+
+.lite-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.55rem);
+  transform: translateX(-50%) translateY(4px);
+  min-width: 150px;
+  max-width: 260px;
+  padding: 0.5rem 0.62rem;
+  border-radius: 10px;
+  background: rgba(14, 20, 34, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f6f8fb;
+  font-size: 0.73rem;
+  line-height: 1.35;
+  white-space: pre-line;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+  z-index: 14;
+}
+
+.lite-tooltip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.2rem);
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(14, 20, 34, 0.94);
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  z-index: 13;
+}
+
+.lite-tooltip:hover::after,
+.lite-tooltip:hover::before,
+.lite-tooltip:focus-visible::after,
+.lite-tooltip:focus-visible::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+.lite-tooltip:hover::after,
+.lite-tooltip:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
+}
+
 .settings-schedule-actions {
   gap: 0.35rem;
   flex-wrap: nowrap;

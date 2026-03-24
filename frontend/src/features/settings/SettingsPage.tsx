@@ -332,6 +332,65 @@ function getTaskStatusLabel(status: string) {
   return status
 }
 
+type ScheduleBadgeTone = 'success' | 'error' | 'running' | 'queued' | 'idle' | 'enabled' | 'disabled'
+
+function ScheduleStatusIcon({ tone }: { tone: ScheduleBadgeTone }) {
+  if (tone === 'success' || tone === 'enabled') {
+    return (
+      <SvgIcon>
+        <path d="m5.1 10.2 2.3 2.3 5.1-5.1" />
+      </SvgIcon>
+    )
+  }
+  if (tone === 'error') {
+    return (
+      <SvgIcon>
+        <path d="m6.2 6.2 7.6 7.6M13.8 6.2l-7.6 7.6" />
+      </SvgIcon>
+    )
+  }
+  if (tone === 'running') {
+    return (
+      <SvgIcon>
+        <circle cx="10" cy="10" r="4.1" />
+        <path d="M10 6.4v3.4l2.5 1.6" />
+      </SvgIcon>
+    )
+  }
+  if (tone === 'queued') {
+    return (
+      <SvgIcon>
+        <circle cx="10" cy="10" r="4.1" />
+        <path d="M10 7.2v2.6h2.2" />
+      </SvgIcon>
+    )
+  }
+  if (tone === 'disabled') {
+    return (
+      <SvgIcon>
+        <path d="M4.5 10h11" />
+      </SvgIcon>
+    )
+  }
+  return (
+    <SvgIcon>
+      <circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  )
+}
+
+function getScheduleRunStatusMeta(status: string | null | undefined): { label: string; tone: ScheduleBadgeTone } {
+  if (status === 'succeeded') return { label: getTaskStatusLabel(status), tone: 'success' }
+  if (status === 'failed') return { label: getTaskStatusLabel(status), tone: 'error' }
+  if (status === 'running') return { label: getTaskStatusLabel(status), tone: 'running' }
+  if (status === 'queued') return { label: getTaskStatusLabel(status), tone: 'queued' }
+  return { label: '未执行', tone: 'idle' }
+}
+
+function getScheduleEnabledMeta(isActive: boolean): { label: string; tone: ScheduleBadgeTone } {
+  return isActive ? { label: '启用中', tone: 'enabled' } : { label: '已停用', tone: 'disabled' }
+}
+
 function getMaintenanceTriggerLabel(triggerType: string) {
   return triggerType === 'schedule' ? '定时任务' : '手动执行'
 }
@@ -1851,6 +1910,19 @@ export function SettingsPage() {
                           <tbody>
                             {filteredScheduleTasks.map((task) => {
                               const isExpanded = expandedScheduleTaskCode === task.task_code
+                              const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
+                              const enabledMeta = getScheduleEnabledMeta(task.is_active)
+                              const statusTooltip = [
+                                `最近执行：${task.last_run_at ? formatDateTimeBeijing(task.last_run_at) : '尚未执行'}`,
+                                `状态：${runStatusMeta.label}`,
+                                task.last_error_message ? `错误：${task.last_error_message}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join('\n')
+                              const enabledTooltip = [
+                                `下次执行：${task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '未安排'}`,
+                                `规则类型：${getScheduleModeLabel(task.schedule_mode, task.preset_type)}`,
+                              ].join('\n')
                               return (
                                 <Fragment key={task.task_code}>
                                   <tr>
@@ -1875,13 +1947,27 @@ export function SettingsPage() {
                                     </td>
                                     <td>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
                                     <td>
-                                      <span className={clsx('status-pill', task.last_run_status === 'succeeded' && 'is-active', task.last_run_status === 'failed' && 'is-deleted')}>
-                                        {task.last_run_status ? getTaskStatusLabel(task.last_run_status) : '未执行'}
+                                      <span
+                                        className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${runStatusMeta.tone}`)}
+                                        data-tooltip={statusTooltip}
+                                        title={statusTooltip}
+                                      >
+                                        <span className="schedule-status-pill__icon" aria-hidden="true">
+                                          <ScheduleStatusIcon tone={runStatusMeta.tone} />
+                                        </span>
+                                        <span>{runStatusMeta.label}</span>
                                       </span>
                                     </td>
                                     <td>
-                                      <span className={clsx('status-pill', task.is_active ? 'is-active' : 'is-muted')}>
-                                        {task.is_active ? '启用中' : '已停用'}
+                                      <span
+                                        className={clsx('schedule-status-pill', 'lite-tooltip', `schedule-status-pill--${enabledMeta.tone}`)}
+                                        data-tooltip={enabledTooltip}
+                                        title={enabledTooltip}
+                                      >
+                                        <span className="schedule-status-pill__icon" aria-hidden="true">
+                                          <ScheduleStatusIcon tone={enabledMeta.tone} />
+                                        </span>
+                                        <span>{enabledMeta.label}</span>
                                       </span>
                                     </td>
                                     <td>
