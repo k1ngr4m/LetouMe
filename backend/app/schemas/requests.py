@@ -36,6 +36,7 @@ class ProviderCodePayload(BaseModel):
 
 
 class ModelUpdatePayload(ModelSettingsPayload):
+    original_model_code: str
     model_code: str
 
 

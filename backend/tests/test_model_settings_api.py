@@ -121,6 +121,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         update_response = self.client.post(
             "/api/settings/models/update",
             json={
+                "original_model_code": "custom-model",
                 "model_code": "custom-model",
                 "display_name": "Custom Model Updated",
                 "provider": "openai",
@@ -137,15 +138,34 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(updated_payload["provider"], "openai")
         self.assertFalse(updated_payload["is_active"])
 
-        delete_response = self.client.post("/api/settings/models/delete", json={"model_code": "custom-model"})
+        rename_response = self.client.post(
+            "/api/settings/models/update",
+            json={
+                "original_model_code": "custom-model",
+                "model_code": "custom-model-renamed",
+                "display_name": "Custom Model Updated",
+                "provider": "openai",
+                "api_model_name": "gpt-custom",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "secret-key-2",
+                "app_code": "APP-999",
+                "temperature": 0.3,
+                "is_active": False,
+            },
+        )
+        self.assertEqual(rename_response.status_code, 200)
+        self.assertEqual(rename_response.json()["model_code"], "custom-model-renamed")
+
+        delete_response = self.client.post("/api/settings/models/delete", json={"model_code": "custom-model-renamed"})
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.json()["is_deleted"])
 
         list_response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
         visible_codes = [model["model_code"] for model in list_response.json()["models"]]
         self.assertNotIn("custom-model", visible_codes)
+        self.assertNotIn("custom-model-renamed", visible_codes)
 
-        restore_response = self.client.post("/api/settings/models/restore", json={"model_code": "custom-model"})
+        restore_response = self.client.post("/api/settings/models/restore", json={"model_code": "custom-model-renamed"})
         self.assertEqual(restore_response.status_code, 200)
         self.assertFalse(restore_response.json()["is_deleted"])
 

@@ -2815,7 +2815,7 @@ export function SettingsPage() {
                 <div className="model-config-modal__grid">
                   <label className="field">
                     <span>模型编码</span>
-                    <input value={modelForm.model_code || ''} onChange={(event) => setModelForm((previous) => ({ ...previous, model_code: event.target.value }))} required disabled={modelMode === 'edit'} />
+                    <input value={modelForm.model_code || ''} onChange={(event) => setModelForm((previous) => ({ ...previous, model_code: event.target.value }))} required />
                   </label>
                   <label className="field">
                     <span>显示名称</span>

@@ -40,9 +40,13 @@ class ModelService:
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = self._normalize_payload(payload, is_create=False)
-        normalized.pop("model_code", None)
+        if not normalized.get("model_code"):
+            normalized["model_code"] = str(model_code or "").strip()
         updated = self._serialize_model(self.repository.update_model(model_code, normalized))
+        updated_model_code = str(updated.get("model_code") or "").strip()
         self._invalidate_model_cache(model_code)
+        if updated_model_code and updated_model_code != model_code:
+            self._invalidate_model_cache(updated_model_code)
         return updated
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
@@ -203,8 +207,7 @@ class ModelService:
     @staticmethod
     def _normalize_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:
         normalized = dict(payload)
-        if is_create:
-            normalized["model_code"] = str(payload.get("model_code") or "").strip()
+        normalized["model_code"] = str(payload.get("model_code") or "").strip()
         normalized["display_name"] = str(payload.get("display_name") or "").strip()
         normalized["provider"] = str(payload.get("provider") or "").strip()
         provider_model_id = payload.get("provider_model_id")

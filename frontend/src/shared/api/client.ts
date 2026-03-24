@@ -338,7 +338,7 @@ export const apiClient = {
   updateSettingsModel(modelCode: string, payload: SettingsModelPayload) {
     return requestJson<SettingsModel>('/api/settings/models/update', {
       method: 'POST',
-      body: JSON.stringify({ ...payload, model_code: modelCode }),
+      body: JSON.stringify({ ...payload, original_model_code: modelCode }),
     })
   },
   testSettingsModelConnectivity(payload: SettingsModelConnectivityTestPayload) {

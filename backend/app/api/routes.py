@@ -369,7 +369,7 @@ def create_settings_model(payload: ModelSettingsPayload, _: dict = Depends(requi
 @router.post("/settings/models/update", response_model=ModelResponse)
 def update_settings_model(payload: ModelUpdatePayload, _: dict = Depends(require_model_management_permission)) -> dict:
     try:
-        return model_service.update_model(payload.model_code, payload.model_dump())
+        return model_service.update_model(payload.original_model_code, payload.model_dump())
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="模型不存在") from exc
     except ValueError as exc:

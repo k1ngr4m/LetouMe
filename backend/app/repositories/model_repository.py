@@ -115,6 +115,7 @@ class ModelRepository:
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         self._validate_payload(payload, is_create=False)
+        next_model_code = str(payload.get("model_code") or "").strip()
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
@@ -122,6 +123,12 @@ class ModelRepository:
                 if not row:
                     raise KeyError(model_code)
                 model_id = int(row["id"])
+                if not next_model_code:
+                    next_model_code = model_code
+                if next_model_code != model_code:
+                    cursor.execute("SELECT 1 FROM ai_model WHERE model_code = ?", (next_model_code,))
+                    if cursor.fetchone():
+                        raise ValueError(f"模型编码已存在: {next_model_code}")
                 provider_row = self._resolve_provider(cursor, str(payload["provider"]))
                 provider_id = int(provider_row["id"])
                 self._sync_provider_api_format(cursor, provider_id, payload.get("api_format"))
@@ -129,7 +136,8 @@ class ModelRepository:
                 cursor.execute(
                     """
                     UPDATE ai_model
-                    SET display_name = ?,
+                    SET model_code = ?,
+                        display_name = ?,
                         provider_id = ?,
                         provider_model_id = ?,
                         api_model_name = ?,
@@ -142,6 +150,7 @@ class ModelRepository:
                     WHERE model_code = ?
                     """,
                     (
+                        next_model_code,
                         str(payload["display_name"]).strip(),
                         provider_id,
                         provider_model_id,
@@ -155,7 +164,9 @@ class ModelRepository:
                     ),
                 )
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
-        return self.get_model(model_code) or {}
+                if next_model_code != model_code:
+                    self._sync_scheduled_task_model_codes(cursor, model_code, next_model_code)
+        return self.get_model(next_model_code) or {}
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
         return self._update_flag(model_code, "is_active", 1 if is_active else 0)
@@ -439,6 +450,33 @@ class ModelRepository:
                 VALUES (?, ?)
                 """,
                 (model_id, lottery_code),
+            )
+
+    @staticmethod
+    def _sync_scheduled_task_model_codes(cursor, old_model_code: str, new_model_code: str) -> None:
+        cursor.execute("SELECT id, model_codes_json FROM scheduled_task")
+        rows = cursor.fetchall()
+        for row in rows:
+            try:
+                model_codes = json.loads(row.get("model_codes_json") or "[]")
+            except Exception:
+                model_codes = []
+            normalized_codes = [str(code).strip() for code in (model_codes if isinstance(model_codes, list) else []) if str(code).strip()]
+            if old_model_code not in normalized_codes:
+                continue
+            next_codes: list[str] = []
+            for code in normalized_codes:
+                target_code = new_model_code if code == old_model_code else code
+                if target_code not in next_codes:
+                    next_codes.append(target_code)
+            cursor.execute(
+                """
+                UPDATE scheduled_task
+                SET model_codes_json = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (json.dumps(next_codes, ensure_ascii=False), int(row["id"])),
             )
 
     def _upsert_provider(self, cursor, provider_code: str) -> int:
