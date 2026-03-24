@@ -862,9 +862,14 @@ describe('HomePage dashboard sidebar', () => {
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
 
-    expect(within(historySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
+    expect(within(historySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
     expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
     expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.getByText('第 2026021 期')).toBeInTheDocument()
+
+    await userEvent.selectOptions(within(historySection as HTMLElement).getByRole('combobox'), '10')
+
+    expect(within(historySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
     expect(screen.queryByText('第 2026021 期')).not.toBeInTheDocument()
 
     await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '下一页' }))
@@ -912,6 +917,7 @@ describe('HomePage dashboard sidebar', () => {
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
 
+    await userEvent.selectOptions(within(historySection as HTMLElement).getByRole('combobox'), '10')
     await userEvent.click(within(historySection as HTMLElement).getByRole('button', { name: '下一页' }))
     expect(within(historySection as HTMLElement).getByText('第 2 / 2 页')).toBeInTheDocument()
     expect(within(historySection as HTMLElement).getByText('第 2026021 期')).toBeInTheDocument()

@@ -47,6 +47,7 @@ class LotteryFetchTaskService:
             task_id=str(task["task_id"]),
             lottery_code=lottery_code,
             trigger_type=trigger_type,
+            task_type="lottery_fetch",
             status=str(task["status"]),
             created_at=str(task.get("created_at") or ""),
         )
@@ -64,6 +65,7 @@ class LotteryFetchTaskService:
             return
         summary = state.get("progress_summary") if isinstance(state.get("progress_summary"), dict) else {}
         payload = {
+            "task_type": "lottery_fetch",
             "status": str(state.get("status") or "queued"),
             "started_at": state.get("started_at"),
             "finished_at": state.get("finished_at"),
@@ -81,6 +83,7 @@ class LotteryFetchTaskService:
                     task_id=task_id,
                     lottery_code=str(state.get("lottery_code") or "dlt"),
                     trigger_type=trigger_type,
+                    task_type="lottery_fetch",
                     status=payload["status"],
                     created_at=str(state.get("created_at") or ""),
                 )

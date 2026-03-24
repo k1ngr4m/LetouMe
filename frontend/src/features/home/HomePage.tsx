@@ -38,7 +38,7 @@ import {
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
 import { HOME_RULES_PATH, getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type HomeRulesRouteState, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
 
-const HISTORY_DEFAULT_PAGE_SIZE = 10
+const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const LOTTERY_DEFAULT_PAGE_SIZE = 10
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [

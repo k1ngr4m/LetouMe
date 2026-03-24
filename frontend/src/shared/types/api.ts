@@ -544,11 +544,17 @@ export type MaintenanceRunLog = {
   task_id: string
   lottery_code: LotteryCode
   trigger_type: 'manual' | 'schedule'
+  task_type?: 'lottery_fetch' | 'prediction_generate'
+  mode?: 'current' | 'history' | string | null
+  model_code?: string | null
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   started_at?: string | null
   finished_at?: string | null
   fetched_count: number
   saved_count: number
+  processed_count?: number
+  skipped_count?: number
+  failed_count?: number
   latest_period?: string | null
   duration_ms: number
   error_message?: string | null

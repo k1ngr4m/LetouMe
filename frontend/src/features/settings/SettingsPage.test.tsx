@@ -464,6 +464,49 @@ describe('SettingsPage model management view switch', () => {
     expect(await screen.findByText('2026033')).toBeInTheDocument()
   })
 
+  it('shows prediction generation logs in maintenance table', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listMaintenanceRunLogs.mockResolvedValue({
+      logs: [
+        {
+          id: 99,
+          task_id: 'pred-task-1',
+          lottery_code: 'dlt',
+          trigger_type: 'manual',
+          task_type: 'prediction_generate',
+          mode: 'history',
+          model_code: '__bulk__',
+          status: 'succeeded',
+          started_at: '2026-03-24T01:00:00Z',
+          finished_at: '2026-03-24T01:00:08Z',
+          fetched_count: 0,
+          saved_count: 0,
+          processed_count: 2,
+          skipped_count: 1,
+          failed_count: 0,
+          latest_period: null,
+          duration_ms: 8000,
+          error_message: null,
+          created_at: '2026-03-24T01:00:00Z',
+          updated_at: '2026-03-24T01:00:08Z',
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '数据维护' }))
+    expect(screen.getByText('预测生成')).toBeInTheDocument()
+    expect(screen.getByText('2 / 1 / 0')).toBeInTheDocument()
+    expect(screen.getByText('历史重算 · 批量模型')).toBeInTheDocument()
+  })
+
   it('supports selecting all models and bulk actions in list view', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [

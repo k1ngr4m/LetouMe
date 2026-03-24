@@ -123,6 +123,7 @@ class ScheduleService:
             lottery_code=task["lottery_code"],
             mode=task.get("generation_mode") or "current",
             model_code="__bulk__",
+            trigger_type="schedule",
             on_update=handle_update,
             worker=lambda progress_callback: self.prediction_generation_service.generate_for_models(
                 lottery_code=task["lottery_code"],

@@ -37,6 +37,9 @@ class MaintenanceRunLogRepository:
         task_id: str,
         lottery_code: str,
         trigger_type: str,
+        task_type: str = "lottery_fetch",
+        mode: str | None = None,
+        model_code: str | None = None,
         status: str,
         created_at: str | None = None,
     ) -> dict[str, Any]:
@@ -48,27 +51,39 @@ class MaintenanceRunLogRepository:
                         task_id,
                         lottery_code,
                         trigger_type,
+                        task_type,
+                        mode,
+                        model_code,
                         status,
                         created_at
                     )
-                    VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
                     ON DUPLICATE KEY UPDATE
                         lottery_code = VALUES(lottery_code),
                         trigger_type = VALUES(trigger_type),
+                        task_type = VALUES(task_type),
+                        mode = VALUES(mode),
+                        model_code = VALUES(model_code),
                         status = VALUES(status),
                         updated_at = CURRENT_TIMESTAMP
                     """,
-                    (task_id, lottery_code, trigger_type, status, _parse_datetime(created_at)),
+                    (task_id, lottery_code, trigger_type, task_type, mode, model_code, status, _parse_datetime(created_at)),
                 )
         return self.get_by_task_id(task_id) or {}
 
     def update_by_task_id(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         fields = {
             "status": payload.get("status"),
+            "task_type": str(payload.get("task_type") or "lottery_fetch"),
+            "mode": payload.get("mode"),
+            "model_code": payload.get("model_code"),
             "started_at": _parse_datetime(payload.get("started_at")),
             "finished_at": _parse_datetime(payload.get("finished_at")),
             "fetched_count": int(payload.get("fetched_count") or 0),
             "saved_count": int(payload.get("saved_count") or 0),
+            "processed_count": int(payload.get("processed_count") or 0),
+            "skipped_count": int(payload.get("skipped_count") or 0),
+            "failed_count": int(payload.get("failed_count") or 0),
             "latest_period": payload.get("latest_period"),
             "duration_ms": float(payload.get("duration_ms") or 0),
             "error_message": payload.get("error_message"),
@@ -148,11 +163,17 @@ class MaintenanceRunLogRepository:
             "task_id": str(row["task_id"]),
             "lottery_code": str(row.get("lottery_code") or "dlt"),
             "trigger_type": str(row.get("trigger_type") or "manual"),
+            "task_type": str(row.get("task_type") or "lottery_fetch"),
+            "mode": str(row["mode"]) if row.get("mode") else None,
+            "model_code": str(row["model_code"]) if row.get("model_code") else None,
             "status": str(row.get("status") or "queued"),
             "started_at": _format_datetime(row.get("started_at")),
             "finished_at": _format_datetime(row.get("finished_at")),
             "fetched_count": int(row.get("fetched_count") or 0),
             "saved_count": int(row.get("saved_count") or 0),
+            "processed_count": int(row.get("processed_count") or 0),
+            "skipped_count": int(row.get("skipped_count") or 0),
+            "failed_count": int(row.get("failed_count") or 0),
             "latest_period": str(row["latest_period"]) if row.get("latest_period") else None,
             "duration_ms": float(row.get("duration_ms") or 0),
             "error_message": str(row["error_message"]) if row.get("error_message") else None,

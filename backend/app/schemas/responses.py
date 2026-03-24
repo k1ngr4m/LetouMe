@@ -55,11 +55,17 @@ class MaintenanceRunLogItemResponse(BaseModel):
     task_id: str
     lottery_code: str = "dlt"
     trigger_type: str = "manual"
+    task_type: str = "lottery_fetch"
+    mode: str | None = None
+    model_code: str | None = None
     status: str
     started_at: str | None = None
     finished_at: str | None = None
     fetched_count: int = 0
     saved_count: int = 0
+    processed_count: int = 0
+    skipped_count: int = 0
+    failed_count: int = 0
     latest_period: str | None = None
     duration_ms: float = 0
     error_message: str | None = None

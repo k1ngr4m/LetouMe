@@ -464,6 +464,18 @@ function getMaintenanceTriggerLabel(triggerType: string) {
   return triggerType === 'schedule' ? '定时任务' : '手动执行'
 }
 
+function getMaintenanceTaskType(log: MaintenanceRunLog): 'lottery_fetch' | 'prediction_generate' {
+  if (log.task_type === 'prediction_generate') return 'prediction_generate'
+  if (log.task_type === 'lottery_fetch') return 'lottery_fetch'
+  if (log.mode || log.model_code) return 'prediction_generate'
+  if ((log.processed_count || 0) > 0 || (log.skipped_count || 0) > 0 || (log.failed_count || 0) > 0) return 'prediction_generate'
+  return 'lottery_fetch'
+}
+
+function getMaintenanceTaskTypeLabel(taskType: 'lottery_fetch' | 'prediction_generate') {
+  return taskType === 'prediction_generate' ? '预测生成' : '开奖抓取'
+}
+
 function getScheduleTaskTypeLabel(taskType: ScheduleTaskType) {
   return taskType === 'lottery_fetch' ? '开奖抓取' : '预测生成'
 }
@@ -471,6 +483,10 @@ function getScheduleTaskTypeLabel(taskType: ScheduleTaskType) {
 function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: SchedulePresetType | null) {
   if (scheduleMode === 'cron') return 'Cron'
   return presetType === 'weekly' ? '每周' : '每日'
+}
+
+function getGenerationModeLabel(mode: string | null | undefined) {
+  return mode === 'history' ? '历史重算' : '当前期'
 }
 
 function getGenerationTaskTotal(task: PredictionGenerationTask | null) {
@@ -645,9 +661,11 @@ export function SettingsPage() {
           }
           setMessageType('success')
           void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (task.status === 'failed') {
           setMessage(task.error_message || '预测任务执行失败')
           setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '读取任务状态失败')
@@ -904,6 +922,7 @@ export function SettingsPage() {
       setSelectedModelCodes([])
       setMessage(generationForm.modelCodes.length > 1 ? '批量预测任务已创建，正在后台执行。' : '预测生成任务已创建，正在后台执行。')
       setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建预测任务失败')
@@ -1947,40 +1966,53 @@ export function SettingsPage() {
                           <tr>
                             <th>执行时间</th>
                             <th>彩种</th>
+                            <th>任务类型</th>
                             <th>触发方式</th>
                             <th>状态</th>
-                            <th>抓取/写入</th>
-                            <th>最新期号</th>
+                            <th>统计</th>
+                            <th>详情</th>
                             <th>错误信息</th>
                           </tr>
                         </thead>
                         <tbody>
                           {maintenanceLogsQuery.isLoading ? (
                             <tr>
-                              <td colSpan={7}>日志加载中...</td>
+                              <td colSpan={8}>日志加载中...</td>
                             </tr>
                           ) : maintenanceLogs.length ? (
                             maintenanceLogs.map((item: MaintenanceRunLog) => (
-                              <tr key={item.id}>
-                                <td>
-                                  <strong>{formatDateTimeLocal(item.started_at || item.created_at)}</strong>
-                                  <span>{item.finished_at ? `结束：${formatDateTimeLocal(item.finished_at)}` : '-'}</span>
-                                </td>
-                                <td>{getLotteryLabel(item.lottery_code)}</td>
-                                <td>{getMaintenanceTriggerLabel(item.trigger_type)}</td>
-                                <td>
-                                  <span className={clsx('status-pill', item.status === 'succeeded' && 'is-active', item.status === 'failed' && 'is-deleted')}>
-                                    {getTaskStatusLabel(item.status)}
-                                  </span>
-                                </td>
-                                <td>{item.fetched_count} / {item.saved_count}</td>
-                                <td>{item.latest_period || '-'}</td>
-                                <td>{item.error_message || '-'}</td>
-                              </tr>
+                              (() => {
+                                const taskType = getMaintenanceTaskType(item)
+                                const summaryText = taskType === 'prediction_generate'
+                                  ? `${item.processed_count || 0} / ${item.skipped_count || 0} / ${item.failed_count || 0}`
+                                  : `${item.fetched_count} / ${item.saved_count}`
+                                const detailText = taskType === 'prediction_generate'
+                                  ? `${getGenerationModeLabel(item.mode)} · ${item.model_code === '__bulk__' ? '批量模型' : item.model_code || '-'}`
+                                  : item.latest_period || '-'
+                                return (
+                                  <tr key={item.id}>
+                                    <td>
+                                      <strong>{formatDateTimeLocal(item.started_at || item.created_at)}</strong>
+                                      <span>{item.finished_at ? `结束：${formatDateTimeLocal(item.finished_at)}` : '-'}</span>
+                                    </td>
+                                    <td>{getLotteryLabel(item.lottery_code)}</td>
+                                    <td>{getMaintenanceTaskTypeLabel(taskType)}</td>
+                                    <td>{getMaintenanceTriggerLabel(item.trigger_type)}</td>
+                                    <td>
+                                      <span className={clsx('status-pill', item.status === 'succeeded' && 'is-active', item.status === 'failed' && 'is-deleted')}>
+                                        {getTaskStatusLabel(item.status)}
+                                      </span>
+                                    </td>
+                                    <td>{summaryText}</td>
+                                    <td>{detailText}</td>
+                                    <td>{item.error_message || '-'}</td>
+                                  </tr>
+                                )
+                              })()
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={7}>暂无日志</td>
+                              <td colSpan={8}>暂无日志</td>
                             </tr>
                           )}
                         </tbody>
@@ -2832,74 +2864,87 @@ export function SettingsPage() {
 
       {generationModalOpen ? (
         <div className="modal-shell" role="presentation" onClick={() => setGenerationModalOpen(false)}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <form className="settings-form-grid" onSubmit={submitGenerationForm}>
-              <div className="modal-card__header">
-                <div>
+          <div className="modal-card modal-card--form generation-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid generation-modal__form" onSubmit={submitGenerationForm}>
+              <div className="modal-card__header generation-modal__header">
+                <div className="generation-modal__header-main">
                   <p className="modal-card__eyebrow">预测生成</p>
                   <h3>{generationDisplayName}</h3>
-                  <p className="settings-inline-hint">
+                  <p className="generation-modal__lottery">
                     当前生成彩种：{getLotteryLabel(generationForm.lotteryCode)}
                   </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
               </div>
-              <label className="field">
-                <span>彩种</span>
-                <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as LotteryCode)}>
-                  <option value="dlt">大乐透</option>
-                  <option value="pl3">排列3</option>
-                  <option value="pl5">排列5</option>
-                </select>
-              </label>
-              {generationFilterNotice ? <div className="settings-inline-hint">{generationFilterNotice}</div> : null}
-              {!generationForm.modelCodes.length ? <div className="state-shell">当前彩种暂无可用模型，请切换彩种。</div> : null}
-              <label className="field">
-                <span>生成模式</span>
-                <select
-                  value={generationForm.mode}
-                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
-                >
-                  <option value="current">当前期生成</option>
-                  <option value="history">历史重算</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>结果策略</span>
-                <select
-                  value={generationForm.overwrite ? 'overwrite' : 'skip'}
-                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, overwrite: event.target.value === 'overwrite' }))}
-                >
-                  <option value="skip">已有结果时跳过</option>
-                  <option value="overwrite">已有结果时覆盖</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>并发线程数</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={8}
-                  step={1}
-                  value={generationForm.parallelism}
-                  onChange={(event) => setGenerationForm((previous) => ({ ...previous, parallelism: event.target.value }))}
-                  placeholder="默认 3"
-                />
-              </label>
-              {generationForm.mode === 'history' ? (
-                <>
+              <section className="generation-modal__section generation-modal__section--config">
+                <div className="generation-modal__section-title">
+                  <strong>任务参数</strong>
+                  <span>设置彩种、模式、覆盖策略与并发线程数。</span>
+                </div>
+                <div className="generation-modal__grid">
                   <label className="field">
-                    <span>开始期号</span>
-                    <input value={generationForm.startPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))} required />
+                    <span>彩种</span>
+                    <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as LotteryCode)}>
+                      <option value="dlt">大乐透</option>
+                      <option value="pl3">排列3</option>
+                      <option value="pl5">排列5</option>
+                    </select>
                   </label>
                   <label className="field">
-                    <span>结束期号</span>
-                    <input value={generationForm.endPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))} required />
+                    <span>生成模式</span>
+                    <select
+                      value={generationForm.mode}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
+                    >
+                      <option value="current">当前期生成</option>
+                      <option value="history">历史重算</option>
+                    </select>
                   </label>
-                </>
-              ) : null}
+                  <label className="field">
+                    <span>结果策略</span>
+                    <select
+                      value={generationForm.overwrite ? 'overwrite' : 'skip'}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, overwrite: event.target.value === 'overwrite' }))}
+                    >
+                      <option value="skip">已有结果时跳过</option>
+                      <option value="overwrite">已有结果时覆盖</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>并发线程数</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={8}
+                      step={1}
+                      value={generationForm.parallelism}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, parallelism: event.target.value }))}
+                      placeholder="默认 3"
+                    />
+                  </label>
+                </div>
+                {generationForm.mode === 'history' ? (
+                  <div className="generation-modal__history-grid">
+                    <label className="field">
+                      <span>开始期号</span>
+                      <input value={generationForm.startPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))} required />
+                    </label>
+                    <label className="field">
+                      <span>结束期号</span>
+                      <input value={generationForm.endPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))} required />
+                    </label>
+                  </div>
+                ) : null}
+                {generationFilterNotice ? <div className="settings-inline-hint generation-modal__hint">{generationFilterNotice}</div> : null}
+                {!generationForm.modelCodes.length ? <div className="state-shell generation-modal__warning">当前彩种暂无可用模型，请切换彩种。</div> : null}
+              </section>
               {generationTask ? (
-                <section className="generation-task-panel" aria-live="polite">
+                <section className="generation-modal__section generation-modal__section--task" aria-live="polite">
+                  <div className="generation-modal__section-title">
+                    <strong>任务状态</strong>
+                    <span>创建后会持续刷新执行进度与失败明细。</span>
+                  </div>
+                  <section className="generation-task-panel">
                   <div className="generation-task-panel__header">
                     <div>
                       <p className="modal-card__eyebrow">任务状态</p>
@@ -3003,9 +3048,10 @@ export function SettingsPage() {
                     </div>
                   )}
                   {generationTask.error_message ? <div className="state-shell state-shell--error">任务失败：{generationTask.error_message}</div> : null}
+                  </section>
                 </section>
               ) : null}
-              <div className="form-actions">
+              <div className="form-actions generation-modal__actions">
                 <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending || generationForm.modelCodes.length === 0}>创建任务</button>
               </div>
             </form>

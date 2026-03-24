@@ -417,11 +417,17 @@ SCHEMA_STATEMENTS = [
         task_id VARCHAR(64) NOT NULL,
         lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
         trigger_type VARCHAR(16) NOT NULL DEFAULT 'manual',
+        task_type VARCHAR(32) NOT NULL DEFAULT 'lottery_fetch',
+        mode VARCHAR(32) NULL,
+        model_code VARCHAR(128) NULL,
         status VARCHAR(32) NOT NULL,
         started_at DATETIME NULL,
         finished_at DATETIME NULL,
         fetched_count INT NOT NULL DEFAULT 0,
         saved_count INT NOT NULL DEFAULT 0,
+        processed_count INT NOT NULL DEFAULT 0,
+        skipped_count INT NOT NULL DEFAULT 0,
+        failed_count INT NOT NULL DEFAULT 0,
         latest_period VARCHAR(32) NULL,
         duration_ms DOUBLE NOT NULL DEFAULT 0,
         error_message TEXT NULL,
@@ -771,7 +777,33 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "my_bet_record_meta": {
         "ticket_purchased_at": "ALTER TABLE my_bet_record_meta ADD COLUMN ticket_purchased_at DATETIME NULL AFTER ocr_recognized_at",
-    }
+    },
+    "maintenance_run_log": {
+        "task_type": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN task_type VARCHAR(32) NOT NULL DEFAULT 'lottery_fetch' AFTER trigger_type"
+        ),
+        "mode": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN mode VARCHAR(32) NULL AFTER task_type"
+        ),
+        "model_code": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN model_code VARCHAR(128) NULL AFTER mode"
+        ),
+        "processed_count": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN processed_count INT NOT NULL DEFAULT 0 AFTER saved_count"
+        ),
+        "skipped_count": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN skipped_count INT NOT NULL DEFAULT 0 AFTER processed_count"
+        ),
+        "failed_count": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN failed_count INT NOT NULL DEFAULT 0 AFTER skipped_count"
+        ),
+    },
 }
 
 for _lottery_code in SUPPORTED_LOTTERY_CODES:
