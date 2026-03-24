@@ -39,6 +39,15 @@ class ModelUpdatePayload(ModelSettingsPayload):
     model_code: str
 
 
+class ModelConnectivityTestPayload(BaseModel):
+    provider: str
+    api_format: str | None = None
+    api_model_name: str
+    base_url: str | None = ""
+    api_key: str | None = ""
+    app_code: str | None = ""
+
+
 class ProviderCreatePayload(ProviderSettingsPayload):
     code: str
 

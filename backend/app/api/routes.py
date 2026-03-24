@@ -29,6 +29,7 @@ from backend.app.schemas.auth import (
 )
 from backend.app.schemas.history import PredictionsHistoryListResponse
 from backend.app.schemas.model_settings import (
+    ModelConnectivityTestResponse,
     ModelListResponse,
     ModelResponse,
     ModelSettingsPayload,
@@ -39,6 +40,7 @@ from backend.app.schemas.requests import (
     BulkModelActionPayload,
     GenerateModelPredictionsPayload,
     ModelCodePayload,
+    ModelConnectivityTestPayload,
     MyBetRecordDeletePayload,
     MyBetRecordListPayload,
     MyBetRecordPayload,
@@ -371,6 +373,14 @@ def update_settings_model(payload: ModelUpdatePayload, _: dict = Depends(require
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="模型不存在") from exc
     except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/models/connectivity-test", response_model=ModelConnectivityTestResponse)
+def test_settings_model_connectivity(payload: ModelConnectivityTestPayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        return model_service.test_model_connectivity(payload.model_dump())
+    except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

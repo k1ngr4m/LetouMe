@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from time import perf_counter
 from typing import Any
 
 from backend.app.cache import runtime_cache
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.model_repository import ModelRepository
+from backend.core.model_config import ModelDefinition
+from backend.core.model_factory import ModelFactory
 
 
 class ModelService:
@@ -77,6 +80,32 @@ class ModelService:
         deleted = self.repository.delete_provider(provider_code)
         self._invalidate_model_cache()
         return deleted
+
+    def test_model_connectivity(self, payload: dict[str, Any]) -> dict[str, Any]:
+        provider = str(payload.get("provider") or "").strip()
+        api_model_name = str(payload.get("api_model_name") or "").strip()
+        api_format = str(payload.get("api_format") or "").strip().lower() or None
+        if not provider:
+            raise ValueError("Provider 不能为空")
+        if not api_model_name:
+            raise ValueError("API 模型名不能为空")
+
+        started_at = perf_counter()
+        model_definition = ModelDefinition(
+            id=f"connectivity-test-{provider}-{api_model_name}",
+            name="Connectivity Test",
+            provider=provider,
+            model_id=api_model_name,
+            api_model=api_model_name,
+            api_format=api_format,
+            api_key_value=str(payload.get("api_key") or "").strip(),
+            base_url_value=str(payload.get("base_url") or "").strip(),
+            app_code_value=str(payload.get("app_code") or "").strip(),
+        )
+        model = ModelFactory().create(model_definition)
+        ok, message = model.health_check()
+        duration_ms = int((perf_counter() - started_at) * 1000)
+        return {"ok": bool(ok), "message": str(message or ""), "duration_ms": max(duration_ms, 0)}
 
     def bulk_action(self, model_codes: list[str], action: str, updates: dict[str, Any] | None = None) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]

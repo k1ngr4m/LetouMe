@@ -535,6 +535,7 @@ export function SettingsPage() {
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
+  const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
@@ -807,8 +808,8 @@ export function SettingsPage() {
     if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AiMixHub' })
     return result
   }, [providers])
-  const modelFormProviders = modelMode === 'create'
-    ? (createModeProviders.length ? createModeProviders : providers.map((provider) => ({ ...provider, display_name: provider.name })))
+  const modelFormProviders = createModeProviders.length
+    ? createModeProviders
     : providers.map((provider) => ({ ...provider, display_name: provider.name }))
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
   const selectedProvider = providerMap[modelForm.provider]
@@ -938,6 +939,23 @@ export function SettingsPage() {
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '模型保存失败')
       setMessageType('error')
+    },
+  })
+  const testModelConnectivityMutation = useMutation({
+    mutationFn: (payload: Pick<SettingsModelPayload, 'provider' | 'api_format' | 'api_model_name' | 'base_url' | 'api_key' | 'app_code'>) =>
+      apiClient.testSettingsModelConnectivity(payload),
+    onSuccess: (result) => {
+      setModelConnectivityResult({
+        status: result.ok ? 'success' : 'error',
+        message: result.message || (result.ok ? '连通性测试通过' : '连通性测试失败'),
+        durationMs: result.duration_ms,
+      })
+    },
+    onError: (error) => {
+      setModelConnectivityResult({
+        status: 'error',
+        message: error instanceof Error ? error.message : '连通性测试失败',
+      })
     },
   })
 
@@ -1212,6 +1230,7 @@ export function SettingsPage() {
       base_url: defaultProvider?.base_url || '',
       lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
     })
+    setModelConnectivityResult(null)
     setModelModalOpen(true)
   }
 
@@ -1267,7 +1286,7 @@ export function SettingsPage() {
     setProviderForm({
       code: provider.code,
       name: provider.name,
-      api_format: provider.api_format,
+      api_format: provider.api_format || 'openai_compatible',
       remark: provider.remark || '',
       website_url: provider.website_url || '',
       api_key: provider.api_key || '',
@@ -1421,7 +1440,13 @@ export function SettingsPage() {
       is_active: model.is_active,
       lottery_codes: model.lottery_codes,
     })
+    setModelConnectivityResult(null)
     setModelModalOpen(true)
+  }
+
+  function closeModelModal() {
+    setModelModalOpen(false)
+    setModelConnectivityResult(null)
   }
 
   function selectRole(role: RoleItem) {
@@ -1447,6 +1472,18 @@ export function SettingsPage() {
       display_name: modelForm.display_name.trim(),
       provider: modelForm.provider.trim(),
       provider_model_name: modelForm.provider_model_name?.trim(),
+      api_model_name: modelForm.api_model_name.trim(),
+      base_url: modelForm.base_url.trim(),
+      api_key: modelForm.api_key.trim(),
+      app_code: modelForm.app_code.trim(),
+    })
+  }
+
+  function testModelConnectivity() {
+    setModelConnectivityResult(null)
+    testModelConnectivityMutation.mutate({
+      provider: modelForm.provider.trim(),
+      api_format: modelForm.api_format,
       api_model_name: modelForm.api_model_name.trim(),
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
@@ -1657,11 +1694,11 @@ export function SettingsPage() {
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Settings Center</p>
           <h2 className="hero-panel__title">设置中心</h2>
-          <p className="hero-panel__description">综合管理模型、抓取任务、定时任务与账号配置，不再按彩种切换页面视图。</p>
+          <p className="hero-panel__description">综合管理用户</p>
           <div className="hero-panel__meta">
-            <span>当前角色 {user?.role_name || '-'}</span>
-            <span>权限数 {user?.permissions?.length || 0}</span>
-            <span>账号 {user?.username || '-'}</span>
+            {/*<span>当前角色 {user?.role_name || '-'}</span>*/}
+            {/*<span>权限数 {user?.permissions?.length || 0}</span>*/}
+            {/*<span>账号 {user?.username || '-'}</span>*/}
           </div>
         </div>
       </section>
@@ -2745,7 +2782,7 @@ export function SettingsPage() {
       </section>
 
       {modelModalOpen ? (
-        <div className="modal-shell" role="presentation" onClick={() => setModelModalOpen(false)}>
+        <div className="modal-shell" role="presentation" onClick={closeModelModal}>
           <div className="modal-card modal-card--form model-config-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <form className="settings-form-grid model-config-modal__form" onSubmit={submitModelForm}>
               <div className="modal-card__header model-config-modal__header">
@@ -2754,7 +2791,7 @@ export function SettingsPage() {
                   <h3>{modelMode === 'create' ? '新增模型' : '编辑模型'}</h3>
                   <p className="model-config-modal__mode-tip">{modelMode === 'create' ? '创建新模型用于预测生成。' : '修改当前模型配置，不影响历史记录。'}</p>
                 </div>
-                <button className="ghost-button" type="button" onClick={() => setModelModalOpen(false)}>关闭</button>
+                <button className="ghost-button" type="button" onClick={closeModelModal}>关闭</button>
               </div>
               <section className="model-config-modal__section">
                 <div className="model-config-modal__section-title">
@@ -2833,6 +2870,25 @@ export function SettingsPage() {
                     <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
                   </label>
                 </div>
+                <div className="model-config-modal__connectivity">
+                  <button
+                    className="ghost-button model-config-modal__connectivity-button"
+                    type="button"
+                    onClick={testModelConnectivity}
+                    disabled={testModelConnectivityMutation.isPending}
+                  >
+                    {testModelConnectivityMutation.isPending ? '测试中...' : '测试连通性'}
+                  </button>
+                  {modelConnectivityResult ? (
+                    <p className={clsx('model-config-modal__connectivity-result', modelConnectivityResult.status === 'success' && 'is-success')}>
+                      <span className="model-config-modal__connectivity-result-icon" aria-hidden="true">
+                        {modelConnectivityResult.status === 'success' ? '✓' : '✕'}
+                      </span>
+                      {modelConnectivityResult.message}
+                      {typeof modelConnectivityResult.durationMs === 'number' ? `（${modelConnectivityResult.durationMs}ms）` : ''}
+                    </p>
+                  ) : null}
+                </div>
               </section>
 
               <section className="model-config-modal__section">
@@ -2874,7 +2930,7 @@ export function SettingsPage() {
               </section>
 
               <div className="form-actions model-config-modal__actions">
-                <button className="ghost-button" type="button" onClick={() => setModelModalOpen(false)}>关闭</button>
+                <button className="ghost-button" type="button" onClick={closeModelModal}>关闭</button>
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
               </div>
             </form>

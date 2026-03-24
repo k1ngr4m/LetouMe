@@ -460,6 +460,21 @@ export type SettingsModelPayload = {
   lottery_codes: LotteryCode[]
 }
 
+export type SettingsModelConnectivityTestPayload = {
+  provider: string
+  api_format?: string
+  api_model_name: string
+  base_url?: string
+  api_key?: string
+  app_code?: string
+}
+
+export type SettingsModelConnectivityTestResponse = {
+  ok: boolean
+  message: string
+  duration_ms: number
+}
+
 export type SettingsProviderPayload = {
   code?: string
   name: string

@@ -16,6 +16,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     changePassword: vi.fn(),
     createSettingsModel: vi.fn(),
     updateSettingsModel: vi.fn(),
+    testSettingsModelConnectivity: vi.fn(),
     toggleSettingsModel: vi.fn(),
     deleteSettingsModel: vi.fn(),
     restoreSettingsModel: vi.fn(),

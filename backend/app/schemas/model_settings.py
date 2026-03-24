@@ -45,6 +45,12 @@ class ModelListResponse(BaseModel):
     models: list[ModelResponse] = Field(default_factory=list)
 
 
+class ModelConnectivityTestResponse(BaseModel):
+    ok: bool
+    message: str
+    duration_ms: int = 0
+
+
 class ProviderListResponse(BaseModel):
     providers: list[dict[str, Any]] = Field(default_factory=list)
 

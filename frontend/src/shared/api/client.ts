@@ -35,6 +35,8 @@ import type {
   SettingsPredictionRecordDetail,
   SettingsPredictionRecordListResponse,
   SettingsModel,
+  SettingsModelConnectivityTestPayload,
+  SettingsModelConnectivityTestResponse,
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProvider,
@@ -337,6 +339,12 @@ export const apiClient = {
     return requestJson<SettingsModel>('/api/settings/models/update', {
       method: 'POST',
       body: JSON.stringify({ ...payload, model_code: modelCode }),
+    })
+  },
+  testSettingsModelConnectivity(payload: SettingsModelConnectivityTestPayload) {
+    return requestJson<SettingsModelConnectivityTestResponse>('/api/settings/models/connectivity-test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
   toggleSettingsModel(modelCode: string, isActive: boolean) {

@@ -3041,6 +3041,52 @@ a {
   margin: 0;
 }
 
+.model-config-modal__connectivity {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.model-config-modal__connectivity-button {
+  width: fit-content;
+}
+
+.model-config-modal__connectivity-result {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(253, 164, 175, 0.34);
+  background: rgba(190, 24, 93, 0.12);
+  color: #fda4af;
+  font-size: 0.84rem;
+}
+
+.model-config-modal__connectivity-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(253, 164, 175, 0.24);
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.model-config-modal__connectivity-result.is-success {
+  border-color: rgba(134, 239, 172, 0.34);
+  background: rgba(22, 163, 74, 0.12);
+  color: #86efac;
+}
+
+.model-config-modal__connectivity-result.is-success .model-config-modal__connectivity-result-icon {
+  background: rgba(134, 239, 172, 0.24);
+}
+
 .model-config-modal__actions {
   justify-content: flex-end;
   margin-top: 0.25rem;
@@ -3099,6 +3145,26 @@ a {
 :root[data-theme='light'] .model-config-modal .field select {
   border-color: rgba(133, 150, 178, 0.24);
   background: rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme='light'] .model-config-modal__connectivity-result {
+  border-color: rgba(190, 24, 93, 0.26);
+  background: rgba(251, 207, 232, 0.52);
+  color: #be123c;
+}
+
+:root[data-theme='light'] .model-config-modal__connectivity-result-icon {
+  background: rgba(225, 29, 72, 0.16);
+}
+
+:root[data-theme='light'] .model-config-modal__connectivity-result.is-success {
+  border-color: rgba(5, 150, 105, 0.28);
+  background: rgba(209, 250, 229, 0.75);
+  color: #047857;
+}
+
+:root[data-theme='light'] .model-config-modal__connectivity-result.is-success .model-config-modal__connectivity-result-icon {
+  background: rgba(16, 185, 129, 0.18);
 }
 
 .generation-modal {

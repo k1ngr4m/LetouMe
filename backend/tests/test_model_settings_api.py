@@ -158,6 +158,45 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["is_active"])
 
+    def test_connectivity_test_endpoint_returns_result(self) -> None:
+        with patch("backend.app.api.routes.model_service.test_model_connectivity") as test_connectivity:
+            test_connectivity.return_value = {"ok": True, "message": "ok", "duration_ms": 123}
+
+            response = self.client.post(
+                "/api/settings/models/connectivity-test",
+                json={
+                    "provider": "deepseek",
+                    "api_format": "openai_compatible",
+                    "api_model_name": "deepseek-chat",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "api_key": "test-key",
+                    "app_code": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertEqual(response.json()["duration_ms"], 123)
+        test_connectivity.assert_called_once()
+
+    def test_connectivity_test_endpoint_returns_error_detail(self) -> None:
+        with patch("backend.app.api.routes.model_service.test_model_connectivity") as test_connectivity:
+            test_connectivity.side_effect = ValueError("模型缺少 API Key 配置")
+            response = self.client.post(
+                "/api/settings/models/connectivity-test",
+                json={
+                    "provider": "deepseek",
+                    "api_format": "openai_compatible",
+                    "api_model_name": "deepseek-chat",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "api_key": "",
+                    "app_code": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "模型缺少 API Key 配置")
+
     def test_generate_prediction_task_endpoint_returns_task_payload(self) -> None:
         with (
             patch("backend.app.api.routes.prediction_generation_service.validate_model") as validate_model,
