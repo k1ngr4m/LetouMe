@@ -74,6 +74,7 @@ class ModelRepository:
                     raise ValueError(f"模型编码已存在: {model_code}")
                 provider_row = self._resolve_provider(cursor, str(payload["provider"]))
                 provider_id = int(provider_row["id"])
+                self._sync_provider_api_format(cursor, provider_id, payload.get("api_format"))
                 provider_model_id, api_model_name = self._resolve_provider_model_binding(cursor, provider_id, payload)
                 cursor.execute(
                     """
@@ -121,6 +122,7 @@ class ModelRepository:
                 model_id = int(row["id"])
                 provider_row = self._resolve_provider(cursor, str(payload["provider"]))
                 provider_id = int(provider_row["id"])
+                self._sync_provider_api_format(cursor, provider_id, payload.get("api_format"))
                 provider_model_id, api_model_name = self._resolve_provider_model_binding(cursor, provider_id, payload)
                 cursor.execute(
                     """
@@ -656,7 +658,7 @@ class ModelRepository:
             raise ValueError("provider 不能为空")
         cursor.execute(
             """
-            SELECT id, provider_code, base_url, api_key, is_deleted
+            SELECT id, provider_code, api_format, base_url, api_key, is_deleted
             FROM model_provider
             WHERE provider_code = ?
             """,
@@ -667,7 +669,7 @@ class ModelRepository:
             self._upsert_provider(cursor, code)
             cursor.execute(
                 """
-                SELECT id, provider_code, base_url, api_key, is_deleted
+                SELECT id, provider_code, api_format, base_url, api_key, is_deleted
                 FROM model_provider
                 WHERE provider_code = ?
                 """,
@@ -679,6 +681,22 @@ class ModelRepository:
         if bool(provider_row.get("is_deleted")):
             raise ValueError("供应商已删除")
         return provider_row
+
+    @staticmethod
+    def _sync_provider_api_format(cursor, provider_id: int, api_format: Any) -> None:
+        normalized = str(api_format or "").strip().lower()
+        if not normalized:
+            return
+        if normalized not in SUPPORTED_API_FORMATS:
+            raise ValueError("不支持的接口格式")
+        cursor.execute(
+            """
+            UPDATE model_provider
+            SET api_format = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (normalized, provider_id),
+        )
 
     @staticmethod
     def _resolve_provider_model_binding(cursor, provider_id: int, payload: dict[str, Any]) -> tuple[int | None, str]:
@@ -764,6 +782,9 @@ class ModelRepository:
         provider = str(payload.get("provider") or "").strip()
         if not provider:
             raise ValueError("provider 不能为空")
+        api_format = str(payload.get("api_format") or "").strip().lower()
+        if api_format and api_format not in SUPPORTED_API_FORMATS:
+            raise ValueError("不支持的接口格式")
         if not str(payload.get("api_model_name") or "").strip() and not str(payload.get("provider_model_id") or "").strip():
             raise ValueError("api_model_name 不能为空")
         lottery_codes = payload.get("lottery_codes")

@@ -179,7 +179,8 @@ class ModelService:
         provider_model_id = payload.get("provider_model_id")
         normalized["provider_model_id"] = int(provider_model_id) if str(provider_model_id or "").strip() else None
         normalized["provider_model_name"] = str(payload.get("provider_model_name") or "").strip()
-        normalized["api_format"] = str(payload.get("api_format") or "openai_compatible").strip().lower()
+        api_format = str(payload.get("api_format") or "").strip().lower()
+        normalized["api_format"] = api_format or None
         normalized["api_model_name"] = str(payload.get("api_model_name") or "").strip()
         normalized["base_url"] = str(payload.get("base_url") or "").strip()
         normalized["api_key"] = str(payload.get("api_key") or "").strip()

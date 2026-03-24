@@ -2766,7 +2766,16 @@ export function SettingsPage() {
                   </label>
                   <label className="field">
                     <span>接口格式</span>
-                    <input value={modelForm.api_format || selectedProvider?.api_format || ''} readOnly />
+                    <select
+                      value={modelForm.api_format || selectedProvider?.api_format || 'openai_compatible'}
+                      onChange={(event) => setModelForm((previous) => ({ ...previous, api_format: event.target.value as SettingsProviderPayload['api_format'] }))}
+                    >
+                      <option value="openai_responses">OpenAI Responses</option>
+                      <option value="openai_compatible">OpenAI Compatible</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="amazon_bedrock">Amazon Bedrock</option>
+                      <option value="google_gemini">Google(Gemini)</option>
+                    </select>
                   </label>
                   <label className="field">
                     <span>供应商模型</span>

@@ -11,7 +11,7 @@ class ModelSettingsPayload(BaseModel):
     provider: str
     provider_model_id: int | None = None
     provider_model_name: str | None = ""
-    api_format: str | None = "openai_compatible"
+    api_format: str | None = None
     api_model_name: str
     base_url: str | None = ""
     api_key: str | None = ""
