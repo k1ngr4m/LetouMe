@@ -443,7 +443,7 @@ vi.mock('./hooks/useHomeData', () => ({
   },
 }))
 
-function renderPage(initialEntry = '/dashboard/prediction') {
+function renderPage(initialEntry = '/dashboard/dlt/prediction') {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -462,7 +462,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
-            path="/dashboard/:tab"
+            path="/dashboard/:lotteryCode/:tab"
             element={
               <>
                 <HomePage />
@@ -470,8 +470,8 @@ function renderPage(initialEntry = '/dashboard/prediction') {
               </>
             }
           />
-          <Route path="/dashboard/models/:modelId" element={<LocationDisplay />} />
-          <Route path="/dashboard/rules" element={<LocationDisplay />} />
+          <Route path="/dashboard/:lotteryCode/models/:modelId" element={<LocationDisplay />} />
+          <Route path="/dashboard/:lotteryCode/rules" element={<LocationDisplay />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -752,7 +752,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: /查看详情：/ })[0])
 
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/dlt/models/model-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -761,7 +761,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/dlt/history')
   })
 
   it('navigates to rules page from tab strip', async () => {
@@ -769,7 +769,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '规则与奖金' }))
 
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/rules')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/dlt/rules')
   })
 
   it('shows strategy filters for dlt views', async () => {
@@ -799,9 +799,7 @@ describe('HomePage dashboard sidebar', () => {
   })
 
   it('shows five position summary columns for pl5', async () => {
-    renderPage()
-
-    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+    renderPage('/dashboard/pl5/prediction')
 
     const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
     expect(summarySection).not.toBeNull()
@@ -1446,9 +1444,7 @@ describe('HomePage dashboard sidebar', () => {
       total_count: 1,
     })
 
-    renderPage()
-
-    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    renderPage('/dashboard/pl3/prediction')
     expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
@@ -1511,9 +1507,7 @@ describe('HomePage dashboard sidebar', () => {
       total_count: 1,
     })
 
-    renderPage()
-
-    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+    renderPage('/dashboard/pl5/prediction')
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
@@ -1531,9 +1525,7 @@ describe('HomePage dashboard sidebar', () => {
   })
 
   it('uses direct-only display and three-position summary for pl3', async () => {
-    renderPage()
-
-    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    renderPage('/dashboard/pl3/prediction')
     expect(screen.queryByText('玩法筛选')).not.toBeInTheDocument()
     expect(screen.queryByText('预测玩法筛选')).not.toBeInTheDocument()
     expect(screen.getByText('第一位（百位）统计')).toBeInTheDocument()
@@ -1547,11 +1539,11 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
     await userEvent.click(screen.getByRole('button', { name: '我的投注' }))
     expect(await screen.findByText('我的投注')).toBeInTheDocument()
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/my-bets')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/dlt/my-bets')
   })
 
   it('supports create and delete on my-bets tab', async () => {
-    renderPage('/dashboard/my-bets')
+    renderPage('/dashboard/dlt/my-bets')
     await screen.findByText('我的投注')
     expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
 

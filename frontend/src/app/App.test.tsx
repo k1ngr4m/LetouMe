@@ -72,7 +72,7 @@ describe('App routing', () => {
     renderApp(['/dashboard'])
     expect(await screen.findByText('Home Page Mock')).toBeInTheDocument()
     expect(await screen.findByText(DISCLAIMER_TEXT)).toBeInTheDocument()
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/dlt/prediction')
   })
 
   it('renders dashboard model detail route', async () => {

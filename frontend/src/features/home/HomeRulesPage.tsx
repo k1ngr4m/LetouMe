@@ -1,9 +1,6 @@
-import { useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
-import { loadSelectedLottery } from '../../shared/lib/storage'
-import type { LotteryCode } from '../../shared/types/api'
-import { HOME_TAB_PATHS, type HomeRulesRouteState } from './navigation'
+import { getDashboardPath, normalizeLotteryCodeParam } from './navigation'
 
 const DLT_RULES_PDF_PATH = '/rules/dlt-rules.pdf'
 const DLT_PRIZE_TABLE_IMAGE_PATH = '/rules/dlt-prize-table.png'
@@ -71,9 +68,8 @@ const PL3_RULE_CHAPTERS = [
 
 export function HomeRulesPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const navigationState = location.state as HomeRulesRouteState | null
-  const selectedLottery = useMemo<LotteryCode>(() => navigationState?.lotteryCode || loadSelectedLottery(), [navigationState?.lotteryCode])
+  const { lotteryCode } = useParams()
+  const selectedLottery = normalizeLotteryCodeParam(lotteryCode)
   const isPl3 = selectedLottery === 'pl3'
   const isPl5 = selectedLottery === 'pl5'
 
@@ -85,7 +81,7 @@ export function HomeRulesPage() {
             <p className="modal-card__eyebrow">Game Rules</p>
             <h2 className="panel-card__title">{isPl3 ? '排列3规则与奖金' : isPl5 ? '排列5规则与奖金' : '大乐透规则与奖金'}</h2>
           </div>
-          <button className="ghost-button" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
+          <button className="ghost-button" type="button" onClick={() => navigate(getDashboardPath('prediction', selectedLottery))}>
             返回预测总览
           </button>
         </div>

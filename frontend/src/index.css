@@ -552,6 +552,68 @@ a {
   gap: 1rem;
 }
 
+.app-main--with-dashboard-sidebar {
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+}
+
+.app-main__content {
+  min-width: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.app-dashboard-sidebar {
+  position: sticky;
+  top: 1.25rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(10px);
+}
+
+.app-dashboard-sidebar__trigger {
+  width: 100%;
+  text-align: left;
+  border: none;
+  padding: 0.62rem 0.72rem;
+  border-radius: 0.72rem;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-dashboard-sidebar__trigger:hover {
+  color: var(--text-1);
+}
+
+.app-dashboard-lottery-listbox {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.app-dashboard-lottery-listbox__option {
+  width: 100%;
+  border: none;
+  text-align: left;
+  padding: 0.65rem 0.72rem;
+  border-radius: 0.72rem;
+  color: var(--text-2);
+  background: transparent;
+}
+
+.app-dashboard-lottery-listbox__option:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-dashboard-lottery-listbox__option.is-active {
+  color: var(--text-1);
+  background: rgba(241, 178, 76, 0.12);
+}
+
 .site-disclaimer {
   display: flex;
   align-items: center;
@@ -5241,6 +5303,14 @@ a {
   .dashboard-sidebar {
     position: static;
     grid-template-columns: 1fr;
+  }
+
+  .app-main--with-dashboard-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .app-dashboard-sidebar {
+    position: static;
   }
 
   .spotlight-grid,

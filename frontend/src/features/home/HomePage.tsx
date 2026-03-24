@@ -1,12 +1,12 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import { loadPinnedModels, loadSelectedLottery, savePinnedModels, saveSelectedLottery } from '../../shared/lib/storage'
+import { loadPinnedModels, savePinnedModels, saveSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import {
@@ -36,7 +36,17 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
-import { HOME_RULES_PATH, getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type HomeRulesRouteState, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import {
+  getDashboardPath,
+  getHomeModelDetailPath,
+  getHomeRulesPath,
+  getHomeTabFromPath,
+  normalizeLotteryCodeParam,
+  type HomeDetailRouteState,
+  type HomeModelView,
+  type ScoreViewSortDirection,
+  type ScoreViewSortKey,
+} from './navigation'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -242,7 +252,9 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
 export function HomePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { lotteryCode: routeLotteryCode } = useParams()
   const activeTab = getHomeTabFromPath(location.pathname)
+  const selectedLottery = normalizeLotteryCodeParam(routeLotteryCode)
   const navigationState = location.state as HomeDetailRouteState | null
   const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
   const [modelListView, setModelListView] = useState<HomeModelView>('list')
@@ -252,8 +264,7 @@ export function HomePage() {
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
   const [lotteryPage, setLotteryPage] = useState(1)
   const [lotteryPageSize, setLotteryPageSize] = useState(LOTTERY_DEFAULT_PAGE_SIZE)
-  const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
-  const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
+  const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
@@ -562,7 +573,9 @@ export function HomePage() {
   }
 
   function openModelDetail(modelId: string) {
-    navigate(`/dashboard/models/${modelId}`, { state: { scrollY: window.scrollY } satisfies HomeDetailRouteState })
+    navigate(getHomeModelDetailPath(selectedLottery, modelId), {
+      state: { scrollY: window.scrollY } satisfies HomeDetailRouteState,
+    })
   }
 
   function handleHistoryPageSizeChange(nextPageSize: number) {
@@ -599,21 +612,6 @@ export function HomePage() {
       <section className="hero-panel">
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Prediction Command Center</p>
-          <div className="lottery-switch" role="tablist" aria-label="彩种切换">
-            {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={clsx('chip-button', selectedLottery === code && 'is-active')}
-                onClick={() => setSelectedLottery(code)}
-                aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
-                aria-pressed={selectedLottery === code}
-              >
-                <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : '仅直选定位玩法'}</span>
-              </button>
-            ))}
-          </div>
           <h2 className="hero-panel__title">{lotteryLabel}AI预测</h2>
           <p className="hero-panel__description">
             当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>，下期开奖日{' '}
@@ -645,37 +643,37 @@ export function HomePage() {
       <section className="tab-strip dashboard-tab-strip">
         <button
           className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('prediction'))}
+          onClick={() => navigate(getDashboardPath('prediction', selectedLottery))}
         >
           预测总览
         </button>
         <button
           className={clsx('tab-strip__item', activeTab === 'simulation' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('simulation'))}
+          onClick={() => navigate(getDashboardPath('simulation', selectedLottery))}
         >
           模拟试玩
         </button>
         <button
           className={clsx('tab-strip__item', activeTab === 'analysis' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('analysis'))}
+          onClick={() => navigate(getDashboardPath('analysis', selectedLottery))}
         >
           图表分析
         </button>
         <button
           className={clsx('tab-strip__item', activeTab === 'history' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('history'))}
+          onClick={() => navigate(getDashboardPath('history', selectedLottery))}
         >
           历史回溯
         </button>
         <button
           className="tab-strip__item"
-          onClick={() => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState })}
+          onClick={() => navigate(getHomeRulesPath(selectedLottery))}
         >
           规则与奖金
         </button>
         <button
           className={clsx('tab-strip__item', activeTab === 'my-bets' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('my-bets'))}
+          onClick={() => navigate(getDashboardPath('my-bets', selectedLottery))}
         >
           我的投注
         </button>

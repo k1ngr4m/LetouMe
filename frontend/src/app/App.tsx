@@ -1,11 +1,18 @@
 import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AppShell } from '../shared/components/AppShell'
 import { AuthProvider } from '../shared/auth/AuthProvider'
 import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
-import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../features/home/navigation'
+import { loadSelectedLottery } from '../shared/lib/storage'
+import {
+  DASHBOARD_BASE_PATH,
+  getDashboardPath,
+  getHomeModelDetailPath,
+  getHomeRulesPath,
+  normalizeLotteryCodeParam,
+} from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
@@ -27,6 +34,24 @@ function RouteLoadingFallback() {
   return <div style={{ padding: '24px', textAlign: 'center' }}>加载中...</div>
 }
 
+function LegacyDashboardTabRedirect({ tab }: { tab: 'prediction' | 'analysis' | 'history' | 'simulation' | 'my-bets' }) {
+  return <Navigate to={getDashboardPath(tab, loadSelectedLottery())} replace />
+}
+
+function LegacyDashboardRulesRedirect() {
+  return <Navigate to={getHomeRulesPath(loadSelectedLottery())} replace />
+}
+
+function LegacyDashboardModelDetailRedirect() {
+  const { modelId = '' } = useParams()
+  return <Navigate to={getHomeModelDetailPath(loadSelectedLottery(), modelId)} replace />
+}
+
+function DashboardLotteryRootRedirect() {
+  const { lotteryCode } = useParams()
+  return <Navigate to={getDashboardPath('prediction', normalizeLotteryCodeParam(lotteryCode))} replace />
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -37,9 +62,17 @@ export function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/dashboard" element={<Navigate to={HOME_TAB_PATHS.prediction} replace />} />
+            <Route path={DASHBOARD_BASE_PATH} element={<Navigate to={getDashboardPath('prediction', loadSelectedLottery())} replace />} />
+            <Route path="/dashboard/prediction" element={<LegacyDashboardTabRedirect tab="prediction" />} />
+            <Route path="/dashboard/simulation" element={<LegacyDashboardTabRedirect tab="simulation" />} />
+            <Route path="/dashboard/analysis" element={<LegacyDashboardTabRedirect tab="analysis" />} />
+            <Route path="/dashboard/history" element={<LegacyDashboardTabRedirect tab="history" />} />
+            <Route path="/dashboard/my-bets" element={<LegacyDashboardTabRedirect tab="my-bets" />} />
+            <Route path="/dashboard/rules" element={<LegacyDashboardRulesRedirect />} />
+            <Route path="/dashboard/models/:modelId" element={<LegacyDashboardModelDetailRedirect />} />
+            <Route path="/dashboard/:lotteryCode" element={<DashboardLotteryRootRedirect />} />
             <Route
-              path={HOME_TAB_PATHS.prediction}
+              path="/dashboard/:lotteryCode/prediction"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -49,7 +82,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_TAB_PATHS.simulation}
+              path="/dashboard/:lotteryCode/simulation"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -59,7 +92,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_TAB_PATHS.analysis}
+              path="/dashboard/:lotteryCode/analysis"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -69,7 +102,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_TAB_PATHS.history}
+              path="/dashboard/:lotteryCode/history"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -79,7 +112,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_TAB_PATHS['my-bets']}
+              path="/dashboard/:lotteryCode/my-bets"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -89,7 +122,7 @@ export function App() {
               }
             />
             <Route
-              path="/dashboard/models/:modelId"
+              path="/dashboard/:lotteryCode/models/:modelId"
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -99,7 +132,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_RULES_PATH}
+              path="/dashboard/:lotteryCode/rules"
               element={
                 <ProtectedRoute>
                   <AppShell>
