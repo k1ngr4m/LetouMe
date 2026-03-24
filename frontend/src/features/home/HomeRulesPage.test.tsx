@@ -47,6 +47,8 @@ describe('HomeRulesPage', () => {
     expect(screen.getByRole('heading', { name: '大乐透规则与奖金' })).toBeInTheDocument()
     expect(screen.getByTitle('中国体育彩票超级大乐透游戏规则')).toBeInTheDocument()
     expect(screen.getByAltText('大乐透奖金对照表')).toBeInTheDocument()
+    expect(screen.getByText('规则切换说明')).toBeInTheDocument()
+    expect(screen.getByText(/26014期及之后：使用新规则，奖级共七档/)).toBeInTheDocument()
     expect(screen.getByText('当前查看彩种：大乐透')).toBeInTheDocument()
   })
 

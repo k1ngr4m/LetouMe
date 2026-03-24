@@ -6,6 +6,11 @@ from time import perf_counter
 from typing import Any
 
 from backend.app.cache import runtime_cache
+from backend.app.dlt_rules import (
+    DLT_OLD_FIXED_PRIZE_RULES,
+    resolve_dlt_fallback_prize_amount,
+    resolve_dlt_prize_level,
+)
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_digit_balls, normalize_group_digits, normalize_lottery_code
 from backend.app.repositories.prediction_repository import PredictionRepository
@@ -16,15 +21,7 @@ class PredictionService:
     BET_COST = 2
     DEFAULT_STRATEGY_LABEL = "AI 组合策略"
     RECENT_SCORE_WINDOW = 20
-    FIXED_PRIZE_RULES = {
-        "三等奖": 10000,
-        "四等奖": 3000,
-        "五等奖": 300,
-        "六等奖": 200,
-        "七等奖": 100,
-        "八等奖": 15,
-        "九等奖": 5,
-    }
+    FIXED_PRIZE_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
     PL3_FIXED_PRIZE_RULES = {
         "直选": 1040,
         "组选3": 346,
@@ -1119,33 +1116,9 @@ class PredictionService:
             return "直选" if bool(is_exact_match) else None
         red_hit_count = int(hit_result.get("red_hit_count") or 0)
         blue_hit_count = int(hit_result.get("blue_hit_count") or 0)
-        if red_hit_count == 5 and blue_hit_count == 2:
-            return "一等奖"
-        if red_hit_count == 5 and blue_hit_count == 1:
-            return "二等奖"
-        if red_hit_count == 5 and blue_hit_count == 0:
-            return "三等奖"
-        if red_hit_count == 4 and blue_hit_count == 2:
-            return "四等奖"
-        if red_hit_count == 4 and blue_hit_count == 1:
-            return "五等奖"
-        if red_hit_count == 3 and blue_hit_count == 2:
-            return "六等奖"
-        if red_hit_count == 4 and blue_hit_count == 0:
-            return "七等奖"
-        if (red_hit_count == 3 and blue_hit_count == 1) or (red_hit_count == 2 and blue_hit_count == 2):
-            return "八等奖"
-        if (
-            (red_hit_count == 3 and blue_hit_count == 0)
-            or (red_hit_count == 2 and blue_hit_count == 1)
-            or (red_hit_count == 1 and blue_hit_count == 2)
-            or (red_hit_count == 0 and blue_hit_count == 2)
-        ):
-            return "九等奖"
-        return None
+        return resolve_dlt_prize_level(red_hit_count, blue_hit_count, (actual_result or {}).get("period"))
 
-    @classmethod
-    def resolve_prize_amount(cls, actual_result: dict[str, Any], prize_level: str | None) -> dict[str, Any]:
+    def resolve_prize_amount(self, actual_result: dict[str, Any], prize_level: str | None) -> dict[str, Any]:
         if not prize_level:
             return {"amount": 0, "source": "none"}
         for prize in actual_result.get("prize_breakdown", []) or []:
@@ -1153,12 +1126,25 @@ class PredictionService:
                 amount = int(prize.get("prize_amount") or 0)
                 if amount > 0:
                     return {"amount": amount, "source": "official"}
-        if normalize_lottery_code(actual_result.get("lottery_code") or "dlt") == "pl3" and prize_level in cls.PL3_FIXED_PRIZE_RULES:
-            return {"amount": cls.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
-        if normalize_lottery_code(actual_result.get("lottery_code") or "dlt") == "pl5" and prize_level in cls.PL5_FIXED_PRIZE_RULES:
-            return {"amount": cls.PL5_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
-        if prize_level in cls.FIXED_PRIZE_RULES:
-            return {"amount": cls.FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
+        lottery_code = normalize_lottery_code(actual_result.get("lottery_code") or "dlt")
+        if lottery_code == "pl3" and prize_level in self.PL3_FIXED_PRIZE_RULES:
+            return {"amount": self.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
+        if lottery_code == "pl5" and prize_level in self.PL5_FIXED_PRIZE_RULES:
+            return {"amount": self.PL5_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
+        if lottery_code == "dlt":
+            previous_jackpot_pool = int(actual_result.get("previous_jackpot_pool") or 0)
+            if previous_jackpot_pool <= 0:
+                period = str(actual_result.get("period") or "")
+                if period:
+                    previous_draw = self.lottery_service.get_previous_draw_by_period(period, lottery_code="dlt")
+                    previous_jackpot_pool = int((previous_draw or {}).get("jackpot_pool_balance") or 0)
+            amount = resolve_dlt_fallback_prize_amount(
+                prize_level,
+                actual_result.get("period"),
+                previous_jackpot_pool,
+            )
+            if amount > 0:
+                return {"amount": amount, "source": "fallback"}
         return {"amount": 0, "source": "missing"}
 
     @staticmethod

@@ -5,6 +5,12 @@ from datetime import datetime
 from math import comb
 from typing import Any
 
+from backend.app.dlt_rules import (
+    DLT_OLD_FIXED_PRIZE_RULES,
+    dlt_prize_level_order,
+    is_dlt_new_rule_period,
+    resolve_dlt_fallback_prize_amount,
+)
 from backend.app.lotteries import normalize_digit_balls, normalize_lottery_code
 from backend.app.repositories.lottery_repository import LotteryRepository
 from backend.app.repositories.my_bet_repository import MyBetRepository
@@ -16,16 +22,7 @@ class MyBetService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
-    DLT_FIXED_RULES = {
-        "三等奖": 10000,
-        "四等奖": 3000,
-        "五等奖": 300,
-        "六等奖": 200,
-        "七等奖": 100,
-        "八等奖": 15,
-        "九等奖": 5,
-    }
-    DLT_PRIZE_LEVEL_ORDER = ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖", "七等奖", "八等奖", "九等奖"]
+    DLT_FIXED_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
     PL3_PRIZE_LEVEL_ORDER = ["直选", "组选3", "组选6"]
     PL5_PRIZE_LEVEL_ORDER = ["直选"]
 
@@ -360,7 +357,7 @@ class MyBetService:
         total_winning_bets = 0
         best_level: str | None = None
         level_order = (
-            self.DLT_PRIZE_LEVEL_ORDER
+            dlt_prize_level_order(draw.get("period"))
             if lottery_code == "dlt"
             else self.PL3_PRIZE_LEVEL_ORDER if lottery_code == "pl3" else self.PL5_PRIZE_LEVEL_ORDER
         )
@@ -414,12 +411,18 @@ class MyBetService:
         back_hits = [ball for ball in back_numbers if ball in draw_blue_balls]
         red_hits = len(front_hits)
         blue_hits = len(back_hits)
-        breakdown = self._calculate_dlt_prize_breakdown(len(front_numbers), len(back_numbers), red_hits, blue_hits)
+        breakdown = self._calculate_dlt_prize_breakdown(
+            len(front_numbers),
+            len(back_numbers),
+            red_hits,
+            blue_hits,
+            period=str(draw.get("period") or ""),
+        )
         is_append = bool(line.get("is_append"))
         total_prize = 0
         total_winning_bets = 0
         best_level = None
-        for level in self.DLT_PRIZE_LEVEL_ORDER:
+        for level in dlt_prize_level_order(draw.get("period")):
             winning_count = breakdown.get(level, 0)
             if winning_count <= 0:
                 continue
@@ -537,22 +540,46 @@ class MyBetService:
         }
 
     @staticmethod
-    def _calculate_dlt_prize_breakdown(front_count: int, back_count: int, red_hit_count: int, blue_hit_count: int) -> dict[str, int]:
-        conditions = [
-            {"red_hits": 5, "blue_hits": 2, "level": "一等奖"},
-            {"red_hits": 5, "blue_hits": 1, "level": "二等奖"},
-            {"red_hits": 5, "blue_hits": 0, "level": "三等奖"},
-            {"red_hits": 4, "blue_hits": 2, "level": "四等奖"},
-            {"red_hits": 4, "blue_hits": 1, "level": "五等奖"},
-            {"red_hits": 3, "blue_hits": 2, "level": "六等奖"},
-            {"red_hits": 4, "blue_hits": 0, "level": "七等奖"},
-            {"red_hits": 3, "blue_hits": 1, "level": "八等奖"},
-            {"red_hits": 2, "blue_hits": 2, "level": "八等奖"},
-            {"red_hits": 3, "blue_hits": 0, "level": "九等奖"},
-            {"red_hits": 2, "blue_hits": 1, "level": "九等奖"},
-            {"red_hits": 1, "blue_hits": 2, "level": "九等奖"},
-            {"red_hits": 0, "blue_hits": 2, "level": "九等奖"},
-        ]
+    def _calculate_dlt_prize_breakdown(
+        front_count: int,
+        back_count: int,
+        red_hit_count: int,
+        blue_hit_count: int,
+        *,
+        period: str,
+    ) -> dict[str, int]:
+        if not is_dlt_new_rule_period(period):
+            conditions = [
+                {"red_hits": 5, "blue_hits": 2, "level": "一等奖"},
+                {"red_hits": 5, "blue_hits": 1, "level": "二等奖"},
+                {"red_hits": 5, "blue_hits": 0, "level": "三等奖"},
+                {"red_hits": 4, "blue_hits": 2, "level": "四等奖"},
+                {"red_hits": 4, "blue_hits": 1, "level": "五等奖"},
+                {"red_hits": 3, "blue_hits": 2, "level": "六等奖"},
+                {"red_hits": 4, "blue_hits": 0, "level": "七等奖"},
+                {"red_hits": 3, "blue_hits": 1, "level": "八等奖"},
+                {"red_hits": 2, "blue_hits": 2, "level": "八等奖"},
+                {"red_hits": 3, "blue_hits": 0, "level": "九等奖"},
+                {"red_hits": 2, "blue_hits": 1, "level": "九等奖"},
+                {"red_hits": 1, "blue_hits": 2, "level": "九等奖"},
+                {"red_hits": 0, "blue_hits": 2, "level": "九等奖"},
+            ]
+        else:
+            conditions = [
+                {"red_hits": 5, "blue_hits": 2, "level": "一等奖"},
+                {"red_hits": 5, "blue_hits": 1, "level": "二等奖"},
+                {"red_hits": 5, "blue_hits": 0, "level": "三等奖"},
+                {"red_hits": 4, "blue_hits": 2, "level": "三等奖"},
+                {"red_hits": 4, "blue_hits": 1, "level": "四等奖"},
+                {"red_hits": 4, "blue_hits": 0, "level": "五等奖"},
+                {"red_hits": 3, "blue_hits": 2, "level": "五等奖"},
+                {"red_hits": 3, "blue_hits": 1, "level": "六等奖"},
+                {"red_hits": 2, "blue_hits": 2, "level": "六等奖"},
+                {"red_hits": 3, "blue_hits": 0, "level": "七等奖"},
+                {"red_hits": 2, "blue_hits": 1, "level": "七等奖"},
+                {"red_hits": 1, "blue_hits": 2, "level": "七等奖"},
+                {"red_hits": 0, "blue_hits": 2, "level": "七等奖"},
+            ]
         miss_front = front_count - red_hit_count
         miss_back = back_count - blue_hit_count
         result: dict[str, int] = {}
@@ -576,7 +603,11 @@ class MyBetService:
                 if amount > 0:
                     return amount
         if prize_type == "basic":
-            return self.DLT_FIXED_RULES.get(level, 0)
+            return resolve_dlt_fallback_prize_amount(
+                level,
+                draw.get("period"),
+                int(draw.get("previous_jackpot_pool") or 0),
+            )
         return 0
 
     @staticmethod

@@ -10,6 +10,8 @@ export type PrizeLevel =
   | '五等奖'
   | '六等奖'
   | '七等奖'
+  | '八等奖'
+  | '九等奖'
   | '直选'
   | '组选3'
   | '组选6'
@@ -186,7 +188,13 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
     .map((draw) => {
       const redHits = normalizedFront.filter((ball) => draw.red_balls.includes(ball))
       const blueHits = normalizedBack.filter((ball) => draw.blue_balls.includes(ball))
-      const prizes = calculateDltPrizeBreakdown(normalizedFront.length, normalizedBack.length, redHits.length, blueHits.length)
+      const prizes = calculateDltPrizeBreakdown(
+        normalizedFront.length,
+        normalizedBack.length,
+        redHits.length,
+        blueHits.length,
+        draw.period,
+      )
       const winningPrizes = prizes.filter((item) => item.count > 0)
       return {
         period: draw.period,
@@ -239,22 +247,38 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
     })
 }
 
-function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHitCount: number, blueHitCount: number) {
-  const conditions: Array<{ redHits: number; blueHits: number; level: PrizeLevel }> = [
-    { redHits: 5, blueHits: 2, level: '一等奖' },
-    { redHits: 5, blueHits: 1, level: '二等奖' },
-    { redHits: 5, blueHits: 0, level: '三等奖' },
-    { redHits: 4, blueHits: 2, level: '四等奖' },
-    { redHits: 4, blueHits: 1, level: '五等奖' },
-    { redHits: 3, blueHits: 2, level: '五等奖' },
-    { redHits: 4, blueHits: 0, level: '六等奖' },
-    { redHits: 3, blueHits: 1, level: '六等奖' },
-    { redHits: 2, blueHits: 2, level: '六等奖' },
-    { redHits: 3, blueHits: 0, level: '七等奖' },
-    { redHits: 2, blueHits: 1, level: '七等奖' },
-    { redHits: 1, blueHits: 2, level: '七等奖' },
-    { redHits: 0, blueHits: 2, level: '七等奖' },
-  ]
+function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHitCount: number, blueHitCount: number, period: string) {
+  const conditions: Array<{ redHits: number; blueHits: number; level: PrizeLevel }> = isDltNewRulePeriod(period)
+    ? [
+        { redHits: 5, blueHits: 2, level: '一等奖' },
+        { redHits: 5, blueHits: 1, level: '二等奖' },
+        { redHits: 5, blueHits: 0, level: '三等奖' },
+        { redHits: 4, blueHits: 2, level: '三等奖' },
+        { redHits: 4, blueHits: 1, level: '四等奖' },
+        { redHits: 4, blueHits: 0, level: '五等奖' },
+        { redHits: 3, blueHits: 2, level: '五等奖' },
+        { redHits: 3, blueHits: 1, level: '六等奖' },
+        { redHits: 2, blueHits: 2, level: '六等奖' },
+        { redHits: 3, blueHits: 0, level: '七等奖' },
+        { redHits: 2, blueHits: 1, level: '七等奖' },
+        { redHits: 1, blueHits: 2, level: '七等奖' },
+        { redHits: 0, blueHits: 2, level: '七等奖' },
+      ]
+    : [
+        { redHits: 5, blueHits: 2, level: '一等奖' },
+        { redHits: 5, blueHits: 1, level: '二等奖' },
+        { redHits: 5, blueHits: 0, level: '三等奖' },
+        { redHits: 4, blueHits: 2, level: '四等奖' },
+        { redHits: 4, blueHits: 1, level: '五等奖' },
+        { redHits: 3, blueHits: 2, level: '六等奖' },
+        { redHits: 4, blueHits: 0, level: '七等奖' },
+        { redHits: 3, blueHits: 1, level: '八等奖' },
+        { redHits: 2, blueHits: 2, level: '八等奖' },
+        { redHits: 3, blueHits: 0, level: '九等奖' },
+        { redHits: 2, blueHits: 1, level: '九等奖' },
+        { redHits: 1, blueHits: 2, level: '九等奖' },
+        { redHits: 0, blueHits: 2, level: '九等奖' },
+      ]
   const prizeMap = new Map<PrizeLevel, number>()
   const missFront = frontCount - redHitCount
   const missBack = backCount - blueHitCount
@@ -270,6 +294,13 @@ function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHi
   }
 
   return Array.from(prizeMap.entries()).map(([level, count]) => ({ level, count }))
+}
+
+function isDltNewRulePeriod(period: string): boolean {
+  const digits = (period || '').replace(/\D/g, '')
+  if (!digits) return false
+  const normalized = Number((digits.length >= 5 ? digits.slice(-5) : digits) || '0')
+  return normalized >= 26014
 }
 
 function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits: string[]): SimulationMatchPrize[] {

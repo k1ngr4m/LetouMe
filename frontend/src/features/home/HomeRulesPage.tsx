@@ -110,13 +110,21 @@ export function HomeRulesPage() {
 
           <StatusCard
             title="奖金对照表"
-            subtitle="展示各奖级中奖条件与奖池分档奖金标准。"
+            subtitle="26014期前按旧规（九等奖），26014期及之后按新规（七等奖）；新规固定奖按上期奖池是否达到 8 亿元分档。"
             actions={
               <a className="ghost-button" href={DLT_PRIZE_TABLE_IMAGE_PATH} target="_blank" rel="noreferrer">
                 查看原图
               </a>
             }
           >
+            <div className="rules-page__text-shell">
+              <section className="rules-page__chapter">
+                <h3>规则切换说明</h3>
+                <p>26014期之前：使用旧规则，奖级共九档（一等奖至九等奖）。</p>
+                <p>26014期及之后：使用新规则，奖级共七档（一等奖至七等奖）。</p>
+                <p>新规则固定奖分档：上期奖池&lt;8亿元按低档发放；上期奖池≥8亿元按高档发放。</p>
+              </section>
+            </div>
             <div className="rules-page__image-shell">
               <img src={DLT_PRIZE_TABLE_IMAGE_PATH} alt="大乐透奖金对照表" className="rules-page__image" loading="lazy" />
             </div>

@@ -209,10 +209,10 @@ class LotteryFetchService:
         detail_url = self.DETAIL_URL_TEMPLATE.format(period=period)
         soup = self.fetch_page(detail_url, retry=2)
         if not soup:
-            return {"prize_breakdown": self.build_fallback_prize_breakdown(), "jackpot_pool_balance": 0}
+            return {"prize_breakdown": [], "jackpot_pool_balance": 0}
         parsed = self.parse_prize_breakdown(soup)
         return {
-            "prize_breakdown": parsed or self.build_fallback_prize_breakdown(),
+            "prize_breakdown": parsed,
             "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
         }
 

@@ -8,6 +8,8 @@ export type LotteryDraw = {
   blue_balls: string[]
   digits?: string[]
   blue_ball?: string | null
+  jackpot_pool_balance?: number
+  previous_jackpot_pool?: number
   prize_breakdown?: PrizeBreakdownItem[]
 }
 

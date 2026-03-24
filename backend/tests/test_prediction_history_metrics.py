@@ -15,6 +15,7 @@ class _FakePredictionRepository:
                 "date": "2026-03-10",
                 "red_balls": ["01", "02", "03", "04", "05"],
                 "blue_balls": ["06", "07"],
+                "previous_jackpot_pool": 1000000,
                 "prize_breakdown": [
                     {"prize_level": "三等奖", "prize_type": "basic", "winner_count": 1, "prize_amount": 10000, "total_amount": 10000},
                     {"prize_level": "九等奖", "prize_type": "basic", "winner_count": 1, "prize_amount": 5, "total_amount": 5},
@@ -261,9 +262,9 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         model_b = next(item for item in payload["models"] if item["model_id"] == "model-b")
         group = model_b["predictions"][0]
-        self.assertEqual(group["prize_level"], "九等奖")
+        self.assertEqual(group["prize_level"], "七等奖")
         self.assertEqual(group["prize_amount"], 5)
-        self.assertEqual(group["prize_source"], "official")
+        self.assertEqual(group["prize_source"], "fallback")
 
     def test_resolve_prize_amount_falls_back_for_fixed_prizes_only(self) -> None:
         fixed = self.service.resolve_prize_amount({"prize_breakdown": []}, "三等奖")
@@ -271,6 +272,27 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(fixed, {"amount": 10000, "source": "fallback"})
         self.assertEqual(floating, {"amount": 0, "source": "missing"})
+
+    def test_resolve_prize_amount_applies_new_rule_tiers_by_previous_pool(self) -> None:
+        low_tier = self.service.resolve_prize_amount(
+            {"lottery_code": "dlt", "period": "26014", "previous_jackpot_pool": 799999999, "prize_breakdown": []},
+            "三等奖",
+        )
+        high_tier = self.service.resolve_prize_amount(
+            {"lottery_code": "dlt", "period": "26014", "previous_jackpot_pool": 800000000, "prize_breakdown": []},
+            "三等奖",
+        )
+
+        self.assertEqual(low_tier, {"amount": 5000, "source": "fallback"})
+        self.assertEqual(high_tier, {"amount": 6666, "source": "fallback"})
+
+    def test_resolve_prize_amount_returns_missing_for_new_rule_floating_prizes(self) -> None:
+        first_prize = self.service.resolve_prize_amount(
+            {"lottery_code": "dlt", "period": "26014", "previous_jackpot_pool": 900000000, "prize_breakdown": []},
+            "一等奖",
+        )
+
+        self.assertEqual(first_prize, {"amount": 0, "source": "missing"})
 
     def test_history_list_payload_filters_by_single_strategy(self) -> None:
         payload = self.service.get_history_list_payload(strategy_filters=["增强型热号追随者"], strategy_match_mode="all")

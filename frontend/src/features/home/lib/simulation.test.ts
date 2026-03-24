@@ -35,6 +35,22 @@ describe('simulation helpers', () => {
     expect(matches[0].blueHits).toEqual(['01', '02'])
   })
 
+  it('uses old/new dlt prize mapping by period boundary', () => {
+    const oldRule = buildSimulationMatches(
+      makeDltSelection(['01', '02', '31', '32', '33'], ['01', '02']),
+      [{ period: '26013', date: '2026-01-01', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['01', '02'] }],
+      30,
+    )
+    const newRule = buildSimulationMatches(
+      makeDltSelection(['01', '02', '31', '32', '33'], ['01', '02']),
+      [{ period: '26014', date: '2026-01-02', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['01', '02'] }],
+      30,
+    )
+
+    expect(oldRule[0].topPrizeLevel).toBe('八等奖')
+    expect(newRule[0].topPrizeLevel).toBe('六等奖')
+  })
+
   it('calculates pl3 direct and group bet count', () => {
     expect(
       calculateBetCount({
