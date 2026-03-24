@@ -649,7 +649,10 @@ export function SettingsPage() {
     if (!providerList.length) return
     setModelForm((previous) => {
       if (previous.provider) return previous
-      const firstProvider = providerList[0]
+      const deepseekProvider = providerList.find((provider) => provider.code === 'deepseek')
+      const aiMixHubProvider = providerList.find((provider) => provider.code === 'aimixhub')
+      const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub')
+      const firstProvider = customProvider || deepseekProvider || aiMixHubProvider || providerList[0]
       return {
         ...previous,
         provider: firstProvider.code,
@@ -794,6 +797,19 @@ export function SettingsPage() {
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
+  const createModeProviders = useMemo(() => {
+    const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
+    const aiMixHubProvider = providers.find((provider) => provider.code === 'aimixhub')
+    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub')
+    const result: Array<SettingsProvider & { display_name: string }> = []
+    if (customProvider) result.push({ ...customProvider, display_name: '自定义供应商' })
+    if (deepseekProvider) result.push({ ...deepseekProvider, display_name: 'DeepSeek' })
+    if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AiMixHub' })
+    return result
+  }, [providers])
+  const modelFormProviders = modelMode === 'create'
+    ? (createModeProviders.length ? createModeProviders : providers.map((provider) => ({ ...provider, display_name: provider.name })))
+    : providers.map((provider) => ({ ...provider, display_name: provider.name }))
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
   const selectedProvider = providerMap[modelForm.provider]
   const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
@@ -1188,7 +1204,7 @@ export function SettingsPage() {
   function openCreateModel() {
     setModelMode('create')
     setSelectedModelCode(null)
-    const defaultProvider = providers[0]
+    const defaultProvider = createModeProviders[0] || providers[0]
     setModelForm({
       ...EMPTY_MODEL_FORM,
       provider: defaultProvider?.code || '',
@@ -2757,9 +2773,9 @@ export function SettingsPage() {
                   <label className="field">
                     <span>Provider</span>
                     <select value={modelForm.provider} onChange={(event) => handleModelProviderChange(event.target.value)}>
-                      {providers.map((provider) => (
+                      {modelFormProviders.map((provider) => (
                         <option key={provider.code} value={provider.code}>
-                          {provider.name}
+                          {provider.display_name}
                         </option>
                       ))}
                     </select>
