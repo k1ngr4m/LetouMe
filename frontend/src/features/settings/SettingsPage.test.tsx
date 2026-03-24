@@ -202,6 +202,83 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByText('https://api.deepseek.com')).toBeInTheDocument()
   })
 
+  it('supports filtering models by enabled status', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'enabled-model',
+          display_name: 'EnabledModel',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'inactive-model',
+          display_name: 'InactiveModel',
+          provider: 'anthropic',
+          api_model_name: 'claude-sonnet',
+          version: '1',
+          tags: [],
+          base_url: 'https://example.test',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: false,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:01:00',
+        },
+        {
+          model_code: 'deleted-model',
+          display_name: 'DeletedModel',
+          provider: 'openai_compatible',
+          api_model_name: 'gpt-4.1',
+          version: '1',
+          tags: [],
+          base_url: 'https://example.test',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: false,
+          is_deleted: true,
+          updated_at: '2026-03-16 12:02:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    expect(screen.getByText('EnabledModel')).toBeInTheDocument()
+    expect(screen.getByText('InactiveModel')).toBeInTheDocument()
+    expect(screen.getByText('DeletedModel')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '未启用' }))
+    expect(screen.queryByText('EnabledModel')).not.toBeInTheDocument()
+    expect(screen.getByText('InactiveModel')).toBeInTheDocument()
+    expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '启用' }))
+    expect(screen.getByText('EnabledModel')).toBeInTheDocument()
+    expect(screen.queryByText('InactiveModel')).not.toBeInTheDocument()
+    expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
+  })
+
   it('renders profile route by default', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })

@@ -32,6 +32,7 @@ type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' 
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
+type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type MaintenanceLogFilter = 'all' | LotteryCode
 type BulkEditForm = {
@@ -153,6 +154,11 @@ const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> 
   name_asc: { label: '名称 A-Z', hint: '按名称正序排序' },
   name_desc: { label: '名称 Z-A', hint: '按名称倒序排序' },
 }
+const MODEL_STATUS_FILTER_META: Array<{ value: ModelStatusFilter; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'active', label: '启用' },
+  { value: 'inactive', label: '未启用' },
+]
 
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
@@ -517,6 +523,7 @@ export function SettingsPage() {
   const activeTab = getSettingsTabFromPath(location.pathname)
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
+  const [modelStatusFilter, setModelStatusFilter] = useState<ModelStatusFilter>('all')
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
@@ -800,8 +807,17 @@ export function SettingsPage() {
     })
     return items
   }, [modelSortOption, models])
-  const selectedVisibleCount = sortedModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
-  const allVisibleModelsSelected = sortedModels.length > 0 && selectedVisibleCount === sortedModels.length
+  const visibleModels = useMemo(
+    () =>
+      sortedModels.filter((model) => {
+        if (modelStatusFilter === 'active') return model.is_active && !model.is_deleted
+        if (modelStatusFilter === 'inactive') return !model.is_active && !model.is_deleted
+        return true
+      }),
+    [modelStatusFilter, sortedModels],
+  )
+  const selectedVisibleCount = visibleModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
+  const allVisibleModelsSelected = visibleModels.length > 0 && selectedVisibleCount === visibleModels.length
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
   const currentSortMeta = MODEL_SORT_META[modelSortOption]
   const modelNameMap = useMemo(
@@ -832,10 +848,10 @@ export function SettingsPage() {
 
   useEffect(() => {
     setSelectedModelCodes((previous) => {
-      const next = previous.filter((code) => sortedModels.some((model) => model.model_code === code))
+      const next = previous.filter((code) => visibleModels.some((model) => model.model_code === code))
       return next.length === previous.length && next.every((code, index) => code === previous[index]) ? previous : next
     })
-  }, [sortedModels])
+  }, [visibleModels])
 
   const profileMutation = useMutation({
     mutationFn: () => apiClient.updateProfile({ nickname: profileNickname.trim() }),
@@ -1182,7 +1198,7 @@ export function SettingsPage() {
   }
 
   function toggleSelectAllModels(checked: boolean) {
-    setSelectedModelCodes(checked ? sortedModels.map((model) => model.model_code) : [])
+    setSelectedModelCodes(checked ? visibleModels.map((model) => model.model_code) : [])
   }
 
   function openBulkEditModels() {
@@ -1625,6 +1641,18 @@ export function SettingsPage() {
                             </div>
                           </>
                         ) : null}
+                        <div className="filter-chip-group" role="group" aria-label="模型状态筛选">
+                          {MODEL_STATUS_FILTER_META.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={clsx('filter-chip', modelStatusFilter === option.value && 'is-active')}
+                              onClick={() => setModelStatusFilter(option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
                         <div className="action-menu" onClick={stopMenuEvent}>
                           <button
                             className={clsx('icon-button settings-sort-trigger', sortMenuOpen && 'is-active')}
@@ -1680,114 +1708,122 @@ export function SettingsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedModels.map((model) => (
-                          <tr key={model.model_code}>
-                            <td className="settings-model-table__select-cell">
-                              <input
-                                type="checkbox"
-                                aria-label={`选择模型 ${model.display_name}`}
-                                checked={selectedModelCodes.includes(model.model_code)}
-                                onChange={() => toggleModelSelection(model.model_code)}
-                              />
-                            </td>
-                            <td>
-                              <div className="settings-model-table__title">
-                                <strong>{model.display_name}</strong>
-                                <span>{model.model_code}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="settings-model-table__tags">
-                                {(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map((code) => (
-                                  <span key={`${model.model_code}-${code}`} className="tag tag--muted settings-model-table__tag-compact">
-                                    {getLotteryLabel(code)}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td>
-                              <span className="settings-model-table__chip">{model.provider}</span>
-                            </td>
-                            <td>
-                              <div className="settings-model-table__api">
-                                <strong>{model.api_model_name}</strong>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="settings-model-table__tags">
-                                {model.tags.length ? (
-                                  model.tags.map((tag) => (
-                                    <span key={`${model.model_code}-${tag}`} className="tag tag--muted settings-model-table__tag-compact">
-                                      {tag}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="tag tag--muted settings-model-table__tag-compact is-empty">无标签</span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={clsx('status-pill settings-model-table__status', model.is_active ? 'is-active' : 'is-muted')}>
-                                {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
-                              </span>
-                            </td>
-                            <td>
-                              <time className="settings-model-table__time" dateTime={model.updated_at}>
-                                {formatDateTimeLocal(model.updated_at)}
-                              </time>
-                            </td>
-                            <td>
-                              <div className="settings-model-table__actions">
-                                <IconButton
-                                  label={`编辑模型 ${model.display_name}`}
-                                  icon={<EditIcon />}
-                                  onClick={() => void openEditModel(model.model_code)}
+                        {visibleModels.length ? (
+                          visibleModels.map((model) => (
+                            <tr key={model.model_code}>
+                              <td className="settings-model-table__select-cell">
+                                <input
+                                  type="checkbox"
+                                  aria-label={`选择模型 ${model.display_name}`}
+                                  checked={selectedModelCodes.includes(model.model_code)}
+                                  onChange={() => toggleModelSelection(model.model_code)}
                                 />
-                                {!model.is_deleted ? (
-                                  <>
-                                    <IconButton
-                                      label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
-                                      icon={<ToggleIcon active={model.is_active} />}
-                                      onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
-                                    />
+                              </td>
+                              <td>
+                                <div className="settings-model-table__title">
+                                  <strong>{model.display_name}</strong>
+                                  <span>{model.model_code}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="settings-model-table__tags">
+                                  {(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map((code) => (
+                                    <span key={`${model.model_code}-${code}`} className="tag tag--muted settings-model-table__tag-compact">
+                                      {getLotteryLabel(code)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td>
+                                <span className="settings-model-table__chip">{model.provider}</span>
+                              </td>
+                              <td>
+                                <div className="settings-model-table__api">
+                                  <strong>{model.api_model_name}</strong>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="settings-model-table__tags">
+                                  {model.tags.length ? (
+                                    model.tags.map((tag) => (
+                                      <span key={`${model.model_code}-${tag}`} className="tag tag--muted settings-model-table__tag-compact">
+                                        {tag}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="tag tag--muted settings-model-table__tag-compact is-empty">无标签</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <span className={clsx('status-pill settings-model-table__status', model.is_active ? 'is-active' : 'is-muted')}>
+                                  {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
+                                </span>
+                              </td>
+                              <td>
+                                <time className="settings-model-table__time" dateTime={model.updated_at}>
+                                  {formatDateTimeLocal(model.updated_at)}
+                                </time>
+                              </td>
+                              <td>
+                                <div className="settings-model-table__actions">
+                                  <IconButton
+                                    label={`编辑模型 ${model.display_name}`}
+                                    icon={<EditIcon />}
+                                    onClick={() => void openEditModel(model.model_code)}
+                                  />
+                                  {!model.is_deleted ? (
+                                    <>
+                                      <IconButton
+                                        label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
+                                        icon={<ToggleIcon active={model.is_active} />}
+                                        onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
+                                      />
+                                      <div className="action-menu" onClick={stopMenuEvent}>
+                                        <IconButton
+                                          label={`更多操作：${model.display_name}`}
+                                          icon={<MoreIcon />}
+                                          onClick={(event) => toggleModelMenu(`list:${model.model_code}`, event)}
+                                          expanded={modelActionMenu === `list:${model.model_code}`}
+                                        />
+                                        {modelActionMenu === `list:${model.model_code}` ? (
+                                          <div className="action-menu__panel settings-action-menu__panel">
+                                            <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
+                                              生成预测数据
+                                            </button>
+                                            <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
+                                              删除模型
+                                            </button>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </>
+                                  ) : (
                                     <div className="action-menu" onClick={stopMenuEvent}>
                                       <IconButton
-                                        label={`更多操作：${model.display_name}`}
-                                        icon={<MoreIcon />}
-                                        onClick={(event) => toggleModelMenu(`list:${model.model_code}`, event)}
-                                        expanded={modelActionMenu === `list:${model.model_code}`}
+                                        label={`恢复模型 ${model.display_name}`}
+                                        icon={<RestoreIcon />}
+                                        onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
                                       />
-                                      {modelActionMenu === `list:${model.model_code}` ? (
-                                        <div className="action-menu__panel settings-action-menu__panel">
-                                          <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
-                                            生成预测数据
-                                          </button>
-                                          <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
-                                            删除模型
-                                          </button>
-                                        </div>
-                                      ) : null}
                                     </div>
-                                  </>
-                                ) : (
-                                  <div className="action-menu" onClick={stopMenuEvent}>
-                                    <IconButton
-                                      label={`恢复模型 ${model.display_name}`}
-                                      icon={<RestoreIcon />}
-                                      onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
-                                    />
-                                  </div>
-                                )}
-                              </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={9}>
+                              <div className="state-shell">当前筛选下暂无模型。</div>
                             </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
                   ) : (
                   <div className="settings-grid-react">
-                    {sortedModels.map((model) => (
+                    {visibleModels.map((model) => (
                       <article key={model.model_code} className="settings-model-card-react">
                         <div className="settings-model-card-react__header">
                           <div>
@@ -1849,6 +1885,9 @@ export function SettingsPage() {
                         </div>
                       </article>
                     ))}
+                    {visibleModels.length === 0 ? (
+                      <div className="state-shell">当前筛选下暂无模型。</div>
+                    ) : null}
                   </div>
                 )}
               </StatusCard>
