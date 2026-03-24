@@ -52,9 +52,8 @@ class ModelRepository:
             with connection.cursor() as cursor:
                 rows = self._fetch_models(cursor, include_deleted=include_deleted)
                 model_codes = [row["model_code"] for row in rows]
-                tags_by_code = self._fetch_tags(cursor, model_codes)
                 lotteries_by_code = self._fetch_lotteries(cursor, model_codes)
-        return [self._serialize_model(row, tags_by_code.get(row["model_code"], []), lotteries_by_code.get(row["model_code"], ["dlt"])) for row in rows]
+        return [self._serialize_model(row, lotteries_by_code.get(row["model_code"], ["dlt"])) for row in rows]
 
     def get_model(self, model_code: str) -> dict[str, Any] | None:
         with get_connection() as connection:
@@ -62,9 +61,8 @@ class ModelRepository:
                 rows = self._fetch_models(cursor, include_deleted=True, model_codes=[model_code])
                 if not rows:
                     return None
-                tags_by_code = self._fetch_tags(cursor, [model_code])
                 lotteries_by_code = self._fetch_lotteries(cursor, [model_code])
-        return self._serialize_model(rows[0], tags_by_code.get(model_code, []), lotteries_by_code.get(model_code, ["dlt"]))
+        return self._serialize_model(rows[0], lotteries_by_code.get(model_code, ["dlt"]))
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
         model_code = str(payload["model_code"]).strip()
@@ -85,16 +83,14 @@ class ModelRepository:
                         provider_id,
                         provider_model_id,
                         api_model_name,
-                        version,
                         is_active,
                         base_url,
                         api_key,
                         app_code,
-                        temperature,
                         is_deleted,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
                     (
                         model_code,
@@ -102,18 +98,15 @@ class ModelRepository:
                         provider_id,
                         provider_model_id,
                         api_model_name,
-                        self._optional_str(payload.get("version")),
                         1 if payload.get("is_active", True) else 0,
                         self._normalize_base_url(payload.get("base_url"), str(provider_row.get("base_url") or ""), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
-                        payload.get("temperature"),
                         0,
                     ),
                 )
                 cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
                 model_id = int(cursor.fetchone()["id"])
-                self._save_tags(cursor, model_id, self._normalize_tags(payload.get("tags")))
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
         return self.get_model(model_code) or {}
 
@@ -136,12 +129,10 @@ class ModelRepository:
                         provider_id = ?,
                         provider_model_id = ?,
                         api_model_name = ?,
-                        version = ?,
                         is_active = ?,
                         base_url = ?,
                         api_key = ?,
                         app_code = ?,
-                        temperature = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE model_code = ?
                     """,
@@ -150,16 +141,13 @@ class ModelRepository:
                         provider_id,
                         provider_model_id,
                         api_model_name,
-                        self._optional_str(payload.get("version")),
                         1 if payload.get("is_active", True) else 0,
                         self._normalize_base_url(payload.get("base_url"), str(provider_row.get("base_url") or ""), str(payload["provider"])),
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
-                        payload.get("temperature"),
                         model_code,
                     ),
                 )
-                self._save_tags(cursor, model_id, self._normalize_tags(payload.get("tags")))
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
         return self.get_model(model_code) or {}
 
@@ -391,11 +379,9 @@ class ModelRepository:
                 am.provider_model_id,
                 am.api_model_name,
                 pmc.model_id AS provider_model_name,
-                am.version,
                 am.base_url,
                 am.api_key,
                 am.app_code,
-                am.temperature,
                 am.is_active,
                 am.is_deleted,
                 am.updated_at
@@ -418,26 +404,6 @@ class ModelRepository:
         cursor.execute(sql, tuple(params))
         return cursor.fetchall()
 
-    def _fetch_tags(self, cursor, model_codes: list[str]) -> dict[str, list[str]]:
-        if not model_codes:
-            return {}
-        placeholders = ", ".join("?" for _ in model_codes)
-        cursor.execute(
-            f"""
-            SELECT am.model_code, mt.tag_code
-            FROM ai_model am
-            INNER JOIN ai_model_tag amt ON amt.model_id = am.id
-            INNER JOIN model_tag mt ON mt.id = amt.tag_id
-            WHERE am.model_code IN ({placeholders})
-            ORDER BY mt.tag_code ASC
-            """,
-            tuple(model_codes),
-        )
-        result: dict[str, list[str]] = {}
-        for row in cursor.fetchall():
-            result.setdefault(str(row["model_code"]), []).append(str(row["tag_code"]))
-        return result
-
     def _fetch_lotteries(self, cursor, model_codes: list[str]) -> dict[str, list[str]]:
         if not model_codes:
             return {}
@@ -456,27 +422,6 @@ class ModelRepository:
         for row in cursor.fetchall():
             result.setdefault(str(row["model_code"]), []).append(str(row["lottery_code"]))
         return result
-
-    def _save_tags(self, cursor, model_id: int, tags: list[str]) -> None:
-        cursor.execute("DELETE FROM ai_model_tag WHERE model_id = ?", (model_id,))
-        for tag in tags:
-            cursor.execute(
-                """
-                INSERT INTO model_tag (tag_code, tag_name)
-                VALUES (?, ?)
-                ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
-                """,
-                (tag, tag),
-            )
-            cursor.execute("SELECT id FROM model_tag WHERE tag_code = ?", (tag,))
-            tag_id = int(cursor.fetchone()["id"])
-            cursor.execute(
-                """
-                INSERT INTO ai_model_tag (model_id, tag_id)
-                VALUES (?, ?)
-                """,
-                (model_id, tag_id),
-            )
 
     def _save_lotteries(self, cursor, model_id: int, lottery_codes: list[str]) -> None:
         cursor.execute("DELETE FROM ai_model_lottery WHERE model_id = ?", (model_id,))
@@ -759,7 +704,7 @@ class ModelRepository:
         return provider_model_id, api_model_name
 
     @staticmethod
-    def _serialize_model(row: dict[str, Any], tags: list[str], lottery_codes: list[str]) -> dict[str, Any]:
+    def _serialize_model(row: dict[str, Any], lottery_codes: list[str]) -> dict[str, Any]:
         return {
             "model_code": row["model_code"],
             "display_name": row["display_name"],
@@ -768,12 +713,9 @@ class ModelRepository:
             "provider_model_id": row.get("provider_model_id"),
             "provider_model_name": row.get("provider_model_name") or "",
             "api_model_name": row.get("api_model_name") or row.get("provider_model_name") or "",
-            "version": row.get("version") or "",
-            "tags": tags,
             "base_url": row.get("base_url") or DEFAULT_BASE_URL,
             "api_key": row.get("api_key") or "",
             "app_code": row.get("app_code") or "",
-            "temperature": row.get("temperature"),
             "is_active": bool(row.get("is_active")),
             "is_deleted": bool(row.get("is_deleted")),
             "lottery_codes": lottery_codes or ["dlt"],
@@ -786,21 +728,6 @@ class ModelRepository:
             return None
         text = str(value).strip()
         return text or None
-
-    @staticmethod
-    def _normalize_tags(value: Any) -> list[str]:
-        if value is None:
-            return []
-        if isinstance(value, str):
-            parts = value.split(",")
-        else:
-            parts = value
-        tags: list[str] = []
-        for item in parts:
-            tag = str(item).strip()
-            if tag and tag not in tags:
-                tags.append(tag)
-        return tags
 
     @staticmethod
     def _normalize_lottery_codes(value: Any) -> list[str]:
@@ -847,10 +774,4 @@ class ModelRepository:
             for code in normalized_lottery_codes:
                 if code not in SUPPORTED_LOTTERY_CODES:
                     raise ValueError(f"不支持的彩种: {code}")
-        temperature = payload.get("temperature")
-        if temperature in ("", None):
-            return
-        try:
-            float(temperature)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("temperature 必须是数字") from exc
+        return

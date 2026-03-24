@@ -44,10 +44,6 @@ type BulkEditForm = {
   base_url: string
   apiKeyEnabled: boolean
   api_key: string
-  tagsEnabled: boolean
-  tags: string
-  temperatureEnabled: boolean
-  temperature: string
   isActiveEnabled: boolean
   is_active: boolean
 }
@@ -75,12 +71,9 @@ const EMPTY_MODEL_FORM: SettingsModelPayload = {
   provider_model_name: '',
   api_format: 'openai_compatible',
   api_model_name: '',
-  version: '',
-  tags: [],
   base_url: '',
   api_key: '',
   app_code: '',
-  temperature: null,
   is_active: true,
   lottery_codes: ['dlt'],
 }
@@ -127,10 +120,6 @@ const EMPTY_BULK_EDIT_FORM: BulkEditForm = {
   base_url: '',
   apiKeyEnabled: false,
   api_key: '',
-  tagsEnabled: false,
-  tags: '',
-  temperatureEnabled: false,
-  temperature: '',
   isActiveEnabled: false,
   is_active: true,
 }
@@ -656,10 +645,11 @@ export function SettingsPage() {
   }, [maintenanceLogFilter])
 
   useEffect(() => {
-    if (!providers.length) return
+    const providerList = providersQuery.data?.providers ?? EMPTY_PROVIDERS
+    if (!providerList.length) return
     setModelForm((previous) => {
       if (previous.provider) return previous
-      const firstProvider = providers[0]
+      const firstProvider = providerList[0]
       return {
         ...previous,
         provider: firstProvider.code,
@@ -667,8 +657,8 @@ export function SettingsPage() {
         base_url: firstProvider.base_url || '',
       }
     })
-    setBulkEditForm((previous) => (previous.provider ? previous : { ...previous, provider: providers[0].code }))
-  }, [providers])
+    setBulkEditForm((previous) => (previous.provider ? previous : { ...previous, provider: providerList[0].code }))
+  }, [providersQuery.data?.providers])
 
   useEffect(() => {
     saveSettingsTableColumnWidths('settings:schedules', scheduleColumnWidths)
@@ -1409,12 +1399,9 @@ export function SettingsPage() {
       provider_model_name: model.provider_model_name || '',
       api_format: model.api_format || providerMap[model.provider]?.api_format || 'openai_compatible',
       api_model_name: model.api_model_name,
-      version: model.version,
-      tags: model.tags,
       base_url: model.base_url,
       api_key: model.api_key,
       app_code: model.app_code,
-      temperature: model.temperature,
       is_active: model.is_active,
       lottery_codes: model.lottery_codes,
     })
@@ -1445,11 +1432,9 @@ export function SettingsPage() {
       provider: modelForm.provider.trim(),
       provider_model_name: modelForm.provider_model_name?.trim(),
       api_model_name: modelForm.api_model_name.trim(),
-      version: modelForm.version.trim(),
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
       app_code: modelForm.app_code.trim(),
-      tags: modelForm.tags.filter(Boolean),
     })
   }
 
@@ -1533,8 +1518,6 @@ export function SettingsPage() {
     if (bulkEditForm.providerEnabled) updates.provider = bulkEditForm.provider.trim()
     if (bulkEditForm.baseUrlEnabled) updates.base_url = bulkEditForm.base_url.trim()
     if (bulkEditForm.apiKeyEnabled) updates.api_key = bulkEditForm.api_key.trim()
-    if (bulkEditForm.tagsEnabled) updates.tags = bulkEditForm.tags.split(',').map((item) => item.trim()).filter(Boolean)
-    if (bulkEditForm.temperatureEnabled) updates.temperature = bulkEditForm.temperature ? Number(bulkEditForm.temperature) : null
     if (bulkEditForm.isActiveEnabled) updates.is_active = bulkEditForm.is_active
     bulkModelActionMutation.mutate({ action: 'edit', updates })
   }
@@ -1900,7 +1883,6 @@ export function SettingsPage() {
                           <th className="settings-model-table__compact-head">彩种</th>
                           <th className="settings-model-table__compact-head">Provider</th>
                           <th className="settings-model-table__compact-head">接口模型</th>
-                          <th className="settings-model-table__compact-head">Tag</th>
                           <th>状态</th>
                           <th>更新时间</th>
                           <th>操作</th>
@@ -1939,19 +1921,6 @@ export function SettingsPage() {
                               <td>
                                 <div className="settings-model-table__api">
                                   <strong>{model.api_model_name}</strong>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="settings-model-table__tags">
-                                  {model.tags.length ? (
-                                    model.tags.map((tag) => (
-                                      <span key={`${model.model_code}-${tag}`} className="tag tag--muted settings-model-table__tag-compact">
-                                        {tag}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="tag tag--muted settings-model-table__tag-compact is-empty">无标签</span>
-                                  )}
                                 </div>
                               </td>
                               <td>
@@ -2012,7 +1981,7 @@ export function SettingsPage() {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={9}>
+                            <td colSpan={8}>
                               <div className="state-shell">当前筛选下暂无模型。</div>
                             </td>
                           </tr>
@@ -2079,7 +2048,6 @@ export function SettingsPage() {
                         <div className="settings-model-card-react__facts">
                           <span>{(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map(getLotteryLabel).join(' / ')}</span>
                           <span>{model.base_url}</span>
-                          <span>{model.tags.join(', ') || '无标签'}</span>
                           <span>{formatDateTimeLocal(model.updated_at)}</span>
                         </div>
                       </article>
@@ -2845,29 +2813,7 @@ export function SettingsPage() {
               <section className="model-config-modal__section">
                 <div className="model-config-modal__section-title">
                   <strong>高级参数</strong>
-                  <span>控制采样参数、标签与投放彩种。</span>
-                </div>
-                <div className="model-config-modal__grid">
-                  <label className="field">
-                    <span>版本</span>
-                    <input value={modelForm.version} onChange={(event) => setModelForm((previous) => ({ ...previous, version: event.target.value }))} />
-                  </label>
-                  <label className="field">
-                    <span>Temperature</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={modelForm.temperature ?? ''}
-                      onChange={(event) => setModelForm((previous) => ({ ...previous, temperature: event.target.value ? Number(event.target.value) : null }))}
-                    />
-                  </label>
-                  <label className="field model-config-modal__field--full">
-                    <span>标签</span>
-                    <input
-                      value={modelForm.tags.join(',')}
-                      onChange={(event) => setModelForm((previous) => ({ ...previous, tags: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))}
-                    />
-                  </label>
+                  <span>配置模型启用状态与投放彩种。</span>
                 </div>
                 <div className="model-config-modal__toggles">
                   <label className="toggle-chip model-config-modal__toggle">
@@ -2923,10 +2869,10 @@ export function SettingsPage() {
                 <button className="ghost-button" type="button" onClick={() => setProviderModalOpen(false)}>关闭</button>
               </div>
 
-              <div className="toolbar-inline">
-                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('custom')}>自定义供应商</button>
-                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('deepseek')}>DeepSeek</button>
-                <button className="ghost-button" type="button" onClick={() => applyProviderPreset('aimixhub')}>AiMixHub</button>
+              <div className="toolbar-inline provider-config-modal__preset-group">
+                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('custom')}>自定义供应商</button>
+                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('deepseek')}>DeepSeek</button>
+                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('aimixhub')}>AiMixHub</button>
               </div>
 
               <label className="field">
@@ -2972,13 +2918,13 @@ export function SettingsPage() {
                 <input value={providerForm.remark} onChange={(event) => setProviderForm((previous) => ({ ...previous, remark: event.target.value }))} />
               </label>
 
-              <div className="panel-card">
-                <div className="toolbar-inline" style={{ justifyContent: 'space-between' }}>
+              <div className="panel-card provider-config-modal__model-section">
+                <div className="toolbar-inline provider-config-modal__section-header">
                   <strong>模型配置</strong>
                   <button className="ghost-button" type="button" onClick={addProviderModelConfig}>+ 添加模型</button>
                 </div>
                 {providerForm.model_configs.map((modelConfig, index) => (
-                  <div key={`${modelConfig.id || 'new'}-${index}`} className="model-config-modal__grid">
+                  <div key={`${modelConfig.id || 'new'}-${index}`} className="model-config-modal__grid provider-config-modal__model-row">
                     <label className="field">
                       <span>模型ID</span>
                       <input
@@ -3006,7 +2952,7 @@ export function SettingsPage() {
 
               <div className="panel-card">
                 <strong>现有供应商</strong>
-                <div className="toolbar-inline" style={{ flexWrap: 'wrap' }}>
+                <div className="toolbar-inline provider-config-modal__provider-list">
                   {providers.map((provider) => (
                     <button key={provider.code} className="ghost-button" type="button" onClick={() => openEditProvider(provider)}>
                       {provider.name}
@@ -3078,18 +3024,6 @@ export function SettingsPage() {
                   <input type="checkbox" checked={bulkEditForm.apiKeyEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, apiKeyEnabled: event.target.checked }))} /> API Key
                 </span>
                 <input value={bulkEditForm.api_key} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, api_key: event.target.value }))} disabled={!bulkEditForm.apiKeyEnabled} />
-              </label>
-              <label className="field">
-                <span>
-                  <input type="checkbox" checked={bulkEditForm.tagsEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, tagsEnabled: event.target.checked }))} /> 标签
-                </span>
-                <input value={bulkEditForm.tags} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, tags: event.target.value }))} disabled={!bulkEditForm.tagsEnabled} />
-              </label>
-              <label className="field">
-                <span>
-                  <input type="checkbox" checked={bulkEditForm.temperatureEnabled} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, temperatureEnabled: event.target.checked }))} /> Temperature
-                </span>
-                <input type="number" step="0.1" value={bulkEditForm.temperature} onChange={(event) => setBulkEditForm((previous) => ({ ...previous, temperature: event.target.value }))} disabled={!bulkEditForm.temperatureEnabled} />
               </label>
               <label className="field">
                 <span>

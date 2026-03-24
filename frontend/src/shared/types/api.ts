@@ -404,12 +404,12 @@ export type SettingsModel = {
   provider_model_name?: string
   api_format?: string
   api_model_name: string
-  version: string
-  tags: string[]
+  version?: string
+  tags?: string[]
   base_url: string
   api_key: string
   app_code: string
-  temperature: number | null
+  temperature?: number | null
   is_active: boolean
   is_deleted: boolean
   lottery_codes: LotteryCode[]
@@ -450,12 +450,12 @@ export type SettingsModelPayload = {
   provider_model_name?: string
   api_format?: string
   api_model_name: string
-  version: string
-  tags: string[]
+  version?: string
+  tags?: string[]
   base_url: string
   api_key: string
   app_code: string
-  temperature: number | null
+  temperature?: number | null
   is_active: boolean
   lottery_codes: LotteryCode[]
 }
@@ -493,8 +493,6 @@ export type BulkSettingsModelActionPayload = {
     provider?: string
     base_url?: string
     api_key?: string
-    tags?: string[]
-    temperature?: number | null
     is_active?: boolean
   }
 }

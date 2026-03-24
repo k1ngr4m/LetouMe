@@ -3046,6 +3046,37 @@ a {
   margin-top: 0.25rem;
 }
 
+.provider-config-modal__section-header {
+  justify-content: space-between;
+}
+
+.provider-config-modal__preset-group {
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.provider-config-modal__preset-button {
+  min-width: 9rem;
+  justify-content: center;
+}
+
+.provider-config-modal__model-section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.provider-config-modal__model-row {
+  align-items: end;
+}
+
+.provider-config-modal__model-row .ghost-button {
+  min-height: 2.6rem;
+}
+
+.provider-config-modal__provider-list {
+  flex-wrap: wrap;
+}
+
 :root[data-theme='light'] .model-config-modal {
   border-color: rgba(133, 150, 178, 0.24);
   background:

@@ -13,12 +13,9 @@ class ModelSettingsPayload(BaseModel):
     provider_model_name: str | None = ""
     api_format: str | None = "openai_compatible"
     api_model_name: str
-    version: str | None = ""
-    tags: list[str] = Field(default_factory=list)
     base_url: str | None = ""
     api_key: str | None = ""
     app_code: str | None = ""
-    temperature: float | None = None
     is_active: bool = True
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])
 
@@ -35,12 +32,9 @@ class ModelResponse(BaseModel):
     provider_model_name: str = ""
     api_format: str = "openai_compatible"
     api_model_name: str
-    version: str = ""
-    tags: list[str] = Field(default_factory=list)
     base_url: str = ""
     api_key: str = ""
     app_code: str = ""
-    temperature: float | None = None
     is_active: bool
     is_deleted: bool
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])

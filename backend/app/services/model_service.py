@@ -181,12 +181,9 @@ class ModelService:
         normalized["provider_model_name"] = str(payload.get("provider_model_name") or "").strip()
         normalized["api_format"] = str(payload.get("api_format") or "openai_compatible").strip().lower()
         normalized["api_model_name"] = str(payload.get("api_model_name") or "").strip()
-        normalized["version"] = str(payload.get("version") or "").strip()
         normalized["base_url"] = str(payload.get("base_url") or "").strip()
         normalized["api_key"] = str(payload.get("api_key") or "").strip()
         normalized["app_code"] = str(payload.get("app_code") or "").strip()
-        normalized["temperature"] = payload.get("temperature")
-        normalized["tags"] = payload.get("tags") or []
         normalized["lottery_codes"] = [
             normalize_lottery_code(str(item))
             for item in (payload.get("lottery_codes") or ["dlt"])
@@ -220,7 +217,7 @@ class ModelService:
 
     @staticmethod
     def _normalize_bulk_updates(payload: dict[str, Any]) -> dict[str, Any]:
-        allowed_fields = {"provider", "base_url", "api_key", "tags", "lottery_codes", "temperature", "is_active"}
+        allowed_fields = {"provider", "base_url", "api_key", "lottery_codes", "is_active"}
         normalized: dict[str, Any] = {}
         for key in allowed_fields:
             if key not in payload:
@@ -228,16 +225,12 @@ class ModelService:
             value = payload[key]
             if key in {"provider", "base_url", "api_key"}:
                 normalized[key] = str(value or "").strip()
-            elif key == "tags":
-                normalized[key] = [str(item).strip() for item in (value or []) if str(item).strip()]
             elif key == "lottery_codes":
                 normalized[key] = [
                     normalize_lottery_code(str(item))
                     for item in (value or [])
                     if str(item).strip()
                 ] or ["dlt"]
-            elif key == "temperature":
-                normalized[key] = value
             elif key == "is_active":
                 normalized[key] = bool(value)
         return normalized
