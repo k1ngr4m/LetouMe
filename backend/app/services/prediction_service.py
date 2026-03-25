@@ -25,8 +25,39 @@ class PredictionService:
     FIXED_PRIZE_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
     PL3_FIXED_PRIZE_RULES = {
         "直选": 1040,
+        "和值": 1040,
         "组选3": 346,
         "组选6": 173,
+    }
+    PL3_DIRECT_SUM_COST_RULES = {
+        0: 2,
+        1: 6,
+        2: 12,
+        3: 20,
+        4: 30,
+        5: 42,
+        6: 56,
+        7: 72,
+        8: 90,
+        9: 110,
+        10: 126,
+        11: 138,
+        12: 146,
+        13: 150,
+        14: 150,
+        15: 146,
+        16: 138,
+        17: 126,
+        18: 110,
+        19: 90,
+        20: 72,
+        21: 56,
+        22: 42,
+        23: 30,
+        24: 20,
+        25: 12,
+        26: 6,
+        27: 2,
     }
     PL5_FIXED_PRIZE_RULES = {
         "直选": 100000,
@@ -560,6 +591,21 @@ class PredictionService:
             return int(hit_result.get("total_hits") or 0)
         return int(prediction_group.get("total_hits") or 0)
 
+    @classmethod
+    def _resolve_prediction_group_cost(cls, prediction_group: dict[str, Any], lottery_code: str) -> int:
+        normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or "dlt")
+        if normalized_code != "pl3":
+            return cls.BET_COST
+        play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
+        if play_type != "direct_sum":
+            return cls.BET_COST
+        sum_value = prediction_group.get("sum_value")
+        try:
+            normalized_sum = int(str(sum_value).strip())
+        except (TypeError, ValueError):
+            return cls.BET_COST
+        return int(cls.PL3_DIRECT_SUM_COST_RULES.get(normalized_sum, cls.BET_COST))
+
     def _build_history_list_payload(
         self,
         limit: int | None = None,
@@ -707,6 +753,7 @@ class PredictionService:
             prize_amount = 0
             best_group = None
             best_hit_count = 0
+            model_cost_amount = 0
 
             for metric in group_metrics:
                 if lottery_code in {"pl3", "pl5"}:
@@ -733,12 +780,13 @@ class PredictionService:
                     best_hit_count = trend_hit_count
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=metric)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                model_cost_amount += self._resolve_prediction_group_cost(metric, lottery_code)
                 if prize_info["amount"] > 0:
                     winning_bet_count += 1
                     prize_amount += prize_info["amount"]
 
             bet_count = len(group_metrics)
-            cost_amount = bet_count * self.BET_COST
+            cost_amount = model_cost_amount
             annotated_models.append(
                 {
                     **model,
@@ -797,10 +845,12 @@ class PredictionService:
                     best_hit_count = trend_hit_count
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=group)
                 prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                group_cost = self._resolve_prediction_group_cost(group, lottery_code)
                 predictions.append(
                     {
                         **group,
                         "hit_result": hit_result,
+                        "cost_amount": group_cost,
                         "prize_level": prize_level,
                         "prize_amount": prize_info["amount"],
                         "prize_source": prize_info["source"],
@@ -811,7 +861,7 @@ class PredictionService:
                     prize_amount += prize_info["amount"]
 
             bet_count = len(predictions)
-            cost_amount = bet_count * self.BET_COST
+            cost_amount = sum(int(group.get("cost_amount") or self.BET_COST) for group in predictions)
             annotated_models.append(
                 {
                     **model,
@@ -1295,12 +1345,14 @@ class PredictionService:
     def resolve_prize_amount(self, actual_result: dict[str, Any], prize_level: str | None) -> dict[str, Any]:
         if not prize_level:
             return {"amount": 0, "source": "none"}
+        lottery_code = normalize_lottery_code(actual_result.get("lottery_code") or "dlt")
+        if lottery_code == "pl3" and prize_level == "和值":
+            return {"amount": self.PL3_FIXED_PRIZE_RULES["和值"], "source": "fallback"}
         for prize in actual_result.get("prize_breakdown", []) or []:
             if prize.get("prize_level") == prize_level and prize.get("prize_type") == "basic":
                 amount = int(prize.get("prize_amount") or 0)
                 if amount > 0:
                     return {"amount": amount, "source": "official"}
-        lottery_code = normalize_lottery_code(actual_result.get("lottery_code") or "dlt")
         if lottery_code == "pl3" and prize_level in self.PL3_FIXED_PRIZE_RULES:
             return {"amount": self.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         if lottery_code == "pl5" and prize_level in self.PL5_FIXED_PRIZE_RULES:

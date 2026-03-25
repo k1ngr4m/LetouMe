@@ -486,11 +486,18 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="pl3", play_type_filters=["direct_sum"])
         model = payload["predictions_history"][0]["models"][0]
+        period_summary = payload["predictions_history"][0]["period_summary"]
 
         self.assertEqual(payload["total_count"], 1)
         self.assertEqual(model["bet_count"], 2)
+        self.assertEqual(model["cost_amount"], 264)
+        self.assertEqual(model["prize_amount"], 1040)
         self.assertEqual(model["prediction_play_mode"], "direct_sum")
+        self.assertEqual(period_summary["total_cost_amount"], 264)
+        self.assertEqual(period_summary["total_prize_amount"], 1040)
         self.assertEqual(payload["model_stats"][0]["prediction_play_mode"], "direct_sum")
+        self.assertEqual(payload["model_stats"][0]["cost_amount"], 264)
+        self.assertEqual(payload["model_stats"][0]["prize_amount"], 1040)
 
     def test_pl3_history_detail_payload_infers_sum_mode_from_predictions(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3SumMislabelRepository())
@@ -500,6 +507,15 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         model = payload["models"][0]
         self.assertEqual(model["prediction_play_mode"], "direct_sum")
+        self.assertEqual(model["cost_amount"], 264)
+        self.assertEqual(model["prize_amount"], 1040)
+        prediction_one = model["predictions"][0]
+        prediction_two = model["predictions"][1]
+        self.assertEqual(prediction_one["cost_amount"], 126)
+        self.assertEqual(prediction_one["prize_amount"], 1040)
+        self.assertEqual(prediction_one["prize_source"], "fallback")
+        self.assertEqual(prediction_two["cost_amount"], 138)
+        self.assertEqual(prediction_two["prize_amount"], 0)
 
     def test_pl3_history_list_ignores_strategy_filters(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
@@ -562,6 +578,19 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         )
 
         self.assertEqual(prize_level, "和值")
+
+    def test_pl3_direct_sum_cost_falls_back_to_two_for_invalid_sum_value(self) -> None:
+        invalid_cost = self.service._resolve_prediction_group_cost(
+            {"play_type": "direct_sum", "sum_value": "invalid"},
+            "pl3",
+        )
+        out_of_range_cost = self.service._resolve_prediction_group_cost(
+            {"play_type": "direct_sum", "sum_value": "99"},
+            "pl3",
+        )
+
+        self.assertEqual(invalid_cost, 2)
+        self.assertEqual(out_of_range_cost, 2)
 
     def test_current_payload_hides_inactive_models_when_requested(self) -> None:
         service = PredictionService(

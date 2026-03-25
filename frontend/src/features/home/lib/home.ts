@@ -131,6 +131,7 @@ export function normalizeGroup(group: PredictionGroup): PredictionGroup {
   return {
     ...group,
     sum_value: typeof group.sum_value === 'string' ? group.sum_value : undefined,
+    cost_amount: Number(group.cost_amount || 0),
     red_balls: (group.red_balls || []).map(padBall).sort(),
     blue_balls: (group.blue_balls || []).map(padBall).sort(),
     digits: (group.digits || []).map(padBall),

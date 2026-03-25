@@ -215,6 +215,47 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
+const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
+  0: 2,
+  1: 6,
+  2: 12,
+  3: 20,
+  4: 30,
+  5: 42,
+  6: 56,
+  7: 72,
+  8: 90,
+  9: 110,
+  10: 126,
+  11: 138,
+  12: 146,
+  13: 150,
+  14: 150,
+  15: 146,
+  16: 138,
+  17: 126,
+  18: 110,
+  19: 90,
+  20: 72,
+  21: 56,
+  22: 42,
+  23: 30,
+  24: 20,
+  25: 12,
+  26: 6,
+  27: 2,
+}
+
+function resolveHistoryPredictionGroupCost(group: PredictionGroup, lotteryCode: LotteryCode) {
+  const explicitCost = Number(group.cost_amount || 0)
+  if (explicitCost > 0) return explicitCost
+  const playType = String(group.play_type || 'direct').trim().toLowerCase()
+  if (lotteryCode !== 'pl3' || playType !== 'direct_sum') return 2
+  const sumValue = Number(String(group.sum_value || '').trim())
+  if (!Number.isInteger(sumValue)) return 2
+  return PL3_DIRECT_SUM_COST_RULES[sumValue] || 2
+}
+
 function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models: HistoryModelRef[]): HistoryModelStatView[] {
   const stats = new Map<string, HistoryModelStatView>()
 
@@ -2943,7 +2984,10 @@ function HistoryRecordCard({
           const filteredDetailBetCount = filteredDetailPredictions.length
           const filteredDetailWinningBetCount = filteredDetailPredictions.filter((group) => Number(group.prize_amount || 0) > 0).length
           const filteredDetailPrizeAmount = filteredDetailPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0)
-          const filteredDetailCostAmount = filteredDetailBetCount * 2
+          const filteredDetailCostAmount = filteredDetailPredictions.reduce(
+            (sum, group) => sum + resolveHistoryPredictionGroupCost(group, lotteryCode),
+            0,
+          )
           const filteredWinRateByPeriod = filteredDetailWinningBetCount > 0 ? 1 : 0
           const filteredWinRateByBet = filteredDetailBetCount ? filteredDetailWinningBetCount / filteredDetailBetCount : 0
 

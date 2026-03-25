@@ -1497,6 +1497,74 @@ describe('HomePage dashboard sidebar', () => {
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
   })
 
+  it('uses group-level cost for pl3 direct_sum detail summary', async () => {
+    simulatePl3SumHistoryMislabel.current = true
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: [],
+            blue_balls: [],
+            digits: ['01', '02', '07'],
+            lottery_code: 'pl3',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 1,
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'direct_sum',
+                  sum_value: '10',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: [],
+                  cost_amount: 126,
+                  prize_level: '和值',
+                  prize_amount: 1040,
+                  prize_source: 'fallback',
+                },
+                {
+                  group_id: 2,
+                  play_type: 'direct_sum',
+                  sum_value: '11',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: [],
+                  cost_amount: 138,
+                  prize_amount: 0,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    expect(within(detailSection as HTMLElement).getByText('成本 264 元')).toBeInTheDocument()
+    expect(within(detailSection as HTMLElement).getByText('奖金 1,040 元')).toBeInTheDocument()
+  })
+
   it('shows pl3 sum history records even when model mode is mislabeled', async () => {
     simulatePl3SumHistoryMislabel.current = true
     renderPage()

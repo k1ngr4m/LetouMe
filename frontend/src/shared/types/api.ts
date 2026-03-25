@@ -50,6 +50,7 @@ export type PredictionGroup = {
   group_id: number
   play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6'
   sum_value?: string
+  cost_amount?: number
   strategy?: string
   description?: string
   red_balls: string[]
