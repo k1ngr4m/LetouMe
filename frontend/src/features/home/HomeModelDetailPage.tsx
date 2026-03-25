@@ -3,8 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
-import { getActualResult, normalizePredictionModelPlayMode } from './lib/home'
-import { useHomeModelFilters } from './hooks/useHomeModelFilters'
+import { buildModelScores, getActualResult, normalizePredictionModelPlayMode } from './lib/home'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
 import type { HomeDetailRouteState } from './navigation'
 
@@ -28,7 +27,6 @@ export function HomeModelDetailPage() {
   const models = currentPredictions.data?.models || []
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []
-  const { modelScores } = useHomeModelFilters(models, history, [])
 
   const selectedModel = useMemo(
     () =>
@@ -41,7 +39,25 @@ export function HomeModelDetailPage() {
       null,
     [expectedPlayMode, modelId, models],
   )
-  const selectedScore = selectedModel ? modelScores[selectedModel.model_id] : undefined
+  const selectedScore = useMemo(() => {
+    if (!selectedModel) return undefined
+    const selectedPlayMode = normalizePredictionModelPlayMode(selectedModel)
+    const matchedModelStats = (history?.model_stats || []).filter(
+      (item) =>
+        item.model_id === selectedModel.model_id &&
+        normalizePredictionModelPlayMode(item) === selectedPlayMode,
+    )
+    const scoreByModelId = buildModelScores(
+      {
+        model_stats: matchedModelStats,
+        predictions_history: [],
+        total_count: 0,
+        strategy_options: [],
+      },
+      [selectedModel],
+    )
+    return scoreByModelId[selectedModel.model_id]
+  }, [history?.model_stats, selectedModel])
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   function handleBack() {
