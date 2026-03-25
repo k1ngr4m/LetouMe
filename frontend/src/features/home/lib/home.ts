@@ -42,7 +42,7 @@ export type BallStatItem = {
 }
 
 export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
-export type PredictionPlayType = 'direct' | 'group3' | 'group6'
+export type PredictionPlayType = 'direct' | 'direct_sum' | 'group3' | 'group6'
 
 export type ModelListFilters = {
   nameQuery: string
@@ -84,6 +84,7 @@ export function normalizeStrategyLabel(value?: string | null): string {
 }
 
 export function normalizePredictionPlayType(value?: string | null): PredictionPlayType {
+  if (value === 'direct_sum') return 'direct_sum'
   if (value === 'group3') return 'group3'
   if (value === 'group6') return 'group6'
   return 'direct'
@@ -119,6 +120,7 @@ export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
 export function normalizeGroup(group: PredictionGroup): PredictionGroup {
   return {
     ...group,
+    sum_value: typeof group.sum_value === 'string' ? group.sum_value : undefined,
     red_balls: (group.red_balls || []).map(padBall).sort(),
     blue_balls: (group.blue_balls || []).map(padBall).sort(),
     digits: (group.digits || []).map(padBall),
@@ -279,9 +281,25 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
   const inferredLotteryCode =
     actualResult.lottery_code || ((prediction.digits || []).length >= 5 ? 'pl5' : prediction.play_type || (prediction.digits || []).length ? 'pl3' : 'dlt')
   if (inferredLotteryCode === 'pl3') {
+    const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
+    if (playType === 'direct_sum') {
+      const sumValue = Number(String(prediction.sum_value || '').trim())
+      const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
+      const actualSum = actualDigits.reduce((total, digit) => total + Number(digit || 0), 0)
+      const isHit = Number.isFinite(sumValue) && sumValue === actualSum
+      return {
+        redHits: [],
+        redHitCount: 0,
+        blueHits: [],
+        blueHitCount: 0,
+        digitHits: isHit ? [String(actualSum)] : [],
+        digitHitCount: isHit ? 1 : 0,
+        digitHitIndexes: isHit ? [0] : [],
+        totalHits: isHit ? 1 : 0,
+      }
+    }
     const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || []).map(padBall).slice(0, 3)
     const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
-    const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
     if (playType === 'group3') {
       const actualDigitSet = new Set(actualDigits)
       const seenDigits = new Set<string>()
@@ -383,6 +401,9 @@ export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult:
   }
   if (normalizePredictionPlayType(group.play_type) === 'group6') {
     return '组选6'
+  }
+  if (normalizePredictionPlayType(group.play_type) === 'direct_sum') {
+    return '和值'
   }
   return '直选'
 }

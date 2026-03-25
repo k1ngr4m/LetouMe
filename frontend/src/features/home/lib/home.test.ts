@@ -408,11 +408,36 @@ describe('compareNumbers for pl3', () => {
     expect(group6Hit?.digitHitIndexes).toEqual([0, 1, 2])
     expect(group6Hit?.digitHitCount).toBe(3)
   })
+
+  it('counts direct_sum hit by sum equality', () => {
+    const hit = compareNumbers(
+      {
+        group_id: 3,
+        play_type: 'direct_sum',
+        sum_value: '10',
+        red_balls: [],
+        blue_balls: [],
+        digits: [],
+      },
+      {
+        lottery_code: 'pl3',
+        period: '26067',
+        date: '2026-03-18',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '02', '07'],
+      },
+    )
+
+    expect(hit?.digitHitCount).toBe(1)
+    expect(hit?.totalHits).toBe(1)
+  })
 })
 
 describe('getPredictionPlayTypeLabel', () => {
   it('returns direct/group labels for pl3 groups and keeps dlt as 复式', () => {
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] })).toBe('直选')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] })).toBe('和值')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
     expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('复式')
   })

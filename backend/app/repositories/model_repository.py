@@ -169,7 +169,21 @@ class ModelRepository:
         return self.get_model(next_model_code) or {}
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
-        return self._update_flag(model_code, "is_active", 1 if is_active else 0)
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ai_model
+                    SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE model_code = ?
+                    """,
+                    (1 if is_active else 0, model_code),
+                )
+                if cursor.rowcount == 0:
+                    raise KeyError(model_code)
+                if not is_active:
+                    self._remove_model_from_prediction_tasks(cursor, model_code)
+        return self.get_model(model_code) or {}
 
     def soft_delete_model(self, model_code: str) -> dict[str, Any]:
         with get_connection() as connection:
@@ -477,6 +491,48 @@ class ModelRepository:
                 WHERE id = ?
                 """,
                 (json.dumps(next_codes, ensure_ascii=False), int(row["id"])),
+            )
+
+    @staticmethod
+    def _remove_model_from_prediction_tasks(cursor, model_code: str) -> None:
+        cursor.execute(
+            """
+            SELECT id, model_codes_json
+            FROM scheduled_task
+            WHERE task_type = 'prediction_generate'
+            """
+        )
+        rows = cursor.fetchall()
+        for row in rows:
+            try:
+                model_codes = json.loads(row.get("model_codes_json") or "[]")
+            except Exception:
+                model_codes = []
+            normalized_codes = [str(code).strip() for code in (model_codes if isinstance(model_codes, list) else []) if str(code).strip()]
+            if model_code not in normalized_codes:
+                continue
+            next_codes = [code for code in normalized_codes if code != model_code]
+            if next_codes:
+                cursor.execute(
+                    """
+                    UPDATE scheduled_task
+                    SET model_codes_json = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (json.dumps(next_codes, ensure_ascii=False), int(row["id"])),
+                )
+                continue
+            cursor.execute(
+                """
+                UPDATE scheduled_task
+                SET model_codes_json = '[]',
+                    is_active = 0,
+                    next_run_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (int(row["id"]),),
             )
 
     def _upsert_provider(self, cursor, provider_code: str) -> int:

@@ -18,7 +18,7 @@ class PredictionsHistoryListPayload(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
     strategy_filters: list[str] = Field(default_factory=list)
-    play_type_filters: list[Literal["direct", "group3", "group6"]] = Field(default_factory=list)
+    play_type_filters: list[Literal["direct", "direct_sum", "group3", "group6"]] = Field(default_factory=list)
     strategy_match_mode: Literal["all"] = "all"
 
 
@@ -67,6 +67,7 @@ class GenerateModelPredictionsPayload(BaseModel):
     lottery_code: str = "dlt"
     model_code: str
     mode: str
+    prediction_play_mode: Literal["direct", "direct_sum"] = "direct"
     overwrite: bool = False
     parallelism: int | None = Field(default=None, ge=1, le=8)
     start_period: str | None = None
@@ -83,6 +84,7 @@ class BulkGenerateModelPredictionsPayload(BaseModel):
     lottery_code: str = "dlt"
     model_codes: list[str] = Field(default_factory=list)
     mode: str
+    prediction_play_mode: Literal["direct", "direct_sum"] = "direct"
     overwrite: bool = False
     parallelism: int | None = Field(default=None, ge=1, le=8)
     start_period: str | None = None

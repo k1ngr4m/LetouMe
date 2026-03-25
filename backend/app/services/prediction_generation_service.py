@@ -21,6 +21,7 @@ from backend.core.model_factory import ModelFactory
 
 DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2.0.md"
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
+PL3_SUM_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_sum_prompt.md"
 PL5_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl5_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
 DEFAULT_BULK_PARALLELISM = 3
@@ -72,13 +73,15 @@ class PredictionGenerationService:
         *,
         lottery_code: str = "dlt",
         model_code: str,
+        prediction_play_mode: str = "direct",
         overwrite: bool,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
-        prompt_template = self._load_prompt_template(normalized_code)
+        prompt_template = self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
         lottery_data = self._load_lottery_history(normalized_code)
         self.prediction_service.archive_current_prediction_if_needed(lottery_data, lottery_code=normalized_code)
         next_draw = lottery_data.get("next_draw") or {}
@@ -107,6 +110,7 @@ class PredictionGenerationService:
             model=model,
             model_def=model_def,
             lottery_code=normalized_code,
+            prediction_play_mode=normalized_play_mode,
             prompt_template=prompt_template,
             target_period=target_period,
             prediction_date=prediction_date,
@@ -131,6 +135,7 @@ class PredictionGenerationService:
         *,
         lottery_code: str = "dlt",
         model_code: str,
+        prediction_play_mode: str = "direct",
         start_period: str,
         end_period: str,
         overwrite: bool,
@@ -144,8 +149,9 @@ class PredictionGenerationService:
             raise ValueError("开始期号不能大于结束期号")
 
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
-        prompt_template = self._load_prompt_template(normalized_code)
+        prompt_template = self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
         history_data = self._load_lottery_history(normalized_code)
         period_map = self._build_period_map(history_data)
         available_periods = {int(period) for period in period_map}
@@ -227,6 +233,7 @@ class PredictionGenerationService:
                     model=get_thread_model(),
                     model_def=model_def,
                     lottery_code=normalized_code,
+                    prediction_play_mode=normalized_play_mode,
                     prompt_template=prompt_template,
                     target_period=target_period,
                     prediction_date=prediction_date,
@@ -303,6 +310,7 @@ class PredictionGenerationService:
         lottery_code: str = "dlt",
         model_codes: list[str],
         mode: str,
+        prediction_play_mode: str = "direct",
         overwrite: bool,
         parallelism: int | None = None,
         start_period: str | None = None,
@@ -343,6 +351,7 @@ class PredictionGenerationService:
                 lottery_code=lottery_code,
                 unique_codes=unique_codes,
                 overwrite=overwrite,
+                prediction_play_mode=prediction_play_mode,
                 parallelism=parallelism,
                 start_period=str(start_period or ""),
                 end_period=str(end_period or ""),
@@ -365,12 +374,14 @@ class PredictionGenerationService:
                         self.generate_current_for_model(
                             lottery_code=lottery_code,
                             model_code=model_code,
+                            prediction_play_mode=prediction_play_mode,
                             overwrite=overwrite,
                         )
                         if mode == "current"
                         else self.recalculate_history_for_model(
                             lottery_code=lottery_code,
                             model_code=model_code,
+                            prediction_play_mode=prediction_play_mode,
                             start_period=str(start_period or ""),
                             end_period=str(end_period or ""),
                             overwrite=overwrite,
@@ -434,6 +445,7 @@ class PredictionGenerationService:
         lottery_code: str,
         unique_codes: list[str],
         overwrite: bool,
+        prediction_play_mode: str,
         parallelism: int | None,
         start_period: str,
         end_period: str,
@@ -442,6 +454,7 @@ class PredictionGenerationService:
     ) -> dict[str, Any]:
         ensure_schema()
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
         start_value = int(start_period)
         end_value = int(end_period)
         if start_value > end_value:
@@ -455,7 +468,10 @@ class PredictionGenerationService:
         period_map = self._build_period_map(history_data)
         sorted_periods_desc = sorted((int(period), period) for period in period_map)
         model_defs = {model_code: self._get_model_definition(model_code, lottery_code=normalized_code) for model_code in unique_codes}
-        prompt_templates = {model_code: self._load_prompt_template(normalized_code) for model_code in unique_codes}
+        prompt_templates = {
+            model_code: self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
+            for model_code in unique_codes
+        }
         history_context_map: dict[str, list[dict[str, Any]]] = {}
         for period in target_periods:
             period_int = int(period)
@@ -512,6 +528,7 @@ class PredictionGenerationService:
                     model=get_thread_model(model_code),
                     model_def=model_defs[model_code],
                     lottery_code=normalized_code,
+                    prediction_play_mode=normalized_play_mode,
                     prompt_template=prompt_templates[model_code],
                     target_period=target_period,
                     prediction_date=prediction_date,
@@ -735,6 +752,8 @@ class PredictionGenerationService:
             raise KeyError(model_code)
         if bool(model.get("is_deleted")):
             raise ValueError("已删除模型不能生成预测数据")
+        if not bool(model.get("is_active")):
+            raise ValueError("已停用模型不能生成预测数据")
         normalized_code = normalize_lottery_code(lottery_code)
         if normalized_code not in (model.get("lottery_codes") or ["dlt"]):
             raise ValueError("该模型未配置当前彩种")
@@ -752,11 +771,15 @@ class PredictionGenerationService:
             raise KeyError(model_code) from exc
 
     @staticmethod
-    def _load_prompt_template(lottery_code: str = "dlt") -> str:
+    def _load_prompt_template(lottery_code: str = "dlt", prediction_play_mode: str = "direct") -> str:
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = PredictionGenerationService._normalize_prediction_play_mode(
+            prediction_play_mode,
+            lottery_code=normalized_code,
+        )
         path = DEFAULT_PROMPT_PATH
         if normalized_code == "pl3":
-            path = PL3_PROMPT_PATH
+            path = PL3_SUM_PROMPT_PATH if normalized_play_mode == "direct_sum" else PL3_PROMPT_PATH
         elif normalized_code == "pl5":
             path = PL5_PROMPT_PATH
         return path.read_text(encoding="utf-8")
@@ -794,6 +817,7 @@ class PredictionGenerationService:
         model: Any,
         model_def: ModelDefinition,
         lottery_code: str,
+        prediction_play_mode: str,
         prompt_template: str,
         target_period: str,
         prediction_date: str,
@@ -813,6 +837,7 @@ class PredictionGenerationService:
             extra={
                 "context": {
                     "lottery_code": lottery_code,
+                    "prediction_play_mode": prediction_play_mode,
                     "target_period": target_period,
                     "model_code": model_def.model_id,
                     "model_provider": model_def.provider,
@@ -829,6 +854,7 @@ class PredictionGenerationService:
                 extra={
                     "context": {
                         "lottery_code": lottery_code,
+                        "prediction_play_mode": prediction_play_mode,
                         "target_period": target_period,
                         "model_code": model_def.model_id,
                         "model_provider": model_def.provider,
@@ -861,6 +887,7 @@ class PredictionGenerationService:
                 extra={
                     "context": {
                         "lottery_code": lottery_code,
+                        "prediction_play_mode": prediction_play_mode,
                         "target_period": target_period,
                         "model_code": model_def.model_id,
                         "response_preview": raw_preview,
@@ -868,7 +895,11 @@ class PredictionGenerationService:
                 },
             )
             raise
-        if not self._validate_prediction(prediction, lottery_code=lottery_code):
+        if not self._validate_prediction(
+            prediction,
+            lottery_code=lottery_code,
+            prediction_play_mode=prediction_play_mode,
+        ):
             normalized_summary = self._build_prediction_payload_summary(prediction)
             normalized_preview = self._build_payload_preview(prediction)
             self.logger.warning(
@@ -876,6 +907,7 @@ class PredictionGenerationService:
                 extra={
                     "context": {
                         "lottery_code": lottery_code,
+                        "prediction_play_mode": prediction_play_mode,
                         "target_period": target_period,
                         "model_code": model_def.model_id,
                         "response_group_count": normalized_summary["group_count"],
@@ -891,6 +923,7 @@ class PredictionGenerationService:
             extra={
                 "context": {
                     "lottery_code": lottery_code,
+                    "prediction_play_mode": prediction_play_mode,
                     "target_period": target_period,
                     "model_code": model_def.model_id,
                     "normalized_group_count": normalized_summary["group_count"],
@@ -974,19 +1007,36 @@ class PredictionGenerationService:
         normalized["model_api_model"] = model_def.api_model
         return normalized
 
-    def _validate_prediction(self, prediction: dict[str, Any], lottery_code: str = "dlt") -> bool:
+    def _validate_prediction(
+        self,
+        prediction: dict[str, Any],
+        lottery_code: str = "dlt",
+        prediction_play_mode: str = "direct",
+    ) -> bool:
         groups = prediction.get("predictions", [])
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
         if len(groups) != 5:
             return False
         for group in groups:
             if normalized_code == "pl3":
                 play_type = str(group.get("play_type") or "").strip().lower()
                 digits = normalize_digit_balls(group.get("digits", []))
-                if play_type != "direct":
-                    return False
-                if len(digits) != 3:
-                    return False
+                if normalized_play_mode == "direct_sum":
+                    if play_type != "direct_sum":
+                        return False
+                    if len(digits) != 0:
+                        return False
+                    sum_value = str(group.get("sum_value") or "").strip()
+                    if not sum_value.isdigit():
+                        return False
+                    if int(sum_value) < 0 or int(sum_value) > 27:
+                        return False
+                else:
+                    if play_type != "direct":
+                        return False
+                    if len(digits) != 3:
+                        return False
                 continue
             if normalized_code == "pl5":
                 play_type = str(group.get("play_type") or "").strip().lower()
@@ -1003,6 +1053,16 @@ class PredictionGenerationService:
             if len(blue_balls) != 2 or blue_balls != sorted(blue_balls):
                 return False
         return True
+
+    @staticmethod
+    def _normalize_prediction_play_mode(prediction_play_mode: str, lottery_code: str = "dlt") -> str:
+        normalized_code = normalize_lottery_code(lottery_code)
+        normalized_mode = str(prediction_play_mode or "direct").strip().lower() or "direct"
+        if normalized_code != "pl3":
+            return "direct"
+        if normalized_mode not in {"direct", "direct_sum"}:
+            raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
+        return normalized_mode
 
     @classmethod
     def _build_period_map(cls, history_data: dict[str, Any]) -> dict[str, dict[str, Any]]:

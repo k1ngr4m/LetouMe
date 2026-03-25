@@ -433,6 +433,26 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(hit_result["digit_hit_count"], 3)
         self.assertTrue(hit_result["is_exact_match"])
 
+    def test_calculate_hit_result_pl3_direct_sum_uses_sum_value(self) -> None:
+        hit_result = self.service.calculate_hit_result(
+            {"play_type": "direct_sum", "sum_value": "10", "digits": []},
+            {"lottery_code": "pl3", "digits": ["01", "02", "07"]},
+            lottery_code="pl3",
+        )
+
+        self.assertEqual(hit_result["digit_hit_count"], 1)
+        self.assertEqual(hit_result["total_hits"], 1)
+        self.assertTrue(hit_result["is_exact_match"])
+
+    def test_resolve_pl3_direct_sum_prize_level_accepts_hit(self) -> None:
+        prize_level = self.service.resolve_prize_level(
+            {"digit_hit_count": 1},
+            actual_result={"lottery_code": "pl3"},
+            prediction_group={"play_type": "direct_sum", "sum_value": "10", "digits": []},
+        )
+
+        self.assertEqual(prize_level, "和值")
+
     def test_current_payload_hides_inactive_models_when_requested(self) -> None:
         service = PredictionService(
             prediction_repository=_FakePredictionRepository(),

@@ -539,6 +539,7 @@ def generate_model_predictions(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     mode = payload.mode.strip().lower()
+    prediction_play_mode = payload.prediction_play_mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
     if mode == "history" and (not payload.start_period or not payload.end_period):
@@ -553,6 +554,7 @@ def generate_model_predictions(
             worker=lambda progress_callback: prediction_generation_service.generate_current_for_model(
                 lottery_code=lottery_code,
                 model_code=payload.model_code,
+                prediction_play_mode=prediction_play_mode,
                 overwrite=payload.overwrite,
                 progress_callback=progress_callback,
             )
@@ -560,6 +562,7 @@ def generate_model_predictions(
             else prediction_generation_service.recalculate_history_for_model(
                 lottery_code=lottery_code,
                 model_code=payload.model_code,
+                prediction_play_mode=prediction_play_mode,
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
                 overwrite=payload.overwrite,
@@ -595,6 +598,7 @@ def bulk_generate_model_predictions(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     mode = payload.mode.strip().lower()
+    prediction_play_mode = payload.prediction_play_mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
     if mode == "history" and (not payload.start_period or not payload.end_period):
@@ -609,6 +613,7 @@ def bulk_generate_model_predictions(
                 lottery_code=lottery_code,
                 model_codes=payload.model_codes,
                 mode=mode,
+                prediction_play_mode=prediction_play_mode,
                 overwrite=payload.overwrite,
                 parallelism=payload.parallelism,
                 start_period=payload.start_period,

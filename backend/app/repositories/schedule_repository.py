@@ -160,6 +160,43 @@ class ScheduleRepository:
                     raise KeyError(task_code)
         return self.get_task(task_code) or {}
 
+    def set_task_model_codes(
+        self,
+        task_code: str,
+        model_codes: list[str],
+        *,
+        deactivate_if_empty: bool = False,
+    ) -> dict[str, Any]:
+        normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
+        next_active = 0 if (deactivate_if_empty and not normalized_codes) else None
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                if next_active is None:
+                    cursor.execute(
+                        """
+                        UPDATE scheduled_task
+                        SET model_codes_json = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE task_code = ?
+                        """,
+                        (json.dumps(normalized_codes, ensure_ascii=False), task_code),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE scheduled_task
+                        SET model_codes_json = ?,
+                            is_active = ?,
+                            next_run_at = NULL,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE task_code = ?
+                        """,
+                        (json.dumps(normalized_codes, ensure_ascii=False), next_active, task_code),
+                    )
+                if cursor.rowcount == 0:
+                    raise KeyError(task_code)
+        return self.get_task(task_code) or {}
+
     def delete_task(self, task_code: str) -> None:
         with get_connection() as connection:
             with connection.cursor() as cursor:

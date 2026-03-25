@@ -118,7 +118,30 @@ class ScheduleService:
             lottery_fetch_task_service.create_task(task["lottery_code"], trigger_type="schedule", on_update=handle_update)
             return
 
-        model_codes = [str(code) for code in task.get("model_codes") or []]
+        model_codes = [str(code).strip() for code in task.get("model_codes") or [] if str(code).strip()]
+        active_model_codes = self.prediction_generation_service.model_repository.list_active_model_codes()
+        filtered_model_codes = [code for code in model_codes if code in active_model_codes]
+        if filtered_model_codes != model_codes:
+            refreshed_task = self.repository.set_task_model_codes(
+                task["task_code"],
+                filtered_model_codes,
+                deactivate_if_empty=True,
+            )
+            task = refreshed_task
+            model_codes = [str(code).strip() for code in task.get("model_codes") or [] if str(code).strip()]
+        if not model_codes:
+            self.repository.update_run_state(
+                task["task_code"],
+                {
+                    "last_run_at": self._format_datetime(now),
+                    "last_run_status": "skipped",
+                    "last_error_message": "无可用启用模型，任务已自动停用",
+                    "last_task_id": None,
+                    "next_run_at": None,
+                },
+            )
+            return
+
         prediction_generation_task_service.create_task(
             lottery_code=task["lottery_code"],
             mode=task.get("generation_mode") or "current",

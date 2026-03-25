@@ -414,6 +414,24 @@ class PredictionService:
         if normalized_code == "pl3":
             play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
             actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+            if play_type == "direct_sum":
+                sum_value = prediction_group.get("sum_value")
+                try:
+                    predicted_sum = int(str(sum_value).strip())
+                except (TypeError, ValueError):
+                    predicted_sum = -1
+                actual_sum = sum(int(item) for item in actual_digits if str(item).isdigit())
+                is_exact_match = predicted_sum == actual_sum
+                return {
+                    "digit_hits": [str(actual_sum)] if is_exact_match else [],
+                    "digit_hit_count": 1 if is_exact_match else 0,
+                    "red_hits": [],
+                    "red_hit_count": 0,
+                    "blue_hits": [],
+                    "blue_hit_count": 0,
+                    "total_hits": 1 if is_exact_match else 0,
+                    "is_exact_match": is_exact_match,
+                }
             digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
             if play_type == "direct":
                 digit_hits = [digit for digit, actual in zip(digits, actual_digits) if digit == actual]
@@ -469,6 +487,14 @@ class PredictionService:
     def _calculate_pl3_trend_hit_count(prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> int:
         play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
         actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+        if play_type == "direct_sum":
+            sum_value = prediction_group.get("sum_value")
+            try:
+                predicted_sum = int(str(sum_value).strip())
+            except (TypeError, ValueError):
+                return 0
+            actual_sum = sum(int(item) for item in actual_digits if str(item).isdigit())
+            return 1 if predicted_sum == actual_sum else 0
         digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
 
         if play_type == "direct":
@@ -1129,7 +1155,7 @@ class PredictionService:
     def _normalize_play_type_filters(values: list[str] | None) -> list[str]:
         if not values:
             return []
-        allowed_play_types = {"direct", "group3", "group6"}
+        allowed_play_types = {"direct", "direct_sum", "group3", "group6"}
         normalized = [str(value or "").strip().lower() for value in values]
         return [play_type for play_type in dict.fromkeys(normalized) if play_type in allowed_play_types]
 
@@ -1172,6 +1198,11 @@ class PredictionService:
         lottery_code = normalize_lottery_code((actual_result or {}).get("lottery_code") or "dlt")
         if lottery_code == "pl3":
             play_type = str((prediction_group or {}).get("play_type") or "direct").strip().lower()
+            if play_type == "direct_sum":
+                is_exact_match = hit_result.get("is_exact_match")
+                if is_exact_match is None:
+                    is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 1
+                return "和值" if bool(is_exact_match) else None
             if play_type == "direct":
                 is_exact_match = hit_result.get("is_exact_match")
                 if is_exact_match is None:

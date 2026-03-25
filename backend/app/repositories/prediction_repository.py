@@ -614,13 +614,14 @@ class PredictionRepository:
                     group_no = int(group.get("group_id") or 0)
                     cursor.execute(
                         """
-                        INSERT INTO prediction_group (model_run_id, group_no, play_type, strategy_text, description_text)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO prediction_group (model_run_id, group_no, play_type, sum_value, strategy_text, description_text)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         """,
                         (
                             model_run_id,
                             group_no,
                             group.get("play_type"),
+                            str(group.get("sum_value") or "").strip() or None,
                             group.get("strategy"),
                             group.get("description"),
                         ),
@@ -741,7 +742,6 @@ class PredictionRepository:
                     provider_id = VALUES(provider_id),
                     api_model_name = VALUES(api_model_name),
                     version = VALUES(version),
-                    is_active = 1,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (model_code, display_name, provider_id, api_model_name, version),
@@ -924,7 +924,7 @@ class PredictionRepository:
         placeholders = ", ".join("?" for _ in model_run_ids)
         cursor.execute(
             f"""
-            SELECT id, model_run_id, group_no, play_type, strategy_text, description_text
+            SELECT id, model_run_id, group_no, play_type, sum_value, strategy_text, description_text
             FROM prediction_group
             WHERE model_run_id IN ({placeholders})
             ORDER BY model_run_id ASC, group_no ASC
@@ -948,6 +948,7 @@ class PredictionRepository:
                 {
                     "group_id": int(row["group_no"]),
                     "play_type": row.get("play_type"),
+                    "sum_value": row.get("sum_value"),
                     "strategy": row.get("strategy_text"),
                     "description": row.get("description_text"),
                     "red_balls": red_balls or digits,

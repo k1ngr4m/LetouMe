@@ -33,6 +33,7 @@ import type {
 type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
+type ModelPredictionPlayMode = 'direct' | 'direct_sum'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
@@ -96,6 +97,7 @@ const EMPTY_GENERATION_FORM = {
   modelCodes: [] as string[],
   displayName: '',
   mode: 'current' as ModelPredictionMode,
+  predictionPlayMode: 'direct' as ModelPredictionPlayMode,
   overwrite: false,
   parallelism: '3',
   startPeriod: '',
@@ -1007,6 +1009,7 @@ export function SettingsPage() {
             lottery_code: generationForm.lotteryCode,
             model_codes: generationForm.modelCodes,
             mode: generationForm.mode,
+            prediction_play_mode: generationForm.lotteryCode === 'pl3' ? generationForm.predictionPlayMode : 'direct',
             overwrite: generationForm.overwrite,
             parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
@@ -1016,6 +1019,7 @@ export function SettingsPage() {
             lottery_code: generationForm.lotteryCode,
             model_code: generationForm.modelCodes[0] || '',
             mode: generationForm.mode,
+            prediction_play_mode: generationForm.lotteryCode === 'pl3' ? generationForm.predictionPlayMode : 'direct',
             overwrite: generationForm.overwrite,
             parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
@@ -1355,6 +1359,7 @@ export function SettingsPage() {
       modelCodes: nextModelCodes,
       displayName,
       mode: 'current',
+      predictionPlayMode: 'direct',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -1375,6 +1380,7 @@ export function SettingsPage() {
       modelCodes: nextModelCodes,
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
+      predictionPlayMode: 'direct',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -1576,6 +1582,7 @@ export function SettingsPage() {
       ...previous,
       lotteryCode: nextLottery,
       modelCodes: nextModelCodes,
+      predictionPlayMode: nextLottery === 'pl3' ? previous.predictionPlayMode : 'direct',
     }))
   }
 
@@ -3363,6 +3370,18 @@ export function SettingsPage() {
                       <option value="history">历史重算</option>
                     </select>
                   </label>
+                  {generationForm.lotteryCode === 'pl3' ? (
+                    <label className="field">
+                      <span>排列3预测玩法</span>
+                      <select
+                        value={generationForm.predictionPlayMode}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, predictionPlayMode: event.target.value as ModelPredictionPlayMode }))}
+                      >
+                        <option value="direct">直选预测</option>
+                        <option value="direct_sum">和值预测</option>
+                      </select>
+                    </label>
+                  ) : null}
                   <label className="field">
                     <span>结果策略</span>
                     <select

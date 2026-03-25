@@ -55,6 +55,12 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(attempts["model-c"], 2)
         self.assertEqual([update["completed_count"] for update in progress_updates], [1, 2, 3])
 
+    def test_validate_model_rejects_inactive_model(self) -> None:
+        service = PredictionGenerationService()
+        with patch.object(service.model_repository, "get_model", return_value={"model_code": "model-a", "is_active": False, "is_deleted": False, "lottery_codes": ["dlt"]}):
+            with self.assertRaisesRegex(ValueError, "已停用模型不能生成预测数据"):
+                service.validate_model("model-a", lottery_code="dlt")
+
     def test_pl3_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl3")
         rendered = template.format(
@@ -83,6 +89,18 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             "`play_type` 只能是 `direct`",
             "`digits` 必须是长度为 3 的数组",
             "禁止生成或提及组选",
+            "只输出纯 JSON",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
+    def test_pl3_sum_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("pl3", prediction_play_mode="direct_sum")
+        required_phrases = [
+            "`play_type` 只能是 `direct_sum`",
+            "`sum_value` 必须是字符串",
+            "`digits` 必须是空数组 `[]`",
+            "禁止输出具体号码组合",
             "只输出纯 JSON",
         ]
         for phrase in required_phrases:
@@ -121,6 +139,40 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="pl3"))
         self.assertFalse(service._validate_prediction(invalid_play_type_prediction, lottery_code="pl3"))
         self.assertFalse(service._validate_prediction(invalid_digits_prediction, lottery_code="pl3"))
+
+    def test_validate_prediction_pl3_direct_sum_requires_sum_value_and_empty_digits(self) -> None:
+        service = PredictionGenerationService()
+        valid_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct_sum", "sum_value": "9", "digits": []},
+                {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
+                {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
+                {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
+                {"group_id": 5, "play_type": "direct_sum", "sum_value": "13", "digits": []},
+            ]
+        }
+        invalid_sum_value_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct_sum", "sum_value": "28", "digits": []},
+                {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
+                {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
+                {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
+                {"group_id": 5, "play_type": "direct_sum", "sum_value": "13", "digits": []},
+            ]
+        }
+        invalid_digits_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct_sum", "sum_value": "9", "digits": ["0"]},
+                {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
+                {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
+                {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
+                {"group_id": 5, "play_type": "direct_sum", "sum_value": "13", "digits": []},
+            ]
+        }
+
+        self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
+        self.assertFalse(service._validate_prediction(invalid_sum_value_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
+        self.assertFalse(service._validate_prediction(invalid_digits_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
 
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")
@@ -184,6 +236,7 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 model=model,
                 model_def=model_def,
                 lottery_code="dlt",
+                prediction_play_mode="direct",
                 prompt_template=prompt_template,
                 target_period="2026032",
                 prediction_date="2026-03-18",
@@ -217,6 +270,7 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                         model=model,
                         model_def=model_def,
                         lottery_code="dlt",
+                        prediction_play_mode="direct",
                         prompt_template=prompt_template,
                         target_period="2026032",
                         prediction_date="2026-03-18",

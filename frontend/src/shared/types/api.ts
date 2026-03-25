@@ -48,7 +48,8 @@ export type PredictionHitResult = {
 
 export type PredictionGroup = {
   group_id: number
-  play_type?: 'direct' | 'group3' | 'group6'
+  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6'
+  sum_value?: string
   strategy?: string
   description?: string
   red_balls: string[]
@@ -496,6 +497,7 @@ export type GenerateSettingsModelPredictionsPayload = {
   lottery_code: LotteryCode
   model_code: string
   mode: 'current' | 'history'
+  prediction_play_mode: 'direct' | 'direct_sum'
   overwrite: boolean
   parallelism?: number
   start_period?: string
@@ -517,6 +519,7 @@ export type BulkGenerateSettingsModelPredictionsPayload = {
   lottery_code: LotteryCode
   model_codes: string[]
   mode: 'current' | 'history'
+  prediction_play_mode: 'direct' | 'direct_sum'
   overwrite: boolean
   parallelism?: number
   start_period?: string

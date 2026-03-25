@@ -260,11 +260,11 @@ export function HomePage() {
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? ['direct'] : []),
+    () => (selectedLottery === 'pl3' ? ['direct', 'direct_sum'] : []),
     [selectedLottery],
   )
   const historyPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? ['direct'] : []),
+    () => (selectedLottery === 'pl3' ? ['direct', 'direct_sum'] : []),
     [selectedLottery],
   )
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
@@ -610,7 +610,7 @@ export function HomePage() {
                 aria-pressed={selectedLottery === code}
               >
                 <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : '仅直选定位玩法'}</span>
+                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
               </button>
             ))}
           </div>
@@ -2072,6 +2072,22 @@ function PredictionNumberRow({
   const hit = compareNumbers(group, actualResult)
   const inferredLotteryCode =
     actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const normalizedPlayType = String(group.play_type || 'direct').trim().toLowerCase()
+  if (inferredLotteryCode === 'pl3' && normalizedPlayType === 'direct_sum') {
+    const sumValue = String(group.sum_value || '').trim() || '-'
+    const isHit = Boolean((hit?.totalHits || 0) > 0)
+    return (
+      <div className={clsx('number-row', compact && 'number-row--compact')}>
+        <NumberBall
+          key={`s-${group.group_id}-${sumValue}`}
+          value={`和${sumValue}`}
+          color="red"
+          isHit={isHit}
+          tone={grayMisses && !isHit ? 'muted' : 'default'}
+        />
+      </div>
+    )
+  }
   const digitLength = inferredLotteryCode === 'pl5' ? 5 : 3
   const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).slice(0, digitLength)
   if (inferredLotteryCode === 'pl3' || inferredLotteryCode === 'pl5') {

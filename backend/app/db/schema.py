@@ -163,6 +163,7 @@ SCHEMA_STATEMENTS = [
         model_run_id BIGINT NOT NULL,
         group_no INT NOT NULL,
         play_type VARCHAR(32) NULL,
+        sum_value VARCHAR(8) NULL,
         strategy_text TEXT NULL,
         description_text TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -545,6 +546,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         model_run_id BIGINT NOT NULL,
         group_no INT NOT NULL,
         play_type VARCHAR(32) NULL,
+        sum_value VARCHAR(8) NULL,
         strategy_text TEXT NULL,
         description_text TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -792,6 +794,7 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "prediction_group": {
         "play_type": "ALTER TABLE prediction_group ADD COLUMN play_type VARCHAR(32) NULL AFTER group_no",
+        "sum_value": "ALTER TABLE prediction_group ADD COLUMN sum_value VARCHAR(8) NULL AFTER play_type",
     },
     "simulation_ticket": {
         "lottery_code": "ALTER TABLE simulation_ticket ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER user_id",
@@ -870,6 +873,10 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
     SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record_line"] = {
         "direct_ten_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
         "direct_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}prediction_group"] = {
+        "play_type": f"ALTER TABLE {_table_prefix}prediction_group ADD COLUMN play_type VARCHAR(32) NULL AFTER group_no",
+        "sum_value": f"ALTER TABLE {_table_prefix}prediction_group ADD COLUMN sum_value VARCHAR(8) NULL AFTER play_type",
     }
 
 _CREATE_TABLE_PATTERN = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?([a-zA-Z0-9_]+)`?", re.IGNORECASE)
