@@ -724,7 +724,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(within(filterPanel as HTMLElement).getByRole('button', { name: '清空筛选' }))
     const modelAButtonsAfterClear = within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })
     expect(modelAButtonsAfterClear.length).toBeGreaterThan(0)
-    expect(modelAButtonsAfterClear[0]).toHaveClass('is-inactive')
+    expect(modelAButtonsAfterClear[0]).toHaveClass('is-active')
 
     await userEvent.type(within(filterPanel as HTMLElement).getByPlaceholderText('按模型名称或ID筛选'), '型a')
     const matchedModelAButton = within(filterPanel as HTMLElement)
@@ -737,7 +737,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(within(filterPanel as HTMLElement).getByRole('button', { name: '清空筛选' }))
     const modelAButtonsAfterSecondClear = within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })
-    expect(modelAButtonsAfterSecondClear.some((button) => button.classList.contains('is-inactive'))).toBe(true)
+    expect(modelAButtonsAfterSecondClear.some((button) => button.classList.contains('is-active'))).toBe(true)
   })
 
   it('switches model overview across list, card and score views', async () => {
@@ -914,6 +914,65 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(modelBInactiveChip)
     expect(summaryScope.getByRole('button', { name: '模型B' })).toHaveClass('is-active')
+  })
+
+  it('applies selected models consistently to model list, summary and history', async () => {
+    renderPage()
+
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+    const summaryScope = within(summarySection as HTMLElement)
+
+    await userEvent.click(summaryScope.getByRole('button', { name: '模型B' }))
+
+    const modelTable = document.querySelector('.home-model-list-table tbody')
+    expect(modelTable).not.toBeNull()
+    expect(within(modelTable as HTMLElement).getByText('模型A')).toBeInTheDocument()
+    expect(within(modelTable as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
+    expect(summaryScope.getByRole('button', { name: '模型B' })).toHaveClass('is-inactive')
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+    const historyRecords = (historySection as HTMLElement).querySelector('.history-card-list__records')
+    expect(historyRecords).not.toBeNull()
+    expect(within(historyRecords as HTMLElement).getAllByText('模型A').length).toBeGreaterThan(0)
+    expect(within(historyRecords as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
+  })
+
+  it('falls back to all models when the last selected model is cleared', async () => {
+    renderPage()
+
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+    const summaryScope = within(summarySection as HTMLElement)
+
+    await userEvent.click(summaryScope.getByRole('button', { name: '模型B' }))
+    await userEvent.click(summaryScope.getByRole('button', { name: '模型A' }))
+
+    expect(summaryScope.getByRole('button', { name: '模型A' })).toHaveClass('is-active')
+    expect(summaryScope.getByRole('button', { name: '模型B' })).toHaveClass('is-active')
+
+    const modelTable = document.querySelector('.home-model-list-table tbody')
+    expect(modelTable).not.toBeNull()
+    expect(within(modelTable as HTMLElement).getByText('模型A')).toBeInTheDocument()
+    expect(within(modelTable as HTMLElement).getByText('模型B')).toBeInTheDocument()
+  })
+
+  it('resets selected models to all when clearing filters', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '筛选' }))
+    const filterPanel = screen.getByText('名称搜索').closest('.model-filter-panel')
+    expect(filterPanel).not.toBeNull()
+
+    await userEvent.click(within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型B' })[0])
+    expect(within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型B' })[0]).toHaveClass('is-inactive')
+
+    await userEvent.click(within(filterPanel as HTMLElement).getByRole('button', { name: '清空筛选' }))
+
+    expect(within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型A' })[0]).toHaveClass('is-active')
+    expect(within(filterPanel as HTMLElement).getAllByRole('button', { name: '模型B' })[0]).toHaveClass('is-active')
   })
 
   it('shows five position summary columns for pl5', async () => {

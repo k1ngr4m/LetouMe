@@ -440,19 +440,19 @@ export function HomePage() {
     selectedScoreRange: 'all',
   })
   const effectiveSelectedModelIds = useMemo(() => {
-    const baseModelIds = filteredModelIds
-    const selectedModelIds = (summarySelectedModelIds ?? baseModelIds).filter((modelId) => baseModelIds.includes(modelId))
-    return selectedModelIds.length ? selectedModelIds : baseModelIds
+    return summarySelectedModelIds === null
+      ? filteredModelIds
+      : summarySelectedModelIds.filter((modelId) => filteredModelIds.includes(modelId))
   }, [filteredModelIds, summarySelectedModelIds])
   const effectiveSelectedModels = useMemo(
     () => filteredModels.filter((model) => effectiveSelectedModelIds.includes(model.model_id)),
     [effectiveSelectedModelIds, filteredModels],
   )
   const panelSelectedModelIds = useMemo(
-    () =>
-      (summarySelectedModelIds ?? filteredModelIds).filter((modelId) =>
-        orderedModels.some((model) => model.model_id === modelId),
-      ),
+    () => {
+      const candidateIds = summarySelectedModelIds === null ? filteredModelIds : summarySelectedModelIds
+      return candidateIds.filter((modelId) => orderedModels.some((model) => model.model_id === modelId))
+    },
     [filteredModelIds, orderedModels, summarySelectedModelIds],
   )
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
@@ -656,7 +656,7 @@ export function HomePage() {
     () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
-  const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summarySelectableModels
+  const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summaryModels
   const canExportSummary = summarySelectableModels.length > 0 && selectedSummaryIds.length > 0
   const exportModel = useMemo(
     () => (exportingModelId ? models.find((model) => model.model_id === exportingModelId) || null : null),

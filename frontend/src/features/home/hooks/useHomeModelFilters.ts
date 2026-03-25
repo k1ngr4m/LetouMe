@@ -68,6 +68,9 @@ export function useHomeModelFilters(
     setSummarySelectedModelIds((previous) => {
       if (previous === null) return null
       const next = previous.filter((modelId) => filteredModelIds.includes(modelId))
+      if (next.length === 0 || next.length === filteredModelIds.length) {
+        return null
+      }
       return next.length === previous.length ? previous : next
     })
   }, [filteredModelIds])
@@ -87,14 +90,18 @@ export function useHomeModelFilters(
     setSelectedProviders([])
     setSelectedTags([])
     setSelectedScoreRange('all')
-    setSummarySelectedModelIds([])
+    setSummarySelectedModelIds(null)
   }
 
   function toggleSummaryModel(modelId: string) {
     const fallbackIds = filteredModelIds
     setSummarySelectedModelIds((previous) => {
       const current = previous ?? fallbackIds
-      return current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
+      const next = current.includes(modelId) ? current.filter((item) => item !== modelId) : [...current, modelId]
+      if (next.length === 0 || next.length === fallbackIds.length) {
+        return null
+      }
+      return next
     })
   }
 
@@ -109,7 +116,10 @@ export function useHomeModelFilters(
   ) {
     const summaryModels = summaryModelsOverride ?? filteredModels
     const summaryModelIds = summaryModels.map((model) => model.model_id)
-    const selectedSummaryIds = (summarySelectedModelIds ?? summaryModelIds).filter((modelId) => summaryModelIds.includes(modelId))
+    const selectedSummaryIds =
+      summarySelectedModelIds === null
+        ? summaryModelIds
+        : summarySelectedModelIds.filter((modelId) => summaryModelIds.includes(modelId))
     const summary = buildSummary(summaryModels, modelScores, selectedSummaryIds, weightedSummary, commonOnly, summaryStrategyFilters, summaryPlayTypeFilters)
     const historyModelIds = historyModelIdsOverride ?? filteredModelIds
     const filteredHistory = history ? filterHistoryRecords(history, historyModelIds, periodQuery) : []
