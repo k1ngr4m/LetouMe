@@ -38,7 +38,7 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
-import { getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import { getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
 import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
