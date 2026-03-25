@@ -207,6 +207,14 @@ type HistoryModelRef = {
   prediction_play_mode?: 'direct' | 'direct_sum'
 }
 
+function resolveHistoryModelModeKey(model: {
+  model_id: string
+  prediction_play_mode?: 'direct' | 'direct_sum' | null
+  predictions?: PredictionGroup[]
+}) {
+  return `${model.model_id}::${normalizePredictionModelPlayMode(model)}`
+}
+
 function formatCurrency(value: number | undefined) {
   return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
 }
@@ -2855,10 +2863,12 @@ function HistoryRecordCard({
       }
     : null
   const listModels = record.models || []
-  const detailModelsById = useMemo(() => {
-    const mappings = new Map<string, PredictionModel>()
+  const detailModelCandidatesById = useMemo(() => {
+    const mappings = new Map<string, PredictionModel[]>()
     for (const model of detailRecord?.models || []) {
-      mappings.set(model.model_id, model)
+      const candidates = mappings.get(model.model_id) || []
+      candidates.push(model)
+      mappings.set(model.model_id, candidates)
     }
     return mappings
   }, [detailRecord])
@@ -2866,18 +2876,18 @@ function HistoryRecordCard({
     () => strategyFilters.map((item) => normalizeStrategyLabel(item)),
     [strategyFilters],
   )
-	  const normalizedPlayTypeFilters = useMemo(
-	    () => playTypeFilters,
-	    [playTypeFilters],
-	  )
-	  const isPl3SumMode = useMemo(
-	    () => lotteryCode === 'pl3' && normalizedPlayTypeFilters.length > 0 && normalizedPlayTypeFilters.every((playType) => playType === 'direct_sum'),
-	    [lotteryCode, normalizedPlayTypeFilters],
-	  )
-	  const strategyFilterSet = useMemo(
-	    () => new Set(normalizedStrategyFilters),
-	    [normalizedStrategyFilters],
-	  )
+  const normalizedPlayTypeFilters = useMemo(
+    () => playTypeFilters,
+    [playTypeFilters],
+  )
+  const isPl3SumMode = useMemo(
+    () => lotteryCode === 'pl3' && normalizedPlayTypeFilters.length > 0 && normalizedPlayTypeFilters.every((playType) => playType === 'direct_sum'),
+    [lotteryCode, normalizedPlayTypeFilters],
+  )
+  const strategyFilterSet = useMemo(
+    () => new Set(normalizedStrategyFilters),
+    [normalizedStrategyFilters],
+  )
   const periodSummary = listModels.reduce(
     (accumulator, model) => ({
       total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
@@ -2890,52 +2900,52 @@ function HistoryRecordCard({
   const actualMainBalls = actualLotteryCode === 'dlt'
     ? (record.actual_result?.red_balls || [])
     : (record.actual_result?.digits?.length ? record.actual_result.digits : (record.actual_result?.red_balls || []))
-  const availableModelIds = useMemo(() => new Set(listModels.map((model) => model.model_id)), [listModels])
-  const allListModelIds = useMemo(() => listModels.map((model) => model.model_id), [listModels])
-  const areAllModelsExpanded = allListModelIds.length > 0 && allListModelIds.every((modelId) => expandedModelIds.includes(modelId))
+  const allListModelModeKeys = useMemo(() => listModels.map((model) => resolveHistoryModelModeKey(model)), [listModels])
+  const availableModelModeKeys = useMemo(() => new Set(allListModelModeKeys), [allListModelModeKeys])
+  const areAllModelsExpanded = allListModelModeKeys.length > 0 && allListModelModeKeys.every((modelKey) => expandedModelIds.includes(modelKey))
   const periodSummaryModels = detailRecord?.models || []
   const periodSummaryModelIds = useMemo(() => periodSummaryModels.map((model) => model.model_id), [periodSummaryModels])
   const periodPredictionSummary = useMemo(
     () => buildSummary(periodSummaryModels, {}, periodSummaryModelIds, false, false, strategyFilters, playTypeFilters),
     [periodSummaryModelIds, periodSummaryModels, playTypeFilters, strategyFilters],
   )
-	  const hasPeriodSummaryStats = useMemo(
-	    () =>
-	      periodPredictionSummary.red.length > 0 ||
-	      periodPredictionSummary.blue.length > 0 ||
-	      periodPredictionSummary.sums.length > 0 ||
-	      (periodPredictionSummary.positions || []).some((items) => items.length > 0),
-	    [periodPredictionSummary],
-	  )
+  const hasPeriodSummaryStats = useMemo(
+    () =>
+      periodPredictionSummary.red.length > 0 ||
+      periodPredictionSummary.blue.length > 0 ||
+      periodPredictionSummary.sums.length > 0 ||
+      (periodPredictionSummary.positions || []).some((items) => items.length > 0),
+    [periodPredictionSummary],
+  )
   const periodSummaryHitSets = useMemo(() => {
     const redHits = new Set((record.actual_result?.red_balls || []).map((ball) => String(ball).padStart(2, '0')))
     const blueHits = new Set((record.actual_result?.blue_balls || []).map((ball) => String(ball).padStart(2, '0')))
-	    const digitSource = (record.actual_result?.digits?.length
-	      ? record.actual_result.digits
-	      : record.actual_result?.red_balls || []
-	    ).map((ball) => String(ball).padStart(2, '0'))
-	    const sumHits = new Set<string>([String(digitSource.slice(0, 3).reduce((total, digit) => total + Number(digit || 0), 0))])
-	    const positionHits = Array.from({ length: 5 }, (_, index) =>
-	      digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
-	    )
-	    return { redHits, blueHits, sumHits, positionHits }
-	  }, [record.actual_result])
+    const digitSource = (record.actual_result?.digits?.length
+      ? record.actual_result.digits
+      : record.actual_result?.red_balls || []
+    ).map((ball) => String(ball).padStart(2, '0'))
+    const sumHits = new Set<string>([String(digitSource.slice(0, 3).reduce((total, digit) => total + Number(digit || 0), 0))])
+    const positionHits = Array.from({ length: 5 }, (_, index) =>
+      digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
+    )
+    return { redHits, blueHits, sumHits, positionHits }
+  }, [record.actual_result])
 
   useEffect(() => {
     setExpandedModelIds((previous) => {
-      const next = previous.filter((modelId) => availableModelIds.has(modelId))
+      const next = previous.filter((modelKey) => availableModelModeKeys.has(modelKey))
       return next.length === previous.length ? previous : next
     })
-  }, [availableModelIds])
+  }, [availableModelModeKeys])
 
-  function toggleModelExpansion(modelId: string) {
+  function toggleModelExpansion(modelModeKey: string) {
     setExpandedModelIds((previous) =>
-      previous.includes(modelId) ? previous.filter((id) => id !== modelId) : [...previous, modelId],
+      previous.includes(modelModeKey) ? previous.filter((id) => id !== modelModeKey) : [...previous, modelModeKey],
     )
   }
 
   function toggleAllModelExpansion() {
-    setExpandedModelIds(areAllModelsExpanded ? [] : allListModelIds)
+    setExpandedModelIds(areAllModelsExpanded ? [] : allListModelModeKeys)
   }
 
   function togglePeriodSummary() {
@@ -2950,7 +2960,7 @@ function HistoryRecordCard({
           <h3>开奖回溯</h3>
         </div>
         <div className="history-record-card__actions">
-          {allListModelIds.length ? (
+          {allListModelModeKeys.length ? (
             <button
               type="button"
               className="ghost-button ghost-button--compact history-record-card__bulk-toggle"
@@ -2993,16 +3003,48 @@ function HistoryRecordCard({
       </div>
       <div className="history-record-card__models">
         {listModels.map((model) => {
-          const isExpanded = expandedModelIds.includes(model.model_id)
-          const detailModel = detailModelsById.get(model.model_id)
-          const detailId = `history-record-card-${record.target_period}-${model.model_id}-detail`
-          const detailModelStrategies = new Set((detailModel?.predictions || []).map((group) => normalizeStrategyLabel(group.strategy)))
-          const matchesAllStrategies = !normalizedStrategyFilters.length || normalizedStrategyFilters.every((strategy) => detailModelStrategies.has(strategy))
-          const playTypeFilteredPredictions = filterPredictionGroupsByPlayType(detailModel?.predictions || [], normalizedPlayTypeFilters)
-          const filteredDetailPredictions = !normalizedStrategyFilters.length
-            ? playTypeFilteredPredictions
-            : playTypeFilteredPredictions.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
-          const matchesPlayTypes = !normalizedPlayTypeFilters.length || filteredDetailPredictions.length > 0
+          const modelModeKey = resolveHistoryModelModeKey(model)
+          const isExpanded = expandedModelIds.includes(modelModeKey)
+          const listModelMode = normalizePredictionModelPlayMode(model)
+          const currentPl3Mode: 'direct' | 'direct_sum' | null = lotteryCode === 'pl3' ? (isPl3SumMode ? 'direct_sum' : 'direct') : null
+          const detailCandidates = detailModelCandidatesById.get(model.model_id) || []
+          const detailCandidateMetrics = detailCandidates.map((candidate) => {
+            const candidateMode = normalizePredictionModelPlayMode(candidate)
+            const candidatePredictions = candidate.predictions || []
+            const candidateStrategies = new Set(candidatePredictions.map((group) => normalizeStrategyLabel(group.strategy)))
+            const candidateMatchesStrategies =
+              !normalizedStrategyFilters.length ||
+              normalizedStrategyFilters.every((strategy) => candidateStrategies.has(strategy))
+            const playTypeFilteredPredictions = filterPredictionGroupsByPlayType(candidatePredictions, normalizedPlayTypeFilters)
+            const filteredPredictions = !normalizedStrategyFilters.length
+              ? playTypeFilteredPredictions
+              : playTypeFilteredPredictions.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+            const score =
+              (filteredPredictions.length > 0 ? 100 : 0) +
+              (playTypeFilteredPredictions.length > 0 ? 10 : 0) +
+              (currentPl3Mode && candidateMode === currentPl3Mode ? 2 : 0) +
+              (candidateMode === listModelMode ? 1 : 0)
+            return {
+              candidate,
+              candidateMatchesStrategies,
+              playTypeFilteredPredictions,
+              filteredPredictions,
+              score,
+            }
+          })
+          const preferredCandidate = detailCandidateMetrics.reduce<(typeof detailCandidateMetrics)[number] | null>((best, metric) => {
+            if (!best) return metric
+            return metric.score > best.score ? metric : best
+          }, null)
+          const detailModel = preferredCandidate?.candidate || null
+          const detailId = `history-record-card-${record.target_period}-${modelModeKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-detail`
+          const matchesAllStrategies =
+            !normalizedStrategyFilters.length ||
+            detailCandidateMetrics.some((metric) => metric.candidateMatchesStrategies)
+          const filteredDetailPredictions = preferredCandidate?.filteredPredictions || []
+          const matchesPlayTypes =
+            !normalizedPlayTypeFilters.length ||
+            detailCandidateMetrics.some((metric) => metric.playTypeFilteredPredictions.length > 0)
           const filteredDetailBetCount = filteredDetailPredictions.length
           const filteredDetailWinningBetCount = filteredDetailPredictions.filter((group) => Number(group.prize_amount || 0) > 0).length
           const filteredDetailPrizeAmount = filteredDetailPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0)
@@ -3014,11 +3056,11 @@ function HistoryRecordCard({
           const filteredWinRateByBet = filteredDetailBetCount ? filteredDetailWinningBetCount / filteredDetailBetCount : 0
 
           return (
-            <section key={`${record.target_period}-${model.model_id}`} className={clsx('history-record-card__model', isExpanded && 'is-expanded')}>
+            <section key={`${record.target_period}-${modelModeKey}`} className={clsx('history-record-card__model', isExpanded && 'is-expanded')}>
               <button
                 type="button"
                 className={clsx('history-record-card__model-trigger', isExpanded && 'is-expanded')}
-                onClick={() => toggleModelExpansion(model.model_id)}
+                onClick={() => toggleModelExpansion(modelModeKey)}
                 aria-expanded={isExpanded}
                 aria-controls={detailId}
                 aria-label={`${isExpanded ? '收起模型详情' : '展开模型详情'}：${model.model_name}`}
