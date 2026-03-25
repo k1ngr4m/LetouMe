@@ -2172,7 +2172,7 @@ function PredictionNumberRow({
       <div className={clsx('number-row', compact && 'number-row--compact')}>
         <NumberBall
           key={`s-${group.group_id}-${sumValue}`}
-          value={`和${sumValue}`}
+          value={sumValue}
           color="red"
           isHit={isHit}
           tone={grayMisses && !isHit ? 'muted' : 'default'}
