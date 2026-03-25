@@ -15,6 +15,7 @@ const {
   getPredictionsHistoryDetail,
   getSimulationTickets,
   quoteSimulationTicket,
+  simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
   updateMyBet,
   simulateHistoryFilterLoading,
@@ -27,6 +28,7 @@ const {
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
@@ -273,29 +275,57 @@ vi.mock('./hooks/useHomeData', () => ({
     )
     const currentModels = isPl3
       ? [
-          {
-            model_id: 'model-a',
-            model_name: '模型A',
-            model_provider: 'openai_compatible',
-            model_tags: ['reasoning'],
-            model_api_model: 'model-a-api',
-            predictions: [
-              { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
-              { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] },
-              { group_id: 3, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '04'] },
-            ],
-          },
-          {
-            model_id: 'model-b',
-            model_name: '模型B',
-            model_provider: 'deepseek',
-            model_tags: ['fast'],
-            model_api_model: 'model-b-api',
-            predictions: [
-              { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['04', '05', '06'] },
-              { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['04', '06', '07'] },
-            ],
-          },
+          ...(simulatePl3SumCurrentPredictions.current
+            ? [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  model_tags: ['reasoning'],
+                  model_api_model: 'model-a-api',
+                  prediction_play_mode: 'direct_sum',
+                  predictions: [
+                    { group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] },
+                    { group_id: 2, play_type: 'direct_sum', sum_value: '11', red_balls: [], blue_balls: [], digits: [] },
+                  ],
+                },
+                {
+                  model_id: 'model-b',
+                  model_name: '模型B',
+                  model_provider: 'deepseek',
+                  model_tags: ['fast'],
+                  model_api_model: 'model-b-api',
+                  prediction_play_mode: 'direct_sum',
+                  predictions: [
+                    { group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] },
+                  ],
+                },
+              ]
+            : [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  model_tags: ['reasoning'],
+                  model_api_model: 'model-a-api',
+                  predictions: [
+                    { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] },
+                    { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] },
+                    { group_id: 3, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '04'] },
+                  ],
+                },
+                {
+                  model_id: 'model-b',
+                  model_name: '模型B',
+                  model_provider: 'deepseek',
+                  model_tags: ['fast'],
+                  model_api_model: 'model-b-api',
+                  predictions: [
+                    { group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['04', '05', '06'] },
+                    { group_id: 2, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['04', '06', '07'] },
+                  ],
+                },
+              ]),
         ]
       : isPl5
         ? [
@@ -502,6 +532,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 beforeEach(() => {
   window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
+  simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
   getMyBets.mockReset()
   getMyBets.mockResolvedValue({
@@ -1221,6 +1252,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(hit4Card).toHaveClass('is-hit-tier-4')
     expect(hit5Card).toHaveClass('is-hit-tier-5')
     expect(hit6Card).toHaveClass('is-hit-tier-6')
+    expect(within(detailSection as HTMLElement).getAllByText('成本 2 元')).toHaveLength(4)
 
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型B' }))
     expect(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '收起模型详情：模型B' })).toBeInTheDocument()
@@ -1562,6 +1594,8 @@ describe('HomePage dashboard sidebar', () => {
     const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
     expect(detailSection).not.toBeNull()
     expect(within(detailSection as HTMLElement).getByText('成本 264 元')).toBeInTheDocument()
+    expect(within(detailSection as HTMLElement).getByText('成本 126 元')).toBeInTheDocument()
+    expect(within(detailSection as HTMLElement).getByText('成本 138 元')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('奖金 1,040 元')).toBeInTheDocument()
   })
 
@@ -1643,6 +1677,69 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('第三位（个位）统计')).toBeInTheDocument()
     expect(screen.queryByText('前区统计')).not.toBeInTheDocument()
     expect(screen.queryByText('后区统计')).not.toBeInTheDocument()
+  })
+
+  it('shows sum-only statistics for pl3 direct_sum in prediction overview', async () => {
+    simulatePl3SumCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
+
+    expect(screen.getByText('和值统计')).toBeInTheDocument()
+    expect(screen.queryByText('第一位（百位）统计')).not.toBeInTheDocument()
+    expect(screen.queryByText('第二位（十位）统计')).not.toBeInTheDocument()
+    expect(screen.queryByText('第三位（个位）统计')).not.toBeInTheDocument()
+  })
+
+  it('shows sum-only statistics in pl3 history period summary', async () => {
+    simulatePl3SumHistoryMislabel.current = true
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: [],
+            blue_balls: [],
+            digits: ['01', '02', '07'],
+            lottery_code: 'pl3',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 1,
+              predictions: [
+                { group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] },
+                { group_id: 2, play_type: 'direct_sum', sum_value: '11', red_balls: [], blue_balls: [], digits: [] },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
+
+    const firstHistoryCard = await screen.findByText('第 2026031 期')
+    const card = firstHistoryCard.closest('.history-record-card')
+    expect(card).not.toBeNull()
+    await userEvent.click(within(card as HTMLElement).getByRole('button', { name: '显示该期预测统计：第 2026031 期' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    expect(within(card as HTMLElement).getByText('和值统计')).toBeInTheDocument()
+    expect(within(card as HTMLElement).queryByText('第一位（百位）统计')).not.toBeInTheDocument()
+    expect(within(card as HTMLElement).queryByText('第二位（十位）统计')).not.toBeInTheDocument()
+    expect(within(card as HTMLElement).queryByText('第三位（个位）统计')).not.toBeInTheDocument()
   })
 
   it('navigates to my-bets tab from dashboard strip', async () => {

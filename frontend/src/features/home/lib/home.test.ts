@@ -230,6 +230,51 @@ describe('buildSummary', () => {
     expect(result.red).toEqual([])
     expect(result.blue).toEqual([])
   })
+
+  it('builds pl3 direct_sum summary by sum values', () => {
+    const result = buildSummary(
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          predictions: [
+            { group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] },
+            { group_id: 2, play_type: 'direct_sum', sum_value: '11', red_balls: [], blue_balls: [], digits: [] },
+          ],
+        },
+        {
+          model_id: 'm2',
+          model_name: 'Model 2',
+          model_provider: 'gemini',
+          predictions: [
+            { group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] },
+            { group_id: 2, play_type: 'direct_sum', sum_value: 'invalid', red_balls: [], blue_balls: [], digits: [] },
+          ],
+        },
+      ],
+      {},
+      ['m1', 'm2'],
+      false,
+      false,
+      [],
+      ['direct_sum'],
+    )
+
+    const sum10 = result.sums.find((item) => item.ball === '10')
+    const sum11 = result.sums.find((item) => item.ball === '11')
+    expect(sum10).toMatchObject({
+      appearanceCount: 2,
+      totalGroupCount: 4,
+      matchedModelCount: 2,
+    })
+    expect(sum11).toMatchObject({
+      appearanceCount: 1,
+      totalGroupCount: 4,
+      matchedModelCount: 1,
+    })
+    expect(result.positions.every((items) => items.length === 0)).toBe(true)
+  })
 })
 
 describe('filterModels', () => {

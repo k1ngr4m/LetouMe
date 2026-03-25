@@ -967,11 +967,11 @@ export function HomePage() {
                 ) : null}
                 {!summaryFilteredModels.length ? (
                   <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
-                ) : !selectedSummaryIds.length ? (
-                  <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
-                ) : (
-                  <div className="summary-columns">
-                    {selectedLottery === 'pl5' ? (
+	                ) : !selectedSummaryIds.length ? (
+	                  <div className="state-shell">请至少选择一个模型以查看号码统计。</div>
+	                ) : (
+	                  <div className="summary-columns">
+	                    {selectedLottery === 'pl5' ? (
                       <>
                         <SummaryList title="第一位（万位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
                         <SummaryList title="第二位（千位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
@@ -979,15 +979,21 @@ export function HomePage() {
                         <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
                         <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
                       </>
-                    ) : selectedLottery === 'pl3' ? (
-                      <>
-                        <SummaryList title="第一位（百位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第二位（十位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第三位（个位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
-                      </>
-                    ) : (
-                      <>
-                        <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
+	                    ) : selectedLottery === 'pl3' ? (
+	                      <>
+	                        {pl3PredictionMode === 'direct_sum' ? (
+	                          <SummaryList title="和值统计" items={summary.sums || []} color="red" models={summaryModels} />
+	                        ) : (
+	                          <>
+	                            <SummaryList title="第一位（百位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
+	                            <SummaryList title="第二位（十位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
+	                            <SummaryList title="第三位（个位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
+	                          </>
+	                        )}
+	                      </>
+	                    ) : (
+	                      <>
+	                        <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
                         <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
                       </>
                     )}
@@ -2109,6 +2115,7 @@ export function PredictionGroupCard({
   compact = false,
   grayMisses = false,
   emphasizeHitTier = false,
+  showCost = false,
   showDescriptionInCompact = false,
 }: {
   group: PredictionGroup
@@ -2116,11 +2123,15 @@ export function PredictionGroupCard({
   compact?: boolean
   grayMisses?: boolean
   emphasizeHitTier?: boolean
+  showCost?: boolean
   showDescriptionInCompact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
   const description = group.description?.trim() || '暂无说明'
   const playTypeLabel = getPredictionPlayTypeLabel(group, actualResult)
+  const inferredLotteryCode: LotteryCode =
+    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const groupCostAmount = showCost ? resolveHistoryPredictionGroupCost(group, inferredLotteryCode) : 0
   const hitTierClass =
     emphasizeHitTier && hit
       ? hit.totalHits >= 6
@@ -2140,12 +2151,17 @@ export function PredictionGroupCard({
         {hit ? <strong className="prediction-group-card__hit">{hit.totalHits} 中</strong> : null}
       </div>
       <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} compact={compact} />
-      {group.prize_level ? (
+      {group.prize_level || showCost ? (
         <div className="prediction-group-card__prize">
-          <strong>{group.prize_level}</strong>
-          <span>{formatCurrency(group.prize_amount)}</span>
-          {group.prize_source === 'fallback' ? <small>固定奖兜底</small> : null}
-          {group.prize_source === 'missing' ? <small>浮动奖待补全</small> : null}
+          {group.prize_level ? (
+            <>
+              <strong>{group.prize_level}</strong>
+              <span>{formatCurrency(group.prize_amount)}</span>
+              {group.prize_source === 'fallback' ? <small>固定奖兜底</small> : null}
+              {group.prize_source === 'missing' ? <small>浮动奖待补全</small> : null}
+            </>
+          ) : null}
+          {showCost ? <span>{`成本 ${formatCurrency(groupCostAmount)}`}</span> : null}
         </div>
       ) : null}
       {compact && !showDescriptionInCompact ? null : (
@@ -2850,14 +2866,18 @@ function HistoryRecordCard({
     () => strategyFilters.map((item) => normalizeStrategyLabel(item)),
     [strategyFilters],
   )
-  const normalizedPlayTypeFilters = useMemo(
-    () => playTypeFilters,
-    [playTypeFilters],
-  )
-  const strategyFilterSet = useMemo(
-    () => new Set(normalizedStrategyFilters),
-    [normalizedStrategyFilters],
-  )
+	  const normalizedPlayTypeFilters = useMemo(
+	    () => playTypeFilters,
+	    [playTypeFilters],
+	  )
+	  const isPl3SumMode = useMemo(
+	    () => lotteryCode === 'pl3' && normalizedPlayTypeFilters.length > 0 && normalizedPlayTypeFilters.every((playType) => playType === 'direct_sum'),
+	    [lotteryCode, normalizedPlayTypeFilters],
+	  )
+	  const strategyFilterSet = useMemo(
+	    () => new Set(normalizedStrategyFilters),
+	    [normalizedStrategyFilters],
+	  )
   const periodSummary = listModels.reduce(
     (accumulator, model) => ({
       total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
@@ -2879,25 +2899,27 @@ function HistoryRecordCard({
     () => buildSummary(periodSummaryModels, {}, periodSummaryModelIds, false, false, strategyFilters, playTypeFilters),
     [periodSummaryModelIds, periodSummaryModels, playTypeFilters, strategyFilters],
   )
-  const hasPeriodSummaryStats = useMemo(
-    () =>
-      periodPredictionSummary.red.length > 0 ||
-      periodPredictionSummary.blue.length > 0 ||
-      (periodPredictionSummary.positions || []).some((items) => items.length > 0),
-    [periodPredictionSummary],
-  )
+	  const hasPeriodSummaryStats = useMemo(
+	    () =>
+	      periodPredictionSummary.red.length > 0 ||
+	      periodPredictionSummary.blue.length > 0 ||
+	      periodPredictionSummary.sums.length > 0 ||
+	      (periodPredictionSummary.positions || []).some((items) => items.length > 0),
+	    [periodPredictionSummary],
+	  )
   const periodSummaryHitSets = useMemo(() => {
     const redHits = new Set((record.actual_result?.red_balls || []).map((ball) => String(ball).padStart(2, '0')))
     const blueHits = new Set((record.actual_result?.blue_balls || []).map((ball) => String(ball).padStart(2, '0')))
-    const digitSource = (record.actual_result?.digits?.length
-      ? record.actual_result.digits
-      : record.actual_result?.red_balls || []
-    ).map((ball) => String(ball).padStart(2, '0'))
-    const positionHits = Array.from({ length: 5 }, (_, index) =>
-      digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
-    )
-    return { redHits, blueHits, positionHits }
-  }, [record.actual_result])
+	    const digitSource = (record.actual_result?.digits?.length
+	      ? record.actual_result.digits
+	      : record.actual_result?.red_balls || []
+	    ).map((ball) => String(ball).padStart(2, '0'))
+	    const sumHits = new Set<string>([String(digitSource.slice(0, 3).reduce((total, digit) => total + Number(digit || 0), 0))])
+	    const positionHits = Array.from({ length: 5 }, (_, index) =>
+	      digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
+	    )
+	    return { redHits, blueHits, sumHits, positionHits }
+	  }, [record.actual_result])
 
   useEffect(() => {
     setExpandedModelIds((previous) => {
@@ -3070,6 +3092,7 @@ function HistoryRecordCard({
                             compact
                             grayMisses
                             emphasizeHitTier
+                            showCost
                             showDescriptionInCompact
                           />
                         ))}
@@ -3104,13 +3127,19 @@ function HistoryRecordCard({
                   <SummaryList title="第四位（十位）统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
                   <SummaryList title="第五位（个位）统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
                 </>
-              ) : lotteryCode === 'pl3' ? (
-                <>
-                  <SummaryList title="第一位（百位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
-                  <SummaryList title="第二位（十位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
-                  <SummaryList title="第三位（个位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
-                </>
-              ) : (
+	              ) : lotteryCode === 'pl3' ? (
+	                <>
+	                  {isPl3SumMode ? (
+	                    <SummaryList title="和值统计" items={periodPredictionSummary.sums || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.sumHits} />
+	                  ) : (
+	                    <>
+	                      <SummaryList title="第一位（百位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+	                      <SummaryList title="第二位（十位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+	                      <SummaryList title="第三位（个位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+	                    </>
+	                  )}
+	                </>
+	              ) : (
                 <>
                   <SummaryList title="前区统计" items={periodPredictionSummary.red} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
                   <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
