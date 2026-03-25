@@ -252,6 +252,10 @@ function resolveExportBackgroundColor() {
   return document.documentElement.dataset.theme === 'light' ? '#f8f2ea' : '#101827'
 }
 
+function notifyExportSuccess() {
+  window.alert('导出成功，已开始下载。')
+}
+
 const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
   0: 2,
   1: 6,
@@ -356,6 +360,7 @@ export function HomePage() {
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
+  const [isExportingSummary, setIsExportingSummary] = useState(false)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
@@ -652,6 +657,7 @@ export function HomePage() {
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
   const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summarySelectableModels
+  const canExportSummary = summarySelectableModels.length > 0 && selectedSummaryIds.length > 0
   const exportModel = useMemo(
     () => (exportingModelId ? models.find((model) => model.model_id === exportingModelId) || null : null),
     [exportingModelId, models],
@@ -709,7 +715,7 @@ export function HomePage() {
   }
 
   async function exportModelDetail(modelId: string) {
-    if (exportingModelId) return
+    if (exportingModelId || isExportingSummary) return
     if (!models.some((model) => model.model_id === modelId)) return
     setActiveActionMenuId(null)
     setExportingModelId(modelId)
@@ -730,11 +736,41 @@ export function HomePage() {
       link.href = dataUrl
       link.download = fileName
       link.click()
+      notifyExportSuccess()
     } catch (error) {
       console.error('导出模型详情 PNG 失败', error)
       window.alert('导出失败，请稍后重试。')
     } finally {
       setExportingModelId(null)
+    }
+  }
+
+  async function exportPredictionSummary() {
+    if (isExportingSummary || exportingModelId || !canExportSummary) return
+    setIsExportingSummary(true)
+    try {
+      await waitForNextPaint()
+      const exportNode = weightsSectionRef.current
+      if (!exportNode) {
+        throw new Error('预测统计导出节点不存在')
+      }
+      const dataUrl = await toPng(exportNode, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: resolveExportBackgroundColor(),
+      })
+      const targetPeriod = currentPredictions.data?.target_period || 'unknown'
+      const fileName = `${sanitizeDownloadFileName(`${selectedLottery}_${targetPeriod}_prediction_summary`)}.png`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+      notifyExportSuccess()
+    } catch (error) {
+      console.error('导出预测统计 PNG 失败', error)
+      window.alert('统计导出失败，请稍后重试。')
+    } finally {
+      setIsExportingSummary(false)
     }
   }
 
@@ -965,6 +1001,16 @@ export function HomePage() {
                       <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
                       <span>仅共同号码</span>
                     </label>
+                    <button
+                      className="icon-button"
+                      onClick={exportPredictionSummary}
+                      aria-label="导出统计"
+                      title={isExportingSummary ? '导出中...' : '导出统计'}
+                      type="button"
+                      disabled={isExportingSummary || exportingModelId !== null || !canExportSummary}
+                    >
+                      <ExportIcon />
+                    </button>
                   </div>
                 }
               >

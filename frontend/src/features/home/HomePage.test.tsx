@@ -819,11 +819,13 @@ describe('HomePage dashboard sidebar', () => {
 
   it('exports model detail png from list and card views', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
 
     await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
@@ -834,6 +836,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('button', { name: /导出详情：/ })).not.toBeInTheDocument()
 
     anchorClickSpy.mockRestore()
+    alertSpy.mockRestore()
   })
 
   it('updates url when switching dashboard tabs', async () => {
@@ -876,6 +879,22 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '81-100 分' }))
     expect(within(summarySection as HTMLElement).getByText('当前筛选条件下没有可统计的模型。')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByRole('button', { name: '导出统计' })).toBeDisabled()
+  })
+
+  it('exports prediction summary png from summary card', async () => {
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '导出统计' }))
+    await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
+
+    anchorClickSpy.mockRestore()
+    alertSpy.mockRestore()
   })
 
   it('keeps summary model chips visible and marks deselected chips inactive', async () => {
