@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
@@ -16,6 +16,7 @@ export function HomeModelDetailPage() {
   const { modelId = '' } = useParams()
   const navigationState = location.state as HomeDetailRouteState | null
   const selectedLottery = loadSelectedLottery()
+  const [isScoreExpanded, setIsScoreExpanded] = useState(false)
   const expectedPlayMode = selectedLottery === 'pl3' ? navigationState?.predictionPlayMode : undefined
 
   const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(selectedLottery, 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
@@ -142,11 +143,21 @@ export function HomeModelDetailPage() {
 
       {selectedScore ? (
         <section className="detail-score-section model-detail-page__panel" aria-label="能力画像">
-          <div className="model-detail-page__section-header">
-            <span>能力画像</span>
+          <button
+            className="model-detail-page__section-toggle"
+            type="button"
+            onClick={() => setIsScoreExpanded((previous) => !previous)}
+            aria-expanded={isScoreExpanded}
+            aria-controls="model-detail-score-showcase"
+          >
+            <span>{isScoreExpanded ? '收起能力画像' : '展开能力画像'}</span>
             <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
-          </div>
-          <ModelScoreShowcase score={selectedScore} compact={false} lotteryCode={selectedLottery} />
+          </button>
+          {isScoreExpanded ? (
+            <div id="model-detail-score-showcase">
+              <ModelScoreShowcase score={selectedScore} compact={false} lotteryCode={selectedLottery} />
+            </div>
+          ) : null}
         </section>
       ) : null}
 

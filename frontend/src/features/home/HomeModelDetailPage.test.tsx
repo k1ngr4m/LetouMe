@@ -352,7 +352,10 @@ describe('HomeModelDetailPage', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
-    expect(screen.getByText('能力画像')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '展开能力画像' })).toBeInTheDocument()
+    expect(screen.queryByText('综合分')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '展开能力画像' }))
+    expect(screen.getByRole('button', { name: '收起能力画像' })).toBeInTheDocument()
     expect(screen.getByText('综合分')).toBeInTheDocument()
     expect(screen.getByText('能力上限')).toBeInTheDocument()
     expect(screen.getByText('能力下限')).toBeInTheDocument()
