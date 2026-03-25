@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { HomeRulesPage } from './HomeRulesPage'
 
 vi.mock('../../shared/lib/storage', () => ({
@@ -45,6 +46,8 @@ describe('HomeRulesPage', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: '大乐透规则与奖金' })).toBeInTheDocument()
+    expect(document.querySelector('.tab-strip.dashboard-tab-strip')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '规则与奖金' })).toHaveClass('is-active')
     expect(screen.getByTitle('中国体育彩票超级大乐透游戏规则')).toBeInTheDocument()
     expect(screen.getByAltText('大乐透奖金对照表')).toBeInTheDocument()
     expect(screen.getByText('规则切换说明')).toBeInTheDocument()
@@ -63,5 +66,11 @@ describe('HomeRulesPage', () => {
     expect(screen.getByText('173 元 / 注')).toBeInTheDocument()
     expect(screen.getByText('346 元 / 注')).toBeInTheDocument()
     expect(screen.queryByTitle('中国体育彩票超级大乐透游戏规则')).not.toBeInTheDocument()
+  })
+
+  it('navigates from rules tab strip to prediction page', async () => {
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '预测总览' }))
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
   })
 })

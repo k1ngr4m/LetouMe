@@ -4,6 +4,7 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
 import type { LotteryCode } from '../../shared/types/api'
 import { HOME_TAB_PATHS, type HomeRulesRouteState } from './navigation'
+import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const DLT_RULES_PDF_PATH = '/rules/dlt-rules.pdf'
 const DLT_PRIZE_TABLE_IMAGE_PATH = '/rules/dlt-prize-table.png'
@@ -91,6 +92,7 @@ export function HomeRulesPage() {
         </div>
         <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : '大乐透'}</div>
       </section>
+      <HomeDashboardTabStrip activeTab="rules" selectedLottery={selectedLottery} />
 
       {!isPl3 && !isPl5 ? (
         <>

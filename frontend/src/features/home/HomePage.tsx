@@ -38,7 +38,8 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
-import { HOME_RULES_PATH, getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type HomeRulesRouteState, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import { getDashboardPath, getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -750,44 +751,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="tab-strip dashboard-tab-strip">
-        <button
-          className={clsx('tab-strip__item', activeTab === 'prediction' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('prediction'))}
-        >
-          预测总览
-        </button>
-        <button
-          className={clsx('tab-strip__item', activeTab === 'simulation' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('simulation'))}
-        >
-          模拟试玩
-        </button>
-        <button
-          className={clsx('tab-strip__item', activeTab === 'analysis' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('analysis'))}
-        >
-          图表分析
-        </button>
-        <button
-          className={clsx('tab-strip__item', activeTab === 'history' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('history'))}
-        >
-          历史回溯
-        </button>
-        <button
-          className="tab-strip__item"
-          onClick={() => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState })}
-        >
-          规则与奖金
-        </button>
-        <button
-          className={clsx('tab-strip__item', activeTab === 'my-bets' && 'is-active')}
-          onClick={() => navigate(getDashboardPath('my-bets'))}
-        >
-          我的投注
-        </button>
-      </section>
+      <HomeDashboardTabStrip activeTab={activeTab} selectedLottery={selectedLottery} />
 
       {activeTab === 'prediction' ? (
         <div className="dashboard-layout">
