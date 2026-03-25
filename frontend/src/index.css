@@ -1992,6 +1992,13 @@ a {
   background: rgba(61, 141, 245, 0.22);
 }
 
+.filter-chip.is-inactive {
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+  opacity: 0.75;
+}
+
 .prediction-group-card {
   padding: 0.85rem;
   border-radius: 1rem;

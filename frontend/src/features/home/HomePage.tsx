@@ -583,17 +583,17 @@ export function HomePage() {
     })
   }, [historyStrategyOptions, predictionsHistory.isFetching])
 
-  const summaryFilteredModels = useMemo(
+  const summarySelectableModels = useMemo(
     () =>
       summaryPlayTypeFilters.length
-        ? effectiveSelectedModels
+        ? filteredModels
             .map((model) => ({
               ...model,
               predictions: filterPredictionGroupsByPlayType(model.predictions || [], summaryPlayTypeFilters),
             }))
             .filter((model) => model.predictions.length > 0)
-        : effectiveSelectedModels,
-    [effectiveSelectedModels, summaryPlayTypeFilters],
+        : filteredModels,
+    [filteredModels, summaryPlayTypeFilters],
   )
 
   const { selectedSummaryIds, summary, filteredHistory } = buildHistoryState(
@@ -602,10 +602,10 @@ export function HomePage() {
     weightedSummary,
     historyVisibleModelIds,
     summaryStrategyFilters,
-    summaryFilteredModels,
+    summarySelectableModels,
     summaryPlayTypeFilters,
   )
-  const summaryModels = summaryFilteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
+  const summaryModels = summarySelectableModels.filter((model) => selectedSummaryIds.includes(model.model_id))
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const historyHitTrend = useMemo(
     () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
@@ -621,7 +621,7 @@ export function HomePage() {
     () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
-  const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summaryFilteredModels
+  const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summarySelectableModels
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || (!predictionsHistory.data && predictionsHistory.isLoading)
   const error =
@@ -901,10 +901,10 @@ export function HomePage() {
                 }
               >
                 <div className="filter-chip-group">
-                  {summaryFilteredModels.map((model) => (
+                  {summarySelectableModels.map((model) => (
                     <button
                       key={model.model_id}
-                      className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) && 'is-active')}
+                      className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) ? 'is-active' : 'is-inactive')}
                       onClick={() => toggleSummaryModel(model.model_id)}
                     >
                       {model.model_name}
@@ -937,7 +937,7 @@ export function HomePage() {
                     )}
                   </div>
                 ) : null}
-                {!summaryFilteredModels.length ? (
+                {!summarySelectableModels.length ? (
                   <div className="state-shell">当前筛选条件下没有可统计的模型。</div>
 	                ) : !selectedSummaryIds.length ? (
 	                  <div className="state-shell">请至少选择一个模型以查看号码统计。</div>

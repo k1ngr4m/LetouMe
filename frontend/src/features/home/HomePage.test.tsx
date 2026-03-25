@@ -851,6 +851,25 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(summarySection as HTMLElement).getByText('当前筛选条件下没有可统计的模型。')).toBeInTheDocument()
   })
 
+  it('keeps summary model chips visible and marks deselected chips inactive', async () => {
+    renderPage()
+
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+
+    const summaryScope = within(summarySection as HTMLElement)
+    const modelBChip = summaryScope.getByRole('button', { name: '模型B' })
+    expect(modelBChip).toHaveClass('is-active')
+
+    await userEvent.click(modelBChip)
+    const modelBInactiveChip = summaryScope.getByRole('button', { name: '模型B' })
+    expect(modelBInactiveChip).toHaveClass('is-inactive')
+    expect(modelBInactiveChip).not.toHaveClass('is-active')
+
+    await userEvent.click(modelBInactiveChip)
+    expect(summaryScope.getByRole('button', { name: '模型B' })).toHaveClass('is-active')
+  })
+
   it('shows five position summary columns for pl5', async () => {
     renderPage()
 
