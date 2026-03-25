@@ -95,6 +95,11 @@ class PredictionGenerationService:
             str(model.get("model_id") or "")
             for model in current_payload.get("models", [])
             if model.get("model_id")
+            and self._prediction_matches_play_mode(
+                model,
+                lottery_code=normalized_code,
+                prediction_play_mode=normalized_play_mode,
+            )
         }
         summary = GenerationSummary(mode="current", model_code=model_code, target_period=target_period, parallelism=1, failed_periods=[])
         if model_code in existing_models and not overwrite:
@@ -182,7 +187,16 @@ class PredictionGenerationService:
                 for item in (existing_record or {}).get("models", [])
                 if item.get("model_id")
             }
-            if model_code in existing_model_map and not overwrite:
+            existing_model_payload = existing_model_map.get(model_code)
+            if (
+                existing_model_payload
+                and self._prediction_matches_play_mode(
+                    existing_model_payload,
+                    lottery_code=normalized_code,
+                    prediction_play_mode=normalized_play_mode,
+                )
+                and not overwrite
+            ):
                 with summary_lock:
                     summary.skipped_count += 1
                     emit_progress_snapshot()
@@ -519,7 +533,16 @@ class PredictionGenerationService:
                     for item in (current_record or {}).get("models", [])
                     if item.get("model_id")
                 }
-                if model_code in current_model_map and not overwrite:
+                existing_model_payload = current_model_map.get(model_code)
+                if (
+                    existing_model_payload
+                    and self._prediction_matches_play_mode(
+                        existing_model_payload,
+                        lottery_code=normalized_code,
+                        prediction_play_mode=normalized_play_mode,
+                    )
+                    and not overwrite
+                ):
                     return task_key, "skipped"
 
             prediction_date = self._make_prediction_date(actual_result.get("date"))
@@ -1063,6 +1086,30 @@ class PredictionGenerationService:
         if normalized_mode not in {"direct", "direct_sum"}:
             raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
         return normalized_mode
+
+    @classmethod
+    def _prediction_matches_play_mode(
+        cls,
+        prediction_model_payload: dict[str, Any],
+        *,
+        lottery_code: str,
+        prediction_play_mode: str,
+    ) -> bool:
+        normalized_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = cls._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
+        if normalized_code != "pl3":
+            return True
+        groups = prediction_model_payload.get("predictions")
+        if not isinstance(groups, list) or not groups:
+            return normalized_play_mode == "direct"
+        play_types = {
+            str(group.get("play_type") or "").strip().lower()
+            for group in groups
+            if isinstance(group, dict)
+        }
+        if normalized_play_mode == "direct_sum":
+            return "direct_sum" in play_types
+        return "direct" in play_types
 
     @classmethod
     def _build_period_map(cls, history_data: dict[str, Any]) -> dict[str, dict[str, Any]]:

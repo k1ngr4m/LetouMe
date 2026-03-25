@@ -61,6 +61,91 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "已停用模型不能生成预测数据"):
                 service.validate_model("model-a", lottery_code="dlt")
 
+    def test_prediction_matches_play_mode_for_pl3(self) -> None:
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "direct"}]},
+                lottery_code="pl3",
+                prediction_play_mode="direct",
+            )
+        )
+        self.assertFalse(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "direct"}]},
+                lottery_code="pl3",
+                prediction_play_mode="direct_sum",
+            )
+        )
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "direct_sum"}]},
+                lottery_code="pl3",
+                prediction_play_mode="direct_sum",
+            )
+        )
+
+    def test_generate_current_for_model_does_not_skip_when_existing_mode_differs(self) -> None:
+        service = PredictionGenerationService()
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+        with (
+            patch("backend.app.services.prediction_generation_service.ensure_schema"),
+            patch.object(service, "_get_model_definition", return_value=model_def),
+            patch.object(service, "_load_prompt_template", return_value="{}"),
+            patch.object(
+                service,
+                "_load_lottery_history",
+                return_value={
+                    "data": [{"period": "26060", "digits": ["1", "2", "3"]}],
+                    "next_draw": {"next_period": "26061", "next_date_display": "2026-03-26"},
+                },
+            ),
+            patch.object(service.prediction_service, "archive_current_prediction_if_needed"),
+            patch.object(
+                service.prediction_service,
+                "get_current_payload_by_period",
+                return_value={
+                    "models": [
+                        {
+                            "model_id": "model-a",
+                            "predictions": [{"play_type": "direct", "digits": ["1", "2", "3"]}],
+                        }
+                    ]
+                },
+            ),
+            patch.object(service, "_prepare_model", return_value=object()),
+            patch.object(
+                service,
+                "_generate_prediction",
+                return_value={
+                    "model_id": "model-a",
+                    "model_name": "模型A",
+                    "model_provider": "openai_compatible",
+                    "model_version": "",
+                    "model_tags": [],
+                    "model_api_model": "gpt-4o-mini",
+                    "predictions": [{"group_id": 1, "play_type": "direct_sum", "sum_value": "10", "digits": []}] * 5,
+                },
+            ) as generate_prediction_mock,
+            patch.object(service.prediction_service, "save_current_prediction") as save_prediction_mock,
+        ):
+            summary = service.generate_current_for_model(
+                lottery_code="pl3",
+                model_code="model-a",
+                prediction_play_mode="direct_sum",
+                overwrite=False,
+            )
+
+        self.assertEqual(summary["processed_count"], 1)
+        self.assertEqual(summary["skipped_count"], 0)
+        generate_prediction_mock.assert_called_once()
+        save_prediction_mock.assert_called_once()
+
     def test_pl3_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl3")
         rendered = template.format(
