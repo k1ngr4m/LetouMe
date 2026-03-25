@@ -873,17 +873,23 @@ class PredictionService:
     @classmethod
     def _infer_prediction_play_mode(cls, model: dict[str, Any]) -> str:
         explicit_mode = str(model.get("prediction_play_mode") or "").strip().lower()
-        if explicit_mode in {"direct", "direct_sum"}:
-            return explicit_mode
-        groups = model.get("predictions")
-        if isinstance(groups, list):
-            has_direct_sum = any(
-                str(group.get("play_type") or "").strip().lower() == "direct_sum"
-                for group in groups
-                if isinstance(group, dict)
-            )
-            if has_direct_sum:
-                return "direct_sum"
+        if explicit_mode == "direct_sum":
+            return "direct_sum"
+        play_types: set[str] = set()
+        for key in ("predictions", "group_metrics"):
+            groups = model.get(key)
+            if not isinstance(groups, list):
+                continue
+            for group in groups:
+                if not isinstance(group, dict):
+                    continue
+                play_type = str(group.get("play_type") or "").strip().lower()
+                if play_type:
+                    play_types.add(play_type)
+        if "direct_sum" in play_types:
+            return "direct_sum"
+        if explicit_mode == "direct":
+            return "direct"
         return "direct"
 
     @classmethod

@@ -253,6 +253,96 @@ class _FakePl3PredictionRepository:
         return self.record if target_period == "26060" else None
 
 
+class _FakePl3SumMislabelRepository:
+    def __init__(self) -> None:
+        self.record = {
+            "lottery_code": "pl3",
+            "prediction_date": "2026-03-13",
+            "target_period": "26061",
+            "actual_result": {
+                "lottery_code": "pl3",
+                "period": "26061",
+                "date": "2026-03-12",
+                "digits": ["01", "02", "07"],
+                "prize_breakdown": [
+                    {"prize_level": "和值", "prize_type": "basic", "winner_count": 1, "prize_amount": 14, "total_amount": 14},
+                ],
+            },
+            "models": [
+                {
+                    "model_id": "deepseek-pl3",
+                    "prediction_play_mode": "direct",
+                    "model_name": "DeepSeek-PL3",
+                    "model_provider": "deepseek",
+                    "predictions": [
+                        {
+                            "group_id": 1,
+                            "play_type": "direct_sum",
+                            "sum_value": "10",
+                            "digits": [],
+                            "hit_result": {"digit_hit_count": 1, "is_exact_match": True},
+                        },
+                        {
+                            "group_id": 2,
+                            "play_type": "direct_sum",
+                            "sum_value": "11",
+                            "digits": [],
+                            "hit_result": {"digit_hit_count": 0, "is_exact_match": False},
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0, lottery_code: str = "pl3") -> list[dict]:
+        return [
+            {
+                "lottery_code": "pl3",
+                "prediction_date": "2026-03-13",
+                "target_period": "26061",
+                "actual_result": self.record["actual_result"],
+                "models": [
+                    {
+                        "model_id": "deepseek-pl3",
+                        "prediction_play_mode": "direct",
+                        "model_name": "DeepSeek-PL3",
+                        "model_provider": "deepseek",
+                        "best_group": 1,
+                        "best_hit_count": 1,
+                        "group_metrics": [
+                            {
+                                "group_id": 1,
+                                "play_type": "direct_sum",
+                                "sum_value": "10",
+                                "digits": [],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 1,
+                                "hit_result": {"digit_hit_count": 1, "is_exact_match": True},
+                            },
+                            {
+                                "group_id": 2,
+                                "play_type": "direct_sum",
+                                "sum_value": "11",
+                                "digits": [],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 0,
+                                "hit_result": {"digit_hit_count": 0, "is_exact_match": False},
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+
+    def count_history_records(self, lottery_code: str = "pl3") -> int:
+        return 1
+
+    def get_history_record_detail(self, target_period: str, lottery_code: str = "pl3") -> dict | None:
+        return self.record if target_period == "26061" else None
+
+
 class _FakeModelRepository:
     def __init__(self, active_model_codes: set[str]) -> None:
         self.active_model_codes = active_model_codes
@@ -390,6 +480,26 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
 
         self.assertEqual(model["bet_count"], 1)
         self.assertEqual(model["best_hit_count"], 1)
+
+    def test_pl3_history_list_payload_infers_sum_mode_from_group_metrics(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3SumMislabelRepository())
+
+        payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="pl3", play_type_filters=["direct_sum"])
+        model = payload["predictions_history"][0]["models"][0]
+
+        self.assertEqual(payload["total_count"], 1)
+        self.assertEqual(model["bet_count"], 2)
+        self.assertEqual(model["prediction_play_mode"], "direct_sum")
+        self.assertEqual(payload["model_stats"][0]["prediction_play_mode"], "direct_sum")
+
+    def test_pl3_history_detail_payload_infers_sum_mode_from_predictions(self) -> None:
+        service = PredictionService(prediction_repository=_FakePl3SumMislabelRepository())
+
+        payload = service.get_history_detail_payload("26061", lottery_code="pl3")
+
+        self.assertIsNotNone(payload)
+        model = payload["models"][0]
+        self.assertEqual(model["prediction_play_mode"], "direct_sum")
 
     def test_pl3_history_list_ignores_strategy_filters(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())

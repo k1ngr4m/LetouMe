@@ -323,22 +323,6 @@ export function HomePage() {
     [allModels, pl3PredictionMode, selectedLottery],
   )
   const history = predictionsHistory.data
-  const filteredHistoryData = useMemo(
-    () =>
-      selectedLottery !== 'pl3' || !history
-        ? history
-        : {
-            ...history,
-            model_stats: (history.model_stats || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
-            predictions_history: (history.predictions_history || [])
-              .map((record) => ({
-                ...record,
-                models: (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
-              }))
-              .filter((record) => (record.models || []).length > 0),
-          },
-    [history, pl3PredictionMode, selectedLottery],
-  )
   const chartDraws = lotteryCharts.data?.data || []
   const pagedDraws = pagedLotteryHistory.data?.data || []
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
@@ -363,7 +347,7 @@ export function HomePage() {
     clearModelFilters,
     toggleSummaryModel,
     buildHistoryState,
-  } = useHomeModelFilters(models, filteredHistoryData, validPinnedModelIds, {
+  } = useHomeModelFilters(models, history, validPinnedModelIds, {
     isModelFilterOpen: false,
     modelNameQuery: '',
     selectedProviders: [],
@@ -461,21 +445,19 @@ export function HomePage() {
     const references = new Map<string, HistoryModelRef>()
     const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' }) =>
       `${model.model_id}::${model.prediction_play_mode || 'direct'}`
-    for (const stat of filteredHistoryData?.model_stats || []) {
+    for (const stat of history?.model_stats || []) {
       if (!stat.model_id) continue
       const normalizedMode = normalizePredictionModelPlayMode(stat)
-      if (selectedLottery === 'pl3' && normalizedMode !== pl3PredictionMode) continue
       references.set(resolveKey({ model_id: stat.model_id, prediction_play_mode: normalizedMode }), {
         model_id: stat.model_id,
         model_name: stat.model_name || stat.model_id,
         prediction_play_mode: normalizedMode,
       })
     }
-    for (const record of filteredHistoryData?.predictions_history || []) {
+    for (const record of history?.predictions_history || []) {
       for (const model of record.models || []) {
         if (!model.model_id) continue
         const normalizedMode = normalizePredictionModelPlayMode(model)
-        if (selectedLottery === 'pl3' && normalizedMode !== pl3PredictionMode) continue
         references.set(resolveKey({ model_id: model.model_id, prediction_play_mode: normalizedMode }), {
           model_id: model.model_id,
           model_name: model.model_name || model.model_id,
@@ -484,7 +466,7 @@ export function HomePage() {
       }
     }
     return [...references.values()]
-  }, [filteredHistoryData, pl3PredictionMode, selectedLottery])
+  }, [history])
   const historyFilterSignature = useMemo(
     () =>
       JSON.stringify({
@@ -532,8 +514,8 @@ export function HomePage() {
     [effectiveSelectedModels],
   )
   const historyStrategyOptions = useMemo(
-    () => [...new Set((filteredHistoryData?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
-    [filteredHistoryData?.strategy_options],
+    () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
+    [history?.strategy_options],
   )
 
   useEffect(() => {
@@ -574,22 +556,10 @@ export function HomePage() {
     summaryPlayTypeFilters,
   )
   const summaryModels = summaryFilteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
-  const historyRecordsForView = useMemo(
-    () =>
-      selectedLottery === 'pl3'
-        ? filteredHistory
-            .map((record) => ({
-              ...record,
-              models: (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
-            }))
-            .filter((record) => (record.models || []).length > 0)
-        : filteredHistory,
-    [filteredHistory, pl3PredictionMode, selectedLottery],
-  )
-  const historyModelStats = buildHistoryModelStats(historyRecordsForView, historyVisibleModels)
+  const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const historyHitTrend = useMemo(
-    () => buildHistoryHitTrend(historyRecordsForView, historyVisibleModelIds),
-    [historyRecordsForView, historyVisibleModelIds],
+    () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
+    [filteredHistory, historyVisibleModelIds],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
@@ -1098,10 +1068,10 @@ export function HomePage() {
                 </div>
               ) : null}
               {!historyVisibleModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
-              {historyVisibleModels.length && !historyRecordsForView.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
-              {historyRecordsForView.length ? (
+              {historyVisibleModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
+              {filteredHistory.length ? (
                 <div className="history-card-list__records">
-                  {historyRecordsForView.map((record) => (
+                  {filteredHistory.map((record) => (
                     <HistoryRecordCard
                       key={`${selectedLottery}-${record.target_period}`}
                       record={record}
@@ -1109,7 +1079,6 @@ export function HomePage() {
                       visibleModelIds={historyVisibleModelIds}
                       strategyFilters={historyStrategyFilters}
                       playTypeFilters={historyPlayTypeFilters}
-                      predictionPlayMode={selectedLottery === 'pl3' ? pl3PredictionMode : undefined}
                     />
                   ))}
                 </div>
@@ -2805,14 +2774,12 @@ function HistoryRecordCard({
   visibleModelIds,
   strategyFilters,
   playTypeFilters,
-  predictionPlayMode,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
   visibleModelIds: string[]
   strategyFilters: string[]
   playTypeFilters: PredictionPlayType[]
-  predictionPlayMode?: 'direct' | 'direct_sum'
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
@@ -2822,29 +2789,15 @@ function HistoryRecordCard({
     enabled: hasExpandedModels || isPeriodSummaryOpen,
     queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period, lotteryCode)),
   })
-  const modeMatchedModels = useMemo(
-    () =>
-      predictionPlayMode && lotteryCode === 'pl3'
-        ? (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === predictionPlayMode)
-        : record.models || [],
-    [lotteryCode, predictionPlayMode, record.models],
-  )
   const detailRecord = detailQuery.data?.predictions_history?.[0]
     ? {
         ...detailQuery.data.predictions_history[0],
         models: visibleModelIds.length
-          ? detailQuery.data.predictions_history[0].models.filter(
-              (model) =>
-                visibleModelIds.includes(model.model_id) &&
-                (!predictionPlayMode || lotteryCode !== 'pl3' || normalizePredictionModelPlayMode(model) === predictionPlayMode),
-            )
-          : detailQuery.data.predictions_history[0].models.filter(
-              (model) =>
-                !predictionPlayMode || lotteryCode !== 'pl3' || normalizePredictionModelPlayMode(model) === predictionPlayMode,
-            ),
+          ? detailQuery.data.predictions_history[0].models.filter((model) => visibleModelIds.includes(model.model_id))
+          : detailQuery.data.predictions_history[0].models,
       }
     : null
-  const listModels = modeMatchedModels
+  const listModels = record.models || []
   const detailModelsById = useMemo(() => {
     const mappings = new Map<string, PredictionModel>()
     for (const model of detailRecord?.models || []) {

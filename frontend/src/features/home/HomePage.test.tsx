@@ -15,6 +15,7 @@ const {
   getPredictionsHistoryDetail,
   getSimulationTickets,
   quoteSimulationTicket,
+  simulatePl3SumHistoryMislabel,
   updateMyBet,
   simulateHistoryFilterLoading,
 } = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ const {
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  simulatePl3SumHistoryMislabel: { current: false },
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
 }))
@@ -124,7 +126,7 @@ vi.mock('./hooks/useHomeData', () => ({
     historyPage = 1,
     historyPageSize = 10,
     historyStrategyFilters: string[] = [],
-    _historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6'> = [],
+    historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6'> = [],
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
@@ -155,10 +157,29 @@ vi.mock('./hooks/useHomeData', () => ({
       buildHistoryRecord('2026022', '2026-02-20', 'model-b'),
       buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
       buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
-    ]
+    ].map((record) => {
+      if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return record
+      return {
+        ...record,
+        models: (record.models || []).map((model, index) =>
+          index === 0
+            ? {
+                ...model,
+                prediction_play_mode: 'direct',
+                play_type: 'direct_sum',
+              }
+            : model,
+        ),
+      }
+    })
     const filteredHistoryRecords = historyRecords
       .map((record) => {
-        const models = (record.models || []).filter((model) => matchesHistoryStrategies(model.model_id))
+        const models = (record.models || []).filter((model) => {
+          if (!matchesHistoryStrategies(model.model_id)) return false
+          if (!isPl3 || !historyPlayTypeFilters.length) return true
+          const modelPlayType = String((model as { play_type?: string }).play_type || 'direct').trim().toLowerCase()
+          return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6')
+        })
         const periodSummary = models.reduce(
           (accumulator, model) => ({
             total_bet_count: accumulator.total_bet_count + Number(model.bet_count || 0),
@@ -481,6 +502,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 beforeEach(() => {
   window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
+  simulatePl3SumHistoryMislabel.current = false
   getMyBets.mockReset()
   getMyBets.mockResolvedValue({
     records: [
@@ -1473,6 +1495,18 @@ describe('HomePage dashboard sidebar', () => {
     expect(oneDigits[1]).not.toHaveClass('is-hit')
     expect(oneDigits[1]).toHaveClass('number-ball--muted')
     expect(cardScope.getByText('12')).toHaveClass('is-hit')
+  })
+
+  it('shows pl3 sum history records even when model mode is mislabeled', async () => {
+    simulatePl3SumHistoryMislabel.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
+
+    expect(await screen.findByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.queryByText('当前筛选条件下没有历史回溯记录。')).not.toBeInTheDocument()
   })
 
   it('renders five digits for pl5 prediction groups', async () => {
