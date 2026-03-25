@@ -15,6 +15,7 @@ export type ScoreViewSortDirection = 'desc' | 'asc'
 
 export type HomeDetailRouteState = {
   scrollY?: number
+  predictionPlayMode?: 'direct' | 'direct_sum'
 }
 
 export type HomeRulesRouteState = {

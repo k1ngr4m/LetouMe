@@ -144,6 +144,7 @@ SCHEMA_STATEMENTS = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         prediction_batch_id BIGINT NOT NULL,
         model_id BIGINT NOT NULL,
+        prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct',
         requested_at DATETIME NULL,
         completed_at DATETIME NULL,
         run_status VARCHAR(32) NOT NULL DEFAULT 'success',
@@ -152,7 +153,7 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_prediction_model_run_batch FOREIGN KEY (prediction_batch_id) REFERENCES prediction_batch(id) ON DELETE CASCADE,
         CONSTRAINT fk_prediction_model_run_model FOREIGN KEY (model_id) REFERENCES ai_model(id),
-        UNIQUE KEY uq_prediction_model_run_batch_model (prediction_batch_id, model_id),
+        UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode),
         INDEX idx_prediction_model_run_batch (prediction_batch_id),
         INDEX idx_prediction_model_run_model (model_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -527,6 +528,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         prediction_batch_id BIGINT NOT NULL,
         model_id BIGINT NOT NULL,
+        prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct',
         requested_at DATETIME NULL,
         completed_at DATETIME NULL,
         run_status VARCHAR(32) NOT NULL DEFAULT 'success',
@@ -535,7 +537,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_prediction_model_run_batch FOREIGN KEY (prediction_batch_id) REFERENCES {table_prefix}_prediction_batch(id) ON DELETE CASCADE,
         CONSTRAINT fk_{fk_prefix}_prediction_model_run_model FOREIGN KEY (model_id) REFERENCES ai_model(id),
-        UNIQUE KEY uq_prediction_model_run_batch_model (prediction_batch_id, model_id),
+        UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode),
         INDEX idx_prediction_model_run_batch (prediction_batch_id),
         INDEX idx_prediction_model_run_model (model_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -742,6 +744,17 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
             "idx_prediction_hit_number_value": "ALTER TABLE prediction_hit_number ADD INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)",
         },
     },
+    "prediction_model_run": {
+        "drop": {
+            "uq_prediction_model_run_batch_model": "ALTER TABLE prediction_model_run DROP INDEX uq_prediction_model_run_batch_model",
+        },
+        "add": {
+            "uq_prediction_model_run_batch_model_mode": (
+                "ALTER TABLE prediction_model_run "
+                "ADD UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode)"
+            ),
+        },
+    },
 }
 
 for _lottery_code in SUPPORTED_LOTTERY_CODES:
@@ -762,6 +775,17 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
         },
         "add": {
             "idx_prediction_hit_number_value": f"ALTER TABLE {_table_prefix}prediction_hit_number ADD INDEX idx_prediction_hit_number_value (hit_summary_id, ball_color, ball_value)",
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_model_run"] = {
+        "drop": {
+            "uq_prediction_model_run_batch_model": f"ALTER TABLE {_table_prefix}prediction_model_run DROP INDEX uq_prediction_model_run_batch_model",
+        },
+        "add": {
+            "uq_prediction_model_run_batch_model_mode": (
+                f"ALTER TABLE {_table_prefix}prediction_model_run "
+                "ADD UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode)"
+            ),
         },
     }
 
@@ -795,6 +819,12 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     "prediction_group": {
         "play_type": "ALTER TABLE prediction_group ADD COLUMN play_type VARCHAR(32) NULL AFTER group_no",
         "sum_value": "ALTER TABLE prediction_group ADD COLUMN sum_value VARCHAR(8) NULL AFTER play_type",
+    },
+    "prediction_model_run": {
+        "prediction_play_mode": (
+            "ALTER TABLE prediction_model_run "
+            "ADD COLUMN prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct' AFTER model_id"
+        ),
     },
     "simulation_ticket": {
         "lottery_code": "ALTER TABLE simulation_ticket ADD COLUMN lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt' AFTER user_id",
@@ -873,6 +903,12 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
     SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record_line"] = {
         "direct_ten_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
         "direct_thousands": f"ALTER TABLE {_table_prefix}my_bet_record_line ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}prediction_model_run"] = {
+        "prediction_play_mode": (
+            f"ALTER TABLE {_table_prefix}prediction_model_run "
+            "ADD COLUMN prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct' AFTER model_id"
+        ),
     }
     SCHEMA_MIGRATIONS[f"{_table_prefix}prediction_group"] = {
         "play_type": f"ALTER TABLE {_table_prefix}prediction_group ADD COLUMN play_type VARCHAR(32) NULL AFTER group_no",

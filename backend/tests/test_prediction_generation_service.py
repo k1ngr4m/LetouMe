@@ -124,6 +124,7 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 "_generate_prediction",
                 return_value={
                     "model_id": "model-a",
+                    "prediction_play_mode": "direct_sum",
                     "model_name": "模型A",
                     "model_provider": "openai_compatible",
                     "model_version": "",
@@ -145,6 +146,36 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(summary["skipped_count"], 0)
         generate_prediction_mock.assert_called_once()
         save_prediction_mock.assert_called_once()
+        saved_payload = save_prediction_mock.call_args.args[0]
+        self.assertEqual(saved_payload["models"][0]["prediction_play_mode"], "direct_sum")
+
+    def test_finalize_prediction_sets_prediction_play_mode(self) -> None:
+        service = PredictionGenerationService()
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+        finalized = service._finalize_prediction(
+            prediction={
+                "predictions": [
+                    {"group_id": 1, "play_type": "direct_sum", "sum_value": "10", "digits": []},
+                    {"group_id": 2, "play_type": "direct_sum", "sum_value": "11", "digits": []},
+                    {"group_id": 3, "play_type": "direct_sum", "sum_value": "12", "digits": []},
+                    {"group_id": 4, "play_type": "direct_sum", "sum_value": "13", "digits": []},
+                    {"group_id": 5, "play_type": "direct_sum", "sum_value": "14", "digits": []},
+                ]
+            },
+            model_def=model_def,
+            prediction_date="2026-03-18",
+            target_period="26061",
+            lottery_code="pl3",
+            prediction_play_mode="direct_sum",
+        )
+
+        self.assertEqual(finalized["prediction_play_mode"], "direct_sum")
 
     def test_pl3_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl3")
@@ -477,6 +508,79 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertEqual(summary["skipped_count"], 0)
         self.assertEqual(summary["failed_periods"], [])
         self.assertEqual(upsert_history_record_mock.call_count, 3)
+
+    def test_recalculate_history_for_model_preserves_other_play_mode_models(self) -> None:
+        service = PredictionGenerationService()
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+        history_payload = {
+            "data": [
+                {"period": "26052", "date": "2026-03-18", "digits": ["1", "2", "3"], "lottery_code": "pl3"},
+                {"period": "26051", "date": "2026-03-17", "digits": ["2", "3", "4"], "lottery_code": "pl3"},
+            ]
+        }
+
+        existing_record = {
+            "prediction_date": "2026-03-17",
+            "lottery_code": "pl3",
+            "target_period": "26052",
+            "actual_result": {"period": "26052", "digits": ["1", "2", "3"], "lottery_code": "pl3"},
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "direct",
+                    "model_name": "模型A",
+                    "model_provider": "openai_compatible",
+                    "predictions": [{"group_id": 1, "play_type": "direct", "digits": ["1", "2", "3"]}],
+                }
+            ],
+        }
+
+        with (
+            patch("backend.app.services.prediction_generation_service.ensure_schema"),
+            patch.object(service, "_get_model_definition", return_value=model_def),
+            patch.object(service, "_prepare_model", return_value=object()),
+            patch.object(service, "_load_prompt_template", return_value="{}"),
+            patch.object(service, "_load_lottery_history", return_value=history_payload),
+            patch.object(
+                service,
+                "_generate_prediction",
+                return_value={
+                    "model_id": "model-a",
+                    "prediction_play_mode": "direct_sum",
+                    "model_name": "模型A",
+                    "model_provider": "openai_compatible",
+                    "model_version": "",
+                    "model_tags": [],
+                    "model_api_model": "gpt-4o-mini",
+                    "predictions": [{"group_id": 1, "play_type": "direct_sum", "sum_value": "10", "digits": []}],
+                },
+            ),
+            patch.object(service.prediction_repository, "get_history_record_detail", return_value=existing_record),
+            patch.object(service.prediction_repository, "upsert_history_record") as upsert_history_record_mock,
+            patch.object(service.prediction_service, "_invalidate_prediction_cache"),
+            patch.object(service.prediction_service, "calculate_hit_result", return_value={"total_hits": 2}),
+        ):
+            summary = service.recalculate_history_for_model(
+                lottery_code="pl3",
+                model_code="model-a",
+                prediction_play_mode="direct_sum",
+                start_period="26052",
+                end_period="26052",
+                overwrite=False,
+                parallelism=1,
+            )
+
+        self.assertEqual(summary["processed_count"], 1)
+        self.assertEqual(summary["skipped_count"], 0)
+        saved_models = upsert_history_record_mock.call_args.args[0]["models"]
+        self.assertEqual(len(saved_models), 2)
+        self.assertEqual(sorted(model["prediction_play_mode"] for model in saved_models), ["direct", "direct_sum"])
 
     def test_generate_for_models_history_parallelizes_by_model_and_period(self) -> None:
         service = PredictionGenerationService()

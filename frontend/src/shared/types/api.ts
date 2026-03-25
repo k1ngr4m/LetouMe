@@ -113,6 +113,7 @@ export type ScoreProfile = {
 
 export type PredictionModel = {
   model_id: string
+  prediction_play_mode?: 'direct' | 'direct_sum'
   model_name: string
   model_provider: string
   model_version?: string | null
@@ -133,6 +134,7 @@ export type PredictionModel = {
 
 export type PredictionHistorySummaryModel = {
   model_id: string
+  prediction_play_mode?: 'direct' | 'direct_sum'
   model_name: string
   model_provider: string
   model_version?: string | null
@@ -157,6 +159,7 @@ export type PredictionHistoryPeriodSummary = {
 
 export type PredictionHistoryModelStat = {
   model_id: string
+  prediction_play_mode?: 'direct' | 'direct_sum'
   model_name: string
   periods: number
   winning_periods: number

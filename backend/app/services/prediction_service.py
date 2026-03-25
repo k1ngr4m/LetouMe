@@ -131,7 +131,8 @@ class PredictionService:
             "models": [
                 {
                     **model,
-                    "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
+                    "prediction_play_mode": self._infer_prediction_play_mode(model),
+                    "score_profile": self._get_model_score_profile(score_profiles, model),
                 }
                 for model in models
             ],
@@ -234,7 +235,8 @@ class PredictionService:
                 "models": [
                     {
                         **model,
-                        "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
+                        "prediction_play_mode": self._infer_prediction_play_mode(model),
+                        "score_profile": self._get_model_score_profile(score_profiles, model),
                     }
                     for model in payload.get("models", [])
                 ],
@@ -320,13 +322,33 @@ class PredictionService:
         target_period = str(payload.get("target_period") or "")
         current = self.get_current_payload_by_period(target_period, lottery_code=lottery_code) if target_period else self.get_current_payload(lottery_code=lottery_code)
         if current.get("target_period") == target_period:
+            def model_map_key(model_payload: dict[str, Any]) -> str:
+                model_id = str(model_payload.get("model_id") or "").strip()
+                if not model_id:
+                    return ""
+                prediction_play_mode = str(model_payload.get("prediction_play_mode") or "").strip().lower()
+                if not prediction_play_mode:
+                    groups = model_payload.get("predictions")
+                    has_direct_sum = isinstance(groups, list) and any(
+                        str(group.get("play_type") or "").strip().lower() == "direct_sum"
+                        for group in groups
+                        if isinstance(group, dict)
+                    )
+                    prediction_play_mode = "direct_sum" if has_direct_sum and lottery_code == "pl3" else "direct"
+                if lottery_code != "pl3":
+                    prediction_play_mode = "direct"
+                return f"{model_id}::{prediction_play_mode}"
+
             existing_model_map = {
-                model.get("model_id"): model
+                model_map_key(model): model
                 for model in current.get("models", [])
-                if model.get("model_id")
+                if model_map_key(model)
             }
             for model in payload.get("models", []):
-                existing_model_map[model.get("model_id")] = model
+                model_key = model_map_key(model)
+                if not model_key:
+                    continue
+                existing_model_map[model_key] = model
 
             payload = {
                 **current,
@@ -383,6 +405,7 @@ class PredictionService:
             models_with_hits.append(
                 {
                     "model_id": model_data.get("model_id"),
+                    "prediction_play_mode": str(model_data.get("prediction_play_mode") or "direct"),
                     "model_name": model_data.get("model_name"),
                     "model_provider": model_data.get("model_provider"),
                     "model_version": model_data.get("model_version"),
@@ -827,6 +850,7 @@ class PredictionService:
             "models": [
                 {
                     "model_id": model.get("model_id"),
+                    "prediction_play_mode": self._infer_prediction_play_mode(model),
                     "model_name": model.get("model_name"),
                     "model_provider": model.get("model_provider"),
                     "model_version": model.get("model_version"),
@@ -840,11 +864,42 @@ class PredictionService:
                     "hit_period_win": bool(model.get("hit_period_win")),
                     "win_rate_by_period": float(model.get("win_rate_by_period") or 0),
                     "win_rate_by_bet": float(model.get("win_rate_by_bet") or 0),
-                    "score_profile": score_profiles.get(str(model.get("model_id") or ""), self._empty_score_profile()),
+                    "score_profile": self._get_model_score_profile(score_profiles, model),
                 }
                 for model in record.get("models", [])
             ],
         }
+
+    @classmethod
+    def _infer_prediction_play_mode(cls, model: dict[str, Any]) -> str:
+        explicit_mode = str(model.get("prediction_play_mode") or "").strip().lower()
+        if explicit_mode in {"direct", "direct_sum"}:
+            return explicit_mode
+        groups = model.get("predictions")
+        if isinstance(groups, list):
+            has_direct_sum = any(
+                str(group.get("play_type") or "").strip().lower() == "direct_sum"
+                for group in groups
+                if isinstance(group, dict)
+            )
+            if has_direct_sum:
+                return "direct_sum"
+        return "direct"
+
+    @classmethod
+    def _build_model_identity_key(cls, model: dict[str, Any]) -> str:
+        model_id = str(model.get("model_id") or "").strip()
+        if not model_id:
+            return ""
+        play_mode = cls._infer_prediction_play_mode(model)
+        return f"{model_id}::{play_mode}"
+
+    def _get_model_score_profile(self, score_profiles: dict[str, dict[str, Any]], model: dict[str, Any]) -> dict[str, Any]:
+        model_key = self._build_model_identity_key(model)
+        if model_key and model_key in score_profiles:
+            return score_profiles[model_key]
+        model_id = str(model.get("model_id") or "")
+        return score_profiles.get(model_id, self._empty_score_profile())
 
     def _build_model_stats(self, records: list[dict[str, Any]], score_profiles: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         stats: dict[str, dict[str, Any]] = {}
@@ -853,10 +908,13 @@ class PredictionService:
                 model_id = str(model.get("model_id") or "")
                 if not model_id:
                     continue
+                prediction_play_mode = self._infer_prediction_play_mode(model)
+                model_key = f"{model_id}::{prediction_play_mode}"
                 entry = stats.setdefault(
-                    model_id,
+                    model_key,
                     {
                         "model_id": model_id,
+                        "prediction_play_mode": prediction_play_mode,
                         "model_name": model.get("model_name") or model_id,
                         "periods": 0,
                         "winning_periods": 0,
@@ -882,7 +940,7 @@ class PredictionService:
                     **entry,
                     "win_rate_by_period": (entry["winning_periods"] / periods) if periods else 0,
                     "win_rate_by_bet": (entry["winning_bet_count"] / bet_count) if bet_count else 0,
-                    "score_profile": (score_profiles or {}).get(str(entry["model_id"]), self._empty_score_profile()),
+                    "score_profile": self._get_model_score_profile(score_profiles or {}, entry),
                 }
             )
         result.sort(
@@ -931,13 +989,16 @@ class PredictionService:
                 model_id = str(model.get("model_id") or "")
                 if not model_id:
                     continue
-                model_names[model_id] = str(model.get("model_name") or model_id)
-                grouped.setdefault(model_id, []).append(
+                model_key = self._build_model_identity_key(model)
+                if not model_key:
+                    continue
+                model_names[model_key] = str(model.get("model_name") or model_id)
+                grouped.setdefault(model_key, []).append(
                     self._build_record_performance(record, model)
                 )
 
         result: dict[str, dict[str, Any]] = {}
-        for model_id, performance_records in grouped.items():
+        for model_key, performance_records in grouped.items():
             recent_records = performance_records[: self.RECENT_SCORE_WINDOW]
             recent_window = self._build_score_window(recent_records)
             long_term_window = self._build_score_window(performance_records)
@@ -948,7 +1009,7 @@ class PredictionService:
                 "ceiling": self._merge_window_score(recent_window["ceiling_score"], long_term_window["ceiling_score"]),
                 "floor": self._merge_window_score(recent_window["floor_score"], long_term_window["floor_score"]),
             }
-            result[model_id] = {
+            result[model_key] = {
                 "overall_score": self._merge_window_score(recent_window["overall_score"], long_term_window["overall_score"]),
                 "per_bet_score": self._merge_window_score(recent_window["per_bet_score"], long_term_window["per_bet_score"]),
                 "per_period_score": self._merge_window_score(recent_window["per_period_score"], long_term_window["per_period_score"]),
@@ -961,7 +1022,7 @@ class PredictionService:
                 "worst_period_snapshot": recent_window["worst_period"] if recent_window["worst_period"].get("net_profit", 0) <= long_term_window["worst_period"].get("net_profit", 0) else long_term_window["worst_period"],
                 "sample_size_periods": len(performance_records),
                 "sample_size_bets": sum(int(item.get("bet_count") or 0) for item in performance_records),
-                "model_name": model_names.get(model_id, model_id),
+                "model_name": model_names.get(model_key, model_key),
             }
         return result
 

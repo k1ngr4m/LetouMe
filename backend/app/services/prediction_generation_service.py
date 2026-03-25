@@ -183,11 +183,21 @@ class PredictionGenerationService:
 
             existing_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
             existing_model_map = {
-                str(item.get("model_id") or ""): item
+                self._build_model_mode_key(
+                    model_id=str(item.get("model_id") or ""),
+                    prediction_play_mode=self._extract_model_play_mode(item, lottery_code=normalized_code),
+                    lottery_code=normalized_code,
+                ): item
                 for item in (existing_record or {}).get("models", [])
                 if item.get("model_id")
             }
-            existing_model_payload = existing_model_map.get(model_code)
+            existing_model_payload = existing_model_map.get(
+                self._build_model_mode_key(
+                    model_id=model_code,
+                    prediction_play_mode=normalized_play_mode,
+                    lottery_code=normalized_code,
+                )
+            )
             if (
                 existing_model_payload
                 and self._prediction_matches_play_mode(
@@ -267,8 +277,15 @@ class PredictionGenerationService:
                 predictions_with_hits.append(group_payload)
 
             best_group = max(predictions_with_hits, key=lambda item: item["hit_result"]["total_hits"])
-            existing_model_map[model_code] = {
+            existing_model_map[
+                self._build_model_mode_key(
+                    model_id=str(prediction.get("model_id") or model_code),
+                    prediction_play_mode=str(prediction.get("prediction_play_mode") or normalized_play_mode),
+                    lottery_code=normalized_code,
+                )
+            ] = {
                 "model_id": prediction.get("model_id"),
+                "prediction_play_mode": str(prediction.get("prediction_play_mode") or normalized_play_mode),
                 "model_name": prediction.get("model_name"),
                 "model_provider": prediction.get("model_provider"),
                 "model_version": prediction.get("model_version"),
@@ -529,11 +546,21 @@ class PredictionGenerationService:
             with get_period_lock(target_period):
                 current_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
                 current_model_map = {
-                    str(item.get("model_id") or ""): item
+                    self._build_model_mode_key(
+                        model_id=str(item.get("model_id") or ""),
+                        prediction_play_mode=self._extract_model_play_mode(item, lottery_code=normalized_code),
+                        lottery_code=normalized_code,
+                    ): item
                     for item in (current_record or {}).get("models", [])
                     if item.get("model_id")
                 }
-                existing_model_payload = current_model_map.get(model_code)
+                existing_model_payload = current_model_map.get(
+                    self._build_model_mode_key(
+                        model_id=model_code,
+                        prediction_play_mode=normalized_play_mode,
+                        lottery_code=normalized_code,
+                    )
+                )
                 if (
                     existing_model_payload
                     and self._prediction_matches_play_mode(
@@ -574,12 +601,23 @@ class PredictionGenerationService:
             with get_period_lock(target_period):
                 current_record = self.prediction_repository.get_history_record_detail(target_period, lottery_code=normalized_code)
                 current_model_map = {
-                    str(item.get("model_id") or ""): item
+                    self._build_model_mode_key(
+                        model_id=str(item.get("model_id") or ""),
+                        prediction_play_mode=self._extract_model_play_mode(item, lottery_code=normalized_code),
+                        lottery_code=normalized_code,
+                    ): item
                     for item in (current_record or {}).get("models", [])
                     if item.get("model_id")
                 }
-                current_model_map[model_code] = {
+                current_model_map[
+                    self._build_model_mode_key(
+                        model_id=str(prediction.get("model_id") or model_code),
+                        prediction_play_mode=str(prediction.get("prediction_play_mode") or normalized_play_mode),
+                        lottery_code=normalized_code,
+                    )
+                ] = {
                     "model_id": prediction.get("model_id"),
+                    "prediction_play_mode": str(prediction.get("prediction_play_mode") or normalized_play_mode),
                     "model_name": prediction.get("model_name"),
                     "model_provider": prediction.get("model_provider"),
                     "model_version": prediction.get("model_version"),
@@ -903,7 +941,14 @@ class PredictionGenerationService:
             },
         )
         try:
-            prediction = self._finalize_prediction(raw_prediction, model_def, prediction_date, target_period, lottery_code=lottery_code)
+            prediction = self._finalize_prediction(
+                raw_prediction,
+                model_def,
+                prediction_date,
+                target_period,
+                lottery_code=lottery_code,
+                prediction_play_mode=prediction_play_mode,
+            )
         except Exception:
             self.logger.exception(
                 "Model prediction normalization failed",
@@ -1017,17 +1062,24 @@ class PredictionGenerationService:
         prediction_date: str,
         target_period: str,
         lottery_code: str = "dlt",
+        prediction_play_mode: str = "direct",
     ) -> dict[str, Any]:
+        normalized_lottery_code = normalize_lottery_code(lottery_code)
+        normalized_prediction_play_mode = self._normalize_prediction_play_mode(
+            prediction_play_mode,
+            lottery_code=normalized_lottery_code,
+        )
         normalized = self.prediction_service.normalize_prediction(prediction, lottery_code=lottery_code)
         normalized["prediction_date"] = prediction_date
         normalized["target_period"] = target_period
-        normalized["lottery_code"] = normalize_lottery_code(lottery_code)
+        normalized["lottery_code"] = normalized_lottery_code
         normalized["model_id"] = model_def.model_id
         normalized["model_name"] = model_def.name
         normalized["model_provider"] = model_def.provider
         normalized["model_version"] = model_def.version
         normalized["model_tags"] = model_def.tags
         normalized["model_api_model"] = model_def.api_model
+        normalized["prediction_play_mode"] = normalized_prediction_play_mode
         return normalized
 
     def _validate_prediction(
@@ -1110,6 +1162,46 @@ class PredictionGenerationService:
         if normalized_play_mode == "direct_sum":
             return "direct_sum" in play_types
         return "direct" in play_types
+
+    @classmethod
+    def _build_model_mode_key(
+        cls,
+        *,
+        model_id: str,
+        prediction_play_mode: str | None,
+        lottery_code: str,
+    ) -> str:
+        normalized_model_id = str(model_id or "").strip()
+        if not normalized_model_id:
+            return ""
+        normalized_lottery_code = normalize_lottery_code(lottery_code)
+        normalized_play_mode = cls._normalize_prediction_play_mode(
+            prediction_play_mode or "direct",
+            lottery_code=normalized_lottery_code,
+        )
+        return f"{normalized_model_id}::{normalized_play_mode}"
+
+    @classmethod
+    def _extract_model_play_mode(
+        cls,
+        model_payload: dict[str, Any],
+        *,
+        lottery_code: str,
+    ) -> str:
+        normalized_lottery_code = normalize_lottery_code(lottery_code)
+        explicit_mode = str(model_payload.get("prediction_play_mode") or "").strip().lower()
+        if explicit_mode:
+            return cls._normalize_prediction_play_mode(explicit_mode, lottery_code=normalized_lottery_code)
+        groups = model_payload.get("predictions")
+        if isinstance(groups, list):
+            has_direct_sum = any(
+                str(group.get("play_type") or "").strip().lower() == "direct_sum"
+                for group in groups
+                if isinstance(group, dict)
+            )
+            if has_direct_sum:
+                return "direct_sum"
+        return "direct"
 
     @classmethod
     def _build_period_map(cls, history_data: dict[str, Any]) -> dict[str, dict[str, Any]]:

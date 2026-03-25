@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, resolveHistoryFallbackState } from './home'
+import { buildHistoryHitTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState } from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -440,5 +440,30 @@ describe('getPredictionPlayTypeLabel', () => {
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] })).toBe('和值')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
     expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('复式')
+  })
+})
+
+describe('normalizePredictionModelPlayMode', () => {
+  it('prefers explicit prediction_play_mode when available', () => {
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm1',
+        prediction_play_mode: 'direct_sum',
+        model_name: 'Model 1',
+        model_provider: 'openai',
+        predictions: [],
+      }),
+    ).toBe('direct_sum')
+  })
+
+  it('infers direct_sum from prediction groups when mode missing', () => {
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm2',
+        model_name: 'Model 2',
+        model_provider: 'openai',
+        predictions: [{ group_id: 1, play_type: 'direct_sum', sum_value: '12', red_balls: [], blue_balls: [], digits: [] }],
+      }),
+    ).toBe('direct_sum')
   })
 })

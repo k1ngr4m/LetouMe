@@ -1,19 +1,23 @@
 import { useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
-import { getActualResult } from './lib/home'
+import { getActualResult, normalizePredictionModelPlayMode } from './lib/home'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
+import type { HomeDetailRouteState } from './navigation'
 
 const HISTORY_PAGE_SIZE = 10
 const LOTTERY_PAGE_SIZE = 10
 
 export function HomeModelDetailPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { modelId = '' } = useParams()
+  const navigationState = location.state as HomeDetailRouteState | null
   const selectedLottery = loadSelectedLottery()
+  const expectedPlayMode = selectedLottery === 'pl3' ? navigationState?.predictionPlayMode : undefined
 
   const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(selectedLottery, 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
     enableCurrentPredictions: true,
@@ -26,7 +30,17 @@ export function HomeModelDetailPage() {
   const chartDraws = lotteryCharts.data?.data || []
   const { modelScores } = useHomeModelFilters(models, history, [])
 
-  const selectedModel = useMemo(() => models.find((item) => item.model_id === modelId) || null, [modelId, models])
+  const selectedModel = useMemo(
+    () =>
+      models.find(
+        (item) =>
+          item.model_id === modelId &&
+          (!expectedPlayMode || normalizePredictionModelPlayMode(item) === expectedPlayMode),
+      ) ||
+      models.find((item) => item.model_id === modelId) ||
+      null,
+    [expectedPlayMode, modelId, models],
+  )
   const selectedScore = selectedModel ? modelScores[selectedModel.model_id] : undefined
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 

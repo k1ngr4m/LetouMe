@@ -12,6 +12,7 @@ import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import {
   type BallStatItem,
   buildSummary,
+  buildHistoryHitTrend,
   buildBlueFrequencyChart,
   buildOddEvenChart,
   filterPredictionGroupsByPlayType,
@@ -24,6 +25,7 @@ import {
   type ModelScore,
   type ModelListScoreRange,
   type PredictionPlayType,
+  normalizePredictionModelPlayMode,
   normalizeStrategyLabel,
   normalizePredictionsHistory,
 } from './lib/home'
@@ -166,6 +168,25 @@ function HomeIconButton({
   )
 }
 
+function Pl3PredictionModeSwitch({
+  value,
+  onChange,
+}: {
+  value: 'direct' | 'direct_sum'
+  onChange: (value: 'direct' | 'direct_sum') => void
+}) {
+  return (
+    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="排列3玩法切换">
+      <button className={clsx('tab-strip__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
+        直选
+      </button>
+      <button className={clsx('tab-strip__item', value === 'direct_sum' && 'is-active')} type="button" onClick={() => onChange('direct_sum')}>
+        和值
+      </button>
+    </div>
+  )
+}
+
 type HistoryModelStatView = {
   model_id: string
   model_name: string
@@ -183,6 +204,7 @@ type HistoryModelStatView = {
 type HistoryModelRef = {
   model_id: string
   model_name: string
+  prediction_play_mode?: 'direct' | 'direct_sum'
 }
 
 function formatCurrency(value: number | undefined) {
@@ -257,15 +279,16 @@ export function HomePage() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
+  const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? ['direct', 'direct_sum'] : []),
-    [selectedLottery],
+    () => (selectedLottery === 'pl3' ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct']) : []),
+    [pl3PredictionMode, selectedLottery],
   )
   const historyPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? ['direct', 'direct_sum'] : []),
-    [selectedLottery],
+    () => (selectedLottery === 'pl3' ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct']) : []),
+    [pl3PredictionMode, selectedLottery],
   )
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
@@ -291,8 +314,31 @@ export function HomePage() {
   )
   const lotteryLabel = selectedLottery === 'dlt' ? '大乐透' : selectedLottery === 'pl3' ? '排列3' : '排列5'
 
-  const models = currentPredictions.data?.models || []
+  const allModels = currentPredictions.data?.models || []
+  const models = useMemo(
+    () =>
+      selectedLottery === 'pl3'
+        ? allModels.filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode)
+        : allModels,
+    [allModels, pl3PredictionMode, selectedLottery],
+  )
   const history = predictionsHistory.data
+  const filteredHistoryData = useMemo(
+    () =>
+      selectedLottery !== 'pl3' || !history
+        ? history
+        : {
+            ...history,
+            model_stats: (history.model_stats || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
+            predictions_history: (history.predictions_history || [])
+              .map((record) => ({
+                ...record,
+                models: (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
+              }))
+              .filter((record) => (record.models || []).length > 0),
+          },
+    [history, pl3PredictionMode, selectedLottery],
+  )
   const chartDraws = lotteryCharts.data?.data || []
   const pagedDraws = pagedLotteryHistory.data?.data || []
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
@@ -317,7 +363,7 @@ export function HomePage() {
     clearModelFilters,
     toggleSummaryModel,
     buildHistoryState,
-  } = useHomeModelFilters(models, history, validPinnedModelIds, {
+  } = useHomeModelFilters(models, filteredHistoryData, validPinnedModelIds, {
     isModelFilterOpen: false,
     modelNameQuery: '',
     selectedProviders: [],
@@ -364,6 +410,17 @@ export function HomePage() {
   }, [selectedLottery])
 
   useEffect(() => {
+    if (selectedLottery !== 'pl3') {
+      setPl3PredictionMode('direct')
+      return
+    }
+    setHistoryFallbackSignature(null)
+    setHistoryPage(1)
+    setSummaryStrategyFilters([])
+    setHistoryStrategyFilters([])
+  }, [pl3PredictionMode, selectedLottery])
+
+  useEffect(() => {
     if (hasRestoredScrollRef.current || typeof navigationState?.scrollY !== 'number') return
     hasRestoredScrollRef.current = true
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
@@ -402,24 +459,32 @@ export function HomePage() {
 
   const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
     const references = new Map<string, HistoryModelRef>()
-    for (const stat of history?.model_stats || []) {
+    const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' }) =>
+      `${model.model_id}::${model.prediction_play_mode || 'direct'}`
+    for (const stat of filteredHistoryData?.model_stats || []) {
       if (!stat.model_id) continue
-      references.set(stat.model_id, {
+      const normalizedMode = normalizePredictionModelPlayMode(stat)
+      if (selectedLottery === 'pl3' && normalizedMode !== pl3PredictionMode) continue
+      references.set(resolveKey({ model_id: stat.model_id, prediction_play_mode: normalizedMode }), {
         model_id: stat.model_id,
         model_name: stat.model_name || stat.model_id,
+        prediction_play_mode: normalizedMode,
       })
     }
-    for (const record of history?.predictions_history || []) {
+    for (const record of filteredHistoryData?.predictions_history || []) {
       for (const model of record.models || []) {
         if (!model.model_id) continue
-        references.set(model.model_id, {
+        const normalizedMode = normalizePredictionModelPlayMode(model)
+        if (selectedLottery === 'pl3' && normalizedMode !== pl3PredictionMode) continue
+        references.set(resolveKey({ model_id: model.model_id, prediction_play_mode: normalizedMode }), {
           model_id: model.model_id,
           model_name: model.model_name || model.model_id,
+          prediction_play_mode: normalizedMode,
         })
       }
     }
     return [...references.values()]
-  }, [history])
+  }, [filteredHistoryData, pl3PredictionMode, selectedLottery])
   const historyFilterSignature = useMemo(
     () =>
       JSON.stringify({
@@ -446,7 +511,10 @@ export function HomePage() {
     historyFallbackEnabled,
   })
   const historyVisibleModelIds = useMemo(
-    () => (useHistoryFallbackModels ? historyAllModelRefs.map((item) => item.model_id) : effectiveSelectedModelIds),
+    () =>
+      useHistoryFallbackModels
+        ? [...new Set(historyAllModelRefs.map((item) => item.model_id))]
+        : effectiveSelectedModelIds,
     [effectiveSelectedModelIds, historyAllModelRefs, useHistoryFallbackModels],
   )
   const historyVisibleModels = useMemo<HistoryModelRef[]>(
@@ -464,8 +532,8 @@ export function HomePage() {
     [effectiveSelectedModels],
   )
   const historyStrategyOptions = useMemo(
-    () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
-    [history?.strategy_options],
+    () => [...new Set((filteredHistoryData?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
+    [filteredHistoryData?.strategy_options],
   )
 
   useEffect(() => {
@@ -496,7 +564,7 @@ export function HomePage() {
     [effectiveSelectedModels, summaryPlayTypeFilters],
   )
 
-  const { selectedSummaryIds, summary, filteredHistory, historyHitTrend } = buildHistoryState(
+  const { selectedSummaryIds, summary, filteredHistory } = buildHistoryState(
     historyPeriodQuery,
     commonOnly,
     weightedSummary,
@@ -506,7 +574,23 @@ export function HomePage() {
     summaryPlayTypeFilters,
   )
   const summaryModels = summaryFilteredModels.filter((model) => selectedSummaryIds.includes(model.model_id))
-  const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
+  const historyRecordsForView = useMemo(
+    () =>
+      selectedLottery === 'pl3'
+        ? filteredHistory
+            .map((record) => ({
+              ...record,
+              models: (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode),
+            }))
+            .filter((record) => (record.models || []).length > 0)
+        : filteredHistory,
+    [filteredHistory, pl3PredictionMode, selectedLottery],
+  )
+  const historyModelStats = buildHistoryModelStats(historyRecordsForView, historyVisibleModels)
+  const historyHitTrend = useMemo(
+    () => buildHistoryHitTrend(historyRecordsForView, historyVisibleModelIds),
+    [historyRecordsForView, historyVisibleModelIds],
+  )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
   const redChart = buildRedFrequencyChart(chartDraws)
@@ -562,7 +646,12 @@ export function HomePage() {
   }
 
   function openModelDetail(modelId: string) {
-    navigate(`/dashboard/models/${modelId}`, { state: { scrollY: window.scrollY } satisfies HomeDetailRouteState })
+    navigate(`/dashboard/models/${modelId}`, {
+      state: {
+        scrollY: window.scrollY,
+        predictionPlayMode: selectedLottery === 'pl3' ? pl3PredictionMode : undefined,
+      } satisfies HomeDetailRouteState,
+    })
   }
 
   function handleHistoryPageSizeChange(nextPageSize: number) {
@@ -705,6 +794,7 @@ export function HomePage() {
                 subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
                   <div className="toolbar-inline">
+                    {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
                     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
                       <HomeIconButton
                         label="列表视图"
@@ -934,6 +1024,7 @@ export function HomePage() {
               />
             ) : null}
             <div className="history-toolbar">
+              {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
               <button
                 className={clsx('icon-button', isModelFilterOpen && 'is-active')}
                 onClick={() => setIsModelFilterOpen((value) => !value)}
@@ -1007,10 +1098,10 @@ export function HomePage() {
                 </div>
               ) : null}
               {!historyVisibleModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
-              {historyVisibleModels.length && !filteredHistory.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
-              {filteredHistory.length ? (
+              {historyVisibleModels.length && !historyRecordsForView.length ? <div className="state-shell">当前筛选条件下没有历史回溯记录。</div> : null}
+              {historyRecordsForView.length ? (
                 <div className="history-card-list__records">
-                  {filteredHistory.map((record) => (
+                  {historyRecordsForView.map((record) => (
                     <HistoryRecordCard
                       key={`${selectedLottery}-${record.target_period}`}
                       record={record}
@@ -1018,6 +1109,7 @@ export function HomePage() {
                       visibleModelIds={historyVisibleModelIds}
                       strategyFilters={historyStrategyFilters}
                       playTypeFilters={historyPlayTypeFilters}
+                      predictionPlayMode={selectedLottery === 'pl3' ? pl3PredictionMode : undefined}
                     />
                   ))}
                 </div>
@@ -2713,12 +2805,14 @@ function HistoryRecordCard({
   visibleModelIds,
   strategyFilters,
   playTypeFilters,
+  predictionPlayMode,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
   visibleModelIds: string[]
   strategyFilters: string[]
   playTypeFilters: PredictionPlayType[]
+  predictionPlayMode?: 'direct' | 'direct_sum'
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
@@ -2728,15 +2822,29 @@ function HistoryRecordCard({
     enabled: hasExpandedModels || isPeriodSummaryOpen,
     queryFn: async () => normalizePredictionsHistory(await apiClient.getPredictionsHistoryDetail(record.target_period, lotteryCode)),
   })
+  const modeMatchedModels = useMemo(
+    () =>
+      predictionPlayMode && lotteryCode === 'pl3'
+        ? (record.models || []).filter((model) => normalizePredictionModelPlayMode(model) === predictionPlayMode)
+        : record.models || [],
+    [lotteryCode, predictionPlayMode, record.models],
+  )
   const detailRecord = detailQuery.data?.predictions_history?.[0]
     ? {
         ...detailQuery.data.predictions_history[0],
         models: visibleModelIds.length
-          ? detailQuery.data.predictions_history[0].models.filter((model) => visibleModelIds.includes(model.model_id))
-          : detailQuery.data.predictions_history[0].models,
+          ? detailQuery.data.predictions_history[0].models.filter(
+              (model) =>
+                visibleModelIds.includes(model.model_id) &&
+                (!predictionPlayMode || lotteryCode !== 'pl3' || normalizePredictionModelPlayMode(model) === predictionPlayMode),
+            )
+          : detailQuery.data.predictions_history[0].models.filter(
+              (model) =>
+                !predictionPlayMode || lotteryCode !== 'pl3' || normalizePredictionModelPlayMode(model) === predictionPlayMode,
+            ),
       }
     : null
-  const listModels = record.models
+  const listModels = modeMatchedModels
   const detailModelsById = useMemo(() => {
     const mappings = new Map<string, PredictionModel>()
     for (const model of detailRecord?.models || []) {

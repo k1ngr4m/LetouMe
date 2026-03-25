@@ -300,6 +300,7 @@ class PredictionRepository:
             models_by_batch.setdefault(batch_id, []).append(
                 {
                     "model_id": row["model_id"],
+                    "prediction_play_mode": str(row.get("prediction_play_mode") or "direct"),
                     "model_name": row["model_name"],
                     "model_provider": row["model_provider"],
                     "model_version": row.get("model_version"),
@@ -597,13 +598,19 @@ class PredictionRepository:
                     INSERT INTO prediction_model_run (
                         prediction_batch_id,
                         model_id,
+                        prediction_play_mode,
                         completed_at,
                         run_status,
                         display_order
                     )
-                    VALUES (?, ?, CURRENT_TIMESTAMP, 'success', ?)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'success', ?)
                     """,
-                    (batch_id, model_db_id, display_order),
+                    (
+                        batch_id,
+                        model_db_id,
+                        str(model_payload.get("prediction_play_mode") or "direct").strip().lower() or "direct",
+                        display_order,
+                    ),
                 )
                 model_run_id = int(cursor.lastrowid)
                 group_id_map: dict[int, int] = {}
@@ -820,6 +827,7 @@ class PredictionRepository:
             SELECT
                 pmr.id,
                 pmr.display_order,
+                pmr.prediction_play_mode,
                 am.model_code AS model_id,
                 am.display_name AS model_name,
                 mp.provider_code AS model_provider,
@@ -850,6 +858,7 @@ class PredictionRepository:
             models.append(
                 {
                     "model_id": model_row["model_id"],
+                    "prediction_play_mode": str(model_row.get("prediction_play_mode") or "direct"),
                     "model_name": model_row["model_name"],
                     "model_provider": model_row["model_provider"],
                     "model_version": model_row.get("model_version"),
@@ -882,6 +891,7 @@ class PredictionRepository:
                 pmr.id,
                 pmr.prediction_batch_id,
                 pmr.display_order,
+                pmr.prediction_play_mode,
                 am.model_code AS model_id,
                 am.display_name AS model_name,
                 mp.provider_code AS model_provider,

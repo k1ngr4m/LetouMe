@@ -90,6 +90,16 @@ export function normalizePredictionPlayType(value?: string | null): PredictionPl
   return 'direct'
 }
 
+export function normalizePredictionModelPlayMode(
+  model: { prediction_play_mode?: string | null; predictions?: PredictionGroup[]; [key: string]: unknown },
+): 'direct' | 'direct_sum' {
+  const explicitMode = String(model.prediction_play_mode || '').trim().toLowerCase()
+  if (explicitMode === 'direct_sum') return 'direct_sum'
+  if (explicitMode === 'direct') return 'direct'
+  const hasDirectSumGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'direct_sum')
+  return hasDirectSumGroup ? 'direct_sum' : 'direct'
+}
+
 export function groupMatchesPlayTypeFilters(group: PredictionGroup, playTypeFilters: PredictionPlayType[] = []) {
   if (!playTypeFilters.length) return true
   return playTypeFilters.includes(normalizePredictionPlayType(group.play_type))
@@ -143,6 +153,7 @@ export function normalizeCurrentPredictions(data: CurrentPredictionsResponse): C
     lottery_code: data.lottery_code || 'dlt',
     models: (data.models || []).map((model) => ({
       ...model,
+      prediction_play_mode: normalizePredictionModelPlayMode(model),
       predictions: (model.predictions || []).map(normalizeGroup),
     })),
   }
@@ -157,6 +168,7 @@ export function normalizePredictionsHistory(data: PredictionsHistoryResponse): P
       actual_result: record.actual_result ? normalizeDraw(record.actual_result) : null,
       models: (record.models || []).map((model) => ({
         ...model,
+        prediction_play_mode: normalizePredictionModelPlayMode(model),
         bet_count: Number(model.bet_count || 0),
         cost_amount: Number(model.cost_amount || 0),
         winning_bet_count: Number(model.winning_bet_count || 0),
@@ -180,6 +192,7 @@ export function normalizePredictionsHistoryList(data: PredictionsHistoryListResp
       period_summary: normalizePeriodSummary(record.period_summary),
       models: (record.models || []).map((model) => ({
         ...model,
+        prediction_play_mode: normalizePredictionModelPlayMode(model),
         bet_count: Number(model.bet_count || 0),
         cost_amount: Number(model.cost_amount || 0),
         winning_bet_count: Number(model.winning_bet_count || 0),
@@ -264,6 +277,7 @@ function normalizeScoreProfile(profile?: ScoreProfile): ScoreProfile {
 function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistoryModelStat {
   return {
     ...item,
+    prediction_play_mode: normalizePredictionModelPlayMode(item),
     periods: Number(item.periods || 0),
     winning_periods: Number(item.winning_periods || 0),
     bet_count: Number(item.bet_count || 0),
