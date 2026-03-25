@@ -3046,6 +3046,8 @@ function HistoryRecordCard({
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
+  const [isExportingRecord, setIsExportingRecord] = useState(false)
+  const recordCardRef = useRef<HTMLElement | null>(null)
   const hasExpandedModels = expandedModelIds.length > 0
   const detailQuery = useQuery({
     queryKey: ['predictions-history-detail', lotteryCode, record.target_period],
@@ -3150,14 +3152,52 @@ function HistoryRecordCard({
     setIsPeriodSummaryOpen((previous) => !previous)
   }
 
+  async function exportHistoryRecord() {
+    if (isExportingRecord) return
+    setIsExportingRecord(true)
+    try {
+      await waitForNextPaint()
+      const exportNode = recordCardRef.current
+      if (!exportNode) {
+        throw new Error('开奖回溯导出节点不存在')
+      }
+      const dataUrl = await toPng(exportNode, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: resolveExportBackgroundColor(),
+      })
+      const fileName = `${sanitizeDownloadFileName(`${lotteryCode}_${record.target_period}_history_record`)}.png`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+      notifyExportSuccess()
+    } catch (error) {
+      console.error('导出开奖回溯 PNG 失败', error)
+      window.alert('导出失败，请稍后重试。')
+    } finally {
+      setIsExportingRecord(false)
+    }
+  }
+
   return (
-    <article className="history-record-card">
+    <article ref={recordCardRef} className="history-record-card">
       <div className="history-record-card__header">
         <div className="history-record-card__title-block">
           <p className="history-record-card__eyebrow">第 {record.target_period} 期</p>
           <h3>开奖回溯</h3>
         </div>
         <div className="history-record-card__actions">
+          <button
+            type="button"
+            className="ghost-button ghost-button--compact history-record-card__bulk-toggle"
+            onClick={exportHistoryRecord}
+            aria-label={`导出开奖回溯：第 ${record.target_period} 期`}
+            title={isExportingRecord ? `导出中：第 ${record.target_period} 期` : `导出开奖回溯：第 ${record.target_period} 期`}
+            disabled={isExportingRecord}
+          >
+            导出
+          </button>
           {allListModelModeKeys.length ? (
             <button
               type="button"

@@ -973,6 +973,23 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getByText('300 元')).toBeInTheDocument()
   })
 
+  it('exports a single history record card png', async () => {
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '导出开奖回溯：第 2026031 期' }))
+
+    await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
+
+    anchorClickSpy.mockRestore()
+    alertSpy.mockRestore()
+  })
+
   it('paginates history records and supports page size changes', async () => {
     renderPage()
 
