@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
+import { toPng } from 'html-to-image'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
@@ -145,6 +146,16 @@ function PinIndicatorIcon() {
   )
 }
 
+function ExportIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 3.5v8.2" />
+      <path d="m6.9 8.7 3.1 3.2 3.1-3.2" />
+      <path d="M4.6 13.4h10.8v2.8H4.6z" />
+    </svg>
+  )
+}
+
 function HomeIconButton({
   label,
   icon,
@@ -222,6 +233,23 @@ function formatCurrency(value: number | undefined) {
 
 function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
+}
+
+function sanitizeDownloadFileName(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+}
+
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  })
+}
+
+function resolveExportBackgroundColor() {
+  return document.documentElement.dataset.theme === 'light' ? '#f8f2ea' : '#101827'
 }
 
 const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
@@ -327,6 +355,7 @@ export function HomePage() {
   const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
+  const [exportingModelId, setExportingModelId] = useState<string | null>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
@@ -344,6 +373,7 @@ export function HomePage() {
   const [weightedSummary] = useState(true)
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
+  const exportSheetRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredScrollRef = useRef(false)
   const hasInitializedLotteryRef = useRef(false)
 
@@ -622,6 +652,10 @@ export function HomePage() {
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
   )
   const summaryViewModels = modelListView === 'score' ? effectiveSelectedModels : summarySelectableModels
+  const exportModel = useMemo(
+    () => (exportingModelId ? models.find((model) => model.model_id === exportingModelId) || null : null),
+    [exportingModelId, models],
+  )
 
   const isLoading = currentPredictions.isLoading || lotteryCharts.isLoading || (!predictionsHistory.data && predictionsHistory.isLoading)
   const error =
@@ -672,6 +706,36 @@ export function HomePage() {
         predictionPlayMode: selectedLottery === 'pl3' ? pl3PredictionMode : undefined,
       } satisfies HomeDetailRouteState,
     })
+  }
+
+  async function exportModelDetail(modelId: string) {
+    if (exportingModelId) return
+    if (!models.some((model) => model.model_id === modelId)) return
+    setActiveActionMenuId(null)
+    setExportingModelId(modelId)
+    try {
+      await waitForNextPaint()
+      const exportNode = exportSheetRef.current
+      if (!exportNode) {
+        throw new Error('导出节点不存在')
+      }
+      const dataUrl = await toPng(exportNode, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: resolveExportBackgroundColor(),
+      })
+      const targetPeriod = currentPredictions.data?.target_period || 'unknown'
+      const fileName = `${sanitizeDownloadFileName(`${selectedLottery}_${targetPeriod}_${modelId}_detail`)}.png`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+    } catch (error) {
+      console.error('导出模型详情 PNG 失败', error)
+      window.alert('导出失败，请稍后重试。')
+    } finally {
+      setExportingModelId(null)
+    }
   }
 
   function handleHistoryPageSizeChange(nextPageSize: number) {
@@ -847,6 +911,8 @@ export function HomePage() {
                           }
                           onPin={() => togglePinned(model.model_id)}
                           onDetail={() => openModelDetail(model.model_id)}
+                          onExport={() => exportModelDetail(model.model_id)}
+                          isExporting={exportingModelId === model.model_id}
                         />
                       ))
                     ) : (
@@ -882,6 +948,8 @@ export function HomePage() {
                     }
                     onPin={togglePinned}
                     onDetail={openModelDetail}
+                    onExport={exportModelDetail}
+                    exportingModelId={exportingModelId}
                   />
                 )}
               </StatusCard>
@@ -1173,6 +1241,20 @@ export function HomePage() {
         <Suspense fallback={<div className="state-shell">正在加载投注面板...</div>}>
           <MyBetsPanel lotteryCode={selectedLottery} targetPeriod={currentPredictions.data?.target_period || ''} />
         </Suspense>
+      ) : null}
+      {exportModel ? (
+        <div className="model-export-sheet-host" aria-hidden="true">
+          <div ref={exportSheetRef}>
+            <ModelDetailExportSheet
+              model={exportModel}
+              score={modelScores[exportModel.model_id]}
+              actualResult={actualResult}
+              lotteryCode={selectedLottery}
+              targetPeriod={currentPredictions.data?.target_period || '-'}
+              predictionDate={currentPredictions.data?.prediction_date || '-'}
+            />
+          </div>
+        </div>
       ) : null}
     </div>
   )
@@ -1896,6 +1978,8 @@ function ModelListCard({
   onToggleActionMenu,
   onPin,
   onDetail,
+  onExport,
+  isExporting,
 }: {
   model: PredictionModel
   score?: ModelScore
@@ -1905,6 +1989,8 @@ function ModelListCard({
   onToggleActionMenu: () => void
   onPin: () => void
   onDetail: () => void
+  onExport: () => void
+  isExporting: boolean
 }) {
   return (
     <article className="model-list-card">
@@ -1927,6 +2013,16 @@ function ModelListCard({
             type="button"
           >
             <DetailIcon />
+          </button>
+          <button
+            className="icon-button model-list-card__export-button"
+            onClick={onExport}
+            aria-label={`导出详情：${model.model_name}`}
+            title={isExporting ? '导出中...' : '导出详情'}
+            type="button"
+            disabled={isExporting}
+          >
+            <ExportIcon />
           </button>
           <div className="action-menu">
             <button
@@ -1971,6 +2067,8 @@ function ModelListTable({
   onToggleActionMenu,
   onPin,
   onDetail,
+  onExport,
+  exportingModelId,
 }: {
   models: PredictionModel[]
   modelScores: Record<string, ModelScore>
@@ -1980,6 +2078,8 @@ function ModelListTable({
   onToggleActionMenu: (modelId: string) => void
   onPin: (modelId: string) => void
   onDetail: (modelId: string) => void
+  onExport: (modelId: string) => void
+  exportingModelId: string | null
 }) {
   if (!models.length) {
     return <div className="state-shell">没有符合当前筛选条件的模型。</div>
@@ -2032,6 +2132,16 @@ function ModelListTable({
                     >
                       <DetailIcon />
                     </button>
+                    <button
+                      className="icon-button home-model-list-table__export-button"
+                      onClick={() => onExport(model.model_id)}
+                      aria-label={`导出详情：${model.model_name}`}
+                      title={exportingModelId === model.model_id ? '导出中...' : '导出详情'}
+                      type="button"
+                      disabled={exportingModelId === model.model_id}
+                    >
+                      <ExportIcon />
+                    </button>
                     <div className="action-menu">
                       <button
                         className="icon-button home-model-list-table__menu-button"
@@ -2058,6 +2168,84 @@ function ModelListTable({
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function ModelDetailExportSheet({
+  model,
+  score,
+  actualResult,
+  lotteryCode,
+  targetPeriod,
+  predictionDate,
+}: {
+  model: PredictionModel
+  score?: ModelScore
+  actualResult: LotteryDraw | null
+  lotteryCode: LotteryCode
+  targetPeriod: string
+  predictionDate: string
+}) {
+  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+
+  return (
+    <div className="model-export-sheet">
+      <section className="model-export-sheet__hero">
+        <div className="model-export-sheet__hero-top">
+          <span className="model-export-sheet__path">预测总览 / 模型详情</span>
+          <span className="model-export-sheet__lottery">{lotteryLabel} AI 预测</span>
+        </div>
+        <div className="model-export-sheet__hero-main">
+          <div className="model-export-sheet__hero-copy">
+            <p className="modal-card__eyebrow">Model Detail</p>
+            <div className="model-export-sheet__title-row">
+              <h2>{model.model_name}</h2>
+              {score ? <span className="model-export-sheet__score-badge">综合 {score.overallScore}</span> : null}
+            </div>
+            <p className="model-export-sheet__description">
+              查看当前目标期 <strong>{targetPeriod}</strong> 下该模型的能力画像与全部预测组合。
+            </p>
+            <div className="model-export-sheet__meta">
+              <span>{model.model_provider}</span>
+              <span>{model.predictions.length} 组预测</span>
+              {score ? <span>近期 {score.recentScore} / 长期 {score.longTermScore}</span> : null}
+              <span>{actualResult ? '已开奖' : '待开奖'}</span>
+            </div>
+          </div>
+          <div className="model-export-sheet__hero-side">
+            <article className="model-export-sheet__metric-card">
+              <span>目标期号</span>
+              <strong>{targetPeriod}</strong>
+              <small>预测日期 {predictionDate}</small>
+            </article>
+            <article className="model-export-sheet__metric-card">
+              <span>能力摘要</span>
+              <strong>{score?.perPeriodScore || 0}</strong>
+              <small>按期分 / ROI 近期 {Math.round((score?.recentWindow.roi || 0) * 100)}%</small>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {score ? (
+        <section className="model-export-sheet__score-collapse">
+          <span>展开能力画像</span>
+          <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
+        </section>
+      ) : null}
+
+      <section className="model-export-sheet__panel">
+        <div className="model-export-sheet__panel-head">
+          <h3>本期预测组</h3>
+          <span>展示该模型当前期号下的全部预测组合与命中情况。</span>
+        </div>
+        <div className="detail-group-list model-export-sheet__group-list">
+          {model.predictions.map((group) => (
+            <PredictionGroupCard key={`${model.model_id}-${group.group_id}`} group={group} actualResult={actualResult} />
+          ))}
+        </div>
+      </section>
     </div>
   )
 }

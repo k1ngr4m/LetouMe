@@ -19,6 +19,7 @@ const {
   simulatePl3SumHistoryMislabel,
   updateMyBet,
   simulateHistoryFilterLoading,
+  toPng,
 } = vi.hoisted(() => ({
   createMyBet: vi.fn(),
   createSimulationTicket: vi.fn(),
@@ -32,6 +33,7 @@ const {
   simulatePl3SumHistoryMislabel: { current: false },
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
+  toPng: vi.fn(),
 }))
 
 function buildHistoryRecord(period: string, date: string, primaryModelId: 'model-a' | 'model-b' = 'model-b') {
@@ -494,6 +496,10 @@ vi.mock('./hooks/useHomeData', () => ({
   },
 }))
 
+vi.mock('html-to-image', () => ({
+  toPng,
+}))
+
 function renderPage(initialEntry = '/dashboard/prediction') {
   const client = new QueryClient({
     defaultOptions: {
@@ -534,6 +540,8 @@ beforeEach(() => {
   simulateHistoryFilterLoading.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
+  toPng.mockReset()
+  toPng.mockResolvedValue('data:image/png;base64,mock-image')
   getMyBets.mockReset()
   getMyBets.mockResolvedValue({
     records: [
@@ -807,6 +815,25 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('exports model detail png from list and card views', async () => {
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
+    await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
+
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
+    await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
+    await waitFor(() => expect(toPng).toHaveBeenCalledTimes(2))
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+    expect(screen.queryByRole('button', { name: /导出详情：/ })).not.toBeInTheDocument()
+
+    anchorClickSpy.mockRestore()
   })
 
   it('updates url when switching dashboard tabs', async () => {

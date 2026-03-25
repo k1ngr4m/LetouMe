@@ -1500,6 +1500,7 @@ a {
 }
 
 .model-list-card__detail-button,
+.model-list-card__export-button,
 .score-view-table__detail-button {
   width: 2rem;
   height: 2rem;
@@ -1528,6 +1529,7 @@ a {
 }
 
 .model-list-card__detail-button svg,
+.model-list-card__export-button svg,
 .score-view-table__detail-button svg {
   width: 0.95rem;
   height: 0.95rem;
@@ -1593,12 +1595,18 @@ a {
   height: 1.9rem;
 }
 
+.home-model-list-table__export-button {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
 .home-model-list-table__menu-button {
   width: 1.9rem;
   height: 1.9rem;
 }
 
 .home-model-list-table__detail-button svg,
+.home-model-list-table__export-button svg,
 .home-model-list-table__menu-button svg {
   width: 0.95rem;
   height: 0.95rem;
@@ -3616,6 +3624,186 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.model-export-sheet-host {
+  position: fixed;
+  left: -12000px;
+  top: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.model-export-sheet {
+  width: 1080px;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  color: var(--text-1);
+  background: var(--app-bg);
+}
+
+.model-export-sheet__hero,
+.model-export-sheet__panel,
+.model-export-sheet__score-collapse {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(11, 17, 29, 0.94);
+}
+
+.model-export-sheet__hero {
+  padding: 1.35rem;
+  border-radius: 1.7rem;
+  box-shadow: 0 24px 80px rgba(4, 8, 18, 0.3);
+}
+
+.model-export-sheet__hero-top,
+.model-export-sheet__hero-main,
+.model-export-sheet__meta {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.model-export-sheet__hero-top {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.model-export-sheet__path {
+  color: var(--text-3);
+  font-size: 0.82rem;
+}
+
+.model-export-sheet__lottery {
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+.model-export-sheet__hero-main {
+  margin-top: 1rem;
+  justify-content: space-between;
+  align-items: stretch;
+}
+
+.model-export-sheet__hero-copy {
+  min-width: min(100%, 26rem);
+  flex: 1 1 30rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.model-export-sheet__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.model-export-sheet__title-row h2 {
+  margin: 0;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+
+.model-export-sheet__description {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.65;
+}
+
+.model-export-sheet__score-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.38rem 0.78rem;
+  border-radius: 999px;
+  color: #f8fafc;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(129, 140, 248, 0.24), rgba(244, 114, 182, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 0.84rem;
+}
+
+.model-export-sheet__meta span,
+.model-export-sheet__metric-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.model-export-sheet__meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0.32rem 0.62rem;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 0.8rem;
+}
+
+.model-export-sheet__hero-side {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: min(100%, 20rem);
+  flex: 0 1 26rem;
+}
+
+.model-export-sheet__metric-card {
+  padding: 1rem;
+  border-radius: 1.15rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.model-export-sheet__metric-card span,
+.model-export-sheet__metric-card small {
+  color: var(--text-2);
+}
+
+.model-export-sheet__metric-card strong {
+  font-size: 1.35rem;
+}
+
+.model-export-sheet__score-collapse {
+  padding: 0.62rem 0.74rem;
+  border-radius: 0.8rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.model-export-sheet__score-collapse small,
+.model-export-sheet__panel-head span {
+  color: var(--text-2);
+}
+
+.model-export-sheet__panel {
+  padding: 1rem;
+  border-radius: 1.25rem;
+}
+
+.model-export-sheet__panel-head {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.model-export-sheet__panel-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.model-export-sheet__group-list {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.model-export-sheet .prediction-group-card {
+  margin-top: 0;
+  padding: 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
 }
 
 .settings-grid-react {
