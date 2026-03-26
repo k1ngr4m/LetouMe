@@ -2155,6 +2155,26 @@ a {
   gap: 0.45rem;
 }
 
+.number-row__segment {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+
+.number-row__segment-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  padding: 0.16rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  color: #b9c6de;
+  background: rgba(185, 198, 222, 0.16);
+  flex-shrink: 0;
+}
+
 .number-row--tight {
   gap: 0.32rem;
 }
@@ -2162,6 +2182,19 @@ a {
 .number-row--compact {
   gap: 0.22rem;
   margin-top: 0.32rem;
+}
+
+.number-row--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.36rem;
+}
+
+.number-row__line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.32rem;
 }
 
 .number-row__divider {
@@ -2174,6 +2207,24 @@ a {
 .prediction-group-card.is-compact .number-row__divider {
   width: 0.72rem;
   margin: 0 0.04rem;
+}
+
+.prediction-group-card.is-compact .number-row__segment {
+  gap: 0.2rem;
+}
+
+.prediction-group-card.is-compact .number-row__segment-label {
+  min-width: 1.92rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.6rem;
+}
+
+.prediction-group-card.is-compact .number-row--stacked {
+  gap: 0.2rem;
+}
+
+.prediction-group-card.is-compact .number-row__line {
+  gap: 0.2rem;
 }
 
 .number-ball {

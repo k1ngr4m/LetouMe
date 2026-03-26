@@ -1404,6 +1404,75 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getByText('deepseek')).toBeInTheDocument()
   })
 
+  it('shows dlt dantuo sections with dan/tuo labels', async () => {
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '08', '12', '19', '25'],
+            blue_balls: ['06', '11'],
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              best_hit_count: 3,
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'dlt_dantuo',
+                  front_dan: ['01', '08'],
+                  front_tuo: ['12', '19', '25', '31'],
+                  back_dan: [],
+                  back_tuo: ['06', '11'],
+                  red_balls: ['01', '08', '12', '19', '25', '31'],
+                  blue_balls: ['06', '11'],
+                  hit_result: {
+                    red_hits: ['01', '08', '12', '19', '25'],
+                    red_hit_count: 5,
+                    blue_hits: ['06', '11'],
+                    blue_hit_count: 2,
+                    total_hits: 7,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'dlt'))
+    const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
+    expect(detailSection).not.toBeNull()
+    const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
+    expect(groupCard).not.toBeNull()
+    const cardScope = within(groupCard as HTMLElement)
+    expect(cardScope.getByText('前胆')).toBeInTheDocument()
+    expect(cardScope.getByText('前拖')).toBeInTheDocument()
+    expect(cardScope.queryByText('后胆')).not.toBeInTheDocument()
+    expect(cardScope.getByText('后拖')).toBeInTheDocument()
+    const numberLines = (groupCard as HTMLElement).querySelectorAll('.number-row__line')
+    expect(numberLines).toHaveLength(2)
+    expect(within(numberLines[0] as HTMLElement).getByText('前胆')).toBeInTheDocument()
+    expect(within(numberLines[1] as HTMLElement).getByText('后拖')).toBeInTheDocument()
+    expect(cardScope.getByText('01')).toHaveClass('is-hit')
+    expect(cardScope.getByText('31')).toHaveClass('number-ball--muted')
+  })
+
   it('supports one-click expand and collapse for all models in a record', async () => {
     getPredictionsHistoryDetail.mockResolvedValue({
       predictions_history: [

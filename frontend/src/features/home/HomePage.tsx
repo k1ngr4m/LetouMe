@@ -2470,35 +2470,40 @@ function PredictionNumberRow({
     const frontTuo = group.front_tuo || []
     const backDan = group.back_dan || []
     const backTuo = group.back_tuo || []
-    const frontValues = frontDan.length || frontTuo.length ? [...frontDan, ...frontTuo] : group.red_balls
-    const backValues = backDan.length || backTuo.length ? [...backDan, ...backTuo] : group.blue_balls
+    const frontDanValues = frontDan
+    const frontTuoValues = frontTuo.length ? frontTuo : frontDan.length ? [] : group.red_balls
+    const backDanValues = backDan
+    const backTuoValues = backTuo.length ? backTuo : backDan.length ? [] : group.blue_balls
+    const frontSegments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }> = []
+    const backSegments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }> = []
+    if (frontDanValues.length) frontSegments.push({ key: 'front-dan', label: '前胆', color: 'red', values: frontDanValues })
+    if (frontTuoValues.length) frontSegments.push({ key: 'front-tuo', label: '前拖', color: 'red', values: frontTuoValues })
+    if (backDanValues.length) backSegments.push({ key: 'back-dan', label: '后胆', color: 'blue', values: backDanValues })
+    if (backTuoValues.length) backSegments.push({ key: 'back-tuo', label: '后拖', color: 'blue', values: backTuoValues })
+    const renderSegments = (segments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }>) =>
+      segments.map((segment, segmentIndex) => (
+        <span key={`${group.group_id}-${segment.key}`} className="number-row__segment">
+          {segmentIndex > 0 ? <span className="number-row__divider" /> : null}
+          <span className="number-row__segment-label">{segment.label}</span>
+          {segment.values.map((ball, index) => {
+            const hitValues = segment.color === 'red' ? hit?.redHits || [] : hit?.blueHits || []
+            const isHit = Boolean(hitValues.includes(ball))
+            return (
+              <NumberBall
+                key={`dlt-${segment.key}-${group.group_id}-${index}-${ball}`}
+                value={ball}
+                color={segment.color}
+                isHit={isHit}
+                tone={grayMisses && !isHit ? 'muted' : 'default'}
+              />
+            )
+          })}
+        </span>
+      ))
     return (
-      <div className={clsx('number-row', compact && 'number-row--compact')}>
-        {frontValues.map((ball, index) => {
-          const isHit = Boolean((hit?.redHits || []).includes(ball))
-          return (
-            <NumberBall
-              key={`dlt-front-${group.group_id}-${index}-${ball}`}
-              value={ball}
-              color="red"
-              isHit={isHit}
-              tone={grayMisses && !isHit ? 'muted' : 'default'}
-            />
-          )
-        })}
-        <span className="number-row__divider" />
-        {backValues.map((ball, index) => {
-          const isHit = Boolean((hit?.blueHits || []).includes(ball))
-          return (
-            <NumberBall
-              key={`dlt-back-${group.group_id}-${index}-${ball}`}
-              value={ball}
-              color="blue"
-              isHit={isHit}
-              tone={grayMisses && !isHit ? 'muted' : 'default'}
-            />
-          )
-        })}
+      <div className={clsx('number-row', 'number-row--stacked', compact && 'number-row--compact')}>
+        {frontSegments.length ? <div className="number-row__line">{renderSegments(frontSegments)}</div> : null}
+        {backSegments.length ? <div className="number-row__line">{renderSegments(backSegments)}</div> : null}
       </div>
     )
   }
