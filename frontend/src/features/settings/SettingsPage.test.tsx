@@ -840,6 +840,7 @@ describe('SettingsPage model management view switch', () => {
           lottery_code: 'dlt',
           model_codes: [],
           generation_mode: 'current',
+          prediction_play_mode: 'direct',
           overwrite_existing: false,
           schedule_mode: 'preset',
           preset_type: 'daily',
@@ -913,6 +914,7 @@ describe('SettingsPage model management view switch', () => {
       lottery_code: 'dlt',
       model_codes: ['deepseek-v3.2'],
       generation_mode: 'current',
+      prediction_play_mode: 'direct',
       overwrite_existing: false,
       schedule_mode: 'preset',
       preset_type: 'daily',
@@ -947,7 +949,128 @@ describe('SettingsPage model management view switch', () => {
           task_type: 'prediction_generate',
           model_codes: ['deepseek-v3.2'],
           schedule_mode: 'preset',
+          prediction_play_mode: 'direct',
           time_of_day: '09:00',
+        }),
+      ),
+    )
+  })
+
+  it('shows prediction play mode in schedule list and detail for pl3 tasks', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listScheduleTasks.mockResolvedValue({
+      tasks: [
+        {
+          task_code: 'sched-predict-pl3-sum',
+          task_name: '排列3和值预测',
+          task_type: 'prediction_generate',
+          lottery_code: 'pl3',
+          model_codes: ['pl3-model-a'],
+          generation_mode: 'current',
+          prediction_play_mode: 'direct_sum',
+          overwrite_existing: false,
+          schedule_mode: 'preset',
+          preset_type: 'daily',
+          time_of_day: '10:00',
+          weekdays: [],
+          cron_expression: null,
+          is_active: true,
+          next_run_at: '2026-03-19T02:00:00Z',
+          last_run_at: null,
+          last_run_status: null,
+          last_error_message: null,
+          last_task_id: null,
+          rule_summary: '每日 10:00（北京时间） · 和值',
+          created_at: '2026-03-18T02:00:00Z',
+          updated_at: '2026-03-18T02:00:00Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    expect(await screen.findByText('排列3和值预测')).toBeInTheDocument()
+    expect(screen.getByText('每日 · 和值')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /查看详情：排列3和值预测/ }))
+    expect(await screen.findByText('预测玩法')).toBeInTheDocument()
+    expect(screen.getAllByText('和值').length).toBeGreaterThan(0)
+  })
+
+  it('supports selecting pl3 prediction play mode for schedule tasks', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'pl3-model-a',
+          display_name: 'PL3 模型 A',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'pl3',
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['pl3'],
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createScheduleTask.mockResolvedValue({
+      task_code: 'sched-predict-pl3-sum',
+      task_name: '排列3和值预测',
+      task_type: 'prediction_generate',
+      lottery_code: 'pl3',
+      model_codes: ['pl3-model-a'],
+      generation_mode: 'current',
+      prediction_play_mode: 'direct_sum',
+      overwrite_existing: false,
+      schedule_mode: 'preset',
+      preset_type: 'daily',
+      time_of_day: '10:00',
+      weekdays: [],
+      cron_expression: null,
+      is_active: true,
+      next_run_at: '2026-03-19T02:00:00Z',
+      last_run_at: null,
+      last_run_status: null,
+      last_error_message: null,
+      last_task_id: null,
+      rule_summary: '每日 10:00（北京时间） · 和值',
+      created_at: '2026-03-18T02:00:00Z',
+      updated_at: '2026-03-18T02:00:00Z',
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    await userEvent.click(screen.getByRole('button', { name: '新增任务' }))
+    await userEvent.type(screen.getByLabelText('任务名称'), '排列3和值预测')
+    await userEvent.selectOptions(screen.getByLabelText('任务类型'), 'prediction_generate')
+    await userEvent.selectOptions(screen.getByLabelText('彩种'), 'pl3')
+    await userEvent.selectOptions(screen.getByLabelText('预测玩法'), 'direct_sum')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'PL3 模型 A' }))
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.createScheduleTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          task_name: '排列3和值预测',
+          lottery_code: 'pl3',
+          prediction_play_mode: 'direct_sum',
+          model_codes: ['pl3-model-a'],
         }),
       ),
     )

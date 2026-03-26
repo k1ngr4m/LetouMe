@@ -452,6 +452,7 @@ SCHEMA_STATEMENTS = [
         task_type VARCHAR(32) NOT NULL,
         lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
         generation_mode VARCHAR(32) NOT NULL DEFAULT 'current',
+        prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct',
         overwrite_existing TINYINT(1) NOT NULL DEFAULT 0,
         schedule_mode VARCHAR(32) NOT NULL DEFAULT 'preset',
         preset_type VARCHAR(32) NULL,
@@ -924,6 +925,12 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         "failed_count": (
             "ALTER TABLE maintenance_run_log "
             "ADD COLUMN failed_count INT NOT NULL DEFAULT 0 AFTER skipped_count"
+        ),
+    },
+    "scheduled_task": {
+        "prediction_play_mode": (
+            "ALTER TABLE scheduled_task "
+            "ADD COLUMN prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct' AFTER generation_mode"
         ),
     },
 }

@@ -132,6 +132,7 @@ const EMPTY_SCHEDULE_FORM: ScheduleForm = {
   lottery_code: 'dlt',
   model_codes: [],
   generation_mode: 'current',
+  prediction_play_mode: 'direct',
   overwrite_existing: false,
   schedule_mode: 'preset',
   preset_type: 'daily',
@@ -498,6 +499,15 @@ function getScheduleTaskTypeLabel(taskType: ScheduleTaskType) {
 function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: SchedulePresetType | null) {
   if (scheduleMode === 'cron') return 'Cron'
   return presetType === 'weekly' ? '每周' : '每日'
+}
+
+function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode) {
+  return predictionPlayMode === 'direct_sum' ? '和值' : '直选'
+}
+
+function getSchedulePredictionPlayModeLabel(task: Pick<ScheduleTask, 'task_type' | 'lottery_code' | 'prediction_play_mode'>) {
+  if (task.task_type !== 'prediction_generate' || task.lottery_code !== 'pl3') return null
+  return getPredictionPlayModeLabel(task.prediction_play_mode)
 }
 
 function getGenerationModeLabel(mode: string | null | undefined) {
@@ -1610,6 +1620,7 @@ export function SettingsPage() {
       lottery_code: task.lottery_code,
       model_codes: task.model_codes,
       generation_mode: 'current',
+      prediction_play_mode: task.prediction_play_mode || 'direct',
       overwrite_existing: task.overwrite_existing,
       schedule_mode: task.schedule_mode,
       preset_type: task.preset_type || 'daily',
@@ -1650,6 +1661,9 @@ export function SettingsPage() {
     saveScheduleTaskMutation.mutate({
       ...scheduleForm,
       task_name: scheduleForm.task_name.trim(),
+      prediction_play_mode: scheduleForm.task_type === 'prediction_generate' && scheduleForm.lottery_code === 'pl3'
+        ? scheduleForm.prediction_play_mode
+        : 'direct',
       cron_expression: scheduleForm.schedule_mode === 'cron' ? scheduleForm.cron_expression?.trim() || '' : undefined,
       preset_type: scheduleForm.schedule_mode === 'preset' ? scheduleForm.preset_type || 'daily' : undefined,
       time_of_day: scheduleForm.schedule_mode === 'preset' ? scheduleForm.time_of_day || '09:00' : undefined,
@@ -2399,6 +2413,7 @@ export function SettingsPage() {
                               const isExpanded = expandedScheduleTaskCode === task.task_code
                               const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
                               const enabledMeta = getScheduleEnabledMeta(task.is_active)
+                              const playModeLabel = getSchedulePredictionPlayModeLabel(task)
                               const statusTooltip = [
                                 `最近执行：${task.last_run_at ? formatDateTimeBeijing(task.last_run_at) : '尚未执行'}`,
                                 `状态：${runStatusMeta.label}`,
@@ -2430,7 +2445,7 @@ export function SettingsPage() {
                                     </td>
                                     <td className="settings-schedule-table__rule settings-schedule-table__col-rule" style={{ width: scheduleColumnWidths.rule, minWidth: scheduleColumnWidths.rule }}>
                                       <strong>{task.rule_summary || '-'}</strong>
-                                      <span>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
+                                      <span>{playModeLabel ? `${getScheduleModeLabel(task.schedule_mode, task.preset_type)} · ${playModeLabel}` : getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
                                     </td>
                                     <td className="settings-schedule-table__col-next-run" style={{ width: scheduleColumnWidths.next_run, minWidth: scheduleColumnWidths.next_run }}>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
                                     <td className="settings-schedule-table__col-status" style={{ width: scheduleColumnWidths.status, minWidth: scheduleColumnWidths.status }}>
@@ -2516,6 +2531,12 @@ export function SettingsPage() {
                                               <span>规则类型</span>
                                               <strong>{getScheduleModeLabel(task.schedule_mode, task.preset_type)}</strong>
                                             </article>
+                                            {playModeLabel ? (
+                                              <article className="settings-schedule-detail-item">
+                                                <span>预测玩法</span>
+                                                <strong>{playModeLabel}</strong>
+                                              </article>
+                                            ) : null}
                                           </div>
                                           <div className="settings-schedule-detail-log">
                                             <span>错误信息</span>
@@ -3224,32 +3245,49 @@ export function SettingsPage() {
                 </select>
               </label>
               {scheduleForm.task_type === 'prediction_generate' ? (
-                <div className="field field--full">
-                  <span>预测模型</span>
-                  <div className="settings-model-table__tags">
-                    {selectedLotteryModels.length ? (
-                      selectedLotteryModels.map((model) => (
-                        <label key={model.model_code} className="checkbox-field">
-                          <input
-                            type="checkbox"
-                            checked={scheduleForm.model_codes.includes(model.model_code)}
-                            onChange={(event) =>
-                              setScheduleForm((previous) => ({
-                                ...previous,
-                                model_codes: event.target.checked
-                                  ? [...previous.model_codes, model.model_code]
-                                  : previous.model_codes.filter((code) => code !== model.model_code),
-                              }))
-                            }
-                          />
-                          <span>{model.display_name}</span>
-                        </label>
-                      ))
-                    ) : (
-                      <span className="settings-inline-hint">当前彩种暂无可选模型。</span>
-                    )}
+                <>
+                  {scheduleForm.lottery_code === 'pl3' ? (
+                    <label className="field">
+                      <span>预测玩法</span>
+                      <select
+                        aria-label="预测玩法"
+                        value={scheduleForm.prediction_play_mode}
+                        onChange={(event) =>
+                          setScheduleForm((previous) => ({ ...previous, prediction_play_mode: event.target.value as ModelPredictionPlayMode }))
+                        }
+                      >
+                        <option value="direct">直选</option>
+                        <option value="direct_sum">和值</option>
+                      </select>
+                    </label>
+                  ) : null}
+                  <div className="field field--full">
+                    <span>预测模型</span>
+                    <div className="settings-model-table__tags">
+                      {selectedLotteryModels.length ? (
+                        selectedLotteryModels.map((model) => (
+                          <label key={model.model_code} className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={scheduleForm.model_codes.includes(model.model_code)}
+                              onChange={(event) =>
+                                setScheduleForm((previous) => ({
+                                  ...previous,
+                                  model_codes: event.target.checked
+                                    ? [...previous.model_codes, model.model_code]
+                                    : previous.model_codes.filter((code) => code !== model.model_code),
+                                }))
+                              }
+                            />
+                            <span>{model.display_name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <span className="settings-inline-hint">当前彩种暂无可选模型。</span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               ) : null}
               {scheduleForm.schedule_mode === 'preset' ? (
                 <>

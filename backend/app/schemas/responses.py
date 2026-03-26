@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -230,6 +230,7 @@ class ScheduleTaskResponse(BaseModel):
     lottery_code: str = "dlt"
     model_codes: list[str] = Field(default_factory=list)
     generation_mode: str = "current"
+    prediction_play_mode: Literal["direct", "direct_sum"] = "direct"
     overwrite_existing: bool = False
     schedule_mode: str
     preset_type: str | None = None

@@ -151,7 +151,8 @@ class ScheduleService:
             worker=lambda progress_callback: self.prediction_generation_service.generate_for_models(
                 lottery_code=task["lottery_code"],
                 model_codes=model_codes,
-                mode="current",
+                mode=task.get("generation_mode") or "current",
+                prediction_play_mode=str(task.get("prediction_play_mode") or "direct"),
                 overwrite=bool(task.get("overwrite_existing")),
                 progress_callback=progress_callback,
             ),
@@ -174,6 +175,11 @@ class ScheduleService:
         model_codes = list(dict.fromkeys(str(code).strip() for code in (payload.get("model_codes") or []) if str(code).strip()))
         if task_type == "prediction_generate" and not model_codes:
             raise ValueError("预测任务至少选择一个模型")
+        prediction_play_mode = self._normalize_prediction_play_mode(
+            payload.get("prediction_play_mode"),
+            lottery_code=lottery_code,
+            task_type=task_type,
+        )
         preset_type = None
         time_of_day = None
         weekdays: list[int] = []
@@ -201,6 +207,7 @@ class ScheduleService:
             "lottery_code": lottery_code,
             "model_codes": model_codes,
             "generation_mode": generation_mode,
+            "prediction_play_mode": prediction_play_mode,
             "overwrite_existing": bool(payload.get("overwrite_existing", False)),
             "schedule_mode": schedule_mode,
             "preset_type": preset_type,
@@ -213,6 +220,24 @@ class ScheduleService:
             self._compute_next_run(normalized, base_time=self._utc_now()) if normalized["is_active"] else None
         )
         return normalized
+
+    @staticmethod
+    def _normalize_prediction_play_mode(
+        prediction_play_mode: Any,
+        *,
+        lottery_code: str,
+        task_type: str,
+    ) -> str:
+        if task_type != "prediction_generate":
+            return "direct"
+        normalized_mode = str(prediction_play_mode or "direct").strip().lower() or "direct"
+        if lottery_code != "pl3":
+            if normalized_mode != "direct":
+                raise ValueError("仅排列3预测任务支持和值模式")
+            return "direct"
+        if normalized_mode not in {"direct", "direct_sum"}:
+            raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
+        return normalized_mode
 
     def _compute_next_run(self, task: dict[str, Any], *, base_time: datetime) -> datetime | None:
         if task.get("schedule_mode") == "preset":
@@ -315,12 +340,23 @@ class ScheduleService:
 
     def _build_rule_summary(self, task: dict[str, Any]) -> str:
         if task.get("schedule_mode") == "cron":
-            return f"Cron（北京时间）· {task.get('cron_expression') or '-'}"
+            summary = f"Cron（北京时间）· {task.get('cron_expression') or '-'}"
+            return self._append_prediction_play_mode(summary, task)
         time_of_day = task.get("time_of_day") or "--:--"
         if task.get("preset_type") == "weekly":
             weekdays = [WEEKDAY_LABELS.get(int(value), str(value)) for value in task.get("weekdays") or []]
-            return f"每周 {' / '.join(weekdays)} {time_of_day}（北京时间）"
-        return f"每日 {time_of_day}（北京时间）"
+            summary = f"每周 {' / '.join(weekdays)} {time_of_day}（北京时间）"
+            return self._append_prediction_play_mode(summary, task)
+        summary = f"每日 {time_of_day}（北京时间）"
+        return self._append_prediction_play_mode(summary, task)
+
+    @staticmethod
+    def _append_prediction_play_mode(summary: str, task: dict[str, Any]) -> str:
+        if task.get("task_type") != "prediction_generate" or task.get("lottery_code") != "pl3":
+            return summary
+        play_mode = str(task.get("prediction_play_mode") or "direct").strip().lower()
+        play_mode_label = "和值" if play_mode == "direct_sum" else "直选"
+        return f"{summary} · {play_mode_label}"
 
     @staticmethod
     def _utc_now() -> datetime:

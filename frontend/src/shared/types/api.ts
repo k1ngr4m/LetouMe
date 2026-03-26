@@ -750,6 +750,7 @@ export type ScheduleTask = {
   lottery_code: LotteryCode
   model_codes: string[]
   generation_mode: 'current'
+  prediction_play_mode: 'direct' | 'direct_sum'
   overwrite_existing: boolean
   schedule_mode: ScheduleMode
   preset_type?: SchedulePresetType | null
@@ -773,6 +774,7 @@ export type ScheduleTaskPayload = {
   lottery_code: LotteryCode
   model_codes: string[]
   generation_mode: 'current'
+  prediction_play_mode: 'direct' | 'direct_sum'
   overwrite_existing: boolean
   schedule_mode: ScheduleMode
   preset_type?: SchedulePresetType | null
