@@ -15,6 +15,7 @@ const {
   getPredictionsHistoryDetail,
   getSimulationTickets,
   quoteSimulationTicket,
+  simulateDltModeCoexistCurrentPredictions,
   simulateDltDantuoCurrentPredictions,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
@@ -30,6 +31,7 @@ const {
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  simulateDltModeCoexistCurrentPredictions: { current: false },
   simulateDltDantuoCurrentPredictions: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
@@ -364,7 +366,48 @@ vi.mock('./hooks/useHomeData', () => ({
               })),
             },
           ]
-      : simulateDltDantuoCurrentPredictions.current
+      : simulateDltModeCoexistCurrentPredictions.current
+        ? [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              prediction_play_mode: 'direct',
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'direct',
+                  strategy: '增强型热号追随者',
+                  red_balls: ['01', '02', '03', '04', '05'],
+                  blue_balls: ['06', '07'],
+                },
+              ],
+            },
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              prediction_play_mode: 'dantuo',
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'dlt_dantuo',
+                  strategy: '增强型热号追随者',
+                  front_dan: ['01', '08'],
+                  front_tuo: ['12', '19', '25', '31'],
+                  back_dan: ['06'],
+                  back_tuo: ['11'],
+                  red_balls: ['01', '08', '12', '19', '25', '31'],
+                  blue_balls: ['06', '11'],
+                },
+              ],
+            },
+          ]
+        : simulateDltDantuoCurrentPredictions.current
         ? [
             {
               model_id: 'model-a',
@@ -585,6 +628,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 beforeEach(() => {
   window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
+  simulateDltModeCoexistCurrentPredictions.current = false
   simulateDltDantuoCurrentPredictions.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
@@ -945,6 +989,20 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('后区拖统计')).toBeInTheDocument()
     expect(screen.queryByText('前区统计')).not.toBeInTheDocument()
     expect(screen.queryByText('后区统计')).not.toBeInTheDocument()
+  })
+
+  it('keeps dlt direct and dantuo current predictions separate by mode switch', async () => {
+    simulateDltModeCoexistCurrentPredictions.current = true
+    renderPage()
+
+    expect(screen.getByText('01')).toBeInTheDocument()
+    expect(screen.queryByText('前胆')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
+
+    expect(screen.getByText('前胆')).toBeInTheDocument()
+    expect(screen.getByText('前拖')).toBeInTheDocument()
+    expect(screen.queryByText('04')).not.toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {

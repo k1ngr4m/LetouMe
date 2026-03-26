@@ -6,6 +6,7 @@ from concurrent.futures import Future
 from unittest.mock import Mock, patch
 
 from backend.app.services.prediction_generation_service import PredictionGenerationService
+from backend.app.services.prediction_service import PredictionService
 from backend.core.model_config import ModelDefinition
 
 
@@ -60,6 +61,90 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         with patch.object(service.model_repository, "get_model", return_value={"model_code": "model-a", "is_active": False, "is_deleted": False, "lottery_codes": ["dlt"]}):
             with self.assertRaisesRegex(ValueError, "已停用模型不能生成预测数据"):
                 service.validate_model("model-a", lottery_code="dlt")
+
+    def test_save_current_prediction_keeps_dlt_direct_and_dantuo_side_by_side(self) -> None:
+        service = PredictionService()
+        existing_current = {
+            "lottery_code": "dlt",
+            "prediction_date": "2026-03-26",
+            "target_period": "2026033",
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "direct",
+                    "predictions": [{"group_id": 1, "play_type": "direct", "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["06", "07"]}],
+                }
+            ],
+        }
+        incoming_payload = {
+            "lottery_code": "dlt",
+            "prediction_date": "2026-03-26",
+            "target_period": "2026033",
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "dantuo",
+                    "predictions": [{"group_id": 1, "play_type": "dlt_dantuo", "front_dan": ["01"], "front_tuo": ["02", "03", "04", "05"], "back_dan": [], "back_tuo": ["06", "07"]}],
+                }
+            ],
+        }
+
+        with (
+            patch.object(service, "get_current_payload_by_period", return_value=existing_current),
+            patch.object(service.prediction_repository, "upsert_current_prediction") as upsert_mock,
+            patch.object(service, "_invalidate_prediction_cache"),
+        ):
+            service.save_current_prediction(incoming_payload)
+
+        saved_payload = upsert_mock.call_args.args[0]
+        self.assertEqual(len(saved_payload["models"]), 2)
+        self.assertEqual(sorted(model["prediction_play_mode"] for model in saved_payload["models"]), ["dantuo", "direct"])
+
+    def test_save_current_prediction_replaces_same_dlt_play_mode_only(self) -> None:
+        service = PredictionService()
+        existing_current = {
+            "lottery_code": "dlt",
+            "prediction_date": "2026-03-26",
+            "target_period": "2026033",
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "direct",
+                    "predictions": [{"group_id": 1, "play_type": "direct", "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["06", "07"]}],
+                },
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "dantuo",
+                    "predictions": [{"group_id": 1, "play_type": "dlt_dantuo", "front_dan": ["01"], "front_tuo": ["02", "03", "04", "05"], "back_dan": [], "back_tuo": ["06", "07"]}],
+                },
+            ],
+        }
+        incoming_payload = {
+            "lottery_code": "dlt",
+            "prediction_date": "2026-03-27",
+            "target_period": "2026033",
+            "models": [
+                {
+                    "model_id": "model-a",
+                    "prediction_play_mode": "direct",
+                    "predictions": [{"group_id": 1, "play_type": "direct", "red_balls": ["08", "09", "10", "11", "12"], "blue_balls": ["01", "02"]}],
+                }
+            ],
+        }
+
+        with (
+            patch.object(service, "get_current_payload_by_period", return_value=existing_current),
+            patch.object(service.prediction_repository, "upsert_current_prediction") as upsert_mock,
+            patch.object(service, "_invalidate_prediction_cache"),
+        ):
+            service.save_current_prediction(incoming_payload)
+
+        saved_payload = upsert_mock.call_args.args[0]
+        self.assertEqual(len(saved_payload["models"]), 2)
+        direct_model = next(model for model in saved_payload["models"] if model["prediction_play_mode"] == "direct")
+        dantuo_model = next(model for model in saved_payload["models"] if model["prediction_play_mode"] == "dantuo")
+        self.assertEqual(direct_model["predictions"][0]["red_balls"], ["08", "09", "10", "11", "12"])
+        self.assertEqual(dantuo_model["predictions"][0]["play_type"], "dlt_dantuo")
 
     def test_prediction_matches_play_mode_for_pl3(self) -> None:
         self.assertTrue(

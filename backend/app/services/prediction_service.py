@@ -379,30 +379,13 @@ class PredictionService:
         target_period = str(payload.get("target_period") or "")
         current = self.get_current_payload_by_period(target_period, lottery_code=lottery_code) if target_period else self.get_current_payload(lottery_code=lottery_code)
         if current.get("target_period") == target_period:
-            def model_map_key(model_payload: dict[str, Any]) -> str:
-                model_id = str(model_payload.get("model_id") or "").strip()
-                if not model_id:
-                    return ""
-                prediction_play_mode = str(model_payload.get("prediction_play_mode") or "").strip().lower()
-                if not prediction_play_mode:
-                    groups = model_payload.get("predictions")
-                    has_direct_sum = isinstance(groups, list) and any(
-                        str(group.get("play_type") or "").strip().lower() == "direct_sum"
-                        for group in groups
-                        if isinstance(group, dict)
-                    )
-                    prediction_play_mode = "direct_sum" if has_direct_sum and lottery_code == "pl3" else "direct"
-                if lottery_code != "pl3":
-                    prediction_play_mode = "direct"
-                return f"{model_id}::{prediction_play_mode}"
-
             existing_model_map = {
-                model_map_key(model): model
+                self._build_model_identity_key(model): model
                 for model in current.get("models", [])
-                if model_map_key(model)
+                if self._build_model_identity_key(model)
             }
             for model in payload.get("models", []):
-                model_key = model_map_key(model)
+                model_key = self._build_model_identity_key(model)
                 if not model_key:
                     continue
                 existing_model_map[model_key] = model
