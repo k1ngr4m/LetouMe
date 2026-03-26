@@ -16,21 +16,13 @@ def normalize_lottery_code(value: str | None) -> str:
 
 
 def storage_issue_no(lottery_code: str, period: str) -> str:
-    normalized_code = normalize_lottery_code(lottery_code)
-    normalized_period = str(period or "").strip()
-    if normalized_code == "dlt":
-        return normalized_period
-    prefix = f"{normalized_code}:"
-    return normalized_period if normalized_period.startswith(prefix) else f"{prefix}{normalized_period}"
+    normalize_lottery_code(lottery_code)
+    return str(period or "").strip()
 
 
 def display_period(lottery_code: str, issue_no: str) -> str:
-    normalized_code = normalize_lottery_code(lottery_code)
-    text = str(issue_no or "").strip()
-    prefix = f"{normalized_code}:"
-    if normalized_code != "dlt" and text.startswith(prefix):
-        return text[len(prefix):]
-    return text
+    normalize_lottery_code(lottery_code)
+    return str(issue_no or "").strip()
 
 
 def pad_number(value: Any, *, width: int = 2) -> str:

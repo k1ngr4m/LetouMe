@@ -4,6 +4,7 @@ from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
+from backend.app.number_codec import EMPTY_NUMBER_FIELDS, build_number_rows, with_number_fields, merge_number_rows
 
 
 class MyBetRepository:
@@ -16,17 +17,8 @@ class MyBetRepository:
                         SELECT
                             record.id,
                             record.user_id,
-                            record.lottery_code,
                             record.target_period,
                             record.play_type,
-                            record.front_numbers,
-                            record.back_numbers,
-                            record.direct_ten_thousands,
-                            record.direct_thousands,
-                            record.direct_hundreds,
-                            record.direct_tens,
-                            record.direct_units,
-                            record.group_numbers,
                             record.multiplier,
                             record.is_append,
                             record.bet_count,
@@ -41,14 +33,17 @@ class MyBetRepository:
                             meta.ticket_purchased_at
                         FROM my_bet_record AS record
                         LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
-                        WHERE record.user_id = ? AND record.lottery_code = ?
+                        WHERE record.user_id = ?
                         ORDER BY record.target_period DESC, record.created_at DESC, record.id DESC
                         """,
-                        (user_id, lottery_code),
+                        (user_id,),
                     )
                     records = cursor.fetchall()
                     line_map = self._list_lines_map(cursor, [int(item["id"]) for item in records])
-                    return [{**item, "lines": line_map.get(int(item["id"]), [])} for item in records]
+                    return [
+                        self._compose_record_payload(item, line_map.get(int(item["id"]), []), lottery_code=lottery_code)
+                        for item in records
+                    ]
 
     def create_record(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = str(payload.get("lottery_code") or "dlt")
@@ -59,37 +54,18 @@ class MyBetRepository:
                         """
                         INSERT INTO my_bet_record (
                             user_id,
-                            lottery_code,
                             target_period,
                             play_type,
-                            front_numbers,
-                            back_numbers,
-                            direct_ten_thousands,
-                            direct_thousands,
-                            direct_hundreds,
-                            direct_tens,
-                            direct_units,
-                            group_numbers,
                             multiplier,
                             is_append,
                             bet_count,
                             amount
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
-                            lottery_code,
                             str(payload.get("target_period") or ""),
                             str(payload.get("play_type") or "dlt"),
-                            str(payload.get("front_numbers") or ""),
-                            str(payload.get("back_numbers") or ""),
-                            payload.get("direct_ten_thousands"),
-                            payload.get("direct_thousands"),
-                            payload.get("direct_hundreds"),
-                            payload.get("direct_tens"),
-                            payload.get("direct_units"),
-                            payload.get("group_numbers"),
                             int(payload.get("multiplier") or 1),
                             1 if bool(payload.get("is_append")) else 0,
                             int(payload.get("bet_count") or 0),
@@ -112,38 +88,21 @@ class MyBetRepository:
                         SET
                             target_period = ?,
                             play_type = ?,
-                            front_numbers = ?,
-                            back_numbers = ?,
-                            direct_ten_thousands = ?,
-                            direct_thousands = ?,
-                            direct_hundreds = ?,
-                            direct_tens = ?,
-                            direct_units = ?,
-                            group_numbers = ?,
                             multiplier = ?,
                             is_append = ?,
                             bet_count = ?,
                             amount = ?
-                        WHERE id = ? AND user_id = ? AND lottery_code = ?
+                        WHERE id = ? AND user_id = ?
                         """,
                         (
                             str(payload.get("target_period") or ""),
                             str(payload.get("play_type") or "dlt"),
-                            str(payload.get("front_numbers") or ""),
-                            str(payload.get("back_numbers") or ""),
-                            payload.get("direct_ten_thousands"),
-                            payload.get("direct_thousands"),
-                            payload.get("direct_hundreds"),
-                            payload.get("direct_tens"),
-                            payload.get("direct_units"),
-                            payload.get("group_numbers"),
                             int(payload.get("multiplier") or 1),
                             1 if bool(payload.get("is_append")) else 0,
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
                             record_id,
                             user_id,
-                            lottery_code,
                         ),
                     )
                     if cursor.rowcount <= 0:
@@ -161,17 +120,8 @@ class MyBetRepository:
                         SELECT
                             record.id,
                             record.user_id,
-                            record.lottery_code,
                             record.target_period,
                             record.play_type,
-                            record.front_numbers,
-                            record.back_numbers,
-                            record.direct_ten_thousands,
-                            record.direct_thousands,
-                            record.direct_hundreds,
-                            record.direct_tens,
-                            record.direct_units,
-                            record.group_numbers,
                             record.multiplier,
                             record.is_append,
                             record.bet_count,
@@ -186,24 +136,24 @@ class MyBetRepository:
                             meta.ticket_purchased_at
                         FROM my_bet_record AS record
                         LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
-                        WHERE record.id = ? AND record.user_id = ? AND record.lottery_code = ?
+                        WHERE record.id = ? AND record.user_id = ?
                         LIMIT 1
                         """,
-                        (record_id, user_id, lottery_code),
+                        (record_id, user_id),
                     )
                     record = cursor.fetchone()
                     if not record:
                         return None
                     line_map = self._list_lines_map(cursor, [record_id])
-                    return {**record, "lines": line_map.get(record_id, [])}
+                    return self._compose_record_payload(record, line_map.get(record_id, []), lottery_code=lottery_code)
 
     def delete_record(self, record_id: int, user_id: int, lottery_code: str = "dlt") -> bool:
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        "DELETE FROM my_bet_record WHERE id = ? AND user_id = ? AND lottery_code = ?",
-                        (record_id, user_id, lottery_code),
+                        "DELETE FROM my_bet_record WHERE id = ? AND user_id = ?",
+                        (record_id, user_id),
                     )
                     return cursor.rowcount > 0
 
@@ -219,43 +169,26 @@ class MyBetRepository:
                 """
                 INSERT INTO my_bet_record_line (
                     record_id,
-                    lottery_code,
                     line_no,
                     play_type,
-                    front_numbers,
-                    back_numbers,
-                    direct_ten_thousands,
-                    direct_thousands,
-                    direct_hundreds,
-                    direct_tens,
-                    direct_units,
-                    group_numbers,
                     multiplier,
                     is_append,
                     bet_count,
                     amount
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record_id,
-                    lottery_code,
                     index,
                     str(line.get("play_type") or "dlt"),
-                    str(line.get("front_numbers") or ""),
-                    str(line.get("back_numbers") or ""),
-                    line.get("direct_ten_thousands"),
-                    line.get("direct_thousands"),
-                    line.get("direct_hundreds"),
-                    line.get("direct_tens"),
-                    line.get("direct_units"),
-                    line.get("group_numbers"),
                     int(line.get("multiplier") or 1),
                     1 if bool(line.get("is_append")) else 0,
                     int(line.get("bet_count") or 0),
                     int(line.get("amount") or 0),
                 ),
             )
+            line_id = int(cursor.lastrowid)
+            MyBetRepository._replace_line_numbers(cursor, line_id=line_id, line=line)
 
     @staticmethod
     def _upsert_meta(cursor: Any, *, record_id: int, lottery_code: str, payload: dict[str, Any]) -> None:
@@ -266,7 +199,6 @@ class MyBetRepository:
             """
             INSERT INTO my_bet_record_meta (
                 record_id,
-                lottery_code,
                 source_type,
                 ticket_image_url,
                 ocr_text,
@@ -274,7 +206,7 @@ class MyBetRepository:
                 ocr_recognized_at,
                 ticket_purchased_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 source_type = VALUES(source_type),
                 ticket_image_url = VALUES(ticket_image_url),
@@ -285,7 +217,6 @@ class MyBetRepository:
             """,
             (
                 record_id,
-                lottery_code,
                 source_type,
                 str(payload.get("ticket_image_url") or "") or None,
                 str(payload.get("ocr_text") or "") or None,
@@ -303,17 +234,10 @@ class MyBetRepository:
         cursor.execute(
             f"""
             SELECT
+                id,
                 record_id,
                 line_no,
                 play_type,
-                front_numbers,
-                back_numbers,
-                direct_ten_thousands,
-                direct_thousands,
-                direct_hundreds,
-                direct_tens,
-                direct_units,
-                group_numbers,
                 multiplier,
                 is_append,
                 bet_count,
@@ -325,10 +249,58 @@ class MyBetRepository:
             tuple(record_ids),
         )
         line_map: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
+        rows = cursor.fetchall()
+        line_ids = [int(row["id"]) for row in rows if row.get("id") is not None]
+        line_numbers_map = MyBetRepository._load_line_numbers_map(cursor, line_ids)
+        for row in rows:
             record_id = int(row.get("record_id") or 0)
+            row.update(with_number_fields(line_numbers_map.get(int(row.get("id") or 0))))
             line_map.setdefault(record_id, []).append(row)
         return line_map
+
+    @staticmethod
+    def _compose_record_payload(record: dict[str, Any], lines: list[dict[str, Any]], *, lottery_code: str) -> dict[str, Any]:
+        primary_line = lines[0] if lines else {}
+        primary_numbers = with_number_fields(
+            {field_name: primary_line.get(field_name) for field_name in EMPTY_NUMBER_FIELDS}
+        )
+        return {
+            **record,
+            **primary_numbers,
+            "lottery_code": lottery_code,
+            "lines": lines,
+        }
+
+    @staticmethod
+    def _replace_line_numbers(cursor: Any, *, line_id: int, line: dict[str, Any]) -> None:
+        cursor.execute("DELETE FROM my_bet_record_line_number WHERE line_id = ?", (line_id,))
+        for number_role, number_position, number_value in build_number_rows(line):
+            cursor.execute(
+                """
+                INSERT INTO my_bet_record_line_number (line_id, number_role, number_position, number_value)
+                VALUES (?, ?, ?, ?)
+                """,
+                (line_id, number_role, number_position, number_value),
+            )
+
+    @staticmethod
+    def _load_line_numbers_map(cursor: Any, line_ids: list[int]) -> dict[int, dict[str, str]]:
+        if not line_ids:
+            return {}
+        placeholders = ", ".join(["?"] * len(line_ids))
+        cursor.execute(
+            f"""
+            SELECT line_id, number_role, number_position, number_value
+            FROM my_bet_record_line_number
+            WHERE line_id IN ({placeholders})
+            ORDER BY line_id ASC, number_role ASC, number_position ASC
+            """,
+            tuple(line_ids),
+        )
+        grouped: dict[int, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            grouped.setdefault(int(row["line_id"]), []).append(row)
+        return {line_id: merge_number_rows(rows) for line_id, rows in grouped.items()}
 
     @staticmethod
     def _normalize_datetime_value(value: Any) -> str | None:

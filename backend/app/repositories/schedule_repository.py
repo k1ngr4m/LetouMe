@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import json
 from datetime import datetime
 from typing import Any
 
@@ -42,14 +40,32 @@ class ScheduleRepository:
                     ORDER BY is_active DESC, next_run_at ASC, created_at DESC
                     """
                 )
-                return [self._serialize_task(row) for row in cursor.fetchall()]
+                rows = cursor.fetchall()
+                task_ids = [int(row["id"]) for row in rows]
+                model_codes_by_task = self._load_task_model_codes(cursor, task_ids)
+                weekdays_by_task = self._load_task_weekdays(cursor, task_ids)
+                return [
+                    self._serialize_task(
+                        row,
+                        model_codes=model_codes_by_task.get(int(row["id"])),
+                        weekdays=weekdays_by_task.get(int(row["id"])),
+                    )
+                    for row in rows
+                ]
 
     def get_task(self, task_code: str) -> dict[str, Any] | None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT * FROM scheduled_task WHERE task_code = ?", (task_code,))
                 row = cursor.fetchone()
-        return self._serialize_task(row) if row else None
+                if not row:
+                    return None
+                task_id = int(row["id"])
+                return self._serialize_task(
+                    row,
+                    model_codes=self._load_task_model_codes(cursor, [task_id]).get(task_id),
+                    weekdays=self._load_task_weekdays(cursor, [task_id]).get(task_id),
+                )
 
     def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         with get_connection() as connection:
@@ -61,13 +77,11 @@ class ScheduleRepository:
                         task_name,
                         task_type,
                         lottery_code,
-                        model_codes_json,
                         generation_mode,
                         overwrite_existing,
                         schedule_mode,
                         preset_type,
                         time_of_day,
-                        weekdays_json,
                         cron_expression,
                         is_active,
                         next_run_at,
@@ -75,20 +89,18 @@ class ScheduleRepository:
                         last_run_status,
                         last_error_message,
                         last_task_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         payload["task_code"],
                         payload["task_name"],
                         payload["task_type"],
                         payload["lottery_code"],
-                        json.dumps(payload.get("model_codes") or [], ensure_ascii=False),
                         payload.get("generation_mode") or "current",
                         1 if payload.get("overwrite_existing") else 0,
                         payload["schedule_mode"],
                         payload.get("preset_type"),
                         payload.get("time_of_day"),
-                        json.dumps(payload.get("weekdays") or [], ensure_ascii=False),
                         payload.get("cron_expression"),
                         1 if payload.get("is_active", True) else 0,
                         _parse_datetime(payload.get("next_run_at")),
@@ -98,24 +110,26 @@ class ScheduleRepository:
                         payload.get("last_task_id"),
                     ),
                 )
+                task_id = int(cursor.lastrowid)
+                self._replace_task_models(cursor, task_id, payload.get("model_codes") or [])
+                self._replace_task_weekdays(cursor, task_id, payload.get("weekdays") or [])
         return self.get_task(str(payload["task_code"])) or {}
 
     def update_task(self, task_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
+                task_id = self._get_task_id(cursor, task_code)
                 cursor.execute(
                     """
                     UPDATE scheduled_task
                     SET task_name = ?,
                         task_type = ?,
                         lottery_code = ?,
-                        model_codes_json = ?,
                         generation_mode = ?,
                         overwrite_existing = ?,
                         schedule_mode = ?,
                         preset_type = ?,
                         time_of_day = ?,
-                        weekdays_json = ?,
                         cron_expression = ?,
                         is_active = ?,
                         next_run_at = ?,
@@ -126,21 +140,19 @@ class ScheduleRepository:
                         payload["task_name"],
                         payload["task_type"],
                         payload["lottery_code"],
-                        json.dumps(payload.get("model_codes") or [], ensure_ascii=False),
                         payload.get("generation_mode") or "current",
                         1 if payload.get("overwrite_existing") else 0,
                         payload["schedule_mode"],
                         payload.get("preset_type"),
                         payload.get("time_of_day"),
-                        json.dumps(payload.get("weekdays") or [], ensure_ascii=False),
                         payload.get("cron_expression"),
                         1 if payload.get("is_active", True) else 0,
                         _parse_datetime(payload.get("next_run_at")),
                         task_code,
                     ),
                 )
-                if cursor.rowcount == 0:
-                    raise KeyError(task_code)
+                self._replace_task_models(cursor, task_id, payload.get("model_codes") or [])
+                self._replace_task_weekdays(cursor, task_id, payload.get("weekdays") or [])
         return self.get_task(task_code) or {}
 
     def set_task_active(self, task_code: str, is_active: bool, next_run_at: str | None) -> dict[str, Any]:
@@ -171,30 +183,28 @@ class ScheduleRepository:
         next_active = 0 if (deactivate_if_empty and not normalized_codes) else None
         with get_connection() as connection:
             with connection.cursor() as cursor:
+                task_id = self._get_task_id(cursor, task_code)
                 if next_active is None:
                     cursor.execute(
                         """
                         UPDATE scheduled_task
-                        SET model_codes_json = ?,
-                            updated_at = CURRENT_TIMESTAMP
+                        SET updated_at = CURRENT_TIMESTAMP
                         WHERE task_code = ?
                         """,
-                        (json.dumps(normalized_codes, ensure_ascii=False), task_code),
+                        (task_code,),
                     )
                 else:
                     cursor.execute(
                         """
                         UPDATE scheduled_task
-                        SET model_codes_json = ?,
-                            is_active = ?,
+                        SET is_active = ?,
                             next_run_at = NULL,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE task_code = ?
                         """,
-                        (json.dumps(normalized_codes, ensure_ascii=False), next_active, task_code),
+                        (next_active, task_code),
                     )
-                if cursor.rowcount == 0:
-                    raise KeyError(task_code)
+                self._replace_task_models(cursor, task_id, normalized_codes)
         return self.get_task(task_code) or {}
 
     def delete_task(self, task_code: str) -> None:
@@ -243,11 +253,28 @@ class ScheduleRepository:
                     """,
                     (due_before,),
                 )
-                return [self._serialize_task(row) for row in cursor.fetchall()]
+                rows = cursor.fetchall()
+                task_ids = [int(row["id"]) for row in rows]
+                model_codes_by_task = self._load_task_model_codes(cursor, task_ids)
+                weekdays_by_task = self._load_task_weekdays(cursor, task_ids)
+                return [
+                    self._serialize_task(
+                        row,
+                        model_codes=model_codes_by_task.get(int(row["id"])),
+                        weekdays=weekdays_by_task.get(int(row["id"])),
+                    )
+                    for row in rows
+                ]
 
-    def _serialize_task(self, row: dict[str, Any]) -> dict[str, Any]:
-        model_codes = json.loads(row.get("model_codes_json") or "[]")
-        weekdays = json.loads(row.get("weekdays_json") or "[]")
+    def _serialize_task(
+        self,
+        row: dict[str, Any],
+        *,
+        model_codes: list[str] | None = None,
+        weekdays: list[int] | None = None,
+    ) -> dict[str, Any]:
+        model_codes = list(model_codes or [])
+        weekdays = list(weekdays or [])
         return {
             "task_code": str(row["task_code"]),
             "task_name": str(row["task_name"]),
@@ -270,3 +297,94 @@ class ScheduleRepository:
             "created_at": _format_datetime(row.get("created_at")),
             "updated_at": _format_datetime(row.get("updated_at")),
         }
+
+    @staticmethod
+    def _get_task_id(cursor, task_code: str) -> int:
+        cursor.execute("SELECT id FROM scheduled_task WHERE task_code = ?", (task_code,))
+        row = cursor.fetchone()
+        if not row:
+            raise KeyError(task_code)
+        return int(row["id"])
+
+    @staticmethod
+    def _resolve_model_ids(cursor, model_codes: list[str]) -> list[tuple[int, str]]:
+        normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
+        if not normalized_codes:
+            return []
+        placeholders = ", ".join("?" for _ in normalized_codes)
+        cursor.execute(
+            f"""
+            SELECT id, model_code
+            FROM ai_model
+            WHERE model_code IN ({placeholders}) AND is_deleted = 0
+            """,
+            tuple(normalized_codes),
+        )
+        rows = cursor.fetchall()
+        row_by_code = {str(row["model_code"]): int(row["id"]) for row in rows}
+        missing_codes = [code for code in normalized_codes if code not in row_by_code]
+        if missing_codes:
+            raise ValueError(f"未知模型: {', '.join(missing_codes)}")
+        return [(row_by_code[code], code) for code in normalized_codes]
+
+    def _replace_task_models(self, cursor, task_id: int, model_codes: list[str]) -> None:
+        cursor.execute("DELETE FROM scheduled_task_model WHERE task_id = ?", (task_id,))
+        for sort_order, (model_id, _) in enumerate(self._resolve_model_ids(cursor, model_codes), start=1):
+            cursor.execute(
+                """
+                INSERT INTO scheduled_task_model (task_id, model_id, sort_order)
+                VALUES (?, ?, ?)
+                """,
+                (task_id, model_id, sort_order),
+            )
+
+    @staticmethod
+    def _replace_task_weekdays(cursor, task_id: int, weekdays: list[int]) -> None:
+        cursor.execute("DELETE FROM scheduled_task_weekday WHERE task_id = ?", (task_id,))
+        for weekday in sorted({int(value) for value in weekdays if int(value) >= 0}):
+            cursor.execute(
+                """
+                INSERT INTO scheduled_task_weekday (task_id, weekday)
+                VALUES (?, ?)
+                """,
+                (task_id, weekday),
+            )
+
+    @staticmethod
+    def _load_task_model_codes(cursor, task_ids: list[int]) -> dict[int, list[str]]:
+        if not task_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in task_ids)
+        cursor.execute(
+            f"""
+            SELECT stm.task_id, am.model_code
+            FROM scheduled_task_model stm
+            INNER JOIN ai_model am ON am.id = stm.model_id
+            WHERE stm.task_id IN ({placeholders})
+            ORDER BY stm.task_id ASC, stm.sort_order ASC, am.model_code ASC
+            """,
+            tuple(task_ids),
+        )
+        result: dict[int, list[str]] = {}
+        for row in cursor.fetchall():
+            result.setdefault(int(row["task_id"]), []).append(str(row["model_code"]))
+        return result
+
+    @staticmethod
+    def _load_task_weekdays(cursor, task_ids: list[int]) -> dict[int, list[int]]:
+        if not task_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in task_ids)
+        cursor.execute(
+            f"""
+            SELECT task_id, weekday
+            FROM scheduled_task_weekday
+            WHERE task_id IN ({placeholders})
+            ORDER BY task_id ASC, weekday ASC
+            """,
+            tuple(task_ids),
+        )
+        result: dict[int, list[int]] = {}
+        for row in cursor.fetchall():
+            result.setdefault(int(row["task_id"]), []).append(int(row["weekday"]))
+        return result

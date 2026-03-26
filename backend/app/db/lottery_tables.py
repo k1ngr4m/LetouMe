@@ -21,8 +21,10 @@ LOTTERY_SCOPED_TABLES = (
     "prediction_hit_number",
     "model_batch_summary",
     "simulation_ticket",
+    "simulation_ticket_number",
     "my_bet_record",
     "my_bet_record_line",
+    "my_bet_record_line_number",
     "my_bet_record_meta",
 )
 

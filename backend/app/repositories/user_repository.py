@@ -12,7 +12,16 @@ class UserRepository:
     def has_any_admin(self) -> bool:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT 1 FROM app_user WHERE role = ? AND is_active = 1 LIMIT 1", (SUPER_ADMIN_ROLE,))
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM app_user au
+                    INNER JOIN app_role ar ON ar.id = au.role_id
+                    WHERE ar.role_code = ? AND au.is_active = 1
+                    LIMIT 1
+                    """,
+                    (SUPER_ADMIN_ROLE,),
+                )
                 return cursor.fetchone() is not None
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -21,16 +30,18 @@ class UserRepository:
                 cursor.execute("SELECT 1 FROM app_user WHERE username = ?", (payload["username"],))
                 if cursor.fetchone():
                     raise ValueError(f"用户名已存在: {payload['username']}")
+                role_code = str(payload.get("role") or NORMAL_USER_ROLE)
+                role_id = self._resolve_role_id(cursor, role_code)
                 cursor.execute(
                     """
-                    INSERT INTO app_user (username, nickname, password_hash, role, is_active)
+                    INSERT INTO app_user (username, nickname, password_hash, role_id, is_active)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
                         payload["username"],
                         payload.get("nickname") or payload["username"],
                         payload["password_hash"],
-                        payload.get("role") or NORMAL_USER_ROLE,
+                        role_id,
                         1 if payload.get("is_active", True) else 0,
                     ),
                 )
@@ -42,10 +53,18 @@ class UserRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT au.id, au.username, au.nickname, au.role, ar.role_name, au.is_active, au.last_login_at, au.created_at
+                    SELECT
+                        au.id,
+                        au.username,
+                        au.nickname,
+                        ar.role_code AS role,
+                        ar.role_name AS role_name,
+                        au.is_active,
+                        au.last_login_at,
+                        au.created_at
                     FROM app_user au
-                    LEFT JOIN app_role ar ON ar.role_code = au.role
-                    ORDER BY au.role DESC, au.created_at ASC
+                    INNER JOIN app_role ar ON ar.id = au.role_id
+                    ORDER BY ar.role_code DESC, au.created_at ASC
                     """
                 )
                 return cursor.fetchall()
@@ -59,13 +78,14 @@ class UserRepository:
     def update_user(self, user_id: int, *, role: str, is_active: bool) -> dict[str, Any]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
+                role_id = self._resolve_role_id(cursor, role)
                 cursor.execute(
                     """
                     UPDATE app_user
-                    SET role = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    SET role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
-                    (role, 1 if is_active else 0, user_id),
+                    (role_id, 1 if is_active else 0, user_id),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(user_id)
@@ -153,14 +173,14 @@ class UserRepository:
                         au.username,
                         au.nickname,
                         au.password_hash,
-                        au.role,
-                        ar.role_name,
+                        ar.role_code AS role,
+                        ar.role_name AS role_name,
                         au.is_active,
                         au.last_login_at,
                         au.created_at
                     FROM user_session us
                     INNER JOIN app_user au ON au.id = us.user_id
-                    LEFT JOIN app_role ar ON ar.role_code = au.role
+                    INNER JOIN app_role ar ON ar.id = au.role_id
                     WHERE us.session_token = ?
                     LIMIT 1
                     """,
@@ -195,9 +215,18 @@ class UserRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT au.id, au.username, au.nickname, au.password_hash, au.role, ar.role_name, au.is_active, au.last_login_at, au.created_at
+                    SELECT
+                        au.id,
+                        au.username,
+                        au.nickname,
+                        au.password_hash,
+                        ar.role_code AS role,
+                        ar.role_name AS role_name,
+                        au.is_active,
+                        au.last_login_at,
+                        au.created_at
                     FROM app_user au
-                    LEFT JOIN app_role ar ON ar.role_code = au.role
+                    INNER JOIN app_role ar ON ar.id = au.role_id
                     WHERE {where_clause}
                     LIMIT 1
                     """,
@@ -229,3 +258,11 @@ class UserRepository:
         permissions = [str(row["permission_code"]) for row in cursor.fetchall()]
         runtime_cache.set(cache_key, permissions, ttl_seconds=300)
         return permissions
+
+    @staticmethod
+    def _resolve_role_id(cursor, role_code: str) -> int:
+        cursor.execute("SELECT id FROM app_role WHERE role_code = ?", (role_code,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"未知角色: {role_code}")
+        return int(row["id"])

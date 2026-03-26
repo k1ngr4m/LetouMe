@@ -23,7 +23,7 @@ class RoleRepository:
                         ar.is_system,
                         COUNT(au.id) AS member_count
                     FROM app_role ar
-                    LEFT JOIN app_user au ON au.role = ar.role_code
+                    LEFT JOIN app_user au ON au.role_id = ar.id
                     GROUP BY ar.id, ar.role_code, ar.role_name, ar.is_system
                     ORDER BY ar.is_system DESC, ar.role_name ASC
                     """
@@ -151,7 +151,16 @@ class RoleRepository:
                     raise KeyError(role_code)
                 if bool(row["is_system"]):
                     raise ValueError("系统角色不能删除")
-                cursor.execute("SELECT 1 FROM app_user WHERE role = ? LIMIT 1", (role_code,))
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM app_user au
+                    INNER JOIN app_role ar ON ar.id = au.role_id
+                    WHERE ar.role_code = ?
+                    LIMIT 1
+                    """,
+                    (role_code,),
+                )
                 if cursor.fetchone():
                     raise ValueError("仍有用户使用该角色，不能删除")
                 cursor.execute("DELETE FROM app_role WHERE role_code = ?", (role_code,))
@@ -161,7 +170,15 @@ class RoleRepository:
     def active_super_admin_count(self) -> int:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) AS total FROM app_user WHERE role = ? AND is_active = 1", (SUPER_ADMIN_ROLE,))
+                cursor.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM app_user au
+                    INNER JOIN app_role ar ON ar.id = au.role_id
+                    WHERE ar.role_code = ? AND au.is_active = 1
+                    """,
+                    (SUPER_ADMIN_ROLE,),
+                )
                 return int((cursor.fetchone() or {}).get("total") or 0)
 
     def _load_permissions(self, cursor) -> dict[str, list[str]]:

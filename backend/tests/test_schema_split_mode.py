@@ -10,6 +10,8 @@ class SchemaSplitModeTests(unittest.TestCase):
     def test_split_mode_skips_shared_lottery_tables(self) -> None:
         statements = get_schema_statements(split_enabled=True)
         self.assertTrue(any("CREATE TABLE IF NOT EXISTS dlt_draw_issue" in statement for statement in statements))
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS dlt_simulation_ticket_number" in statement for statement in statements))
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS dlt_my_bet_record_line_number" in statement for statement in statements))
         self.assertFalse(any("CREATE TABLE IF NOT EXISTS draw_issue" in statement for statement in statements))
         for table_name in LOTTERY_SCOPED_TABLES:
             self.assertNotIn(table_name, get_schema_migrations(split_enabled=True))

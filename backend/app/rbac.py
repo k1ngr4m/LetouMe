@@ -128,8 +128,20 @@ def _sync_role_permissions(cursor, role_ids: dict[str, int], permission_ids: dic
 
 def _migrate_legacy_user_roles(cursor) -> None:
     cursor.execute("UPDATE app_user SET nickname = username WHERE nickname IS NULL OR nickname = ''")
-    cursor.execute("UPDATE app_user SET role = ? WHERE role = 'admin'", (SUPER_ADMIN_ROLE,))
-    cursor.execute("UPDATE app_user SET role = ? WHERE role = 'user'", (NORMAL_USER_ROLE,))
+    cursor.execute("SELECT id FROM app_role WHERE role_code = ?", (NORMAL_USER_ROLE,))
+    row = cursor.fetchone()
+    if not row:
+        return
+    default_role_id = int(row["id"])
+    cursor.execute(
+        """
+        UPDATE app_user
+        SET role_id = ?
+        WHERE role_id IS NULL
+        """
+        ,
+        (default_role_id,),
+    )
 
 
 def serialize_role(row: dict[str, Any], permissions: list[str]) -> dict[str, Any]:

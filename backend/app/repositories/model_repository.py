@@ -81,7 +81,6 @@ class ModelRepository:
                     INSERT INTO ai_model (
                         model_code,
                         display_name,
-                        provider_id,
                         provider_model_id,
                         api_model_name,
                         is_active,
@@ -92,12 +91,11 @@ class ModelRepository:
                         is_deleted,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
                     (
                         model_code,
                         str(payload["display_name"]).strip(),
-                        provider_id,
                         provider_model_id,
                         api_model_name,
                         1 if payload.get("is_active", True) else 0,
@@ -138,7 +136,6 @@ class ModelRepository:
                     UPDATE ai_model
                     SET model_code = ?,
                         display_name = ?,
-                        provider_id = ?,
                         provider_model_id = ?,
                         api_model_name = ?,
                         is_active = ?,
@@ -152,7 +149,6 @@ class ModelRepository:
                     (
                         next_model_code,
                         str(payload["display_name"]).strip(),
-                        provider_id,
                         provider_model_id,
                         api_model_name,
                         1 if payload.get("is_active", True) else 0,
@@ -164,8 +160,6 @@ class ModelRepository:
                     ),
                 )
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
-                if next_model_code != model_code:
-                    self._sync_scheduled_task_model_codes(cursor, model_code, next_model_code)
         return self.get_model(next_model_code) or {}
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
@@ -218,7 +212,6 @@ class ModelRepository:
                         website_url,
                         api_key,
                         base_url,
-                        extra_options_json,
                         is_system_preset,
                         is_deleted
                     FROM model_provider
@@ -229,7 +222,15 @@ class ModelRepository:
                 provider_rows = cursor.fetchall()
                 provider_ids = [int(row["id"]) for row in provider_rows]
                 model_configs = self._fetch_provider_model_configs(cursor, provider_ids)
-        return [self._serialize_provider(row, model_configs.get(int(row["id"]), [])) for row in provider_rows]
+                provider_options = self._fetch_provider_options(cursor, provider_ids)
+        return [
+            self._serialize_provider(
+                row,
+                model_configs.get(int(row["id"]), []),
+                provider_options.get(int(row["id"])),
+            )
+            for row in provider_rows
+        ]
 
     def get_provider(self, provider_code: str) -> dict[str, Any] | None:
         with get_connection() as connection:
@@ -246,7 +247,6 @@ class ModelRepository:
                         website_url,
                         api_key,
                         base_url,
-                        extra_options_json,
                         is_system_preset,
                         is_deleted
                     FROM model_provider
@@ -259,7 +259,8 @@ class ModelRepository:
                     return None
                 provider_id = int(row["id"])
                 model_configs = self._fetch_provider_model_configs(cursor, [provider_id]).get(provider_id, [])
-        return self._serialize_provider(row, model_configs)
+                provider_options = self._fetch_provider_options(cursor, [provider_id]).get(provider_id)
+        return self._serialize_provider(row, model_configs, provider_options)
 
     def create_provider(self, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = self._normalize_provider_payload(payload, is_create=True)
@@ -279,11 +280,10 @@ class ModelRepository:
                         website_url,
                         api_key,
                         base_url,
-                        extra_options_json,
                         is_system_preset,
                         is_deleted
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
                     """,
                     (
                         normalized["code"],
@@ -293,13 +293,13 @@ class ModelRepository:
                         normalized["website_url"],
                         normalized["api_key"],
                         normalized["base_url"],
-                        normalized["extra_options_json"],
                         1 if normalized["is_system_preset"] else 0,
                     ),
                 )
                 cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (normalized["code"],))
                 provider_id = int(cursor.fetchone()["id"])
                 self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
+                self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
         return self.get_provider(normalized["code"]) or {}
 
     def update_provider(self, provider_code: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -322,7 +322,6 @@ class ModelRepository:
                         website_url = ?,
                         api_key = ?,
                         base_url = ?,
-                        extra_options_json = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE provider_code = ?
                     """,
@@ -333,12 +332,12 @@ class ModelRepository:
                         normalized["website_url"],
                         normalized["api_key"],
                         normalized["base_url"],
-                        normalized["extra_options_json"],
                         provider_code,
                     ),
                 )
                 if "model_configs" in normalized:
                     self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
+                self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
         return self.get_provider(provider_code) or {}
 
     def delete_provider(self, provider_code: str) -> dict[str, Any]:
@@ -418,8 +417,8 @@ class ModelRepository:
                 am.is_deleted,
                 am.updated_at
             FROM ai_model am
-            INNER JOIN model_provider mp ON mp.id = am.provider_id
-            LEFT JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+            INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+            INNER JOIN model_provider mp ON mp.id = pmc.provider_id
         """
         params: list[Any] = []
         where_clauses: list[str] = []
@@ -467,72 +466,46 @@ class ModelRepository:
             )
 
     @staticmethod
-    def _sync_scheduled_task_model_codes(cursor, old_model_code: str, new_model_code: str) -> None:
-        cursor.execute("SELECT id, model_codes_json FROM scheduled_task")
+    def _remove_model_from_prediction_tasks(cursor, model_code: str) -> None:
+        cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
+        model_row = cursor.fetchone()
+        model_id = int(model_row["id"]) if model_row else None
+        cursor.execute("SELECT id FROM scheduled_task WHERE task_type = 'prediction_generate'")
         rows = cursor.fetchall()
         for row in rows:
-            try:
-                model_codes = json.loads(row.get("model_codes_json") or "[]")
-            except Exception:
-                model_codes = []
-            normalized_codes = [str(code).strip() for code in (model_codes if isinstance(model_codes, list) else []) if str(code).strip()]
-            if old_model_code not in normalized_codes:
+            task_id = int(row["id"])
+            if model_id is None:
                 continue
-            next_codes: list[str] = []
-            for code in normalized_codes:
-                target_code = new_model_code if code == old_model_code else code
-                if target_code not in next_codes:
-                    next_codes.append(target_code)
             cursor.execute(
                 """
-                UPDATE scheduled_task
-                SET model_codes_json = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                DELETE FROM scheduled_task_model
+                WHERE task_id = ? AND model_id = ?
                 """,
-                (json.dumps(next_codes, ensure_ascii=False), int(row["id"])),
+                (task_id, model_id),
             )
-
-    @staticmethod
-    def _remove_model_from_prediction_tasks(cursor, model_code: str) -> None:
-        cursor.execute(
-            """
-            SELECT id, model_codes_json
-            FROM scheduled_task
-            WHERE task_type = 'prediction_generate'
-            """
-        )
-        rows = cursor.fetchall()
-        for row in rows:
-            try:
-                model_codes = json.loads(row.get("model_codes_json") or "[]")
-            except Exception:
-                model_codes = []
-            normalized_codes = [str(code).strip() for code in (model_codes if isinstance(model_codes, list) else []) if str(code).strip()]
-            if model_code not in normalized_codes:
+            if cursor.rowcount <= 0:
                 continue
-            next_codes = [code for code in normalized_codes if code != model_code]
-            if next_codes:
+            cursor.execute("SELECT COUNT(*) AS total FROM scheduled_task_model WHERE task_id = ?", (task_id,))
+            remaining = int((cursor.fetchone() or {}).get("total") or 0)
+            if remaining > 0:
                 cursor.execute(
                     """
                     UPDATE scheduled_task
-                    SET model_codes_json = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
-                    (json.dumps(next_codes, ensure_ascii=False), int(row["id"])),
+                    (task_id,),
                 )
                 continue
             cursor.execute(
                 """
                 UPDATE scheduled_task
-                SET model_codes_json = '[]',
-                    is_active = 0,
+                SET is_active = 0,
                     next_run_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (int(row["id"]),),
+                (task_id,),
             )
 
     def _upsert_provider(self, cursor, provider_code: str) -> int:
@@ -565,11 +538,10 @@ class ModelRepository:
                     website_url,
                     api_key,
                     base_url,
-                    extra_options_json,
                     is_system_preset,
                     is_deleted
                 )
-                VALUES (?, ?, ?, ?, ?, '', ?, ?, 1, 0)
+                VALUES (?, ?, ?, ?, ?, '', ?, 1, 0)
                 ON DUPLICATE KEY UPDATE
                     provider_name = VALUES(provider_name),
                     api_format = VALUES(api_format),
@@ -584,7 +556,6 @@ class ModelRepository:
                     template.get("remark") or "",
                     template.get("website_url") or "",
                     template.get("base_url") or DEFAULT_BASE_URL,
-                    json.dumps({}, ensure_ascii=False),
                 ),
             )
             cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (provider_code,))
@@ -658,14 +629,11 @@ class ModelRepository:
         return result
 
     @staticmethod
-    def _serialize_provider(row: dict[str, Any], model_configs: list[dict[str, Any]]) -> dict[str, Any]:
-        extra_options: dict[str, Any] = {}
-        try:
-            parsed = json.loads(str(row.get("extra_options_json") or ""))
-            if isinstance(parsed, dict):
-                extra_options = parsed
-        except Exception:
-            extra_options = {}
+    def _serialize_provider(
+        row: dict[str, Any],
+        model_configs: list[dict[str, Any]],
+        extra_options: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         return {
             "id": int(row["id"]),
             "code": str(row["provider_code"]),
@@ -675,7 +643,7 @@ class ModelRepository:
             "website_url": str(row.get("website_url") or ""),
             "api_key": str(row.get("api_key") or ""),
             "base_url": str(row.get("base_url") or ""),
-            "extra_options": extra_options,
+            "extra_options": extra_options or {},
             "is_system_preset": bool(row.get("is_system_preset")),
             "model_configs": model_configs,
         }
@@ -715,7 +683,7 @@ class ModelRepository:
             "website_url": str(payload.get("website_url") or "").strip(),
             "api_key": str(payload.get("api_key") or "").strip(),
             "base_url": str(payload.get("base_url") or "").strip() or DEFAULT_BASE_URL,
-            "extra_options_json": json.dumps(extra_options, ensure_ascii=False),
+            "extra_options": dict(extra_options),
             "is_system_preset": bool(payload.get("is_system_preset", False)),
         }
         if "model_configs" in payload:
@@ -801,6 +769,7 @@ class ModelRepository:
     def _resolve_provider_model_binding(cursor, provider_id: int, payload: dict[str, Any]) -> tuple[int | None, str]:
         provider_model_id_raw = payload.get("provider_model_id")
         provider_model_id = int(provider_model_id_raw) if str(provider_model_id_raw or "").strip() else None
+        provider_model_name = str(payload.get("provider_model_name") or "").strip()
         api_model_name = str(payload.get("api_model_name") or "").strip()
         if provider_model_id is not None:
             cursor.execute(
@@ -816,6 +785,38 @@ class ModelRepository:
                 raise ValueError("供应商模型配置不存在")
             if not api_model_name:
                 api_model_name = str(row.get("model_id") or "")
+        else:
+            config_model_id = provider_model_name or api_model_name
+            if not config_model_id:
+                raise ValueError("api_model_name 不能为空")
+            cursor.execute(
+                """
+                SELECT id
+                FROM provider_model_config
+                WHERE provider_id = ? AND model_id = ? AND is_deleted = 0
+                LIMIT 1
+                """,
+                (provider_id, config_model_id),
+            )
+            row = cursor.fetchone()
+            if row:
+                provider_model_id = int(row["id"])
+            else:
+                cursor.execute("SELECT COALESCE(MAX(sort_order), 0) AS sort_order FROM provider_model_config WHERE provider_id = ?", (provider_id,))
+                sort_order = int((cursor.fetchone() or {}).get("sort_order") or 0) + 1
+                cursor.execute(
+                    """
+                    INSERT INTO provider_model_config (provider_id, model_id, display_name, sort_order, is_deleted)
+                    VALUES (?, ?, ?, ?, 0)
+                    """,
+                    (
+                        provider_id,
+                        config_model_id,
+                        provider_model_name or api_model_name or config_model_id,
+                        sort_order,
+                    ),
+                )
+                provider_model_id = int(cursor.lastrowid)
         if not api_model_name:
             raise ValueError("api_model_name 不能为空")
         return provider_model_id, api_model_name
@@ -839,6 +840,44 @@ class ModelRepository:
             "lottery_codes": lottery_codes or ["dlt"],
             "updated_at": row.get("updated_at") or "",
         }
+
+    @staticmethod
+    def _fetch_provider_options(cursor, provider_ids: list[int]) -> dict[int, dict[str, Any]]:
+        if not provider_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in provider_ids)
+        cursor.execute(
+            f"""
+            SELECT provider_id, option_key, option_value
+            FROM model_provider_option
+            WHERE provider_id IN ({placeholders})
+            ORDER BY provider_id ASC, option_key ASC
+            """,
+            tuple(provider_ids),
+        )
+        result: dict[int, dict[str, Any]] = {}
+        for row in cursor.fetchall():
+            provider_id = int(row["provider_id"])
+            option_value = row.get("option_value")
+            parsed_value: Any = option_value
+            try:
+                parsed_value = json.loads(str(option_value))
+            except Exception:
+                parsed_value = option_value
+            result.setdefault(provider_id, {})[str(row["option_key"])] = parsed_value
+        return result
+
+    @staticmethod
+    def _replace_provider_options(cursor, provider_id: int, extra_options: dict[str, Any]) -> None:
+        cursor.execute("DELETE FROM model_provider_option WHERE provider_id = ?", (provider_id,))
+        for option_key, option_value in sorted(extra_options.items()):
+            cursor.execute(
+                """
+                INSERT INTO model_provider_option (provider_id, option_key, option_value)
+                VALUES (?, ?, ?)
+                """,
+                (provider_id, str(option_key), json.dumps(option_value, ensure_ascii=False)),
+            )
 
     @staticmethod
     def _optional_str(value: Any) -> str | None:

@@ -55,7 +55,6 @@ class LotteryRepository:
             SELECT
                 di.id AS issue_id,
                 di.issue_no AS period,
-                di.lottery_code,
                 di.draw_date,
                 di.updated_at,
                 dr.id AS draw_result_id,
@@ -63,10 +62,9 @@ class LotteryRepository:
             FROM draw_issue di
             LEFT JOIN draw_result dr ON dr.issue_id = di.id
             WHERE dr.id IS NOT NULL
-              AND di.lottery_code = ?
             ORDER BY di.issue_no DESC
         """
-        params: list[Any] = [normalized_code]
+        params: list[Any] = []
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -83,7 +81,15 @@ class LotteryRepository:
                     numbers_by_result = self._fetch_draw_numbers(cursor, result_ids)
                     prizes_by_result = self._fetch_draw_prizes(cursor, result_ids)
 
-        return [self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], [])) for row in rows]
+        return [
+            self._to_draw_dict(
+                row,
+                numbers_by_result.get(row["draw_result_id"], []),
+                prizes_by_result.get(row["draw_result_id"], []),
+                lottery_code=normalized_code,
+            )
+            for row in rows
+        ]
 
     def count_draws(self, lottery_code: str = "dlt") -> int:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -95,9 +101,7 @@ class LotteryRepository:
                         SELECT COUNT(*) AS total
                         FROM draw_issue di
                         INNER JOIN draw_result dr ON dr.issue_id = di.id
-                        WHERE di.lottery_code = ?
                         """,
-                        (normalized_code,),
                     )
                     row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
@@ -112,24 +116,28 @@ class LotteryRepository:
                         SELECT
                             di.id AS issue_id,
                             di.issue_no AS period,
-                            di.lottery_code,
                             di.draw_date,
                             di.updated_at,
                             dr.id AS draw_result_id,
                             dr.jackpot_pool_balance
                         FROM draw_issue di
                         LEFT JOIN draw_result dr ON dr.issue_id = di.id
-                        WHERE di.issue_no = ? AND di.lottery_code = ?
+                        WHERE di.issue_no = ?
                         LIMIT 1
                         """,
-                        (storage_issue_no(normalized_code, period), normalized_code),
+                        (storage_issue_no(normalized_code, period),),
                     )
                     row = cursor.fetchone()
                     if not row or not row.get("draw_result_id"):
                         return None
                     numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
                     prizes_by_result = self._fetch_draw_prizes(cursor, [row["draw_result_id"]])
-        return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], []))
+        return self._to_draw_dict(
+            row,
+            numbers_by_result.get(row["draw_result_id"], []),
+            prizes_by_result.get(row["draw_result_id"], []),
+            lottery_code=normalized_code,
+        )
 
     def get_latest_draw(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         draws = self.list_draws(limit=1, lottery_code=lottery_code)
@@ -146,25 +154,29 @@ class LotteryRepository:
                         SELECT
                             di.id AS issue_id,
                             di.issue_no AS period,
-                            di.lottery_code,
                             di.draw_date,
                             di.updated_at,
                             dr.id AS draw_result_id,
                             dr.jackpot_pool_balance
                         FROM draw_issue di
                         LEFT JOIN draw_result dr ON dr.issue_id = di.id
-                        WHERE di.issue_no < ? AND di.lottery_code = ? AND dr.id IS NOT NULL
+                        WHERE di.issue_no < ? AND dr.id IS NOT NULL
                         ORDER BY di.issue_no DESC
                         LIMIT 1
                         """,
-                        (stored_period, normalized_code),
+                        (stored_period,),
                     )
                     row = cursor.fetchone()
                     if not row or not row.get("draw_result_id"):
                         return None
                     numbers_by_result = self._fetch_draw_numbers(cursor, [row["draw_result_id"]])
                     prizes_by_result = self._fetch_draw_prizes(cursor, [row["draw_result_id"]])
-        return self._to_draw_dict(row, numbers_by_result.get(row["draw_result_id"], []), prizes_by_result.get(row["draw_result_id"], []))
+        return self._to_draw_dict(
+            row,
+            numbers_by_result.get(row["draw_result_id"], []),
+            prizes_by_result.get(row["draw_result_id"], []),
+            lottery_code=normalized_code,
+        )
 
     def _upsert_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> None:
         period = str(draw["period"])
@@ -292,12 +304,18 @@ class LotteryRepository:
         return prizes_by_result
 
     @staticmethod
-    def _to_draw_dict(row: dict[str, Any], numbers: list[dict[str, Any]], prizes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-        lottery_code = normalize_lottery_code(row.get("lottery_code") or "dlt")
+    def _to_draw_dict(
+        row: dict[str, Any],
+        numbers: list[dict[str, Any]],
+        prizes: list[dict[str, Any]] | None = None,
+        *,
+        lottery_code: str,
+    ) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
         red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
         blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
         digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
-        if lottery_code in {"pl3", "pl5"} and not red_balls and digits:
+        if normalized_code in {"pl3", "pl5"} and not red_balls and digits:
             red_balls = list(digits)
         draw_date = row.get("draw_date") or ""
         updated_at = row.get("updated_at")
@@ -305,8 +323,8 @@ class LotteryRepository:
             updated_at = _parse_timestamp(updated_at)
 
         return {
-            "lottery_code": lottery_code,
-            "period": display_period(lottery_code, str(row["period"])),
+            "lottery_code": normalized_code,
+            "period": display_period(normalized_code, str(row["period"])),
             "red_balls": red_balls,
             "blue_balls": blue_balls,
             "digits": digits,
@@ -324,15 +342,14 @@ def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str,
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO draw_issue (issue_no, lottery_code, draw_date, status, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO draw_issue (issue_no, draw_date, status, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
                 ON DUPLICATE KEY UPDATE
-                    lottery_code = VALUES(lottery_code),
                     draw_date = VALUES(draw_date),
                     status = VALUES(status),
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (stored_issue_no, normalized_code, draw_date, status),
+                (stored_issue_no, draw_date, status),
             )
             cursor.execute("SELECT id FROM draw_issue WHERE issue_no = ?", (stored_issue_no,))
             return int(cursor.fetchone()["id"])
