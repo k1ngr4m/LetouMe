@@ -15,6 +15,7 @@ const {
   getPredictionsHistoryDetail,
   getSimulationTickets,
   quoteSimulationTicket,
+  simulateDltDantuoCurrentPredictions,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
   updateMyBet,
@@ -29,6 +30,7 @@ const {
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  simulateDltDantuoCurrentPredictions: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
   updateMyBet: vi.fn(),
@@ -362,34 +364,79 @@ vi.mock('./hooks/useHomeData', () => ({
               })),
             },
           ]
+      : simulateDltDantuoCurrentPredictions.current
+        ? [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              prediction_play_mode: 'dantuo',
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'dlt_dantuo',
+                  strategy: '增强型热号追随者',
+                  front_dan: ['01', '08'],
+                  front_tuo: ['12', '19', '25', '31'],
+                  back_dan: ['06'],
+                  back_tuo: ['11'],
+                  red_balls: ['01', '08', '12', '19', '25', '31'],
+                  blue_balls: ['06', '11'],
+                },
+              ],
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              model_tags: ['fast'],
+              model_api_model: 'model-b-api',
+              prediction_play_mode: 'dantuo',
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'dlt_dantuo',
+                  strategy: '冷号补位',
+                  front_dan: ['01', '09'],
+                  front_tuo: ['12', '22', '25', '32'],
+                  back_dan: ['06'],
+                  back_tuo: ['12'],
+                  red_balls: ['01', '09', '12', '22', '25', '32'],
+                  blue_balls: ['06', '12'],
+                },
+              ],
+            },
+          ]
         : [
-          {
-            model_id: 'model-a',
-            model_name: '模型A',
-            model_provider: 'openai_compatible',
-            model_tags: ['reasoning'],
-            model_api_model: 'model-a-api',
-            predictions: Array.from({ length: 5 }, (_, index) => ({
-              group_id: index + 1,
-              strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
-              red_balls: ['01', '02', '03', '04', '05'],
-              blue_balls: ['06', '07'],
-            })),
-          },
-          {
-            model_id: 'model-b',
-            model_name: '模型B',
-            model_provider: 'deepseek',
-            model_tags: ['fast'],
-            model_api_model: 'model-b-api',
-            predictions: Array.from({ length: 5 }, (_, index) => ({
-              group_id: index + 1,
-              strategy: '冷号补位',
-              red_balls: ['08', '09', '10', '11', '12'],
-              blue_balls: ['01', '02'],
-            })),
-          },
-        ]
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                strategy: index < 3 ? '增强型热号追随者' : 'AI 组合策略',
+                red_balls: ['01', '02', '03', '04', '05'],
+                blue_balls: ['06', '07'],
+              })),
+            },
+            {
+              model_id: 'model-b',
+              model_name: '模型B',
+              model_provider: 'deepseek',
+              model_tags: ['fast'],
+              model_api_model: 'model-b-api',
+              predictions: Array.from({ length: 5 }, (_, index) => ({
+                group_id: index + 1,
+                strategy: '冷号补位',
+                red_balls: ['08', '09', '10', '11', '12'],
+                blue_balls: ['01', '02'],
+              })),
+            },
+          ]
     const lotteryHistoryData = isPl3
       ? [
           {
@@ -538,6 +585,7 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 beforeEach(() => {
   window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
+  simulateDltDantuoCurrentPredictions.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
   toPng.mockReset()
@@ -883,6 +931,20 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
     expect(screen.queryByText('正在更新开奖方案筛选结果...')).not.toBeInTheDocument()
+  })
+
+  it('shows four dlt dantuo summary sections in prediction overview', async () => {
+    simulateDltDantuoCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
+
+    expect(screen.getByText('前区胆统计')).toBeInTheDocument()
+    expect(screen.getByText('前区拖统计')).toBeInTheDocument()
+    expect(screen.getByText('后区胆统计')).toBeInTheDocument()
+    expect(screen.getByText('后区拖统计')).toBeInTheDocument()
+    expect(screen.queryByText('前区统计')).not.toBeInTheDocument()
+    expect(screen.queryByText('后区统计')).not.toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {
@@ -1492,6 +1554,14 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(numberLines[1] as HTMLElement).getByText('后拖')).toBeInTheDocument()
     expect(cardScope.getByText('01')).toHaveClass('is-hit')
     expect(cardScope.getByText('31')).toHaveClass('number-ball--muted')
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '显示该期预测统计：第 2026031 期' }))
+    expect(within(firstHistoryCard as HTMLElement).getByText('前区胆统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('前区拖统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('后区胆统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('后区拖统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
   })
 
   it('supports one-click expand and collapse for all models in a record', async () => {

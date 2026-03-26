@@ -1152,14 +1152,21 @@ export function HomePage() {
 	                          </>
 	                        )}
 	                      </>
-	                    ) : (
-	                      <>
-	                        <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
-                        <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
-                      </>
-                    )}
-                  </div>
-                )}
+	                    ) : dltPredictionMode === 'dantuo' ? (
+                        <>
+                          <SummaryList title="前区胆统计" items={summary.frontDan || []} color="red" models={summaryModels} />
+                          <SummaryList title="前区拖统计" items={summary.frontTuo || []} color="red" models={summaryModels} />
+                          <SummaryList title="后区胆统计" items={summary.backDan || []} color="blue" models={summaryModels} />
+                          <SummaryList title="后区拖统计" items={summary.backTuo || []} color="blue" models={summaryModels} />
+                        </>
+                      ) : (
+                        <>
+                          <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
+                          <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
+                        </>
+                      )}
+                    </div>
+                  )}
               </StatusCard>
             </section>
           </div>
@@ -3233,10 +3240,15 @@ function HistoryRecordCard({
     () => buildSummary(periodSummaryModels, {}, periodSummaryModelIds, false, false, strategyFilters, playTypeFilters),
     [periodSummaryModelIds, periodSummaryModels, playTypeFilters, strategyFilters],
   )
+  const isDltDantuoHistorySummary = lotteryCode === 'dlt' && normalizedPlayTypeFilters.includes('dlt_dantuo')
   const hasPeriodSummaryStats = useMemo(
     () =>
       periodPredictionSummary.red.length > 0 ||
       periodPredictionSummary.blue.length > 0 ||
+      periodPredictionSummary.frontDan.length > 0 ||
+      periodPredictionSummary.frontTuo.length > 0 ||
+      periodPredictionSummary.backDan.length > 0 ||
+      periodPredictionSummary.backTuo.length > 0 ||
       periodPredictionSummary.sums.length > 0 ||
       (periodPredictionSummary.positions || []).some((items) => items.length > 0),
     [periodPredictionSummary],
@@ -3543,12 +3555,19 @@ function HistoryRecordCard({
 	                    </>
 	                  )}
 	                </>
-	              ) : (
-                <>
-                  <SummaryList title="前区统计" items={periodPredictionSummary.red} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
-                  <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
-                </>
-              )}
+	              ) : isDltDantuoHistorySummary ? (
+                  <>
+                    <SummaryList title="前区胆统计" items={periodPredictionSummary.frontDan || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="前区拖统计" items={periodPredictionSummary.frontTuo || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="后区胆统计" items={periodPredictionSummary.backDan || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                    <SummaryList title="后区拖统计" items={periodPredictionSummary.backTuo || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                  </>
+                ) : (
+                  <>
+                    <SummaryList title="前区统计" items={periodPredictionSummary.red} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                  </>
+                )}
             </div>
           ) : null}
         </div>

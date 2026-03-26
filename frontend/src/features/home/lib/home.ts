@@ -537,6 +537,10 @@ export function buildSummary(
   const selectedModels = models.filter((model) => selectedIds.includes(model.model_id))
   const redMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const blueMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const frontDanMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const frontTuoMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const backDanMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
+  const backTuoMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const sumMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const positionMaps = Array.from({ length: 5 }, () => new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>())
   let totalGroupCount = 0
@@ -559,10 +563,15 @@ export function buildSummary(
     const weight = weighted ? (scores[model.model_id]?.overallScore || 0) / 100 || 1 : 1
     const redSeen = new Set<string>()
     const blueSeen = new Set<string>()
+    const frontDanSeen = new Set<string>()
+    const frontTuoSeen = new Set<string>()
+    const backDanSeen = new Set<string>()
+    const backTuoSeen = new Set<string>()
     const sumSeen = new Set<string>()
     const positionSeen = Array.from({ length: 5 }, () => new Set<string>())
     for (const group of activeGroups) {
       const inferredLotteryCode = inferPredictionGroupLotteryCode(group)
+      const normalizedPlayType = normalizePredictionPlayType(group.play_type)
       if (inferredLotteryCode === 'pl5') {
         const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 5)
         digits.forEach((digit, index) => {
@@ -575,7 +584,7 @@ export function buildSummary(
         continue
       }
       if (inferredLotteryCode === 'pl3') {
-        if (normalizePredictionPlayType(group.play_type) === 'direct_sum') {
+        if (normalizedPlayType === 'direct_sum') {
           const normalizedSum = Number.parseInt(String(group.sum_value || '').trim(), 10)
           if (!Number.isNaN(normalizedSum) && normalizedSum >= 0 && normalizedSum <= 27) {
             const sumValue = String(normalizedSum)
@@ -597,6 +606,37 @@ export function buildSummary(
         })
         continue
       }
+      if (inferredLotteryCode === 'dlt' && normalizedPlayType === 'dlt_dantuo') {
+        for (const ball of (group.front_dan || []).map(padBall)) {
+          const current = frontDanMap.get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          frontDanMap.set(ball, current)
+          frontDanSeen.add(ball)
+        }
+        for (const ball of (group.front_tuo || []).map(padBall)) {
+          const current = frontTuoMap.get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          frontTuoMap.set(ball, current)
+          frontTuoSeen.add(ball)
+        }
+        for (const ball of (group.back_dan || []).map(padBall)) {
+          const current = backDanMap.get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          backDanMap.set(ball, current)
+          backDanSeen.add(ball)
+        }
+        for (const ball of (group.back_tuo || []).map(padBall)) {
+          const current = backTuoMap.get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          current.appearanceCount += 1
+          current.weightedScore += weight
+          backTuoMap.set(ball, current)
+          backTuoSeen.add(ball)
+        }
+        continue
+      }
       for (const red of group.red_balls) {
         const current = redMap.get(red) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
         current.appearanceCount += 1
@@ -614,6 +654,10 @@ export function buildSummary(
     }
     for (const red of redSeen) redMap.get(red)?.models.add(model.model_id)
     for (const blue of blueSeen) blueMap.get(blue)?.models.add(model.model_id)
+    for (const ball of frontDanSeen) frontDanMap.get(ball)?.models.add(model.model_id)
+    for (const ball of frontTuoSeen) frontTuoMap.get(ball)?.models.add(model.model_id)
+    for (const ball of backDanSeen) backDanMap.get(ball)?.models.add(model.model_id)
+    for (const ball of backTuoSeen) backTuoMap.get(ball)?.models.add(model.model_id)
     for (const sumValue of sumSeen) sumMap.get(sumValue)?.models.add(model.model_id)
     positionSeen.forEach((seen, index) => {
       for (const digit of seen) positionMaps[index].get(digit)?.models.add(model.model_id)
@@ -645,6 +689,10 @@ export function buildSummary(
   return {
     red: normalize(redMap),
     blue: normalize(blueMap),
+    frontDan: normalize(frontDanMap),
+    frontTuo: normalize(frontTuoMap),
+    backDan: normalize(backDanMap),
+    backTuo: normalize(backTuoMap),
     sums: normalize(sumMap),
     positions: positionMaps.map((positionMap) => normalize(positionMap)),
   }
