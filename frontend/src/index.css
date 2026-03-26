@@ -2039,6 +2039,8 @@ a {
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .prediction-group-card.is-compact {
@@ -2213,6 +2215,8 @@ a {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.36rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .number-row__line {
@@ -2220,17 +2224,19 @@ a {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.32rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .number-row__line--front {
   flex-wrap: nowrap;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  width: 100%;
+  overflow: hidden;
 }
 
 .number-row__line--front .number-row__segment {
   flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
 .number-row__divider {
@@ -2266,6 +2272,31 @@ a {
 
 .prediction-group-card.is-compact .number-row__line {
   gap: 0.2rem;
+}
+
+.prediction-group-card.is-compact .number-row--dlt-dantuo .number-row__line {
+  gap: 0.14rem;
+}
+
+.prediction-group-card.is-compact .number-row--dlt-dantuo .number-row__segment {
+  gap: 0.14rem;
+}
+
+.prediction-group-card.is-compact .number-row--dlt-dantuo .number-row__segment-label {
+  min-width: 1.42rem;
+  padding: 0.08rem 0.22rem;
+  font-size: 0.56rem;
+}
+
+.prediction-group-card.is-compact .number-row--dlt-dantuo .number-row__divider {
+  width: 0.42rem;
+  margin: 0 0.02rem;
+}
+
+.prediction-group-card.is-compact .number-row--dlt-dantuo .number-ball {
+  width: 1.54rem;
+  height: 1.54rem;
+  font-size: 0.68rem;
 }
 
 .number-ball {

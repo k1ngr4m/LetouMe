@@ -2514,7 +2514,7 @@ function PredictionNumberRow({
         </span>
       ))
     return (
-      <div className={clsx('number-row', 'number-row--stacked', compact && 'number-row--compact')}>
+      <div className={clsx('number-row', 'number-row--stacked', 'number-row--dlt-dantuo', compact && 'number-row--compact')}>
         {frontSegments.length ? <div className="number-row__line number-row__line--front">{renderSegments(frontSegments)}</div> : null}
         {backSegments.length ? <div className="number-row__line">{renderSegments(backSegments)}</div> : null}
       </div>
