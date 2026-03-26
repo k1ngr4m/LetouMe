@@ -26,6 +26,7 @@ import {
   type ModelScore,
   type ModelListScoreRange,
   type PredictionPlayType,
+  inferPredictionGroupLotteryCode,
   normalizePredictionModelPlayMode,
   normalizeStrategyLabel,
   normalizePredictionsHistory,
@@ -199,6 +200,25 @@ function Pl3PredictionModeSwitch({
   )
 }
 
+function DltPredictionModeSwitch({
+  value,
+  onChange,
+}: {
+  value: 'direct' | 'dantuo'
+  onChange: (value: 'direct' | 'dantuo') => void
+}) {
+  return (
+    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="大乐透玩法切换">
+      <button className={clsx('tab-strip__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
+        普通
+      </button>
+      <button className={clsx('tab-strip__item', value === 'dantuo' && 'is-active')} type="button" onClick={() => onChange('dantuo')}>
+        胆拖
+      </button>
+    </div>
+  )
+}
+
 type HistoryModelStatView = {
   model_id: string
   model_name: string
@@ -216,12 +236,12 @@ type HistoryModelStatView = {
 type HistoryModelRef = {
   model_id: string
   model_name: string
-  prediction_play_mode?: 'direct' | 'direct_sum'
+  prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo'
 }
 
 function resolveHistoryModelModeKey(model: {
   model_id: string
-  prediction_play_mode?: 'direct' | 'direct_sum' | null
+  prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo' | null
   predictions?: PredictionGroup[]
 }) {
   return `${model.model_id}::${normalizePredictionModelPlayMode(model)}`
@@ -287,10 +307,32 @@ const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
   27: 2,
 }
 
+function combination(total: number, choose: number) {
+  if (choose < 0 || choose > total) return 0
+  if (choose === 0 || choose === total) return 1
+  const actualChoose = Math.min(choose, total - choose)
+  let result = 1
+  for (let index = 1; index <= actualChoose; index += 1) {
+    result = (result * (total - actualChoose + index)) / index
+  }
+  return Math.round(result)
+}
+
 function resolveHistoryPredictionGroupCost(group: PredictionGroup, lotteryCode: LotteryCode) {
   const explicitCost = Number(group.cost_amount || 0)
   if (explicitCost > 0) return explicitCost
   const playType = String(group.play_type || 'direct').trim().toLowerCase()
+  if (lotteryCode === 'dlt' && playType === 'dlt_dantuo') {
+    const frontDan = new Set((group.front_dan || []).map((item) => String(item).padStart(2, '0')))
+    const frontTuo = new Set((group.front_tuo || []).map((item) => String(item).padStart(2, '0')))
+    const backDan = new Set((group.back_dan || []).map((item) => String(item).padStart(2, '0')))
+    const backTuo = new Set((group.back_tuo || []).map((item) => String(item).padStart(2, '0')))
+    const frontPick = 5 - frontDan.size
+    const backPick = 2 - backDan.size
+    if (frontPick < 0 || backPick < 0) return 2
+    if (frontTuo.size < frontPick || backTuo.size < backPick) return 2
+    return combination(frontTuo.size, frontPick) * combination(backTuo.size, backPick) * 2
+  }
   if (lotteryCode !== 'pl3' || playType !== 'direct_sum') return 2
   const sumValue = Number(String(group.sum_value || '').trim())
   if (!Number.isInteger(sumValue)) return 2
@@ -364,15 +406,26 @@ export function HomePage() {
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
+  const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'dantuo'>('direct')
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct']) : []),
-    [pl3PredictionMode, selectedLottery],
+    () =>
+      selectedLottery === 'pl3'
+        ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct'])
+        : selectedLottery === 'dlt'
+          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : ['direct'])
+          : [],
+    [dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
   const historyPlayTypeFilters = useMemo<PredictionPlayType[]>(
-    () => (selectedLottery === 'pl3' ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct']) : []),
-    [pl3PredictionMode, selectedLottery],
+    () =>
+      selectedLottery === 'pl3'
+        ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct'])
+        : selectedLottery === 'dlt'
+          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : ['direct'])
+          : [],
+    [dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
@@ -404,8 +457,10 @@ export function HomePage() {
     () =>
       selectedLottery === 'pl3'
         ? allModels.filter((model) => normalizePredictionModelPlayMode(model) === pl3PredictionMode)
+        : selectedLottery === 'dlt'
+          ? allModels.filter((model) => normalizePredictionModelPlayMode(model) === dltPredictionMode)
         : allModels,
-    [allModels, pl3PredictionMode, selectedLottery],
+    [allModels, dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []
@@ -479,15 +534,28 @@ export function HomePage() {
   }, [selectedLottery])
 
   useEffect(() => {
-    if (selectedLottery !== 'pl3') {
-      setPl3PredictionMode('direct')
+    if (selectedLottery === 'pl3') {
+      setHistoryFallbackSignature(null)
+      setHistoryPage(1)
+      setSummaryStrategyFilters([])
+      setHistoryStrategyFilters([])
       return
     }
-    setHistoryFallbackSignature(null)
-    setHistoryPage(1)
-    setSummaryStrategyFilters([])
-    setHistoryStrategyFilters([])
-  }, [pl3PredictionMode, selectedLottery])
+    if (selectedLottery === 'dlt') {
+      setPl3PredictionMode('direct')
+      setHistoryFallbackSignature(null)
+      setHistoryPage(1)
+      setSummaryStrategyFilters([])
+      setHistoryStrategyFilters([])
+      return
+    }
+    if (dltPredictionMode !== 'direct') {
+      setDltPredictionMode('direct')
+    }
+    if (pl3PredictionMode !== 'direct') {
+      setPl3PredictionMode('direct')
+    }
+  }, [dltPredictionMode, pl3PredictionMode, selectedLottery])
 
   useEffect(() => {
     if (hasRestoredScrollRef.current || typeof navigationState?.scrollY !== 'number') return
@@ -528,7 +596,7 @@ export function HomePage() {
 
   const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
     const references = new Map<string, HistoryModelRef>()
-    const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' }) =>
+    const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo' }) =>
       `${model.model_id}::${model.prediction_play_mode || 'direct'}`
     for (const stat of history?.model_stats || []) {
       if (!stat.model_id) continue
@@ -709,7 +777,7 @@ export function HomePage() {
     navigate(`/dashboard/models/${modelId}`, {
       state: {
         scrollY: window.scrollY,
-        predictionPlayMode: selectedLottery === 'pl3' ? pl3PredictionMode : undefined,
+        predictionPlayMode: selectedLottery === 'pl3' ? pl3PredictionMode : selectedLottery === 'dlt' ? dltPredictionMode : undefined,
       } satisfies HomeDetailRouteState,
     })
   }
@@ -819,7 +887,7 @@ export function HomePage() {
                 aria-pressed={selectedLottery === code}
               >
                 <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '前区后区复式预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
+                <span className="chip-button__meta">{code === 'dlt' ? '支持普通与胆拖预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
               </button>
             ))}
           </div>
@@ -878,6 +946,7 @@ export function HomePage() {
                 actions={
                   <div className="toolbar-inline">
                     {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
+                    {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
                     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
                       <HomeIconButton
                         label="列表视图"
@@ -1128,6 +1197,7 @@ export function HomePage() {
             ) : null}
             <div className="history-toolbar">
               {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
+              {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
               <button
                 className={clsx('icon-button', isModelFilterOpen && 'is-active')}
                 onClick={() => setIsModelFilterOpen((value) => !value)}
@@ -2335,8 +2405,7 @@ export function PredictionGroupCard({
   const hit = compareNumbers(group, actualResult)
   const description = group.description?.trim() || '暂无说明'
   const playTypeLabel = getPredictionPlayTypeLabel(group, actualResult)
-  const inferredLotteryCode: LotteryCode =
-    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode: LotteryCode = inferPredictionGroupLotteryCode(group, actualResult)
   const groupCostAmount = showCost ? resolveHistoryPredictionGroupCost(group, inferredLotteryCode) : 0
   const hitTierClass =
     emphasizeHitTier && hit
@@ -2394,9 +2463,45 @@ function PredictionNumberRow({
   compact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
-  const inferredLotteryCode =
-    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode = inferPredictionGroupLotteryCode(group, actualResult)
   const normalizedPlayType = String(group.play_type || 'direct').trim().toLowerCase()
+  if (inferredLotteryCode === 'dlt' && normalizedPlayType === 'dlt_dantuo') {
+    const frontDan = group.front_dan || []
+    const frontTuo = group.front_tuo || []
+    const backDan = group.back_dan || []
+    const backTuo = group.back_tuo || []
+    const frontValues = frontDan.length || frontTuo.length ? [...frontDan, ...frontTuo] : group.red_balls
+    const backValues = backDan.length || backTuo.length ? [...backDan, ...backTuo] : group.blue_balls
+    return (
+      <div className={clsx('number-row', compact && 'number-row--compact')}>
+        {frontValues.map((ball, index) => {
+          const isHit = Boolean((hit?.redHits || []).includes(ball))
+          return (
+            <NumberBall
+              key={`dlt-front-${group.group_id}-${index}-${ball}`}
+              value={ball}
+              color="red"
+              isHit={isHit}
+              tone={grayMisses && !isHit ? 'muted' : 'default'}
+            />
+          )
+        })}
+        <span className="number-row__divider" />
+        {backValues.map((ball, index) => {
+          const isHit = Boolean((hit?.blueHits || []).includes(ball))
+          return (
+            <NumberBall
+              key={`dlt-back-${group.group_id}-${index}-${ball}`}
+              value={ball}
+              color="blue"
+              isHit={isHit}
+              tone={grayMisses && !isHit ? 'muted' : 'default'}
+            />
+          )
+        })}
+      </div>
+    )
+  }
   if (inferredLotteryCode === 'pl3' && normalizedPlayType === 'direct_sum') {
     const sumValue = String(group.sum_value || '').trim() || '-'
     const isHit = Boolean((hit?.totalHits || 0) > 0)

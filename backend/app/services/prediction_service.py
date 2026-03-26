@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from itertools import combinations
 import math
 from statistics import pstdev
 from time import perf_counter
@@ -9,6 +10,7 @@ from typing import Any
 from backend.app.cache import runtime_cache
 from backend.app.dlt_rules import (
     DLT_OLD_FIXED_PRIZE_RULES,
+    dlt_prize_level_order,
     resolve_dlt_fallback_prize_amount,
     resolve_dlt_prize_level,
 )
@@ -95,14 +97,28 @@ class PredictionService:
         normalized_code = normalize_lottery_code(lottery_code or prediction.get("lottery_code"))
         normalized_predictions = []
         for group in prediction.get("predictions", []):
+            play_type = str(group.get("play_type") or "").strip().lower()
             blue_balls = self.normalize_blue_balls(group.get("blue_balls", group.get("blue_ball")))
+            front_dan = self._normalize_dlt_zone_numbers(group.get("front_dan"), zone="front") or []
+            front_tuo = self._normalize_dlt_zone_numbers(group.get("front_tuo"), zone="front") or []
+            back_dan = self._normalize_dlt_zone_numbers(group.get("back_dan"), zone="back") or []
+            back_tuo = self._normalize_dlt_zone_numbers(group.get("back_tuo"), zone="back") or []
+            red_balls = sorted(str(item).zfill(2) for item in group.get("red_balls", []))
+            if normalized_code == "dlt" and play_type == "dlt_dantuo":
+                red_balls = sorted({*front_dan, *front_tuo})
+                blue_balls = sorted({*back_dan, *back_tuo})
             normalized_predictions.append(
                 {
                     **group,
-                    "red_balls": sorted(str(item).zfill(2) for item in group.get("red_balls", [])),
+                    "play_type": play_type or group.get("play_type"),
+                    "red_balls": red_balls,
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
                     "digits": normalize_digit_balls(group.get("digits", [])),
+                    "front_dan": front_dan,
+                    "front_tuo": front_tuo,
+                    "back_dan": back_dan,
+                    "back_tuo": back_tuo,
                 }
             )
 
@@ -472,8 +488,8 @@ class PredictionService:
             extra={"context": {"target_period": old_target_period, "model_count": len(models_with_hits)}},
         )
 
-    @staticmethod
-    def calculate_hit_result(prediction_group: dict[str, Any], actual_result: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
+    @classmethod
+    def calculate_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or actual_result.get("lottery_code"))
         if normalized_code == "pl3":
             play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
@@ -537,6 +553,9 @@ class PredictionService:
                 "is_exact_match": digits == actual_digits and len(digits) == 5,
             }
 
+        play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
+        if play_type == "dlt_dantuo":
+            return cls._calculate_dlt_dantuo_hit_result(prediction_group, actual_result)
         red_hits = [b for b in prediction_group["red_balls"] if b in actual_result["red_balls"]]
         blue_hits = [b for b in prediction_group["blue_balls"] if b in actual_result["blue_balls"]]
         return {
@@ -545,6 +564,116 @@ class PredictionService:
             "blue_hits": blue_hits,
             "blue_hit_count": len(blue_hits),
             "total_hits": len(red_hits) + len(blue_hits),
+        }
+
+    @classmethod
+    def _calculate_dlt_dantuo_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+        front_dan = cls._normalize_dlt_zone_numbers(prediction_group.get("front_dan", []), zone="front")
+        front_tuo = cls._normalize_dlt_zone_numbers(prediction_group.get("front_tuo", []), zone="front")
+        back_dan = cls._normalize_dlt_zone_numbers(prediction_group.get("back_dan", []), zone="back")
+        back_tuo = cls._normalize_dlt_zone_numbers(prediction_group.get("back_tuo", []), zone="back")
+        actual_red = cls._normalize_dlt_zone_numbers(actual_result.get("red_balls"), zone="front")
+        actual_blue = cls._normalize_dlt_zone_numbers(actual_result.get("blue_balls"), zone="back")
+        if not front_dan or not front_tuo or actual_red is None or actual_blue is None:
+            return {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0,
+                "winning_bet_count": 0,
+                "bet_count": 0,
+                "prize_breakdown": [],
+            }
+
+        front_dan = front_dan or []
+        front_tuo = front_tuo or []
+        back_dan = back_dan or []
+        back_tuo = back_tuo or []
+        front_pick_count = 5 - len(front_dan)
+        back_pick_count = 2 - len(back_dan)
+        if front_pick_count < 0 or back_pick_count < 0:
+            return {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0,
+                "winning_bet_count": 0,
+                "bet_count": 0,
+                "prize_breakdown": [],
+            }
+        if len(front_tuo) < front_pick_count or len(back_tuo) < back_pick_count:
+            return {
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0,
+                "winning_bet_count": 0,
+                "bet_count": 0,
+                "prize_breakdown": [],
+            }
+
+        prize_counter: dict[str, int] = {}
+        best_level_rank: int | None = None
+        best_level: str | None = None
+        best_red_hits = 0
+        best_blue_hits = 0
+        best_red_combo: list[str] = []
+        best_blue_combo: list[str] = []
+        total_bets = 0
+
+        for front_tuo_pick in combinations(front_tuo, front_pick_count):
+            picked_red = sorted([*front_dan, *front_tuo_pick])
+            red_hit_count = len(set(picked_red) & set(actual_red))
+            for back_tuo_pick in combinations(back_tuo, back_pick_count):
+                picked_blue = sorted([*back_dan, *back_tuo_pick])
+                blue_hit_count = len(set(picked_blue) & set(actual_blue))
+                total_bets += 1
+                prize_level = resolve_dlt_prize_level(red_hit_count, blue_hit_count, actual_result.get("period"))
+                if not prize_level:
+                    continue
+                prize_counter[prize_level] = prize_counter.get(prize_level, 0) + 1
+                current_rank = dlt_prize_level_order(actual_result.get("period")).index(prize_level)
+                if best_level_rank is None or current_rank < best_level_rank:
+                    best_level_rank = current_rank
+                    best_level = prize_level
+                    best_red_hits = red_hit_count
+                    best_blue_hits = blue_hit_count
+                    best_red_combo = picked_red
+                    best_blue_combo = picked_blue
+
+        if best_level is None:
+            full_red = sorted({*front_dan, *front_tuo})
+            full_blue = sorted({*back_dan, *back_tuo})
+            red_hits = [value for value in full_red if value in actual_red]
+            blue_hits = [value for value in full_blue if value in actual_blue]
+            return {
+                "red_hits": red_hits,
+                "red_hit_count": len(red_hits),
+                "blue_hits": blue_hits,
+                "blue_hit_count": len(blue_hits),
+                "total_hits": len(red_hits) + len(blue_hits),
+                "winning_bet_count": 0,
+                "bet_count": total_bets,
+                "prize_breakdown": [],
+            }
+
+        return {
+            "red_hits": [value for value in best_red_combo if value in actual_red],
+            "red_hit_count": best_red_hits,
+            "blue_hits": [value for value in best_blue_combo if value in actual_blue],
+            "blue_hit_count": best_blue_hits,
+            "total_hits": best_red_hits + best_blue_hits,
+            "winning_bet_count": sum(prize_counter.values()),
+            "bet_count": total_bets,
+            "best_prize_level": best_level,
+            "prize_breakdown": [
+                {"prize_level": level, "count": prize_counter[level]}
+                for level in dlt_prize_level_order(actual_result.get("period"))
+                if prize_counter.get(level)
+            ],
         }
 
     @staticmethod
@@ -604,6 +733,22 @@ class PredictionService:
     @classmethod
     def _resolve_prediction_group_cost(cls, prediction_group: dict[str, Any], lottery_code: str) -> int:
         normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or "dlt")
+        if normalized_code == "dlt":
+            play_type = str(prediction_group.get("play_type") or "").strip().lower()
+            if play_type != "dlt_dantuo":
+                return cls.BET_COST
+            front_dan = cls._normalize_dlt_zone_numbers(prediction_group.get("front_dan", []), zone="front") or []
+            front_tuo = cls._normalize_dlt_zone_numbers(prediction_group.get("front_tuo", []), zone="front") or []
+            back_dan = cls._normalize_dlt_zone_numbers(prediction_group.get("back_dan", []), zone="back") or []
+            back_tuo = cls._normalize_dlt_zone_numbers(prediction_group.get("back_tuo", []), zone="back") or []
+            front_pick_count = 5 - len(front_dan)
+            back_pick_count = 2 - len(back_dan)
+            if front_pick_count < 0 or back_pick_count < 0:
+                return cls.BET_COST
+            if len(front_tuo) < front_pick_count or len(back_tuo) < back_pick_count:
+                return cls.BET_COST
+            bet_count = math.comb(len(front_tuo), front_pick_count) * math.comb(len(back_tuo), back_pick_count)
+            return max(1, int(bet_count)) * cls.BET_COST
         if normalized_code != "pl3":
             return cls.BET_COST
         play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
@@ -615,6 +760,36 @@ class PredictionService:
         except (TypeError, ValueError):
             return cls.BET_COST
         return int(cls.PL3_DIRECT_SUM_COST_RULES.get(normalized_sum, cls.BET_COST))
+
+    @classmethod
+    def _resolve_prediction_group_bet_count(
+        cls,
+        prediction_group: dict[str, Any],
+        lottery_code: str,
+        *,
+        hit_result: dict[str, Any] | None = None,
+    ) -> int:
+        normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or "dlt")
+        if normalized_code != "dlt":
+            return 1
+        play_type = str(prediction_group.get("play_type") or "").strip().lower()
+        if play_type != "dlt_dantuo":
+            return 1
+        if isinstance(hit_result, dict):
+            resolved = int(hit_result.get("bet_count") or 0)
+            if resolved > 0:
+                return resolved
+        return max(1, cls._resolve_prediction_group_cost(prediction_group, normalized_code) // cls.BET_COST)
+
+    @staticmethod
+    def _normalize_dlt_zone_numbers(value: Any, *, zone: str) -> list[str] | None:
+        if not isinstance(value, list):
+            return None
+        valid_range = range(1, 36) if zone == "front" else range(1, 13)
+        normalized = sorted({str(item).zfill(2) for item in value})
+        if any((not number.isdigit()) or int(number) not in valid_range for number in normalized):
+            return None
+        return normalized
 
     def _build_history_list_payload(
         self,
@@ -764,9 +939,11 @@ class PredictionService:
             best_group = None
             best_hit_count = 0
             model_cost_amount = 0
+            model_bet_count = 0
 
             for metric in group_metrics:
-                if lottery_code in {"pl3", "pl5"}:
+                group_play_type = str(metric.get("play_type") or "").strip().lower()
+                if lottery_code in {"pl3", "pl5"} or (lottery_code == "dlt" and group_play_type == "dlt_dantuo"):
                     hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
                 else:
                     base_hit_result = {
@@ -789,13 +966,31 @@ class PredictionService:
                     best_group = group_id or None
                     best_hit_count = trend_hit_count
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=metric)
-                prize_info = self.resolve_prize_amount(actual_result, prize_level)
-                model_cost_amount += self._resolve_prediction_group_cost(metric, lottery_code)
-                if prize_info["amount"] > 0:
-                    winning_bet_count += 1
-                    prize_amount += prize_info["amount"]
+                group_cost = self._resolve_prediction_group_cost(metric, lottery_code)
+                group_bet_count = self._resolve_prediction_group_bet_count(metric, lottery_code, hit_result=hit_result)
+                model_cost_amount += group_cost
+                model_bet_count += group_bet_count
+                if lottery_code == "dlt" and group_play_type == "dlt_dantuo":
+                    breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
+                    group_winning_bet_count = 0
+                    group_prize_amount = 0
+                    for item in breakdown:
+                        level = str((item or {}).get("prize_level") or "").strip()
+                        count = int((item or {}).get("count") or 0)
+                        if not level or count <= 0:
+                            continue
+                        prize_info = self.resolve_prize_amount(actual_result, level)
+                        group_winning_bet_count += count
+                        group_prize_amount += int(prize_info["amount"] or 0) * count
+                    winning_bet_count += group_winning_bet_count
+                    prize_amount += group_prize_amount
+                else:
+                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    if prize_info["amount"] > 0:
+                        winning_bet_count += 1
+                        prize_amount += prize_info["amount"]
 
-            bet_count = len(group_metrics)
+            bet_count = model_bet_count
             cost_amount = model_cost_amount
             annotated_models.append(
                 {
@@ -844,6 +1039,7 @@ class PredictionService:
             prize_amount = 0
             best_group = None
             best_hit_count = 0
+            model_bet_count = 0
             for group in model.get("predictions", []):
                 hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
                 trend_hit_count = self._resolve_trend_hit_count(group, actual_result, lottery_code, hit_result=hit_result)
@@ -854,23 +1050,49 @@ class PredictionService:
                     best_group = group_id or None
                     best_hit_count = trend_hit_count
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=group)
-                prize_info = self.resolve_prize_amount(actual_result, prize_level)
                 group_cost = self._resolve_prediction_group_cost(group, lottery_code)
+                group_bet_count = self._resolve_prediction_group_bet_count(group, lottery_code, hit_result=hit_result)
+                group_play_type = str(group.get("play_type") or "").strip().lower()
+                if lottery_code == "dlt" and group_play_type == "dlt_dantuo":
+                    breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
+                    group_winning_bet_count = 0
+                    group_prize_amount = 0
+                    for item in breakdown:
+                        level = str((item or {}).get("prize_level") or "").strip()
+                        count = int((item or {}).get("count") or 0)
+                        if not level or count <= 0:
+                            continue
+                        prize_info = self.resolve_prize_amount(actual_result, level)
+                        group_winning_bet_count += count
+                        group_prize_amount += int(prize_info["amount"] or 0) * count
+                    prize_source = "none"
+                    if group_prize_amount > 0:
+                        prize_source = "fallback" if any(
+                            self.resolve_prize_amount(actual_result, str((item or {}).get("prize_level") or "").strip()).get("source") == "fallback"
+                            for item in breakdown
+                            if int((item or {}).get("count") or 0) > 0
+                        ) else "official"
+                    prize_level = str(hit_result.get("best_prize_level") or prize_level or "") or None
+                else:
+                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    group_winning_bet_count = 1 if prize_info["amount"] > 0 else 0
+                    group_prize_amount = int(prize_info["amount"] or 0)
+                    prize_source = prize_info["source"]
                 predictions.append(
                     {
                         **group,
                         "hit_result": hit_result,
                         "cost_amount": group_cost,
                         "prize_level": prize_level,
-                        "prize_amount": prize_info["amount"],
-                        "prize_source": prize_info["source"],
+                        "prize_amount": group_prize_amount,
+                        "prize_source": prize_source,
                     }
                 )
-                if prize_info["amount"] > 0:
-                    winning_bet_count += 1
-                    prize_amount += prize_info["amount"]
+                winning_bet_count += group_winning_bet_count
+                prize_amount += group_prize_amount
+                model_bet_count += group_bet_count
 
-            bet_count = len(predictions)
+            bet_count = model_bet_count
             cost_amount = sum(int(group.get("cost_amount") or self.BET_COST) for group in predictions)
             annotated_models.append(
                 {
@@ -933,6 +1155,8 @@ class PredictionService:
     @classmethod
     def _infer_prediction_play_mode(cls, model: dict[str, Any]) -> str:
         explicit_mode = str(model.get("prediction_play_mode") or "").strip().lower()
+        if explicit_mode == "dantuo":
+            return "dantuo"
         if explicit_mode == "direct_sum":
             return "direct_sum"
         play_types: set[str] = set()
@@ -946,6 +1170,8 @@ class PredictionService:
                 play_type = str(group.get("play_type") or "").strip().lower()
                 if play_type:
                     play_types.add(play_type)
+        if "dlt_dantuo" in play_types:
+            return "dantuo"
         if "direct_sum" in play_types:
             return "direct_sum"
         if explicit_mode == "direct":
@@ -1282,7 +1508,7 @@ class PredictionService:
     def _normalize_play_type_filters(values: list[str] | None) -> list[str]:
         if not values:
             return []
-        allowed_play_types = {"direct", "direct_sum", "group3", "group6"}
+        allowed_play_types = {"direct", "direct_sum", "group3", "group6", "dlt_dantuo"}
         normalized = [str(value or "").strip().lower() for value in values]
         return [play_type for play_type in dict.fromkeys(normalized) if play_type in allowed_play_types]
 
@@ -1348,6 +1574,13 @@ class PredictionService:
             if is_exact_match is None:
                 is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 5
             return "直选" if bool(is_exact_match) else None
+        play_type = str((prediction_group or {}).get("play_type") or "").strip().lower()
+        if play_type == "dlt_dantuo":
+            best_prize_level = str(hit_result.get("best_prize_level") or "").strip()
+            if best_prize_level:
+                return best_prize_level
+            if int(hit_result.get("winning_bet_count") or 0) <= 0:
+                return None
         red_hit_count = int(hit_result.get("red_hit_count") or 0)
         blue_hit_count = int(hit_result.get("blue_hit_count") or 0)
         return resolve_dlt_prize_level(red_hit_count, blue_hit_count, (actual_result or {}).get("period"))

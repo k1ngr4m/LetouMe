@@ -17,7 +17,7 @@ export function HomeModelDetailPage() {
   const navigationState = location.state as HomeDetailRouteState | null
   const selectedLottery = loadSelectedLottery()
   const [isScoreExpanded, setIsScoreExpanded] = useState(false)
-  const expectedPlayMode = selectedLottery === 'pl3' ? navigationState?.predictionPlayMode : undefined
+  const expectedPlayMode = selectedLottery === 'pl3' || selectedLottery === 'dlt' ? navigationState?.predictionPlayMode : undefined
 
   const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(selectedLottery, 1, HISTORY_PAGE_SIZE, [], [], 1, LOTTERY_PAGE_SIZE, {
     enableCurrentPredictions: true,

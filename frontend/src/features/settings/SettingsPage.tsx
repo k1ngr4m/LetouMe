@@ -33,7 +33,7 @@ import type {
 type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
-type ModelPredictionPlayMode = 'direct' | 'direct_sum'
+type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'dantuo'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
@@ -513,13 +513,30 @@ function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: ScheduleP
   return presetType === 'weekly' ? '每周' : '每日'
 }
 
-function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode) {
-  return predictionPlayMode === 'direct_sum' ? '和值' : '直选'
+function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predictionPlayMode: ModelPredictionPlayMode): ModelPredictionPlayMode {
+  if (lotteryCode === 'pl3') {
+    return predictionPlayMode === 'direct_sum' ? 'direct_sum' : 'direct'
+  }
+  if (lotteryCode === 'dlt') {
+    return predictionPlayMode === 'dantuo' ? 'dantuo' : 'direct'
+  }
+  return 'direct'
+}
+
+function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode, lotteryCode: LotteryCode) {
+  const normalizedMode = normalizePredictionPlayModeForLottery(lotteryCode, predictionPlayMode)
+  if (lotteryCode === 'pl3') {
+    return normalizedMode === 'direct_sum' ? '和值' : '直选'
+  }
+  if (lotteryCode === 'dlt') {
+    return normalizedMode === 'dantuo' ? '胆拖' : '普通'
+  }
+  return '直选'
 }
 
 function getSchedulePredictionPlayModeLabel(task: Pick<ScheduleTask, 'task_type' | 'lottery_code' | 'prediction_play_mode'>) {
-  if (task.task_type !== 'prediction_generate' || task.lottery_code !== 'pl3') return null
-  return getPredictionPlayModeLabel(task.prediction_play_mode)
+  if (task.task_type !== 'prediction_generate') return null
+  return getPredictionPlayModeLabel(task.prediction_play_mode, task.lottery_code)
 }
 
 function getScheduleModelProviderLabel(model: SettingsModel, providers: SettingsProvider[]) {
@@ -1041,7 +1058,7 @@ export function SettingsPage() {
             lottery_code: generationForm.lotteryCode,
             model_codes: generationForm.modelCodes,
             mode: generationForm.mode,
-            prediction_play_mode: generationForm.lotteryCode === 'pl3' ? generationForm.predictionPlayMode : 'direct',
+            prediction_play_mode: normalizePredictionPlayModeForLottery(generationForm.lotteryCode, generationForm.predictionPlayMode),
             overwrite: generationForm.overwrite,
             parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
@@ -1051,7 +1068,7 @@ export function SettingsPage() {
             lottery_code: generationForm.lotteryCode,
             model_code: generationForm.modelCodes[0] || '',
             mode: generationForm.mode,
-            prediction_play_mode: generationForm.lotteryCode === 'pl3' ? generationForm.predictionPlayMode : 'direct',
+            prediction_play_mode: normalizePredictionPlayModeForLottery(generationForm.lotteryCode, generationForm.predictionPlayMode),
             overwrite: generationForm.overwrite,
             parallelism,
             start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
@@ -1625,7 +1642,7 @@ export function SettingsPage() {
       ...previous,
       lotteryCode: nextLottery,
       modelCodes: nextModelCodes,
-      predictionPlayMode: nextLottery === 'pl3' ? previous.predictionPlayMode : 'direct',
+      predictionPlayMode: normalizePredictionPlayModeForLottery(nextLottery, previous.predictionPlayMode),
     }))
   }
 
@@ -1709,9 +1726,10 @@ export function SettingsPage() {
     saveScheduleTaskMutation.mutate({
       ...scheduleForm,
       task_name: scheduleForm.task_name.trim(),
-      prediction_play_mode: scheduleForm.task_type === 'prediction_generate' && scheduleForm.lottery_code === 'pl3'
-        ? scheduleForm.prediction_play_mode
-        : 'direct',
+      prediction_play_mode:
+        scheduleForm.task_type === 'prediction_generate'
+          ? normalizePredictionPlayModeForLottery(scheduleForm.lottery_code, scheduleForm.prediction_play_mode)
+          : 'direct',
       cron_expression: scheduleForm.schedule_mode === 'cron' ? scheduleForm.cron_expression?.trim() || '' : undefined,
       preset_type: scheduleForm.schedule_mode === 'preset' ? scheduleForm.preset_type || 'daily' : undefined,
       time_of_day: scheduleForm.schedule_mode === 'preset' ? scheduleForm.time_of_day || '09:00' : undefined,
@@ -3323,6 +3341,7 @@ export function SettingsPage() {
                     setScheduleForm((previous) => ({
                       ...previous,
                       lottery_code: nextLottery,
+                      prediction_play_mode: normalizePredictionPlayModeForLottery(nextLottery, previous.prediction_play_mode),
                       model_codes: [],
                     }))
                   }}
@@ -3345,7 +3364,7 @@ export function SettingsPage() {
               </label>
               {scheduleForm.task_type === 'prediction_generate' ? (
                 <>
-                  {scheduleForm.lottery_code === 'pl3' ? (
+                  {scheduleForm.lottery_code === 'pl3' || scheduleForm.lottery_code === 'dlt' ? (
                     <label className="field">
                       <span>预测玩法</span>
                       <select
@@ -3355,8 +3374,17 @@ export function SettingsPage() {
                           setScheduleForm((previous) => ({ ...previous, prediction_play_mode: event.target.value as ModelPredictionPlayMode }))
                         }
                       >
-                        <option value="direct">直选</option>
-                        <option value="direct_sum">和值</option>
+                        {scheduleForm.lottery_code === 'pl3' ? (
+                          <>
+                            <option value="direct">直选</option>
+                            <option value="direct_sum">和值</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="direct">普通</option>
+                            <option value="dantuo">胆拖</option>
+                          </>
+                        )}
                       </select>
                     </label>
                   ) : null}
@@ -3519,15 +3547,24 @@ export function SettingsPage() {
                       <option value="history">历史重算</option>
                     </select>
                   </label>
-                  {generationForm.lotteryCode === 'pl3' ? (
+                  {generationForm.lotteryCode === 'pl3' || generationForm.lotteryCode === 'dlt' ? (
                     <label className="field">
-                      <span>排列3预测玩法</span>
+                      <span>{generationForm.lotteryCode === 'pl3' ? '排列3预测玩法' : '大乐透预测玩法'}</span>
                       <select
                         value={generationForm.predictionPlayMode}
                         onChange={(event) => setGenerationForm((previous) => ({ ...previous, predictionPlayMode: event.target.value as ModelPredictionPlayMode }))}
                       >
-                        <option value="direct">直选预测</option>
-                        <option value="direct_sum">和值预测</option>
+                        {generationForm.lotteryCode === 'pl3' ? (
+                          <>
+                            <option value="direct">直选预测</option>
+                            <option value="direct_sum">和值预测</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="direct">普通预测</option>
+                            <option value="dantuo">胆拖预测</option>
+                          </>
+                        )}
                       </select>
                     </label>
                   ) : null}

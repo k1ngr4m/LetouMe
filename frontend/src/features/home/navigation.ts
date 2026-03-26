@@ -15,7 +15,7 @@ export type ScoreViewSortDirection = 'desc' | 'asc'
 
 export type HomeDetailRouteState = {
   scrollY?: number
-  predictionPlayMode?: 'direct' | 'direct_sum'
+  predictionPlayMode?: 'direct' | 'direct_sum' | 'dantuo'
 }
 
 export type HomeRulesRouteState = {

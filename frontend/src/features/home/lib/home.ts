@@ -1,5 +1,6 @@
 import type {
   CurrentPredictionsResponse,
+  LotteryCode,
   LotteryDraw,
   PredictionHistoryPeriodSummary,
   PredictionHistoryModelStat,
@@ -42,7 +43,7 @@ export type BallStatItem = {
 }
 
 export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
-export type PredictionPlayType = 'direct' | 'direct_sum' | 'group3' | 'group6'
+export type PredictionPlayType = 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo'
 
 export type ModelListFilters = {
   nameQuery: string
@@ -84,6 +85,7 @@ export function normalizeStrategyLabel(value?: string | null): string {
 }
 
 export function normalizePredictionPlayType(value?: string | null): PredictionPlayType {
+  if (value === 'dlt_dantuo') return 'dlt_dantuo'
   if (value === 'direct_sum') return 'direct_sum'
   if (value === 'group3') return 'group3'
   if (value === 'group6') return 'group6'
@@ -92,10 +94,13 @@ export function normalizePredictionPlayType(value?: string | null): PredictionPl
 
 export function normalizePredictionModelPlayMode(
   model: { prediction_play_mode?: string | null; predictions?: PredictionGroup[]; [key: string]: unknown },
-): 'direct' | 'direct_sum' {
+): 'direct' | 'direct_sum' | 'dantuo' {
   const explicitMode = String(model.prediction_play_mode || '').trim().toLowerCase()
+  if (explicitMode === 'dantuo') return 'dantuo'
   if (explicitMode === 'direct_sum') return 'direct_sum'
   if (explicitMode === 'direct') return 'direct'
+  const hasDantuoGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'dlt_dantuo')
+  if (hasDantuoGroup) return 'dantuo'
   const hasDirectSumGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'direct_sum')
   return hasDirectSumGroup ? 'direct_sum' : 'direct'
 }
@@ -108,6 +113,20 @@ export function groupMatchesPlayTypeFilters(group: PredictionGroup, playTypeFilt
 export function filterPredictionGroupsByPlayType(groups: PredictionGroup[] = [], playTypeFilters: PredictionPlayType[] = []) {
   if (!playTypeFilters.length) return groups
   return groups.filter((group) => groupMatchesPlayTypeFilters(group, playTypeFilters))
+}
+
+export function inferPredictionGroupLotteryCode(group: PredictionGroup, actualResult: LotteryDraw | null = null): LotteryCode {
+  const normalizedPlayType = normalizePredictionPlayType(group.play_type)
+  const digitCount = (group.digits || []).length
+  if (digitCount >= 5) return 'pl5'
+  if (normalizedPlayType === 'dlt_dantuo') return 'dlt'
+  if (normalizedPlayType === 'direct' && digitCount === 3) return 'pl3'
+  if (normalizedPlayType === 'direct_sum' || normalizedPlayType === 'group3' || normalizedPlayType === 'group6') {
+    return 'pl3'
+  }
+  if (actualResult?.lottery_code) return actualResult.lottery_code
+  if (digitCount > 0) return 'pl3'
+  return 'dlt'
 }
 
 export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
@@ -293,8 +312,7 @@ function normalizeModelStat(item: PredictionHistoryModelStat): PredictionHistory
 
 export function compareNumbers(prediction: PredictionGroup, actualResult: LotteryDraw | null): PredictionHitComparison | null {
   if (!actualResult) return null
-  const inferredLotteryCode =
-    actualResult.lottery_code || ((prediction.digits || []).length >= 5 ? 'pl5' : prediction.play_type || (prediction.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode = inferPredictionGroupLotteryCode(prediction, actualResult)
   if (inferredLotteryCode === 'pl3') {
     const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
     if (playType === 'direct_sum') {
@@ -403,13 +421,12 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
 }
 
 export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult: LotteryDraw | null = null): string {
-  const inferredLotteryCode =
-    actualResult?.lottery_code || ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+  const inferredLotteryCode = inferPredictionGroupLotteryCode(group, actualResult)
+  if (inferredLotteryCode === 'dlt') {
+    return normalizePredictionPlayType(group.play_type) === 'dlt_dantuo' ? '胆拖' : '普通'
+  }
   if (inferredLotteryCode === 'pl5') {
     return '直选'
-  }
-  if (inferredLotteryCode !== 'pl3') {
-    return '复式'
   }
   if (normalizePredictionPlayType(group.play_type) === 'group3') {
     return '组选3'
@@ -545,7 +562,7 @@ export function buildSummary(
     const sumSeen = new Set<string>()
     const positionSeen = Array.from({ length: 5 }, () => new Set<string>())
     for (const group of activeGroups) {
-      const inferredLotteryCode = ((group.digits || []).length >= 5 ? 'pl5' : group.play_type || (group.digits || []).length ? 'pl3' : 'dlt')
+      const inferredLotteryCode = inferPredictionGroupLotteryCode(group)
       if (inferredLotteryCode === 'pl5') {
         const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 5)
         digits.forEach((digit, index) => {

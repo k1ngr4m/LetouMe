@@ -84,6 +84,29 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             )
         )
 
+    def test_prediction_matches_play_mode_for_dlt(self) -> None:
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "direct"}]},
+                lottery_code="dlt",
+                prediction_play_mode="direct",
+            )
+        )
+        self.assertFalse(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "dlt_dantuo"}]},
+                lottery_code="dlt",
+                prediction_play_mode="direct",
+            )
+        )
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "dlt_dantuo"}]},
+                lottery_code="dlt",
+                prediction_play_mode="dantuo",
+            )
+        )
+
     def test_generate_current_for_model_does_not_skip_when_existing_mode_differs(self) -> None:
         service = PredictionGenerationService()
         model_def = ModelDefinition(
@@ -223,6 +246,19 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         for phrase in required_phrases:
             self.assertIn(phrase, template)
 
+    def test_dlt_dantuo_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("dlt", prediction_play_mode="dantuo")
+        required_phrases = [
+            "dlt_dantuo",
+            "front_dan",
+            "front_tuo",
+            "back_dan",
+            "back_tuo",
+            "严格输出 JSON",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
     def test_validate_prediction_pl3_requires_direct_and_three_digits(self) -> None:
         service = PredictionGenerationService()
         valid_prediction = {
@@ -294,6 +330,35 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertFalse(service._validate_prediction(invalid_sum_value_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
         self.assertFalse(service._validate_prediction(invalid_digits_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
         self.assertFalse(service._validate_prediction(invalid_group_count_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
+
+    def test_validate_prediction_dlt_dantuo_requires_valid_dan_tuo_structure(self) -> None:
+        service = PredictionGenerationService()
+        valid_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "dlt_dantuo",
+                    "front_dan": ["01", "02"],
+                    "front_tuo": ["03", "04", "05", "06"],
+                    "back_dan": ["07"],
+                    "back_tuo": ["08", "09"],
+                }
+            ]
+        }
+        invalid_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "dlt_dantuo",
+                    "front_dan": ["01", "02", "03", "04", "05"],
+                    "front_tuo": ["06"],
+                    "back_dan": [],
+                    "back_tuo": ["08", "09"],
+                }
+            ]
+        }
+        self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="dlt", prediction_play_mode="dantuo"))
+        self.assertFalse(service._validate_prediction(invalid_prediction, lottery_code="dlt", prediction_play_mode="dantuo"))
 
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")

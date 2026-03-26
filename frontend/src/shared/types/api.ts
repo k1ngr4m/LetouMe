@@ -48,13 +48,17 @@ export type PredictionHitResult = {
 
 export type PredictionGroup = {
   group_id: number
-  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6'
+  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo'
   sum_value?: string
   cost_amount?: number
   strategy?: string
   description?: string
   red_balls: string[]
   blue_balls: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   digits?: string[]
   blue_ball?: string | null
   hit_result?: PredictionHitResult
@@ -62,6 +66,8 @@ export type PredictionGroup = {
   prize_amount?: number
   prize_source?: 'official' | 'fallback' | 'missing' | 'none'
 }
+
+export type PredictionPlayMode = 'direct' | 'direct_sum' | 'dantuo'
 
 export type ScoreSnapshot = {
   target_period: string
@@ -114,7 +120,7 @@ export type ScoreProfile = {
 
 export type PredictionModel = {
   model_id: string
-  prediction_play_mode?: 'direct' | 'direct_sum'
+  prediction_play_mode?: PredictionPlayMode
   model_name: string
   model_provider: string
   model_version?: string | null
@@ -135,7 +141,7 @@ export type PredictionModel = {
 
 export type PredictionHistorySummaryModel = {
   model_id: string
-  prediction_play_mode?: 'direct' | 'direct_sum'
+  prediction_play_mode?: PredictionPlayMode
   model_name: string
   model_provider: string
   model_version?: string | null
@@ -160,7 +166,7 @@ export type PredictionHistoryPeriodSummary = {
 
 export type PredictionHistoryModelStat = {
   model_id: string
-  prediction_play_mode?: 'direct' | 'direct_sum'
+  prediction_play_mode?: PredictionPlayMode
   model_name: string
   periods: number
   winning_periods: number
@@ -501,7 +507,7 @@ export type GenerateSettingsModelPredictionsPayload = {
   lottery_code: LotteryCode
   model_code: string
   mode: 'current' | 'history'
-  prediction_play_mode: 'direct' | 'direct_sum'
+  prediction_play_mode: PredictionPlayMode
   overwrite: boolean
   parallelism?: number
   start_period?: string
@@ -523,7 +529,7 @@ export type BulkGenerateSettingsModelPredictionsPayload = {
   lottery_code: LotteryCode
   model_codes: string[]
   mode: 'current' | 'history'
-  prediction_play_mode: 'direct' | 'direct_sum'
+  prediction_play_mode: PredictionPlayMode
   overwrite: boolean
   parallelism?: number
   start_period?: string
@@ -750,7 +756,7 @@ export type ScheduleTask = {
   lottery_code: LotteryCode
   model_codes: string[]
   generation_mode: 'current'
-  prediction_play_mode: 'direct' | 'direct_sum'
+  prediction_play_mode: PredictionPlayMode
   overwrite_existing: boolean
   schedule_mode: ScheduleMode
   preset_type?: SchedulePresetType | null
@@ -774,7 +780,7 @@ export type ScheduleTaskPayload = {
   lottery_code: LotteryCode
   model_codes: string[]
   generation_mode: 'current'
-  prediction_play_mode: 'direct' | 'direct_sum'
+  prediction_play_mode: PredictionPlayMode
   overwrite_existing: boolean
   schedule_mode: ScheduleMode
   preset_type?: SchedulePresetType | null

@@ -648,6 +648,16 @@ class PredictionRepository:
                         red_balls=group.get("red_balls", []),
                         blue_balls=group.get("blue_balls", group.get("blue_ball", [])),
                         digits=group.get("digits", []),
+                        extra_number_roles=(
+                            {
+                                "front_dan": group.get("front_dan", []),
+                                "front_tuo": group.get("front_tuo", []),
+                                "back_dan": group.get("back_dan", []),
+                                "back_tuo": group.get("back_tuo", []),
+                            }
+                            if str(group.get("play_type") or "").strip().lower() == "dlt_dantuo"
+                            else None
+                        ),
                     )
                     if persist_hit_details and draw_result_id and group.get("hit_result"):
                         hit_result = group.get("hit_result", {})
@@ -1018,7 +1028,15 @@ class PredictionRepository:
             red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
             blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
             digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
+            front_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "front_dan"]
+            front_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "front_tuo"]
+            back_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "back_dan"]
+            back_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "back_tuo"]
             hit_result = hit_by_group.get(group_id)
+            play_type = str(row.get("play_type") or "").strip().lower()
+            if play_type == "dlt_dantuo":
+                red_balls = red_balls or sorted({*front_dan, *front_tuo})
+                blue_balls = blue_balls or sorted({*back_dan, *back_tuo})
             groups_by_run.setdefault(int(row["model_run_id"]), []).append(
                 {
                     "group_id": int(row["group_no"]),
@@ -1030,6 +1048,10 @@ class PredictionRepository:
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
                     "digits": digits,
+                    "front_dan": front_dan,
+                    "front_tuo": front_tuo,
+                    "back_dan": back_dan,
+                    "back_tuo": back_tuo,
                     **({"hit_result": hit_result} if hit_result else {}),
                 }
             )

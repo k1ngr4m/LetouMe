@@ -480,11 +480,23 @@ describe('compareNumbers for pl3', () => {
 })
 
 describe('getPredictionPlayTypeLabel', () => {
-  it('returns direct/group labels for pl3 groups and keeps dlt as 复式', () => {
+  it('returns labels for pl3 and dlt play types', () => {
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] })).toBe('直选')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] })).toBe('和值')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
-    expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('复式')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('普通')
+    expect(
+      getPredictionPlayTypeLabel({
+        group_id: 2,
+        play_type: 'dlt_dantuo',
+        red_balls: ['01', '02', '03', '04', '05', '06'],
+        blue_balls: ['01', '02', '03'],
+        front_dan: ['01', '02'],
+        front_tuo: ['03', '04', '05', '06'],
+        back_dan: ['01'],
+        back_tuo: ['02', '03'],
+      }),
+    ).toBe('胆拖')
   })
 })
 

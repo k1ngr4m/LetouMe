@@ -231,9 +231,13 @@ class ScheduleService:
         if task_type != "prediction_generate":
             return "direct"
         normalized_mode = str(prediction_play_mode or "direct").strip().lower() or "direct"
+        if lottery_code == "dlt":
+            if normalized_mode not in {"direct", "dantuo"}:
+                raise ValueError("大乐透预测模式仅支持 direct 或 dantuo")
+            return normalized_mode
         if lottery_code != "pl3":
             if normalized_mode != "direct":
-                raise ValueError("仅排列3预测任务支持和值模式")
+                raise ValueError("当前彩种预测模式仅支持 direct")
             return "direct"
         if normalized_mode not in {"direct", "direct_sum"}:
             raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
@@ -352,10 +356,16 @@ class ScheduleService:
 
     @staticmethod
     def _append_prediction_play_mode(summary: str, task: dict[str, Any]) -> str:
-        if task.get("task_type") != "prediction_generate" or task.get("lottery_code") != "pl3":
+        if task.get("task_type") != "prediction_generate":
             return summary
+        lottery_code = str(task.get("lottery_code") or "dlt").strip().lower()
         play_mode = str(task.get("prediction_play_mode") or "direct").strip().lower()
-        play_mode_label = "和值" if play_mode == "direct_sum" else "直选"
+        if lottery_code == "pl3":
+            play_mode_label = "和值" if play_mode == "direct_sum" else "直选"
+        elif lottery_code == "dlt":
+            play_mode_label = "胆拖" if play_mode == "dantuo" else "普通"
+        else:
+            play_mode_label = "直选"
         return f"{summary} · {play_mode_label}"
 
     @staticmethod

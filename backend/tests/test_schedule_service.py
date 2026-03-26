@@ -50,8 +50,27 @@ class ScheduleServiceTestCase(unittest.TestCase):
             "is_active": True,
         }
 
-        with self.assertRaisesRegex(ValueError, "仅排列3预测任务支持和值模式"):
+        with self.assertRaisesRegex(ValueError, "大乐透预测模式仅支持 direct 或 dantuo"):
             self.service._normalize_payload(payload, task_code="sched-invalid")
+
+    def test_normalize_payload_keeps_dlt_dantuo_for_prediction_tasks(self) -> None:
+        payload = {
+            "task_name": "大乐透胆拖预测",
+            "task_type": "prediction_generate",
+            "lottery_code": "dlt",
+            "model_codes": ["dlt-model-a"],
+            "generation_mode": "current",
+            "prediction_play_mode": "dantuo",
+            "overwrite_existing": False,
+            "schedule_mode": "preset",
+            "preset_type": "daily",
+            "time_of_day": "09:00",
+            "weekdays": [],
+            "is_active": True,
+        }
+
+        normalized = self.service._normalize_payload(payload, task_code="sched-dlt-dantuo")
+        self.assertEqual(normalized["prediction_play_mode"], "dantuo")
 
     def test_trigger_task_passes_prediction_play_mode_to_generation_service(self) -> None:
         task = {

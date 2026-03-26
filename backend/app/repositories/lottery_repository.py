@@ -364,6 +364,7 @@ def _insert_number_rows(
     red_balls: list[str],
     blue_balls: list[str],
     digits: list[str] | None = None,
+    extra_number_roles: dict[str, list[str]] | None = None,
 ) -> None:
     for index, ball in enumerate(red_balls, start=1):
         cursor.execute(
@@ -389,6 +390,18 @@ def _insert_number_rows(
             """,
             (owner_id, index, str(ball).zfill(2)),
         )
+    for role, numbers in (extra_number_roles or {}).items():
+        normalized_role = str(role or "").strip().lower()
+        if not normalized_role:
+            continue
+        for index, ball in enumerate(numbers or [], start=1):
+            cursor.execute(
+                f"""
+                INSERT INTO {table_name} ({owner_id_field}, ball_color, ball_position, ball_value)
+                VALUES (?, ?, ?, ?)
+                """,
+                (owner_id, normalized_role, index, str(ball).zfill(2)),
+            )
 
 
 def _parse_timestamp(value: str) -> datetime | str:

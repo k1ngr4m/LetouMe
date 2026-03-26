@@ -15,7 +15,7 @@ export function useHomeData(
   historyPage: number,
   historyPageSize: number,
   historyStrategyFilters: string[],
-  historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6'>,
+  historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo'>,
   lotteryPage: number,
   lotteryPageSize: number,
   options?: {
