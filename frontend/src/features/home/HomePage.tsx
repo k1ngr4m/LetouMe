@@ -675,6 +675,7 @@ export function HomePage() {
     () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
     [history?.strategy_options],
   )
+  const showDltStrategyFilters = selectedLottery === 'dlt' && dltPredictionMode === 'direct'
 
   useEffect(() => {
     setSummaryStrategyFilters((previous) => {
@@ -1099,7 +1100,7 @@ export function HomePage() {
                     </button>
                   ))}
                 </div>
-                {selectedLottery === 'dlt' ? (
+                {showDltStrategyFilters ? (
                   <div className="history-strategy-filter">
                     <span className="history-strategy-filter__label">方案筛选</span>
                     {summaryStrategyOptions.length ? (
@@ -1219,7 +1220,7 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
-                {selectedLottery === 'dlt' ? (
+                {showDltStrategyFilters ? (
               <div className="history-strategy-filter">
                 <span className="history-strategy-filter__label">开奖方案筛选</span>
                 {historyStrategyOptions.length ? (
@@ -1245,7 +1246,7 @@ export function HomePage() {
                 )}
               </div>
             ) : null}
-            {selectedLottery === 'dlt' && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
+            {showDltStrategyFilters && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。

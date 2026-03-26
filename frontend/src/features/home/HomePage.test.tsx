@@ -874,6 +874,17 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('开奖方案筛选')).toBeInTheDocument()
   })
 
+  it('hides strategy filters in dlt dantuo mode', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
+    expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
+    expect(screen.queryByText('正在更新开奖方案筛选结果...')).not.toBeInTheDocument()
+  })
+
   it('applies model list filters to number summary candidates', async () => {
     renderPage()
 
