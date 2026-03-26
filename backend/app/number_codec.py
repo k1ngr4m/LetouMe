@@ -12,6 +12,7 @@ NUMBER_FIELD_SPECS: tuple[tuple[str, str], ...] = (
     ("direct_tens", "direct_tens"),
     ("direct_units", "direct_units"),
     ("group_numbers", "group"),
+    ("sum_values", "sum"),
 )
 
 ROLE_TO_FIELD = {role: field_name for field_name, role in NUMBER_FIELD_SPECS}

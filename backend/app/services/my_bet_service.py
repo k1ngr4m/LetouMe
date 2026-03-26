@@ -18,12 +18,27 @@ from backend.app.services.prediction_service import PredictionService
 from backend.app.services.ticket_ocr_service import TicketOCRService
 
 
+def build_pl3_group_sum_bet_counts() -> dict[int, int]:
+    counts = {sum_value: 0 for sum_value in range(28)}
+    for first in range(10):
+        for second in range(first, 10):
+            for third in range(second, 10):
+                if first == second == third:
+                    continue
+                counts[first + second + third] += 1
+    return counts
+
+
 class MyBetService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
     DLT_FIXED_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
-    PL3_PRIZE_LEVEL_ORDER = ["直选", "组选3", "组选6"]
+    PL3_PRIZE_LEVEL_ORDER = ["直选", "和值", "组选3", "组选6"]
+    PL3_DIRECT_SUM_BET_COUNTS = {
+        int(sum_value): int(cost / 2) for sum_value, cost in PredictionService.PL3_DIRECT_SUM_COST_RULES.items()
+    }
+    PL3_GROUP_SUM_BET_COUNTS = build_pl3_group_sum_bet_counts()
     PL5_PRIZE_LEVEL_ORDER = ["直选"]
 
     def __init__(
@@ -131,6 +146,7 @@ class MyBetService:
             "direct_tens": primary_line.get("direct_tens"),
             "direct_units": primary_line.get("direct_units"),
             "group_numbers": primary_line.get("group_numbers"),
+            "sum_values": primary_line.get("sum_values"),
             "multiplier": summary_multiplier,
             "is_append": summary_is_append,
             "bet_count": total_bet_count,
@@ -182,6 +198,7 @@ class MyBetService:
                 "direct_tens": None,
                 "direct_units": None,
                 "group_numbers": None,
+                "sum_values": None,
                 "multiplier": 1,
                 "is_append": False,
                 "bet_count": 0,
@@ -197,6 +214,7 @@ class MyBetService:
             "direct_tens": "",
             "direct_units": "",
             "group_numbers": None,
+            "sum_values": None,
             "multiplier": 1,
             "is_append": False,
             "bet_count": 0,
@@ -224,6 +242,7 @@ class MyBetService:
             "direct_tens": None,
             "direct_units": None,
             "group_numbers": None,
+            "sum_values": None,
             "multiplier": multiplier,
             "is_append": is_append,
             "bet_count": bet_count,
@@ -232,8 +251,8 @@ class MyBetService:
 
     def _build_pl3_line_payload(self, payload: dict[str, Any], *, multiplier: int) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6")
+        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum")
         if play_type == "direct":
             hundreds = self._normalize_numbers(payload.get("direct_hundreds"), valid_range=self.DIGIT_RANGE)
             tens = self._normalize_numbers(payload.get("direct_tens"), valid_range=self.DIGIT_RANGE)
@@ -251,6 +270,31 @@ class MyBetService:
                 "direct_tens": ",".join(tens),
                 "direct_units": ",".join(units),
                 "group_numbers": None,
+                "sum_values": None,
+                "multiplier": multiplier,
+                "is_append": False,
+                "bet_count": bet_count,
+                "amount": bet_count * 2 * multiplier,
+            }
+        if play_type in {"direct_sum", "group_sum"}:
+            sum_values = self._normalize_sum_values(payload.get("sum_values"))
+            if not sum_values:
+                raise ValueError("和值至少选择 1 个号码")
+            bet_count_map = self.PL3_DIRECT_SUM_BET_COUNTS if play_type == "direct_sum" else self.PL3_GROUP_SUM_BET_COUNTS
+            bet_count = sum(int(bet_count_map.get(int(value), 0)) for value in sum_values)
+            if bet_count <= 0:
+                raise ValueError("和值投注注数计算失败")
+            return {
+                "play_type": play_type,
+                "front_numbers": "",
+                "back_numbers": "",
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
+                "direct_hundreds": None,
+                "direct_tens": None,
+                "direct_units": None,
+                "group_numbers": None,
+                "sum_values": ",".join(sum_values),
                 "multiplier": multiplier,
                 "is_append": False,
                 "bet_count": bet_count,
@@ -271,6 +315,7 @@ class MyBetService:
             "direct_tens": None,
             "direct_units": None,
             "group_numbers": ",".join(group_numbers),
+            "sum_values": None,
             "multiplier": multiplier,
             "is_append": False,
             "bet_count": bet_count,
@@ -299,11 +344,23 @@ class MyBetService:
             "direct_tens": ",".join(tens),
             "direct_units": ",".join(units),
             "group_numbers": None,
+            "sum_values": None,
             "multiplier": multiplier,
             "is_append": False,
             "bet_count": bet_count,
             "amount": bet_count * 2 * multiplier,
         }
+
+    @staticmethod
+    def _normalize_sum_values(values: Any) -> list[str]:
+        if isinstance(values, str):
+            values = [item for item in re_split_numbers(values) if item]
+        if not isinstance(values, list):
+            raise ValueError("和值格式不正确")
+        normalized = sorted({str(item).zfill(2) for item in values if str(item).strip()}, key=int)
+        if any(not item.isdigit() or int(item) < 0 or int(item) > 27 for item in normalized):
+            raise ValueError("和值超出可选范围")
+        return normalized
 
     @staticmethod
     def _normalize_numbers(values: Any, *, valid_range: range) -> list[str]:
@@ -379,6 +436,7 @@ class MyBetService:
                     "hit_direct_tens": list(line_result.get("hit_direct_tens") or []),
                     "hit_direct_units": list(line_result.get("hit_direct_units") or []),
                     "hit_group_numbers": list(line_result.get("hit_group_numbers") or []),
+                    "hit_sum_values": list(line_result.get("hit_sum_values") or []),
                 }
             )
             level = line_result.get("prize_level")
@@ -445,12 +503,15 @@ class MyBetService:
             "hit_direct_tens": [],
             "hit_direct_units": [],
             "hit_group_numbers": [],
+            "hit_sum_values": [],
         }
 
     def _calculate_pl3_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
         play_type = str(line.get("play_type") or "direct")
         digits = normalize_digit_balls(draw.get("digits", draw.get("red_balls", [])))
         multiplier = int(line.get("multiplier") or 1)
+        actual_sum = sum(int(item) for item in digits) if len(digits) == 3 else -1
+        actual_sum_value = str(actual_sum).zfill(2) if actual_sum >= 0 else ""
         level = None
         winning_count = 0
         if play_type == "direct":
@@ -460,6 +521,17 @@ class MyBetService:
             matched = len(digits) == 3 and digits[0] in hundreds and digits[1] in tens and digits[2] in units
             if matched:
                 level = "直选"
+                winning_count = 1
+        elif play_type == "direct_sum":
+            selected_sums = set(line.get("sum_values") or [])
+            if actual_sum_value and actual_sum_value in selected_sums:
+                level = "和值"
+                winning_count = 1
+        elif play_type == "group_sum":
+            selected_sums = set(line.get("sum_values") or [])
+            unique_digits = set(digits)
+            if actual_sum_value and actual_sum_value in selected_sums and len(unique_digits) >= 2:
+                level = "和值"
                 winning_count = 1
         elif play_type == "group3":
             unique_digits = sorted(set(digits))
@@ -478,6 +550,7 @@ class MyBetService:
         hit_tens = [item for item in list(line.get("direct_tens") or []) if len(digits) == 3 and item == digits[1]]
         hit_units = [item for item in list(line.get("direct_units") or []) if len(digits) == 3 and item == digits[2]]
         hit_groups = [item for item in list(line.get("group_numbers") or []) if item in digits]
+        hit_sums = [actual_sum_value] if level == "和值" and actual_sum_value else []
         return {
             "winning_bet_count": winning_count,
             "prize_level": level,
@@ -490,6 +563,7 @@ class MyBetService:
             "hit_direct_tens": hit_tens,
             "hit_direct_units": hit_units,
             "hit_group_numbers": hit_groups,
+            "hit_sum_values": hit_sums,
         }
 
     def _calculate_pl5_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
@@ -523,6 +597,7 @@ class MyBetService:
             "hit_direct_tens": [item for item in tens if len(digits) == 5 and item == digits[3]],
             "hit_direct_units": [item for item in units if len(digits) == 5 and item == digits[4]],
             "hit_group_numbers": [],
+            "hit_sum_values": [],
         }
 
     @staticmethod
@@ -649,6 +724,7 @@ class MyBetService:
                     "direct_tens": normalize_numbers(record.get("direct_tens")),
                     "direct_units": normalize_numbers(record.get("direct_units")),
                     "group_numbers": normalize_numbers(record.get("group_numbers")),
+                    "sum_values": normalize_numbers(record.get("sum_values")),
                     "multiplier": int(record.get("multiplier") or 1),
                     "is_append": bool(record.get("is_append")),
                     "bet_count": int(record.get("bet_count") or 0),
@@ -670,6 +746,7 @@ class MyBetService:
             "direct_tens": list(first_line.get("direct_tens") or []),
             "direct_units": list(first_line.get("direct_units") or []),
             "group_numbers": list(first_line.get("group_numbers") or []),
+            "sum_values": list(first_line.get("sum_values") or []),
             "multiplier": int(record.get("multiplier") or first_line.get("multiplier") or 1),
             "is_append": bool(record.get("is_append") if record.get("is_append") is not None else first_line.get("is_append")),
             "bet_count": int(record.get("bet_count") or 0),
@@ -708,6 +785,7 @@ class MyBetService:
             "direct_tens": normalize_numbers(line.get("direct_tens")),
             "direct_units": normalize_numbers(line.get("direct_units")),
             "group_numbers": normalize_numbers(line.get("group_numbers")),
+            "sum_values": normalize_numbers(line.get("sum_values")),
             "hit_front_numbers": normalize_numbers(line.get("hit_front_numbers")),
             "hit_back_numbers": normalize_numbers(line.get("hit_back_numbers")),
             "hit_direct_ten_thousands": normalize_numbers(line.get("hit_direct_ten_thousands")),
@@ -716,6 +794,7 @@ class MyBetService:
             "hit_direct_tens": normalize_numbers(line.get("hit_direct_tens")),
             "hit_direct_units": normalize_numbers(line.get("hit_direct_units")),
             "hit_group_numbers": normalize_numbers(line.get("hit_group_numbers")),
+            "hit_sum_values": normalize_numbers(line.get("hit_sum_values")),
             "multiplier": int(line.get("multiplier") or 1),
             "is_append": bool(line.get("is_append")),
             "bet_count": int(line.get("bet_count") or 0),

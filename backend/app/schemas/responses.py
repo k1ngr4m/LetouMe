@@ -157,6 +157,7 @@ class MyBetRecordResponse(BaseModel):
     direct_tens: list[str] = Field(default_factory=list)
     direct_units: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
+    sum_values: list[str] = Field(default_factory=list)
     multiplier: int = 1
     is_append: bool = False
     bet_count: int = 0

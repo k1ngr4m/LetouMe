@@ -7,7 +7,7 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
-type Pl3PlayType = 'direct' | 'group3' | 'group6'
+type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
 type LinePlayType = 'dlt' | Pl3PlayType
 
 type EditableLine = {
@@ -20,6 +20,7 @@ type EditableLine = {
   directTensInput: string
   directUnitsInput: string
   groupNumbersInput: string
+  sumValuesInput: string
   multiplier: number
   isAppend: boolean
 }
@@ -47,10 +48,58 @@ const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
   { value: 'direct', label: '直选' },
   { value: 'group3', label: '组选3' },
   { value: 'group6', label: '组选6' },
+  { value: 'direct_sum', label: '直选和值' },
+  { value: 'group_sum', label: '组选和值' },
 ]
 const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
 const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
 const pl3Pool = Array.from({ length: 10 }, (_, index) => String(index).padStart(2, '0'))
+const pl3SumPool = Array.from({ length: 28 }, (_, index) => String(index).padStart(2, '0'))
+const PL3_DIRECT_SUM_BET_COUNTS: Record<number, number> = {
+  0: 1,
+  1: 3,
+  2: 6,
+  3: 10,
+  4: 15,
+  5: 21,
+  6: 28,
+  7: 36,
+  8: 45,
+  9: 55,
+  10: 63,
+  11: 69,
+  12: 73,
+  13: 75,
+  14: 75,
+  15: 73,
+  16: 69,
+  17: 63,
+  18: 55,
+  19: 45,
+  20: 36,
+  21: 28,
+  22: 21,
+  23: 15,
+  24: 10,
+  25: 6,
+  26: 3,
+  27: 1,
+}
+
+function buildPl3GroupSumBetCounts() {
+  const counts: Record<number, number> = Object.fromEntries(Array.from({ length: 28 }, (_, index) => [index, 0]))
+  for (let first = 0; first <= 9; first += 1) {
+    for (let second = first; second <= 9; second += 1) {
+      for (let third = second; third <= 9; third += 1) {
+        if (first === second && second === third) continue
+        counts[first + second + third] += 1
+      }
+    }
+  }
+  return counts
+}
+
+const PL3_GROUP_SUM_BET_COUNTS = buildPl3GroupSumBetCounts()
 
 function formatCurrency(value: number | undefined) {
   return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
@@ -90,6 +139,7 @@ function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
     directTensInput: '',
     directUnitsInput: '',
     groupNumbersInput: '',
+    sumValuesInput: '',
     multiplier: 1,
     isAppend: false,
   }
@@ -149,6 +199,7 @@ function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableL
     directTensInput: (line.direct_tens || []).join(','),
     directUnitsInput: (line.direct_units || []).join(','),
     groupNumbersInput: (line.group_numbers || []).join(','),
+    sumValuesInput: (line.sum_values || []).join(','),
     multiplier: line.multiplier || 1,
     isAppend: Boolean(line.is_append),
   }
@@ -232,6 +283,12 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
     const betCount = hundreds.length && tens.length && units.length ? hundreds.length * tens.length * units.length : 0
     return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
   }
+  if (line.playType === 'direct_sum' || line.playType === 'group_sum') {
+    const sumValues = splitNumbers(line.sumValuesInput)
+    const betCountRule = line.playType === 'direct_sum' ? PL3_DIRECT_SUM_BET_COUNTS : PL3_GROUP_SUM_BET_COUNTS
+    const betCount = sumValues.reduce((sum, item) => sum + Number(betCountRule[Number(item)] || 0), 0)
+    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+  }
   const groups = splitNumbers(line.groupNumbersInput)
   const betCount = line.playType === 'group3' ? (groups.length >= 2 ? groups.length * (groups.length - 1) : 0) : combination(groups.length, 3)
   return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
@@ -270,6 +327,14 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
       is_append: false,
     }
   }
+  if (line.playType === 'direct_sum' || line.playType === 'group_sum') {
+    return {
+      play_type: line.playType,
+      sum_values: splitNumbers(line.sumValuesInput),
+      multiplier: normalizedMultiplier,
+      is_append: false,
+    }
+  }
   return {
     play_type: line.playType,
     group_numbers: splitNumbers(line.groupNumbersInput),
@@ -281,6 +346,8 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
 function formatPlayType(playType: string) {
   if (playType === 'group3') return '组选3'
   if (playType === 'group6') return '组选6'
+  if (playType === 'direct_sum') return '直选和值'
+  if (playType === 'group_sum') return '组选和值'
   if (playType === 'direct') return '直选'
   if (playType === 'mixed') return '混合'
   return '大乐透'
@@ -323,6 +390,7 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
   const hitTens = new Set(line.hit_direct_tens || [])
   const hitUnits = new Set(line.hit_direct_units || [])
   const hitGroups = new Set(line.hit_group_numbers || [])
+  const hitSums = new Set(line.hit_sum_values || [])
   const resolveTone = (isHit: boolean): 'default' | 'muted' => (hasActualResult && !isHit ? 'muted' : 'default')
 
   if (lotteryCode === 'dlt') {
@@ -376,6 +444,15 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
         <span className="number-row__divider" />
         {(line.direct_units || []).map((ball) => (
           <NumberBall key={`${recordId}-line-${line.line_no}-u-${ball}`} value={ball} color="red" size="sm" isHit={hitUnits.has(ball)} tone={resolveTone(hitUnits.has(ball))} />
+        ))}
+      </div>
+    )
+  }
+  if (line.play_type === 'direct_sum' || line.play_type === 'group_sum') {
+    return (
+      <div className="number-row number-row--tight">
+        {(line.sum_values || []).map((ball) => (
+          <NumberBall key={`${recordId}-line-${line.line_no}-sum-${ball}`} value={ball} color="red" size="sm" isHit={hitSums.has(ball)} tone={resolveTone(hitSums.has(ball))} />
         ))}
       </div>
     )
@@ -950,6 +1027,26 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             <label>
                               个位号码（逗号分隔）
                               <input value={line.directUnitsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 04,05" />
+                            </label>
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
+                            </label>
+                          </div>
+                        </>
+                      ) : line.playType === 'direct_sum' || line.playType === 'group_sum' ? (
+                        <>
+                          <BallPicker
+                            label="和值点击选号"
+                            numbers={pl3SumPool}
+                            selectedInput={line.sumValuesInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, sumValuesInput: togglePickFromInput(current.sumValuesInput, value, pl3SumPool.length) }))}
+                            color="red"
+                          />
+                          <div className="settings-form-grid">
+                            <label>
+                              和值号码（逗号分隔）
+                              <input value={line.sumValuesInput} onChange={(event) => updateLine(index, (current) => ({ ...current, sumValuesInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 10,11,12" />
                             </label>
                             <label>
                               倍数

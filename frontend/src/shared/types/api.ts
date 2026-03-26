@@ -265,7 +265,7 @@ export type SimulationTicketQuoteResponse = {
 export type MyBetRecordPayload = {
   lottery_code?: LotteryCode
   target_period: string
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers?: string[]
   back_numbers?: string[]
   direct_ten_thousands?: string[]
@@ -274,6 +274,7 @@ export type MyBetRecordPayload = {
   direct_tens?: string[]
   direct_units?: string[]
   group_numbers?: string[]
+  sum_values?: string[]
   multiplier?: number
   is_append?: boolean
   source_type?: 'manual' | 'ocr'
@@ -290,7 +291,7 @@ export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
 }
 
 export type MyBetLinePayload = {
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers?: string[]
   back_numbers?: string[]
   direct_ten_thousands?: string[]
@@ -299,13 +300,14 @@ export type MyBetLinePayload = {
   direct_tens?: string[]
   direct_units?: string[]
   group_numbers?: string[]
+  sum_values?: string[]
   multiplier?: number
   is_append?: boolean
 }
 
 export type MyBetLine = {
   line_no: number
-  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers: string[]
   back_numbers: string[]
   direct_ten_thousands: string[]
@@ -314,6 +316,7 @@ export type MyBetLine = {
   direct_tens: string[]
   direct_units: string[]
   group_numbers: string[]
+  sum_values?: string[]
   hit_front_numbers?: string[]
   hit_back_numbers?: string[]
   hit_direct_ten_thousands?: string[]
@@ -322,6 +325,7 @@ export type MyBetLine = {
   hit_direct_tens?: string[]
   hit_direct_units?: string[]
   hit_group_numbers?: string[]
+  hit_sum_values?: string[]
   multiplier: number
   is_append: boolean
   bet_count: number
@@ -332,7 +336,7 @@ export type MyBetRecord = {
   id: number
   lottery_code: LotteryCode
   target_period: string
-  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers: string[]
   back_numbers: string[]
   direct_ten_thousands: string[]
@@ -341,6 +345,7 @@ export type MyBetRecord = {
   direct_tens: string[]
   direct_units: string[]
   group_numbers: string[]
+  sum_values?: string[]
   multiplier: number
   is_append: boolean
   bet_count: number
