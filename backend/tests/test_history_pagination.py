@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import Mock
 
 from backend.app.services.lottery_service import LotteryService
@@ -14,7 +14,7 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         repository.list_draws.return_value = [
             {
                 "period": "26025",
-                "date": "2026-03-10",
+                "date": date(2026, 3, 10),
                 "red_balls": ["01", "02", "03", "04", "05"],
                 "blue_balls": ["06", "07"],
                 "updated_at": datetime(2026, 3, 11, 8, 0, 0),
@@ -23,7 +23,7 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         repository.count_draws.return_value = 128
         repository.get_latest_draw.return_value = {
             "period": "26025",
-            "date": "2026-03-10",
+            "date": date(2026, 3, 10),
         }
 
         service = LotteryService(repository=repository)
@@ -32,7 +32,9 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         repository.list_draws.assert_called_once_with(limit=20, offset=40, lottery_code="dlt")
         self.assertEqual(payload["total_count"], 128)
         self.assertEqual(len(payload["data"]), 1)
+        self.assertEqual(payload["data"][0]["date"], "2026-03-10")
         self.assertEqual(payload["next_draw"]["next_period"], "26026")
+        self.assertEqual(payload["next_draw"]["next_date_display"], "2026年03月11日")
 
 
 class PredictionHistoryPaginationTests(unittest.TestCase):

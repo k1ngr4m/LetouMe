@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from backend.app.cache import runtime_cache
@@ -22,6 +22,14 @@ class LotteryService:
             return [str(value).zfill(2)]
         return []
 
+    @staticmethod
+    def serialize_draw_date(value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        return str(value or "")
+
     def normalize_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
         blue_balls = self.normalize_blue_balls(draw.get("blue_balls", draw.get("blue_ball")))
@@ -32,7 +40,7 @@ class LotteryService:
             "blue_balls": blue_balls,
             "blue_ball": blue_balls[0] if blue_balls else None,
             "digits": normalize_digit_balls(draw.get("digits", [])),
-            "date": draw.get("date", ""),
+            "date": self.serialize_draw_date(draw.get("date")),
             "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
             "prize_breakdown": list(draw.get("prize_breakdown") or []),
         }
@@ -65,9 +73,10 @@ class LotteryService:
                 "total_count": total_count,
             }
             if latest_draw:
+                latest_draw_date = self.serialize_draw_date(latest_draw.get("date"))
                 payload["next_draw"] = get_lottery_definition(normalized_code).predict_next_draw(
                     latest_draw["period"],
-                    latest_draw["date"],
+                    latest_draw_date,
                 )
             self.logger.debug(
                 "Built lottery history payload",

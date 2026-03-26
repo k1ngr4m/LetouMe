@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from time import perf_counter
 from typing import Any
 
@@ -20,6 +21,14 @@ class PredictionRepository:
 
     def sync_model_catalog(self) -> None:
         self._registry = _load_registry()
+
+    @staticmethod
+    def _serialize_prediction_date(value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        return str(value or "")
 
     def get_current_prediction(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -312,7 +321,7 @@ class PredictionRepository:
         records = [
             {
                 "lottery_code": normalized_code,
-                "prediction_date": row["prediction_date"],
+                "prediction_date": self._serialize_prediction_date(row.get("prediction_date")),
                 "target_period": display_period(normalized_code, row["target_period"]),
                 "actual_result": actual_results_by_issue.get(int(row["target_issue_id"])),
                 "models": models_by_batch.get(int(row["id"]), []),
@@ -927,7 +936,7 @@ class PredictionRepository:
 
         payload = {
             "lottery_code": lottery_code,
-            "prediction_date": batch_row["prediction_date"],
+            "prediction_date": self._serialize_prediction_date(batch_row.get("prediction_date")),
             "target_period": display_period(lottery_code, batch_row["target_period"]),
             "models": models,
         }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 import math
 from statistics import pstdev
 from time import perf_counter
@@ -82,6 +83,14 @@ class PredictionService:
             return [str(value).zfill(2)]
         return []
 
+    @staticmethod
+    def serialize_prediction_date(value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        return str(value or "")
+
     def normalize_prediction(self, prediction: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code or prediction.get("lottery_code"))
         normalized_predictions = []
@@ -159,6 +168,7 @@ class PredictionService:
         return {
             **payload,
             "lottery_code": normalized_code,
+            "prediction_date": self.serialize_prediction_date(payload.get("prediction_date")),
             "models": [
                 {
                     **model,
@@ -296,7 +306,7 @@ class PredictionService:
                     "record_type": "current",
                     "lottery_code": normalized_code,
                     "target_period": current_payload.get("target_period", ""),
-                    "prediction_date": current_payload.get("prediction_date", ""),
+                    "prediction_date": self.serialize_prediction_date(current_payload.get("prediction_date")),
                     "actual_result": None,
                     "model_count": len(current_payload.get("models", [])),
                     "status_label": "待开奖",
@@ -309,7 +319,7 @@ class PredictionService:
                     "record_type": "history",
                     "lottery_code": normalized_code,
                     "target_period": record.get("target_period", ""),
-                    "prediction_date": record.get("prediction_date", ""),
+                    "prediction_date": self.serialize_prediction_date(record.get("prediction_date")),
                     "actual_result": record.get("actual_result"),
                     "model_count": len(record.get("models", [])),
                     "status_label": "已归档",
@@ -341,7 +351,7 @@ class PredictionService:
         return {
             "record_type": normalized_type,
             "lottery_code": normalized_code,
-            "prediction_date": payload.get("prediction_date", ""),
+            "prediction_date": self.serialize_prediction_date(payload.get("prediction_date")),
             "target_period": payload.get("target_period", ""),
             "actual_result": payload.get("actual_result"),
             "models": payload.get("models", []),
@@ -893,7 +903,7 @@ class PredictionService:
 
     def _build_history_summary(self, record: dict[str, Any], score_profiles: dict[str, dict[str, Any]]) -> dict[str, Any]:
         return {
-            "prediction_date": record.get("prediction_date", ""),
+            "prediction_date": self.serialize_prediction_date(record.get("prediction_date")),
             "target_period": record.get("target_period", ""),
             "actual_result": record.get("actual_result"),
             "period_summary": record.get("period_summary") or self._empty_period_summary(),
