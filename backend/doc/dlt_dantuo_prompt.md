@@ -25,9 +25,9 @@
 
 ## 输出格式（必须严格一致）
 ```json
-{
+{{
   "predictions": [
-    {
+    {{
       "group_id": 1,
       "play_type": "dlt_dantuo",
       "strategy": "策略名称",
@@ -36,7 +36,7 @@
       "front_tuo": ["12", "19", "25", "31"],
       "back_dan": ["03"],
       "back_tuo": ["07", "11"]
-    }
+    }}
   ]
-}
+}}
 ```
