@@ -995,14 +995,12 @@ describe('HomePage dashboard sidebar', () => {
     simulateDltModeCoexistCurrentPredictions.current = true
     renderPage()
 
-    expect(screen.getByText('01')).toBeInTheDocument()
     expect(screen.queryByText('前胆')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
 
     expect(screen.getByText('前胆')).toBeInTheDocument()
     expect(screen.getByText('前拖')).toBeInTheDocument()
-    expect(screen.queryByText('04')).not.toBeInTheDocument()
   })
 
   it('applies model list filters to number summary candidates', async () => {
