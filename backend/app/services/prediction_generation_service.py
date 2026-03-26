@@ -1091,7 +1091,8 @@ class PredictionGenerationService:
         groups = prediction.get("predictions", [])
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
-        if len(groups) != 5:
+        expected_group_count = 3 if normalized_code == "pl3" and normalized_play_mode == "direct_sum" else 5
+        if len(groups) != expected_group_count:
             return False
         for group in groups:
             if normalized_code == "pl3":

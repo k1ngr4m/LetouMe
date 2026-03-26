@@ -25,6 +25,53 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
 
         bootstrap_default_models.assert_not_called()
 
+    def test_load_registry_reads_provider_options_from_phase5_tables(self) -> None:
+        connection = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchall.side_effect = [
+            [
+                {
+                    "model_code": "phase5-model",
+                    "display_name": "Phase5 Model",
+                    "provider_code": "openai_compatible",
+                    "api_format": "openai_compatible",
+                    "provider_id": 7,
+                    "provider_base_url": "https://example.com/v1",
+                    "provider_api_key": "",
+                    "api_model_name": "phase5-api-model",
+                    "provider_model_name": "phase5-provider-model",
+                    "version": "1",
+                    "base_url": "",
+                    "api_key": "",
+                    "app_code": "",
+                    "temperature": 0.6,
+                    "is_active": 1,
+                    "is_deleted": 0,
+                }
+            ],
+            [],
+            [{"model_code": "phase5-model", "lottery_code": "dlt"}],
+            [
+                {"provider_id": 7, "option_key": "timeout", "option_value": "30"},
+                {"provider_id": 7, "option_key": "headers", "option_value": "{\"x-app\":\"demo\"}"},
+            ],
+        ]
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.__enter__.return_value = connection
+
+        with patch("backend.core.model_config.get_connection", return_value=connection):
+            registry = load_model_registry()
+
+        definition = registry.get("phase5-model")
+        self.assertEqual(definition.provider, "openai_compatible")
+        self.assertEqual(definition.api_model, "phase5-api-model")
+        self.assertEqual(definition.extra, {"timeout": 30, "headers": {"x-app": "demo"}})
+
+        executed_sql = "\n".join(str(call.args[0]) for call in cursor.execute.call_args_list)
+        self.assertIn("FROM model_provider_option", executed_sql)
+        self.assertNotIn("mp.extra_options_json", executed_sql)
+        self.assertNotIn("am.provider_id", executed_sql)
+
 
 class ModelScopeConfigTests(unittest.TestCase):
     def setUp(self) -> None:

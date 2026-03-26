@@ -213,6 +213,7 @@ class PredictionGenerationServiceTests(unittest.TestCase):
     def test_pl3_sum_prompt_template_has_required_output_constraints(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl3", prediction_play_mode="direct_sum")
         required_phrases = [
+            "必须正好输出 3 组",
             "`play_type` 只能是 `direct_sum`",
             "`sum_value` 必须是字符串",
             "`digits` 必须是空数组 `[]`",
@@ -263,8 +264,6 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 {"group_id": 1, "play_type": "direct_sum", "sum_value": "9", "digits": []},
                 {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
                 {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
-                {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
-                {"group_id": 5, "play_type": "direct_sum", "sum_value": "13", "digits": []},
             ]
         }
         invalid_sum_value_prediction = {
@@ -272,13 +271,18 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 {"group_id": 1, "play_type": "direct_sum", "sum_value": "28", "digits": []},
                 {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
                 {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
-                {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
-                {"group_id": 5, "play_type": "direct_sum", "sum_value": "13", "digits": []},
             ]
         }
         invalid_digits_prediction = {
             "predictions": [
                 {"group_id": 1, "play_type": "direct_sum", "sum_value": "9", "digits": ["0"]},
+                {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
+                {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
+            ]
+        }
+        invalid_group_count_prediction = {
+            "predictions": [
+                {"group_id": 1, "play_type": "direct_sum", "sum_value": "9", "digits": []},
                 {"group_id": 2, "play_type": "direct_sum", "sum_value": "10", "digits": []},
                 {"group_id": 3, "play_type": "direct_sum", "sum_value": "11", "digits": []},
                 {"group_id": 4, "play_type": "direct_sum", "sum_value": "12", "digits": []},
@@ -289,6 +293,7 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
         self.assertFalse(service._validate_prediction(invalid_sum_value_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
         self.assertFalse(service._validate_prediction(invalid_digits_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
+        self.assertFalse(service._validate_prediction(invalid_group_count_prediction, lottery_code="pl3", prediction_play_mode="direct_sum"))
 
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")

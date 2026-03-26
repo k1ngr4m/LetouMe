@@ -367,9 +367,9 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
                     am.display_name,
                     mp.provider_code,
                     mp.api_format,
+                    pmc.provider_id,
                     mp.base_url AS provider_base_url,
                     mp.api_key AS provider_api_key,
-                    mp.extra_options_json,
                     am.api_model_name,
                     pmc.model_id AS provider_model_name,
                     am.version,
@@ -380,8 +380,8 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
                     am.is_active,
                     am.is_deleted
                 FROM ai_model am
-                INNER JOIN model_provider mp ON mp.id = am.provider_id
                 LEFT JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+                LEFT JOIN model_provider mp ON mp.id = pmc.provider_id
                 ORDER BY am.is_active DESC, am.model_code ASC
                 """
             )
@@ -391,6 +391,8 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             model_codes = [str(row["model_code"]) for row in rows]
             tags_by_code = _fetch_tags(cursor, model_codes)
             lotteries_by_code = _fetch_lotteries(cursor, model_codes)
+            provider_ids = sorted({int(row["provider_id"]) for row in rows if row.get("provider_id") is not None})
+            extra_options_by_provider_id = _fetch_provider_options(cursor, provider_ids)
 
     definitions: dict[str, ModelDefinition] = {}
     for row in rows:
@@ -411,7 +413,7 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             lottery_codes=lotteries_by_code.get(model_code, ["dlt"]),
             is_active=bool(row.get("is_active")),
             is_deleted=bool(row.get("is_deleted")),
-            extra=_parse_extra_options(row.get("extra_options_json")),
+            extra=extra_options_by_provider_id.get(int(row["provider_id"]), {}) if row.get("provider_id") is not None else {},
         )
     return ModelRegistry(definitions=definitions)
 
@@ -454,6 +456,32 @@ def _fetch_lotteries(cursor, model_codes: list[str]) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     for row in cursor.fetchall():
         result.setdefault(str(row["model_code"]), []).append(str(row["lottery_code"]))
+    return result
+
+
+def _fetch_provider_options(cursor, provider_ids: list[int]) -> dict[int, dict[str, Any]]:
+    if not provider_ids:
+        return {}
+    placeholders = ", ".join("?" for _ in provider_ids)
+    cursor.execute(
+        f"""
+        SELECT provider_id, option_key, option_value
+        FROM model_provider_option
+        WHERE provider_id IN ({placeholders})
+        ORDER BY provider_id ASC, option_key ASC
+        """,
+        tuple(provider_ids),
+    )
+    result: dict[int, dict[str, Any]] = {}
+    for row in cursor.fetchall():
+        provider_id = int(row["provider_id"])
+        option_value = row.get("option_value")
+        parsed_value: Any = option_value
+        try:
+            parsed_value = json.loads(str(option_value))
+        except Exception:
+            parsed_value = option_value
+        result.setdefault(provider_id, {})[str(row["option_key"])] = parsed_value
     return result
 
 
