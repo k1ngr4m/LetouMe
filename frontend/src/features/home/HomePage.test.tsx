@@ -1477,6 +1477,7 @@ describe('HomePage dashboard sidebar', () => {
     const numberLines = (groupCard as HTMLElement).querySelectorAll('.number-row__line')
     expect(numberLines).toHaveLength(2)
     expect(within(numberLines[0] as HTMLElement).getByText('前胆')).toBeInTheDocument()
+    expect(within(numberLines[0] as HTMLElement).getByText('前拖')).toBeInTheDocument()
     expect(within(numberLines[1] as HTMLElement).getByText('后拖')).toBeInTheDocument()
     expect(cardScope.getByText('01')).toHaveClass('is-hit')
     expect(cardScope.getByText('31')).toHaveClass('number-ball--muted')

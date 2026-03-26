@@ -1585,12 +1585,17 @@ a {
 }
 
 .home-model-list-table__groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(8rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.42rem;
   min-width: 0;
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
+}
+
+.home-model-list-table__groups .prediction-group-card {
+  flex: 0 1 19.5rem;
+  min-width: 14.5rem;
 }
 
 .home-model-list-table__groups .prediction-group-card,
@@ -2215,6 +2220,17 @@ a {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.32rem;
+}
+
+.number-row__line--front {
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.number-row__line--front .number-row__segment {
+  flex-wrap: nowrap;
 }
 
 .number-row__divider {
@@ -5529,7 +5545,11 @@ a {
 
   .home-model-list-table__groups {
     width: 100%;
-    grid-template-columns: repeat(2, minmax(7.5rem, 1fr));
+  }
+
+  .home-model-list-table__groups .prediction-group-card {
+    flex-basis: min(100%, 18rem);
+    min-width: 12rem;
   }
 }
 
@@ -5713,7 +5733,12 @@ a {
   }
 
   .home-model-list-table__groups {
-    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .home-model-list-table__groups .prediction-group-card {
+    flex-basis: 100%;
+    min-width: 0;
   }
 
   .home-model-list-table__title,
