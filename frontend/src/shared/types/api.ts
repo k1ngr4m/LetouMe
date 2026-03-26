@@ -517,6 +517,7 @@ export type GenerateSettingsModelPredictionsPayload = {
   parallelism?: number
   start_period?: string
   end_period?: string
+  recent_period_count?: 1 | 5 | 10 | 20
 }
 
 export type BulkSettingsModelActionPayload = {
@@ -539,6 +540,7 @@ export type BulkGenerateSettingsModelPredictionsPayload = {
   parallelism?: number
   start_period?: string
   end_period?: string
+  recent_period_count?: 1 | 5 | 10 | 20
 }
 
 export type BulkModelActionResult = {

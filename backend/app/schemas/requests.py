@@ -72,6 +72,7 @@ class GenerateModelPredictionsPayload(BaseModel):
     parallelism: int | None = Field(default=None, ge=1, le=8)
     start_period: str | None = None
     end_period: str | None = None
+    recent_period_count: Literal[1, 5, 10, 20] | None = None
 
 
 class BulkModelActionPayload(BaseModel):
@@ -89,6 +90,7 @@ class BulkGenerateModelPredictionsPayload(BaseModel):
     parallelism: int | None = Field(default=None, ge=1, le=8)
     start_period: str | None = None
     end_period: str | None = None
+    recent_period_count: Literal[1, 5, 10, 20] | None = None
 
 
 class PredictionGenerationTaskPayload(BaseModel):

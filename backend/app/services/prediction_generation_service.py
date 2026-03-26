@@ -29,6 +29,7 @@ DEFAULT_BULK_PARALLELISM = 3
 DEFAULT_SINGLE_MODEL_PARALLELISM = 3
 MAX_GENERATION_PARALLELISM = 8
 MAX_BULK_RETRIES_PER_MODEL = 1
+SUPPORTED_RECENT_PERIOD_COUNTS = {1, 5, 10, 20}
 
 
 @dataclass
@@ -142,23 +143,27 @@ class PredictionGenerationService:
         lottery_code: str = "dlt",
         model_code: str,
         prediction_play_mode: str = "direct",
-        start_period: str,
-        end_period: str,
+        start_period: str = "",
+        end_period: str = "",
+        recent_period_count: int | None = None,
         overwrite: bool,
         parallelism: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
-        start_value = int(start_period)
-        end_value = int(end_period)
-        if start_value > end_value:
-            raise ValueError("开始期号不能大于结束期号")
-
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
         prompt_template = self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
         history_data = self._load_lottery_history(normalized_code)
+        start_period, end_period = self._resolve_history_period_range(
+            history_data,
+            start_period=start_period,
+            end_period=end_period,
+            recent_period_count=recent_period_count,
+        )
+        start_value = int(start_period)
+        end_value = int(end_period)
         period_map = self._build_period_map(history_data)
         available_periods = {int(period) for period in period_map}
         sorted_periods_desc = sorted((int(period), period) for period in period_map)
@@ -347,6 +352,7 @@ class PredictionGenerationService:
         parallelism: int | None = None,
         start_period: str | None = None,
         end_period: str | None = None,
+        recent_period_count: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
@@ -355,8 +361,8 @@ class PredictionGenerationService:
             raise ValueError("请选择至少一个模型")
         if mode not in {"current", "history"}:
             raise ValueError("不支持的生成模式")
-        if mode == "history" and (not start_period or not end_period):
-            raise ValueError("历史重算必须提供开始期号和结束期号")
+        if mode == "history" and not recent_period_count and (not start_period or not end_period):
+            raise ValueError("历史重算必须提供开始期号和结束期号，或选择最近期数")
 
         summary = {
             "mode": mode,
@@ -387,6 +393,7 @@ class PredictionGenerationService:
                 parallelism=parallelism,
                 start_period=str(start_period or ""),
                 end_period=str(end_period or ""),
+                recent_period_count=recent_period_count,
                 progress_callback=progress_callback,
                 summary=summary,
             )
@@ -416,6 +423,7 @@ class PredictionGenerationService:
                             prediction_play_mode=prediction_play_mode,
                             start_period=str(start_period or ""),
                             end_period=str(end_period or ""),
+                            recent_period_count=recent_period_count,
                             overwrite=overwrite,
                             parallelism=1,
                         )
@@ -481,22 +489,26 @@ class PredictionGenerationService:
         parallelism: int | None,
         start_period: str,
         end_period: str,
+        recent_period_count: int | None,
         progress_callback: Callable[[dict[str, Any]], None] | None,
         summary: dict[str, Any],
     ) -> dict[str, Any]:
         ensure_schema()
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
+        history_data = self._load_lottery_history(normalized_code)
+        start_period, end_period = self._resolve_history_period_range(
+            history_data,
+            start_period=start_period,
+            end_period=end_period,
+            recent_period_count=recent_period_count,
+        )
         start_value = int(start_period)
         end_value = int(end_period)
-        if start_value > end_value:
-            raise ValueError("开始期号不能大于结束期号")
         target_periods = [str(item) for item in range(start_value, end_value + 1)]
         summary["task_total_count"] = len(unique_codes) * len(target_periods)
         max_workers = self._normalize_bulk_parallelism(parallelism, selected_count=summary["task_total_count"])
         summary["parallelism"] = max_workers
-
-        history_data = self._load_lottery_history(normalized_code)
         period_map = self._build_period_map(history_data)
         sorted_periods_desc = sorted((int(period), period) for period in period_map)
         model_defs = {model_code: self._get_model_definition(model_code, lottery_code=normalized_code) for model_code in unique_codes}
@@ -800,6 +812,40 @@ class PredictionGenerationService:
                 raise ValueError("并发数必须大于 0")
         normalized = min(requested, MAX_GENERATION_PARALLELISM)
         return max(1, min(normalized, task_count))
+
+    @staticmethod
+    def _resolve_history_period_range(
+        history_data: dict[str, Any],
+        *,
+        start_period: str = "",
+        end_period: str = "",
+        recent_period_count: int | None = None,
+    ) -> tuple[str, str]:
+        if recent_period_count is None:
+            if not start_period or not end_period:
+                raise ValueError("历史重算必须提供开始期号和结束期号，或选择最近期数")
+            start_value = int(start_period)
+            end_value = int(end_period)
+            if start_value > end_value:
+                raise ValueError("开始期号不能大于结束期号")
+            return str(start_value), str(end_value)
+
+        if recent_period_count not in SUPPORTED_RECENT_PERIOD_COUNTS:
+            raise ValueError("最近期数仅支持 1、5、10、20")
+
+        available_periods = sorted(
+            {
+                int(str(draw.get("period") or "").strip())
+                for draw in history_data.get("data", [])
+                if str(draw.get("period") or "").strip().isdigit()
+            },
+            reverse=True,
+        )
+        if not available_periods:
+            raise ValueError("暂无可用开奖历史，不能执行历史重算")
+
+        selected_periods = available_periods[:recent_period_count]
+        return str(min(selected_periods)), str(max(selected_periods))
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         model = ModelFactory().create(model_def)

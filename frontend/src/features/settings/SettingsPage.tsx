@@ -34,6 +34,8 @@ type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' 
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'dantuo'
+type GenerationHistoryRangeMode = 'custom' | 'recent'
+type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
@@ -98,6 +100,8 @@ const EMPTY_GENERATION_FORM = {
   displayName: '',
   mode: 'current' as ModelPredictionMode,
   predictionPlayMode: 'direct' as ModelPredictionPlayMode,
+  historyRangeMode: 'custom' as GenerationHistoryRangeMode,
+  recentPeriodCount: '5' as GenerationRecentPeriodCount,
   overwrite: false,
   parallelism: '3',
   startPeriod: '',
@@ -168,6 +172,12 @@ const MODEL_STATUS_FILTER_META: Array<{ value: ModelStatusFilter; label: string 
   { value: 'all', label: '全部' },
   { value: 'active', label: '启用' },
   { value: 'inactive', label: '未启用' },
+]
+const GENERATION_RECENT_PERIOD_OPTIONS: Array<{ value: GenerationRecentPeriodCount; label: string }> = [
+  { value: '1', label: '近1期' },
+  { value: '5', label: '近5期' },
+  { value: '10', label: '近10期' },
+  { value: '20', label: '近20期' },
 ]
 
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
@@ -1034,6 +1044,15 @@ export function SettingsPage() {
   const generatePredictionMutation = useMutation({
     mutationFn: () => {
       const parallelism = Number(generationForm.parallelism.trim())
+      const historyRangePayload =
+        generationForm.mode === 'history'
+          ? generationForm.historyRangeMode === 'recent'
+            ? { recent_period_count: Number(generationForm.recentPeriodCount.trim()) as 1 | 5 | 10 | 20 }
+            : {
+                start_period: generationForm.startPeriod.trim(),
+                end_period: generationForm.endPeriod.trim(),
+              }
+          : {}
       return generationForm.modelCodes.length > 1
         ? apiClient.bulkGenerateSettingsModelPredictions({
             lottery_code: generationForm.lotteryCode,
@@ -1042,8 +1061,7 @@ export function SettingsPage() {
             prediction_play_mode: normalizePredictionPlayModeForLottery(generationForm.lotteryCode, generationForm.predictionPlayMode),
             overwrite: generationForm.overwrite,
             parallelism,
-            start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
-            end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
+            ...historyRangePayload,
           })
         : apiClient.generateSettingsModelPredictions({
             lottery_code: generationForm.lotteryCode,
@@ -1052,8 +1070,7 @@ export function SettingsPage() {
             prediction_play_mode: normalizePredictionPlayModeForLottery(generationForm.lotteryCode, generationForm.predictionPlayMode),
             overwrite: generationForm.overwrite,
             parallelism,
-            start_period: generationForm.mode === 'history' ? generationForm.startPeriod.trim() : undefined,
-            end_period: generationForm.mode === 'history' ? generationForm.endPeriod.trim() : undefined,
+            ...historyRangePayload,
           })
     },
     onSuccess: (task) => {
@@ -1390,6 +1407,8 @@ export function SettingsPage() {
       displayName,
       mode: 'current',
       predictionPlayMode: 'direct',
+      historyRangeMode: 'custom',
+      recentPeriodCount: '5',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -1411,6 +1430,8 @@ export function SettingsPage() {
       displayName: `已选 ${selectedModelCodes.length} 个模型`,
       mode: 'current',
       predictionPlayMode: 'direct',
+      historyRangeMode: 'custom',
+      recentPeriodCount: '5',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -1575,15 +1596,17 @@ export function SettingsPage() {
       return
     }
     if (generationForm.mode === 'history') {
-      if (!generationForm.startPeriod.trim() || !generationForm.endPeriod.trim()) {
-        setMessage('历史重算必须填写开始期号和结束期号')
-        setMessageType('error')
-        return
-      }
-      if (Number(generationForm.startPeriod) > Number(generationForm.endPeriod)) {
-        setMessage('开始期号不能大于结束期号')
-        setMessageType('error')
-        return
+      if (generationForm.historyRangeMode === 'custom') {
+        if (!generationForm.startPeriod.trim() || !generationForm.endPeriod.trim()) {
+          setMessage('历史重算必须填写开始期号和结束期号')
+          setMessageType('error')
+          return
+        }
+        if (Number(generationForm.startPeriod) > Number(generationForm.endPeriod)) {
+          setMessage('开始期号不能大于结束期号')
+          setMessageType('error')
+          return
+        }
       }
     }
     generatePredictionMutation.mutate()
@@ -3575,12 +3598,42 @@ export function SettingsPage() {
                 {generationForm.mode === 'history' ? (
                   <div className="generation-modal__history-grid">
                     <label className="field">
+                      <span>历史范围</span>
+                      <select
+                        value={generationForm.historyRangeMode === 'recent' ? generationForm.recentPeriodCount : 'custom'}
+                        aria-label="历史范围"
+                        onChange={(event) => {
+                          const nextValue = event.target.value
+                          setGenerationForm((previous) => ({
+                            ...previous,
+                            historyRangeMode: nextValue === 'custom' ? 'custom' : 'recent',
+                            recentPeriodCount: nextValue === 'custom' ? previous.recentPeriodCount : (nextValue as GenerationRecentPeriodCount),
+                          }))
+                        }}
+                      >
+                        <option value="custom">自定义</option>
+                        {GENERATION_RECENT_PERIOD_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
                       <span>开始期号</span>
-                      <input value={generationForm.startPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))} required />
+                      <input
+                        value={generationForm.startPeriod}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))}
+                        required={generationForm.historyRangeMode === 'custom'}
+                        disabled={generationForm.historyRangeMode === 'recent'}
+                      />
                     </label>
                     <label className="field">
                       <span>结束期号</span>
-                      <input value={generationForm.endPeriod} onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))} required />
+                      <input
+                        value={generationForm.endPeriod}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))}
+                        required={generationForm.historyRangeMode === 'custom'}
+                        disabled={generationForm.historyRangeMode === 'recent'}
+                      />
                     </label>
                   </div>
                 ) : null}

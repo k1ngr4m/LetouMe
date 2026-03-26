@@ -310,6 +310,42 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "bulk-task-1")
         create_task.assert_called_once()
 
+    def test_generate_prediction_task_endpoint_accepts_recent_period_count(self) -> None:
+        with (
+            patch("backend.app.api.routes.prediction_generation_service.validate_model") as validate_model,
+            patch("backend.app.api.routes.prediction_generation_task_service.create_task") as create_task,
+        ):
+            validate_model.return_value = {"model_code": "claude-sonnet-4.6", "is_deleted": False}
+            create_task.return_value = {
+                "task_id": "task-2",
+                "status": "queued",
+                "mode": "history",
+                "model_code": "claude-sonnet-4.6",
+                "created_at": "2026-03-16T00:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "mode": "history",
+                    "model_code": "claude-sonnet-4.6",
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                    "failed_periods": [],
+                    "completed_count": 0,
+                    "failed_details": [],
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post(
+                "/api/settings/models/predictions/generate",
+                json={"model_code": "claude-sonnet-4.6", "mode": "history", "overwrite": False, "recent_period_count": 10},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "task-2")
+        create_task.assert_called_once()
+
     def test_settings_prediction_records_list_endpoint(self) -> None:
         with patch("backend.app.api.routes.prediction_service.get_settings_record_list_payload") as get_payload:
             get_payload.return_value = {

@@ -542,8 +542,8 @@ def generate_model_predictions(
     prediction_play_mode = payload.prediction_play_mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
-    if mode == "history" and (not payload.start_period or not payload.end_period):
-        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号")
+    if mode == "history" and not payload.recent_period_count and (not payload.start_period or not payload.end_period):
+        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号，或选择最近期数")
 
     try:
         prediction_generation_service.validate_model(payload.model_code, lottery_code=lottery_code)
@@ -565,6 +565,7 @@ def generate_model_predictions(
                 prediction_play_mode=prediction_play_mode,
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
+                recent_period_count=payload.recent_period_count,
                 overwrite=payload.overwrite,
                 parallelism=payload.parallelism,
                 progress_callback=progress_callback,
@@ -601,8 +602,8 @@ def bulk_generate_model_predictions(
     prediction_play_mode = payload.prediction_play_mode.strip().lower()
     if mode not in {"current", "history"}:
         raise HTTPException(status_code=400, detail="不支持的生成模式")
-    if mode == "history" and (not payload.start_period or not payload.end_period):
-        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号")
+    if mode == "history" and not payload.recent_period_count and (not payload.start_period or not payload.end_period):
+        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号，或选择最近期数")
 
     try:
         return prediction_generation_task_service.create_task(
@@ -618,6 +619,7 @@ def bulk_generate_model_predictions(
                 parallelism=payload.parallelism,
                 start_period=payload.start_period,
                 end_period=payload.end_period,
+                recent_period_count=payload.recent_period_count,
                 progress_callback=progress_callback,
             ),
         )
