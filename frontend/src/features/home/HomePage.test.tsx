@@ -766,6 +766,15 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('本期预测号码')).not.toBeInTheDocument()
   })
 
+  it('shows per-group cost summary in model list and card views', async () => {
+    renderPage()
+
+    expect(screen.getAllByText('成本 1注/2元').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
+    expect(screen.getAllByText('成本 1注/2元').length).toBeGreaterThan(0)
+  })
+
   it('removes standalone overall score and api model columns from list view', () => {
     renderPage()
 

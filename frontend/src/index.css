@@ -2126,15 +2126,35 @@ a {
   flex-shrink: 0;
 }
 
+.prediction-group-card__cost-chip {
+  padding: 0.2rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(126, 148, 183, 0.22);
+  color: #c9d8f5;
+  font-size: 0.68rem;
+  flex-shrink: 0;
+}
+
 .prediction-group-card.is-compact .prediction-group-card__play-type {
   padding: 0.16rem 0.32rem;
   font-size: 0.66rem;
+}
+
+.prediction-group-card.is-compact .prediction-group-card__cost-chip {
+  padding: 0.14rem 0.3rem;
+  font-size: 0.58rem;
 }
 
 .prediction-group-card__desc {
   margin: 0.7rem 0 0;
   color: var(--text-2);
   font-size: 0.92rem;
+}
+
+.prediction-group-card__cost-summary {
+  margin-top: 0.52rem;
+  font-size: 0.78rem;
+  color: var(--text-3);
 }
 
 .prediction-group-card__desc--compact {
@@ -2217,6 +2237,11 @@ a {
   min-width: 1.92rem;
   padding: 0.1rem 0.3rem;
   font-size: 0.6rem;
+}
+
+.prediction-group-card.is-compact .prediction-group-card__cost-summary {
+  margin-top: 0.34rem;
+  font-size: 0.68rem;
 }
 
 .prediction-group-card.is-compact .number-row--stacked {

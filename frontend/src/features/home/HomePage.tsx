@@ -339,6 +339,11 @@ function resolveHistoryPredictionGroupCost(group: PredictionGroup, lotteryCode: 
   return PL3_DIRECT_SUM_COST_RULES[sumValue] || 2
 }
 
+function resolvePredictionGroupBetCount(groupCostAmount: number) {
+  if (groupCostAmount <= 0) return 1
+  return Math.max(1, Math.round(groupCostAmount / 2))
+}
+
 function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models: HistoryModelRef[]): HistoryModelStatView[] {
   const stats = new Map<string, HistoryModelStatView>()
 
@@ -2163,7 +2168,7 @@ function ModelListCard({
       </div>
       <div className="model-list-card__groups">
         {model.predictions.map((group) => (
-          <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
+          <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact showBetCostSummary />
         ))}
       </div>
       {score ? <ModelScoreInline score={score} /> : null}
@@ -2227,7 +2232,7 @@ function ModelListTable({
                 <td>
                   <div className="home-model-list-table__groups">
                     {model.predictions.map((group) => (
-                      <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact />
+                      <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact showBetCostSummary />
                     ))}
                   </div>
                 </td>
@@ -2392,6 +2397,7 @@ export function PredictionGroupCard({
   grayMisses = false,
   emphasizeHitTier = false,
   showCost = false,
+  showBetCostSummary = false,
   showDescriptionInCompact = false,
 }: {
   group: PredictionGroup
@@ -2400,13 +2406,18 @@ export function PredictionGroupCard({
   grayMisses?: boolean
   emphasizeHitTier?: boolean
   showCost?: boolean
+  showBetCostSummary?: boolean
   showDescriptionInCompact?: boolean
 }) {
   const hit = compareNumbers(group, actualResult)
   const description = group.description?.trim() || '暂无说明'
   const playTypeLabel = getPredictionPlayTypeLabel(group, actualResult)
   const inferredLotteryCode: LotteryCode = inferPredictionGroupLotteryCode(group, actualResult)
-  const groupCostAmount = showCost ? resolveHistoryPredictionGroupCost(group, inferredLotteryCode) : 0
+  const groupCostAmount = showCost || showBetCostSummary ? resolveHistoryPredictionGroupCost(group, inferredLotteryCode) : 0
+  const groupBetCount = showBetCostSummary ? resolvePredictionGroupBetCount(groupCostAmount) : 0
+  const costSummaryText = showBetCostSummary ? `成本 ${groupBetCount}注/${groupCostAmount}元` : ''
+  const showHeaderCostSummary = showBetCostSummary && compact
+  const showBlockCostSummary = showBetCostSummary && !compact
   const hitTierClass =
     emphasizeHitTier && hit
       ? hit.totalHits >= 6
@@ -2424,8 +2435,10 @@ export function PredictionGroupCard({
         {playTypeLabel !== '复式' ? <span className="prediction-group-card__play-type">{playTypeLabel}</span> : null}
         <span className="prediction-group-card__strategy">{group.strategy || 'AI 组合策略'}</span>
         {hit ? <strong className="prediction-group-card__hit">{hit.totalHits} 中</strong> : null}
+        {showHeaderCostSummary ? <span className="prediction-group-card__cost-chip">{costSummaryText}</span> : null}
       </div>
       <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} compact={compact} />
+      {showBlockCostSummary ? <div className="prediction-group-card__cost-summary">{costSummaryText}</div> : null}
       {group.prize_level || showCost ? (
         <div className="prediction-group-card__prize">
           {group.prize_level ? (
