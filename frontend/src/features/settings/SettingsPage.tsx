@@ -326,25 +326,6 @@ function EyeIcon({ open }: { open: boolean }) {
   )
 }
 
-function PlayIcon() {
-  return (
-    <SvgIcon>
-      <path d="M6.8 5.5v9l7.2-4.5-7.2-4.5Z" fill="currentColor" stroke="none" />
-    </SvgIcon>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <SvgIcon>
-      <path d="M4.8 6.2h10.4" />
-      <path d="M7.1 6.2v8.1M10 6.2v8.1M12.9 6.2v8.1" />
-      <path d="M7.5 6.2V4.9c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9v1.3" />
-      <path d="M6.6 6.2h6.8l-.5 9a1 1 0 0 1-1 .9H8.1a1 1 0 0 1-1-.9l-.5-9Z" />
-    </SvgIcon>
-  )
-}
-
 function IconButton({
   label,
   onClick,
