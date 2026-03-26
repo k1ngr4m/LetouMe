@@ -2576,6 +2576,76 @@ a {
   flex-wrap: nowrap;
 }
 
+.settings-schedule-model-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.settings-schedule-model-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.72rem;
+  min-width: 0;
+  padding: 0.8rem 0.88rem;
+  border: 1px solid var(--border-1);
+  border-radius: 1rem;
+  color: var(--text-1);
+  background: var(--surface-0);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.settings-schedule-model-option:hover {
+  background: var(--surface-1);
+  border-color: rgba(242, 165, 79, 0.22);
+}
+
+.settings-schedule-model-option:focus-within {
+  border-color: rgba(242, 165, 79, 0.36);
+  box-shadow: 0 0 0 1px rgba(242, 165, 79, 0.18);
+}
+
+.settings-schedule-model-option.is-selected {
+  border-color: rgba(242, 165, 79, 0.36);
+  background: rgba(242, 165, 79, 0.12);
+  transform: translateY(-1px);
+}
+
+.settings-schedule-model-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #f2a54f;
+}
+
+.settings-schedule-model-option__content {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.settings-schedule-model-option__content strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.settings-schedule-model-option__content small {
+  color: var(--text-2);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.settings-schedule-model-option__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .settings-model-table__status {
   padding: 0.2rem 0.5rem;
   min-height: 1.45rem;
@@ -4012,7 +4082,8 @@ a {
 }
 
 .settings-schedule-table__col-models {
-  min-width: 10rem;
+  width: 12.4rem;
+  min-width: 12.4rem;
 }
 
 .settings-schedule-table__col-rule {
@@ -4032,8 +4103,8 @@ a {
 }
 
 .settings-schedule-table__col-actions {
-  width: 12.4rem;
-  min-width: 12.4rem;
+  width: 6rem;
+  min-width: 6rem;
 }
 
 .settings-maintenance-table__col-lottery {
@@ -4067,7 +4138,6 @@ a {
 }
 
 .settings-schedule-table--task-list .settings-schedule-table__col-name,
-.settings-schedule-table--task-list .settings-schedule-table__col-actions,
 .settings-maintenance-table--task-list .settings-maintenance-table__col-lottery,
 .settings-maintenance-table--task-list .settings-maintenance-table__col-actions {
   position: sticky;
@@ -4076,11 +4146,6 @@ a {
 
 .settings-schedule-table--task-list .settings-schedule-table__col-name {
   left: 0;
-  z-index: 4;
-}
-
-.settings-schedule-table--task-list .settings-schedule-table__col-actions {
-  right: 0;
   z-index: 4;
 }
 
@@ -4095,7 +4160,6 @@ a {
 }
 
 .settings-schedule-table--task-list th.settings-schedule-table__col-name,
-.settings-schedule-table--task-list th.settings-schedule-table__col-actions,
 .settings-maintenance-table--task-list th.settings-maintenance-table__col-lottery,
 .settings-maintenance-table--task-list th.settings-maintenance-table__col-actions {
   z-index: 6;
@@ -4159,6 +4223,45 @@ a {
 .settings-schedule-table__models {
   color: var(--text-secondary);
   font-size: 0.82rem;
+}
+
+.settings-schedule-table__models-wrap {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.settings-schedule-table__model-badges {
+  display: flex;
+  gap: 0.34rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.settings-schedule-table__model-chip,
+.settings-schedule-table__model-more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.56rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-schedule-table__model-chip {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-schedule-table__model-more {
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-schedule-table__model-count {
+  color: var(--text-3);
+  font-size: 0.74rem;
 }
 
 .schedule-status-pill {
@@ -4288,7 +4391,8 @@ a {
 }
 
 .settings-schedule-actions {
-  gap: 0.35rem;
+  justify-content: flex-start;
+  gap: 0.4rem;
   flex-wrap: nowrap;
 }
 
@@ -4296,6 +4400,10 @@ a {
   width: 2.05rem;
   height: 2.05rem;
   border-radius: 0.78rem;
+}
+
+.settings-schedule-action-menu__panel {
+  min-width: 10.5rem;
 }
 
 .settings-schedule-detail-panel {

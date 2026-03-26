@@ -182,7 +182,7 @@ const SCHEDULE_COLUMN_DEFAULT_WIDTHS: Record<ScheduleColumnKey, number> = {
   next_run: 196,
   status: 146,
   enabled: 136,
-  actions: 210,
+  actions: 104,
 }
 
 const MAINTENANCE_COLUMN_DEFAULT_WIDTHS: Record<MaintenanceColumnKey, number> = {
@@ -204,7 +204,19 @@ const SCHEDULE_COLUMN_MIN_WIDTHS: Record<ScheduleColumnKey, number> = {
   next_run: 168,
   status: 126,
   enabled: 126,
-  actions: 190,
+  actions: 96,
+}
+
+function normalizeScheduleColumnWidths(widths: Partial<Record<ScheduleColumnKey, number>>) {
+  const nextWidths: Record<ScheduleColumnKey, number> = {
+    ...SCHEDULE_COLUMN_DEFAULT_WIDTHS,
+    ...widths,
+  }
+  nextWidths.actions = Math.max(
+    SCHEDULE_COLUMN_MIN_WIDTHS.actions,
+    Math.min(Math.round(nextWidths.actions || SCHEDULE_COLUMN_DEFAULT_WIDTHS.actions), 124),
+  )
+  return nextWidths
 }
 
 const MAINTENANCE_COLUMN_MIN_WIDTHS: Record<MaintenanceColumnKey, number> = {
@@ -510,6 +522,11 @@ function getSchedulePredictionPlayModeLabel(task: Pick<ScheduleTask, 'task_type'
   return getPredictionPlayModeLabel(task.prediction_play_mode)
 }
 
+function getScheduleModelProviderLabel(model: SettingsModel, providers: SettingsProvider[]) {
+  const provider = providers.find((item) => item.code === model.provider)
+  return provider?.name || model.provider || '未配置 Provider'
+}
+
 function getGenerationModeLabel(mode: string | null | undefined) {
   return mode === 'history' ? '历史重算' : '当前期'
 }
@@ -567,10 +584,9 @@ export function SettingsPage() {
   const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null })
   const [maintenanceLogFilter, setMaintenanceLogFilter] = useState<MaintenanceLogFilter>('all')
   const [maintenanceLogOffset, setMaintenanceLogOffset] = useState(0)
-  const [scheduleColumnWidths, setScheduleColumnWidths] = useState<Record<ScheduleColumnKey, number>>(() => ({
-    ...SCHEDULE_COLUMN_DEFAULT_WIDTHS,
-    ...(loadSettingsTableColumnWidths('settings:schedules') as Partial<Record<ScheduleColumnKey, number>>),
-  }))
+  const [scheduleColumnWidths, setScheduleColumnWidths] = useState<Record<ScheduleColumnKey, number>>(() => (
+    normalizeScheduleColumnWidths(loadSettingsTableColumnWidths('settings:schedules') as Partial<Record<ScheduleColumnKey, number>>)
+  ))
   const [maintenanceColumnWidths, setMaintenanceColumnWidths] = useState<Record<MaintenanceColumnKey, number>>(() => ({
     ...MAINTENANCE_COLUMN_DEFAULT_WIDTHS,
     ...(loadSettingsTableColumnWidths('settings:maintenance') as Partial<Record<MaintenanceColumnKey, number>>),
@@ -587,6 +603,7 @@ export function SettingsPage() {
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
   const [modelActionMenu, setModelActionMenu] = useState<string | null>(null)
+  const [scheduleActionMenu, setScheduleActionMenu] = useState<string | null>(null)
 
   const canManageModels = hasPermission('model_management')
   const canManageSchedules = hasPermission('schedule_management')
@@ -686,15 +703,16 @@ export function SettingsPage() {
   }, [maintenanceColumnWidths])
 
   useEffect(() => {
-    if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu) return undefined
+    if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu && !scheduleActionMenu) return undefined
     const closeMenus = () => {
       setToolbarMenuOpen(false)
       setSortMenuOpen(false)
       setModelActionMenu(null)
+      setScheduleActionMenu(null)
     }
     window.addEventListener('click', closeMenus)
     return () => window.removeEventListener('click', closeMenus)
-  }, [modelActionMenu, sortMenuOpen, toolbarMenuOpen])
+  }, [modelActionMenu, scheduleActionMenu, sortMenuOpen, toolbarMenuOpen])
 
   useEffect(() => {
     if (!generationTask || !['queued', 'running'].includes(generationTask.status)) return undefined
@@ -848,7 +866,11 @@ export function SettingsPage() {
     [scheduleTaskFilter, scheduleTasks],
   )
   const selectedLotteryModels = useMemo(
-    () => models.filter((model) => (model.lottery_codes || [DEFAULT_SETTINGS_LOTTERY]).includes(scheduleForm.lottery_code)),
+    () => models.filter((model) => (
+      model.is_active &&
+      !model.is_deleted &&
+      (model.lottery_codes || [DEFAULT_SETTINGS_LOTTERY]).includes(scheduleForm.lottery_code)
+    )),
     [models, scheduleForm.lottery_code],
   )
   const sortedModels = useMemo(() => {
@@ -1427,6 +1449,7 @@ export function SettingsPage() {
     event.stopPropagation()
     setSortMenuOpen(false)
     setModelActionMenu(null)
+    setScheduleActionMenu(null)
     setToolbarMenuOpen((previous) => !previous)
   }
 
@@ -1434,6 +1457,7 @@ export function SettingsPage() {
     event.stopPropagation()
     setToolbarMenuOpen(false)
     setModelActionMenu(null)
+    setScheduleActionMenu(null)
     setSortMenuOpen((previous) => !previous)
   }
 
@@ -1441,7 +1465,16 @@ export function SettingsPage() {
     event.stopPropagation()
     setToolbarMenuOpen(false)
     setSortMenuOpen(false)
+    setScheduleActionMenu(null)
     setModelActionMenu((previous) => (previous === menuId ? null : menuId))
+  }
+
+  function toggleScheduleMenu(menuId: string, event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setToolbarMenuOpen(false)
+    setSortMenuOpen(false)
+    setModelActionMenu(null)
+    setScheduleActionMenu((previous) => (previous === menuId ? null : menuId))
   }
 
   function selectSortOption(option: ModelSortOption) {
@@ -1651,9 +1684,24 @@ export function SettingsPage() {
     }))
   }
 
+  useEffect(() => {
+    if (!scheduleModalOpen || scheduleForm.task_type !== 'prediction_generate') return
+    const availableModelCodes = new Set(selectedLotteryModels.map((model) => model.model_code))
+    const filteredModelCodes = scheduleForm.model_codes.filter((code) => availableModelCodes.has(code))
+    if (filteredModelCodes.length === scheduleForm.model_codes.length) return
+    setScheduleForm((previous) => ({
+      ...previous,
+      model_codes: previous.model_codes.filter((code) => availableModelCodes.has(code)),
+    }))
+  }, [scheduleModalOpen, scheduleForm.task_type, scheduleForm.model_codes, selectedLotteryModels])
+
   function submitScheduleForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (scheduleForm.task_type === 'prediction_generate' && scheduleForm.model_codes.length === 0) {
+    const availableModelCodes = new Set(selectedLotteryModels.map((model) => model.model_code))
+    const nextModelCodes = scheduleForm.task_type === 'prediction_generate'
+      ? scheduleForm.model_codes.filter((code) => availableModelCodes.has(code))
+      : []
+    if (scheduleForm.task_type === 'prediction_generate' && nextModelCodes.length === 0) {
       setMessage('预测任务至少选择一个模型')
       setMessageType('error')
       return
@@ -1668,7 +1716,7 @@ export function SettingsPage() {
       preset_type: scheduleForm.schedule_mode === 'preset' ? scheduleForm.preset_type || 'daily' : undefined,
       time_of_day: scheduleForm.schedule_mode === 'preset' ? scheduleForm.time_of_day || '09:00' : undefined,
       weekdays: scheduleForm.schedule_mode === 'preset' ? scheduleForm.weekdays : [],
-      model_codes: scheduleForm.task_type === 'prediction_generate' ? scheduleForm.model_codes : [],
+      model_codes: nextModelCodes,
       generation_mode: 'current',
     })
   }
@@ -2411,9 +2459,15 @@ export function SettingsPage() {
                           <tbody>
                             {filteredScheduleTasks.map((task) => {
                               const isExpanded = expandedScheduleTaskCode === task.task_code
+                              const scheduleMenuId = `schedule:${task.task_code}`
                               const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
                               const enabledMeta = getScheduleEnabledMeta(task.is_active)
                               const playModeLabel = getSchedulePredictionPlayModeLabel(task)
+                              const modelNames = task.task_type === 'prediction_generate'
+                                ? task.model_codes.map((code) => modelNameMap[code] || code).filter(Boolean)
+                                : []
+                              const visibleModelNames = modelNames.slice(0, 2)
+                              const remainingModelCount = Math.max(0, modelNames.length - visibleModelNames.length)
                               const statusTooltip = [
                                 `最近执行：${task.last_run_at ? formatDateTimeBeijing(task.last_run_at) : '尚未执行'}`,
                                 `状态：${runStatusMeta.label}`,
@@ -2439,9 +2493,25 @@ export function SettingsPage() {
                                     </td>
                                     <td className="settings-schedule-table__col-lottery" style={{ width: scheduleColumnWidths.lottery, minWidth: scheduleColumnWidths.lottery }}>{getLotteryLabel(task.lottery_code as LotteryCode)}</td>
                                     <td className="settings-schedule-table__models settings-schedule-table__col-models" style={{ width: scheduleColumnWidths.models, minWidth: scheduleColumnWidths.models }}>
-                                      {task.task_type === 'prediction_generate'
-                                        ? task.model_codes.map((code) => modelNameMap[code] || code).join(' / ') || '-'
-                                        : '-'}
+                                      {task.task_type === 'prediction_generate' && modelNames.length ? (
+                                        <div className="settings-schedule-table__models-wrap" title={modelNames.join(' / ')}>
+                                          <div className="settings-schedule-table__model-badges">
+                                            {visibleModelNames.map((name) => (
+                                              <span key={`${task.task_code}-${name}`} className="settings-schedule-table__model-chip">
+                                                {name}
+                                              </span>
+                                            ))}
+                                            {remainingModelCount ? (
+                                              <span className="settings-schedule-table__model-more">+{remainingModelCount}</span>
+                                            ) : null}
+                                          </div>
+                                          <span className="settings-schedule-table__model-count">
+                                            共 {modelNames.length} 个模型
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        '-'
+                                      )}
                                     </td>
                                     <td className="settings-schedule-table__rule settings-schedule-table__col-rule" style={{ width: scheduleColumnWidths.rule, minWidth: scheduleColumnWidths.rule }}>
                                       <strong>{task.rule_summary || '-'}</strong>
@@ -2481,32 +2551,61 @@ export function SettingsPage() {
                                           expanded={isExpanded}
                                           onClick={() => toggleScheduleTaskDetail(task.task_code)}
                                         />
-                                        <IconButton
-                                          label={`编辑任务：${task.task_name}`}
-                                          icon={<EditIcon />}
-                                          onClick={() => openEditScheduleTask(task)}
-                                        />
-                                        <IconButton
-                                          label={`立即执行：${task.task_name}`}
-                                          icon={<PlayIcon />}
-                                          onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}
-                                        />
-                                        <IconButton
-                                          label={`${task.is_active ? '停用' : '启用'}任务：${task.task_name}`}
-                                          icon={<ToggleIcon active={task.is_active} />}
-                                          onClick={() => scheduleTaskActionMutation.mutate({ type: 'toggle', task })}
-                                        />
-                                        <IconButton
-                                          label={`删除任务：${task.task_name}`}
-                                          icon={<TrashIcon />}
-                                          danger
-                                          onClick={() => {
-                                            const confirmed = window.confirm(`确认删除定时任务“${task.task_name}”吗？`)
-                                            if (confirmed) {
-                                              scheduleTaskActionMutation.mutate({ type: 'delete', task })
-                                            }
-                                          }}
-                                        />
+                                        <div className="action-menu" onClick={stopMenuEvent}>
+                                          <IconButton
+                                            label={`更多操作：${task.task_name}`}
+                                            icon={<MoreIcon />}
+                                            onClick={(event) => toggleScheduleMenu(scheduleMenuId, event)}
+                                            expanded={scheduleActionMenu === scheduleMenuId}
+                                          />
+                                          {scheduleActionMenu === scheduleMenuId ? (
+                                            <div className="action-menu__panel settings-action-menu__panel settings-schedule-action-menu__panel">
+                                              <button
+                                                className="action-menu__item"
+                                                type="button"
+                                                onClick={() => {
+                                                  setScheduleActionMenu(null)
+                                                  openEditScheduleTask(task)
+                                                }}
+                                              >
+                                                编辑任务
+                                              </button>
+                                              <button
+                                                className="action-menu__item"
+                                                type="button"
+                                                onClick={() => {
+                                                  setScheduleActionMenu(null)
+                                                  scheduleTaskActionMutation.mutate({ type: 'run', task })
+                                                }}
+                                              >
+                                                立即执行
+                                              </button>
+                                              <button
+                                                className="action-menu__item"
+                                                type="button"
+                                                onClick={() => {
+                                                  setScheduleActionMenu(null)
+                                                  scheduleTaskActionMutation.mutate({ type: 'toggle', task })
+                                                }}
+                                              >
+                                                {task.is_active ? '停用任务' : '启用任务'}
+                                              </button>
+                                              <button
+                                                className="action-menu__item action-menu__item--danger"
+                                                type="button"
+                                                onClick={() => {
+                                                  setScheduleActionMenu(null)
+                                                  const confirmed = window.confirm(`确认删除定时任务“${task.task_name}”吗？`)
+                                                  if (confirmed) {
+                                                    scheduleTaskActionMutation.mutate({ type: 'delete', task })
+                                                  }
+                                                }}
+                                              >
+                                                删除任务
+                                              </button>
+                                            </div>
+                                          ) : null}
+                                        </div>
                                       </div>
                                     </td>
                                   </tr>
@@ -3263,12 +3362,16 @@ export function SettingsPage() {
                   ) : null}
                   <div className="field field--full">
                     <span>预测模型</span>
-                    <div className="settings-model-table__tags">
+                    <div className="settings-schedule-model-picker" role="group" aria-label="预测模型">
                       {selectedLotteryModels.length ? (
                         selectedLotteryModels.map((model) => (
-                          <label key={model.model_code} className="checkbox-field">
+                          <label
+                            key={model.model_code}
+                            className={clsx('settings-schedule-model-option', scheduleForm.model_codes.includes(model.model_code) && 'is-selected')}
+                          >
                             <input
                               type="checkbox"
+                              aria-label={model.display_name}
                               checked={scheduleForm.model_codes.includes(model.model_code)}
                               onChange={(event) =>
                                 setScheduleForm((previous) => ({
@@ -3279,11 +3382,19 @@ export function SettingsPage() {
                                 }))
                               }
                             />
-                            <span>{model.display_name}</span>
+                            <span className="settings-schedule-model-option__content">
+                              <strong>{model.display_name}</strong>
+                              <small>{model.api_model_name || model.model_code}</small>
+                            </span>
+                            <span className="settings-schedule-model-option__meta">
+                              <span className="settings-model-table__chip settings-model-table__tag-compact">
+                                {getScheduleModelProviderLabel(model, providers)}
+                              </span>
+                            </span>
                           </label>
                         ))
                       ) : (
-                        <span className="settings-inline-hint">当前彩种暂无可选模型。</span>
+                        <span className="settings-inline-hint">当前彩种暂无可选启用模型。</span>
                       )}
                     </div>
                   </div>

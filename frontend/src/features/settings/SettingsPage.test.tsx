@@ -871,12 +871,14 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByText('抓取接口返回 502')).toBeInTheDocument()
     expect(screen.getByText('task-fetch-1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /收起详情：大乐透抓取/ })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /编辑任务：大乐透抓取/ }))
+    await userEvent.click(screen.getByRole('button', { name: /更多操作：大乐透抓取/ }))
+    await userEvent.click(screen.getByRole('button', { name: '编辑任务' }))
     expect(await screen.findByRole('heading', { name: '编辑任务' })).toBeInTheDocument()
     expect(screen.getByLabelText('任务名称')).toHaveValue('大乐透抓取')
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    await userEvent.click(screen.getByRole('button', { name: /删除任务：大乐透抓取/ }))
+    await userEvent.click(screen.getByRole('button', { name: /更多操作：大乐透抓取/ }))
+    await userEvent.click(screen.getByRole('button', { name: '删除任务' }))
     expect(confirmSpy).toHaveBeenCalled()
     confirmSpy.mockRestore()
   })
@@ -1002,6 +1004,87 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getAllByText('和值').length).toBeGreaterThan(0)
   })
 
+  it('hides inactive models when editing schedule tasks', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'pl3-model-a',
+          display_name: 'PL3 模型 A',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'pl3',
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['pl3'],
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'pl3-model-disabled',
+          display_name: 'PL3 停用模型',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'pl3',
+          temperature: null,
+          is_active: false,
+          is_deleted: false,
+          lottery_codes: ['pl3'],
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listScheduleTasks.mockResolvedValue({
+      tasks: [
+        {
+          task_code: 'sched-predict-pl3-direct',
+          task_name: '排列3直选预测',
+          task_type: 'prediction_generate',
+          lottery_code: 'pl3',
+          model_codes: ['pl3-model-a'],
+          generation_mode: 'current',
+          prediction_play_mode: 'direct',
+          overwrite_existing: false,
+          schedule_mode: 'preset',
+          preset_type: 'daily',
+          time_of_day: '10:00',
+          weekdays: [],
+          cron_expression: null,
+          is_active: true,
+          next_run_at: '2026-03-19T02:00:00Z',
+          last_run_at: null,
+          last_run_status: null,
+          last_error_message: null,
+          last_task_id: null,
+          rule_summary: '每日 10:00（北京时间） · 直选',
+          created_at: '2026-03-18T02:00:00Z',
+          updated_at: '2026-03-18T02:00:00Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '定时任务' }))
+    await userEvent.click(screen.getByRole('button', { name: /更多操作：排列3直选预测/ }))
+    await userEvent.click(screen.getByRole('button', { name: '编辑任务' }))
+    expect(await screen.findByRole('heading', { name: '编辑任务' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'PL3 模型 A' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'PL3 停用模型' })).not.toBeInTheDocument()
+  })
+
   it('supports selecting pl3 prediction play mode for schedule tasks', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [
@@ -1017,6 +1100,22 @@ describe('SettingsPage model management view switch', () => {
           app_code: 'pl3',
           temperature: null,
           is_active: true,
+          is_deleted: false,
+          lottery_codes: ['pl3'],
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'pl3-model-disabled',
+          display_name: 'PL3 停用模型',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
+          version: '1',
+          tags: ['reasoning'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'pl3',
+          temperature: null,
+          is_active: false,
           is_deleted: false,
           lottery_codes: ['pl3'],
           updated_at: '2026-03-16 12:00:00',
@@ -1060,6 +1159,7 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.type(screen.getByLabelText('任务名称'), '排列3和值预测')
     await userEvent.selectOptions(screen.getByLabelText('任务类型'), 'prediction_generate')
     await userEvent.selectOptions(screen.getByLabelText('彩种'), 'pl3')
+    expect(screen.queryByRole('checkbox', { name: 'PL3 停用模型' })).not.toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText('预测玩法'), 'direct_sum')
     await userEvent.click(screen.getByRole('checkbox', { name: 'PL3 模型 A' }))
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
