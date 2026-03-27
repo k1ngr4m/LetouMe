@@ -411,27 +411,6 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
     return <span className="my-bets-card__meta">待开奖，暂无开奖号码</span>
   }
   if (lotteryCode === 'dlt') {
-    if (line.play_type === 'dlt_dantuo') {
-      return (
-        <div className="number-row number-row--tight">
-          {(line.front_dan || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-front-dan-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
-          ))}
-          <span className="number-row__divider" />
-          {(line.front_tuo || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-front-tuo-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
-          ))}
-          <span className="number-row__divider" />
-          {(line.back_dan || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-back-dan-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
-          ))}
-          <span className="number-row__divider" />
-          {(line.back_tuo || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-back-tuo-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
-          ))}
-        </div>
-      )
-    }
     return (
       <div className="number-row number-row--tight">
         {(record.actual_result.red_balls || []).map((ball) => (
@@ -468,6 +447,27 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
   const resolveTone = (isHit: boolean): 'default' | 'muted' => (hasActualResult && !isHit ? 'muted' : 'default')
 
   if (lotteryCode === 'dlt') {
+    if (line.play_type === 'dlt_dantuo') {
+      return (
+        <div className="number-row number-row--tight">
+          {(line.front_dan || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-dan-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.front_tuo || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-tuo-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.back_dan || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-dan-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.back_tuo || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-tuo-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+          ))}
+        </div>
+      )
+    }
     return (
       <div className="number-row number-row--tight">
         {(line.front_numbers || []).map((ball) => (
