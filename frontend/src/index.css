@@ -3999,8 +3999,8 @@ a {
 .model-export-sheet__hero,
 .model-export-sheet__panel,
 .model-export-sheet__score-collapse {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(11, 17, 29, 0.94);
+  border: 1px solid var(--border-1);
+  background: var(--panel-card-bg);
 }
 
 .model-export-sheet__hero {
@@ -4079,8 +4079,8 @@ a {
 
 .model-export-sheet__meta span,
 .model-export-sheet__metric-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-1);
+  background: var(--surface-0);
 }
 
 .model-export-sheet__meta span {
@@ -4155,8 +4155,19 @@ a {
   margin-top: 0;
   padding: 1rem;
   border-radius: 1.15rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-1);
+  background: var(--surface-0);
+}
+
+:root[data-theme='light'] .model-export-sheet__hero {
+  box-shadow: 0 18px 46px rgba(110, 131, 161, 0.2);
+}
+
+:root[data-theme='light'] .model-export-sheet__score-badge {
+  color: #2f4f7d;
+  border-color: rgba(133, 159, 196, 0.36);
+  background: linear-gradient(135deg, rgba(198, 223, 252, 0.95), rgba(223, 235, 251, 0.95), rgba(243, 224, 240, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .settings-grid-react {
