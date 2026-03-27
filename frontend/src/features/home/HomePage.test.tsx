@@ -2349,6 +2349,92 @@ describe('HomePage dashboard sidebar', () => {
     )
   })
 
+  it('keeps my-bets details collapsed by default and supports expand controls', async () => {
+    getMyBets.mockResolvedValueOnce({
+      records: [
+        {
+          id: 1,
+          lottery_code: 'dlt',
+          target_period: '2026032',
+          play_type: 'dlt',
+          front_numbers: ['01', '02', '03', '04', '05'],
+          back_numbers: ['06', '07'],
+          lines: [
+            {
+              line_no: 1,
+              play_type: 'dlt',
+              front_numbers: ['01', '02', '03', '04', '05'],
+              back_numbers: ['06', '07'],
+              multiplier: 1,
+              is_append: false,
+              bet_count: 1,
+              amount: 2,
+            },
+          ],
+          amount: 2,
+          prize_amount: 0,
+          net_profit: -2,
+          winning_bet_count: 0,
+          settlement_status: 'pending',
+          created_at: '2026-03-18T00:00:00Z',
+          updated_at: '2026-03-18T00:00:00Z',
+        },
+        {
+          id: 2,
+          lottery_code: 'dlt',
+          target_period: '2026031',
+          play_type: 'dlt',
+          front_numbers: ['08', '09', '10', '11', '12'],
+          back_numbers: ['01', '02'],
+          lines: [
+            {
+              line_no: 1,
+              play_type: 'dlt',
+              front_numbers: ['08', '09', '10', '11', '12'],
+              back_numbers: ['01', '02'],
+              multiplier: 1,
+              is_append: false,
+              bet_count: 1,
+              amount: 2,
+            },
+          ],
+          amount: 2,
+          prize_amount: 0,
+          net_profit: -2,
+          winning_bet_count: 0,
+          settlement_status: 'pending',
+          created_at: '2026-03-17T00:00:00Z',
+          updated_at: '2026-03-17T00:00:00Z',
+        },
+      ],
+      summary: {
+        total_count: 2,
+        total_amount: 4,
+        total_prize_amount: 0,
+        total_net_profit: -4,
+        settled_count: 0,
+        pending_count: 2,
+      },
+    })
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await screen.findByText('第 2026032 期')
+
+    expect(screen.queryByText('开奖号码：')).not.toBeInTheDocument()
+    expect(screen.queryByText('子注单 #1 · 大乐透')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: '展开详情' })[0])
+    expect(await screen.findByText('开奖号码：')).toBeInTheDocument()
+    expect(await screen.findByText('子注单 #1 · 大乐透')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '全部展开' }))
+    expect(screen.getAllByRole('button', { name: '收起详情' })).toHaveLength(2)
+
+    await userEvent.click(screen.getByRole('button', { name: '全部收起' }))
+    expect(screen.getAllByRole('button', { name: '展开详情' })).toHaveLength(2)
+  })
+
   it('supports dlt dantuo create on my-bets tab', async () => {
     renderPage('/dashboard/my-bets')
     await screen.findByRole('heading', { name: '我的投注' })

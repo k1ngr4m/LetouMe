@@ -579,6 +579,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const [formOpen, setFormOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [expandedRecordMap, setExpandedRecordMap] = useState<Record<number, boolean>>({})
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
 
   useEffect(() => {
@@ -664,6 +665,22 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
+  const hasRecords = records.length > 0
+  const allRecordsExpanded = hasRecords && records.every((record) => Boolean(expandedRecordMap[record.id]))
+
+  useEffect(() => {
+    setExpandedRecordMap((previous) => {
+      const next: Record<number, boolean> = {}
+      for (const record of records) {
+        next[record.id] = Boolean(previous[record.id])
+      }
+      const previousIds = Object.keys(previous)
+      const nextIds = Object.keys(next)
+      if (previousIds.length !== nextIds.length) return next
+      if (nextIds.some((id) => previous[Number(id)] !== next[Number(id)])) return next
+      return previous
+    })
+  }, [records])
 
   function openCreateModal(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
@@ -746,6 +763,19 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     }
   }
 
+  function toggleRecordExpanded(recordId: number) {
+    setExpandedRecordMap((previous) => ({ ...previous, [recordId]: !previous[recordId] }))
+  }
+
+  function toggleAllRecordsExpanded() {
+    const nextExpanded = !allRecordsExpanded
+    const next: Record<number, boolean> = {}
+    for (const record of records) {
+      next[record.id] = nextExpanded
+    }
+    setExpandedRecordMap(next)
+  }
+
   return (
     <div className="page-section my-bets-page">
       <StatusCard
@@ -753,6 +783,11 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         subtitle="按当前账号和彩种隔离，支持手动录入、OCR识别、多注编辑和盈亏自动结算。"
         actions={
           <div className="toolbar-inline">
+            {hasRecords ? (
+              <button className="ghost-button" type="button" onClick={toggleAllRecordsExpanded}>
+                {allRecordsExpanded ? '全部收起' : '全部展开'}
+              </button>
+            ) : null}
             <button className="primary-button" type="button" onClick={() => openCreateModal()}>
               添加投注
             </button>
@@ -787,7 +822,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
           <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
         ) : records.length ? (
           <div className="my-bets-list">
-            {records.map((record) => (
+            {records.map((record) => {
+              const isExpanded = Boolean(expandedRecordMap[record.id])
+              return (
               <article key={record.id} className="my-bets-card">
                 <div className="my-bets-card__header">
                   <div>
@@ -798,12 +835,17 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                     </div>
                     <span className="my-bets-card__meta">{`投注时间：${formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}`}</span>
-                    <div className="my-bets-card__draw">
-                      <span className="my-bets-card__meta">开奖号码：</span>
-                      {renderActualResult(record, lotteryCode)}
-                    </div>
+                    {isExpanded ? (
+                      <div className="my-bets-card__draw">
+                        <span className="my-bets-card__meta">开奖号码：</span>
+                        {renderActualResult(record, lotteryCode)}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="my-bets-card__actions">
+                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => toggleRecordExpanded(record.id)}>
+                      {isExpanded ? '收起详情' : '展开详情'}
+                    </button>
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditModal(record)}>
                       编辑
                     </button>
@@ -813,7 +855,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                   </div>
                 </div>
 
-                {(record.lines || []).length ? (
+                {isExpanded && (record.lines || []).length ? (
                   <div className="my-bets-card__line-list">
                     {(record.lines || []).map((line) => (
                       <div key={`${record.id}-line-${line.line_no}`} className="my-bets-line-card">
@@ -837,7 +879,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                   </a>
                 ) : null}
               </article>
-            ))}
+            )})}
           </div>
         ) : (
           <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
