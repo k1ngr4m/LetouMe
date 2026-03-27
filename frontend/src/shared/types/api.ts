@@ -219,9 +219,13 @@ export type PredictionsHistoryResponse = {
 
 export type SimulationTicketPayload = {
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands?: string[]
   direct_thousands?: string[]
   direct_hundreds?: string[]
@@ -233,9 +237,13 @@ export type SimulationTicketPayload = {
 export type SimulationTicketRecord = {
   id: number
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
   front_numbers: string[]
   back_numbers: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands?: string[]
   direct_thousands?: string[]
   direct_hundreds?: string[]
@@ -257,7 +265,7 @@ export type SimulationTicketCreateResponse = {
 
 export type SimulationTicketQuoteResponse = {
   lottery_code: LotteryCode
-  play_type: 'dlt' | 'direct' | 'group3' | 'group6'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
   bet_count: number
   amount: number
 }
@@ -265,9 +273,13 @@ export type SimulationTicketQuoteResponse = {
 export type MyBetRecordPayload = {
   lottery_code?: LotteryCode
   target_period: string
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers?: string[]
   back_numbers?: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands?: string[]
   direct_thousands?: string[]
   direct_hundreds?: string[]
@@ -291,9 +303,13 @@ export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
 }
 
 export type MyBetLinePayload = {
-  play_type?: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers?: string[]
   back_numbers?: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands?: string[]
   direct_thousands?: string[]
   direct_hundreds?: string[]
@@ -307,9 +323,13 @@ export type MyBetLinePayload = {
 
 export type MyBetLine = {
   line_no: number
-  play_type: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers: string[]
   back_numbers: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands: string[]
   direct_thousands: string[]
   direct_hundreds: string[]
@@ -336,9 +356,13 @@ export type MyBetRecord = {
   id: number
   lottery_code: LotteryCode
   target_period: string
-  play_type: 'dlt' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
   front_numbers: string[]
   back_numbers: string[]
+  front_dan?: string[]
+  front_tuo?: string[]
+  back_dan?: string[]
+  back_tuo?: string[]
   direct_ten_thousands: string[]
   direct_thousands: string[]
   direct_hundreds: string[]

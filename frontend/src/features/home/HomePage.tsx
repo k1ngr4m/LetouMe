@@ -1391,8 +1391,13 @@ export function HomePage() {
 
 function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCode: LotteryCode; draws: LotteryDraw[]; targetPeriod: string }) {
   const queryClient = useQueryClient()
+  const [dltPlayType, setDltPlayType] = useState<'dlt' | 'dlt_dantuo'>('dlt')
   const [selectedFront, setSelectedFront] = useState<string[]>([])
   const [selectedBack, setSelectedBack] = useState<string[]>([])
+  const [selectedFrontDan, setSelectedFrontDan] = useState<string[]>([])
+  const [selectedFrontTuo, setSelectedFrontTuo] = useState<string[]>([])
+  const [selectedBackDan, setSelectedBackDan] = useState<string[]>([])
+  const [selectedBackTuo, setSelectedBackTuo] = useState<string[]>([])
   const [pl3PlayType, setPl3PlayType] = useState<'direct' | 'group3' | 'group6'>('direct')
   const [selectedTenThousands, setSelectedTenThousands] = useState<string[]>([])
   const [selectedThousands, setSelectedThousands] = useState<string[]>([])
@@ -1409,14 +1414,20 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
   const isPl3 = lotteryCode === 'pl3'
   const isPl5 = lotteryCode === 'pl5'
+  const isDlt = lotteryCode === 'dlt'
+  const isDltDantuo = isDlt && dltPlayType === 'dlt_dantuo'
   const playTypeLabel = pl3PlayType === 'direct' ? '直选' : pl3PlayType === 'group3' ? '组选3' : '组选6'
   const selection = useMemo<SimulationSelection>(() => {
-    const playType: SimulationPlayType = lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType
+    const playType: SimulationPlayType = lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType
     return {
       lotteryCode,
       playType,
       frontNumbers: selectedFront,
       backNumbers: selectedBack,
+      frontDan: selectedFrontDan,
+      frontTuo: selectedFrontTuo,
+      backDan: selectedBackDan,
+      backTuo: selectedBackTuo,
       directTenThousands: selectedTenThousands,
       directThousands: selectedThousands,
       directHundreds: selectedHundreds,
@@ -1424,13 +1435,17 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       directUnits: selectedUnits,
       groupNumbers: selectedGroupNumbers,
     }
-  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
   const simulationPayload = useMemo<SimulationTicketPayload>(
     () => ({
       lottery_code: lotteryCode,
-      play_type: lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType,
+      play_type: lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType,
       front_numbers: selectedFront,
       back_numbers: selectedBack,
+      front_dan: selectedFrontDan,
+      front_tuo: selectedFrontTuo,
+      back_dan: selectedBackDan,
+      back_tuo: selectedBackTuo,
       direct_ten_thousands: selectedTenThousands,
       direct_thousands: selectedThousands,
       direct_hundreds: selectedHundreds,
@@ -1438,7 +1453,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       direct_units: selectedUnits,
       group_numbers: selectedGroupNumbers,
     }),
-    [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
+    [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
   )
   const ticketsQuery = useQuery({
     queryKey: ['simulation-tickets', lotteryCode],
@@ -1476,12 +1491,25 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   useEffect(() => {
     setShowMatches(false)
     setMessage(null)
-  }, [lotteryCode, pl3PlayType, selectedFront, selectedBack, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
 
   useEffect(() => {
-    if (lotteryCode === 'dlt') return
+    if (lotteryCode === 'dlt') {
+      setDltPlayType('dlt')
+      setSelectedFront([])
+      setSelectedBack([])
+      setSelectedFrontDan([])
+      setSelectedFrontTuo([])
+      setSelectedBackDan([])
+      setSelectedBackTuo([])
+      return
+    }
     setSelectedFront([])
     setSelectedBack([])
+    setSelectedFrontDan([])
+    setSelectedFrontTuo([])
+    setSelectedBackDan([])
+    setSelectedBackTuo([])
     setPl3PlayType('direct')
     setSelectedTenThousands([])
     setSelectedThousands([])
@@ -1493,6 +1521,18 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
   function toggleSelection(value: string, zone: 'front' | 'back') {
     const updater = zone === 'front' ? setSelectedFront : setSelectedBack
+    updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
+  }
+
+  function toggleDantuoSelection(value: string, zone: 'front_dan' | 'front_tuo' | 'back_dan' | 'back_tuo') {
+    const updater =
+      zone === 'front_dan'
+        ? setSelectedFrontDan
+        : zone === 'front_tuo'
+          ? setSelectedFrontTuo
+          : zone === 'back_dan'
+            ? setSelectedBackDan
+            : setSelectedBackTuo
     updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
 
@@ -1515,9 +1555,13 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   }
 
   function handleRandomPick() {
-    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'pl5' ? 'direct' : pl3PlayType)
+    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType)
     setSelectedFront(randomSelection.frontNumbers)
     setSelectedBack(randomSelection.backNumbers)
+    setSelectedFrontDan(randomSelection.frontDan)
+    setSelectedFrontTuo(randomSelection.frontTuo)
+    setSelectedBackDan(randomSelection.backDan)
+    setSelectedBackTuo(randomSelection.backTuo)
     setSelectedTenThousands(randomSelection.directTenThousands)
     setSelectedThousands(randomSelection.directThousands)
     setSelectedHundreds(randomSelection.directHundreds)
@@ -1530,6 +1574,10 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   function handleClear() {
     setSelectedFront([])
     setSelectedBack([])
+    setSelectedFrontDan([])
+    setSelectedFrontTuo([])
+    setSelectedBackDan([])
+    setSelectedBackTuo([])
     setSelectedTenThousands([])
     setSelectedThousands([])
     setSelectedHundreds([])
@@ -1575,48 +1623,164 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               <section className="simulation-section">
                 <div className="simulation-section__header">
                   <div>
-                    <p className="hero-panel__eyebrow">Front Zone</p>
-                    <h3>前区选号</h3>
+                    <p className="hero-panel__eyebrow">Play Type</p>
+                    <h3>玩法切换</h3>
                   </div>
-                  <span>至少 5 个，可复式</span>
+                  <span>{isDltDantuo ? '胆拖' : '普通复式'}</span>
                 </div>
-                <div className="simulation-ball-grid" aria-label="前区选号">
-                  {frontOptions.map((ball) => (
-                    <button
-                      key={`front-${ball}`}
-                      type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedFront.includes(ball) && 'is-selected')}
-                      onClick={() => toggleSelection(ball, 'front')}
-                      aria-label={`前区 ${ball}`}
-                    >
-                      {ball}
-                    </button>
-                  ))}
+                <div className="tab-strip" role="tablist" aria-label="大乐透玩法切换">
+                  <button className={clsx('tab-strip__item', dltPlayType === 'dlt' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt')}>
+                    普通
+                  </button>
+                  <button className={clsx('tab-strip__item', dltPlayType === 'dlt_dantuo' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt_dantuo')}>
+                    胆拖
+                  </button>
                 </div>
               </section>
 
-              <section className="simulation-section">
-                <div className="simulation-section__header">
-                  <div>
-                    <p className="hero-panel__eyebrow">Back Zone</p>
-                    <h3>后区选号</h3>
-                  </div>
-                  <span>至少 2 个，可复式</span>
-                </div>
-                <div className="simulation-ball-grid" aria-label="后区选号">
-                  {backOptions.map((ball) => (
-                    <button
-                      key={`back-${ball}`}
-                      type="button"
-                      className={clsx('simulation-ball', 'is-back', selectedBack.includes(ball) && 'is-selected')}
-                      onClick={() => toggleSelection(ball, 'back')}
-                      aria-label={`后区 ${ball}`}
-                    >
-                      {ball}
-                    </button>
-                  ))}
-                </div>
-              </section>
+              {isDltDantuo ? (
+                <>
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Front Dan</p>
+                        <h3>前区胆码</h3>
+                      </div>
+                      <span>1-4 个</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="前区胆码选号">
+                      {frontOptions.map((ball) => (
+                        <button
+                          key={`front-dan-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-front', selectedFrontDan.includes(ball) && 'is-selected')}
+                          onClick={() => toggleDantuoSelection(ball, 'front_dan')}
+                          aria-label={`前胆 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Front Tuo</p>
+                        <h3>前区拖码</h3>
+                      </div>
+                      <span>至少 2 个</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="前区拖码选号">
+                      {frontOptions.map((ball) => (
+                        <button
+                          key={`front-tuo-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-front', selectedFrontTuo.includes(ball) && 'is-selected')}
+                          onClick={() => toggleDantuoSelection(ball, 'front_tuo')}
+                          aria-label={`前拖 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Back Dan</p>
+                        <h3>后区胆码</h3>
+                      </div>
+                      <span>0-1 个</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="后区胆码选号">
+                      {backOptions.map((ball) => (
+                        <button
+                          key={`back-dan-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-back', selectedBackDan.includes(ball) && 'is-selected')}
+                          onClick={() => toggleDantuoSelection(ball, 'back_dan')}
+                          aria-label={`后胆 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Back Tuo</p>
+                        <h3>后区拖码</h3>
+                      </div>
+                      <span>至少 2 个</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="后区拖码选号">
+                      {backOptions.map((ball) => (
+                        <button
+                          key={`back-tuo-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-back', selectedBackTuo.includes(ball) && 'is-selected')}
+                          onClick={() => toggleDantuoSelection(ball, 'back_tuo')}
+                          aria-label={`后拖 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Front Zone</p>
+                        <h3>前区选号</h3>
+                      </div>
+                      <span>至少 5 个，可复式</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="前区选号">
+                      {frontOptions.map((ball) => (
+                        <button
+                          key={`front-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-front', selectedFront.includes(ball) && 'is-selected')}
+                          onClick={() => toggleSelection(ball, 'front')}
+                          aria-label={`前区 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="simulation-section">
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">Back Zone</p>
+                        <h3>后区选号</h3>
+                      </div>
+                      <span>至少 2 个，可复式</span>
+                    </div>
+                    <div className="simulation-ball-grid" aria-label="后区选号">
+                      {backOptions.map((ball) => (
+                        <button
+                          key={`back-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', 'is-back', selectedBack.includes(ball) && 'is-selected')}
+                          onClick={() => toggleSelection(ball, 'back')}
+                          aria-label={`后区 ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
             </>
           ) : isPl3 ? (
             <>
@@ -1855,16 +2019,40 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
           <div className="simulation-summary-bar__numbers">
             {lotteryCode === 'dlt' ? (
               <>
-                <span>已选前区 {selectedFront.length} 个 / 后区 {selectedBack.length} 个</span>
-                <div className="number-row number-row--tight">
-                  {selectedFront.map((ball) => (
-                    <NumberBall key={`selected-front-${ball}`} value={ball} color="red" size="sm" />
-                  ))}
-                  {selectedBack.length ? <span className="number-row__divider" /> : null}
-                  {selectedBack.map((ball) => (
-                    <NumberBall key={`selected-back-${ball}`} value={ball} color="blue" size="sm" />
-                  ))}
-                </div>
+                <span>
+                  {isDltDantuo
+                    ? `前胆 ${selectedFrontDan.length} 个 / 前拖 ${selectedFrontTuo.length} 个 · 后胆 ${selectedBackDan.length} 个 / 后拖 ${selectedBackTuo.length} 个`
+                    : `已选前区 ${selectedFront.length} 个 / 后区 ${selectedBack.length} 个`}
+                </span>
+                {isDltDantuo ? (
+                  <div className="number-row number-row--tight">
+                    {selectedFrontDan.map((ball) => (
+                      <NumberBall key={`selected-front-dan-${ball}`} value={ball} color="red" size="sm" />
+                    ))}
+                    {selectedFrontTuo.length ? <span className="number-row__divider" /> : null}
+                    {selectedFrontTuo.map((ball) => (
+                      <NumberBall key={`selected-front-tuo-${ball}`} value={ball} color="red" size="sm" />
+                    ))}
+                    {(selectedBackDan.length || selectedBackTuo.length) ? <span className="number-row__divider" /> : null}
+                    {selectedBackDan.map((ball) => (
+                      <NumberBall key={`selected-back-dan-${ball}`} value={ball} color="blue" size="sm" />
+                    ))}
+                    {selectedBackTuo.length ? <span className="number-row__divider" /> : null}
+                    {selectedBackTuo.map((ball) => (
+                      <NumberBall key={`selected-back-tuo-${ball}`} value={ball} color="blue" size="sm" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="number-row number-row--tight">
+                    {selectedFront.map((ball) => (
+                      <NumberBall key={`selected-front-${ball}`} value={ball} color="red" size="sm" />
+                    ))}
+                    {selectedBack.length ? <span className="number-row__divider" /> : null}
+                    {selectedBack.map((ball) => (
+                      <NumberBall key={`selected-back-${ball}`} value={ball} color="blue" size="sm" />
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -1898,7 +2086,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
             {!canSubmit ? (
               <span>
                 {lotteryCode === 'dlt'
-                  ? '前区至少 5 个号码，后区至少 2 个号码后可投注。'
+                  ? isDltDantuo
+                    ? '胆拖需前胆1-4、前拖至少2（前区合计至少6）；后胆0-1、后拖至少2（后区合计至少3），且胆拖不可重复。'
+                    : '前区至少 5 个号码，后区至少 2 个号码后可投注。'
                   : isPl5
                     ? '直选需万位、千位、百位、十位、个位各至少 1 个号码。'
                     : pl3PlayType === 'direct'
@@ -2036,7 +2226,25 @@ function SavedSimulationTicketCard({
         </button>
       </div>
       <div className="simulation-saved-card__numbers">
-        {lotteryCode === 'dlt' ? (
+        {lotteryCode === 'dlt' && ticket.play_type === 'dlt_dantuo' ? (
+          <div className="number-row number-row--tight">
+            {(ticket.front_dan || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-front-dan-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.front_tuo || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-front-tuo-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.back_dan || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-back-dan-${ball}`} value={ball} color="blue" size="sm" />
+            ))}
+            <span className="number-row__divider" />
+            {(ticket.back_tuo || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-back-tuo-${ball}`} value={ball} color="blue" size="sm" />
+            ))}
+          </div>
+        ) : lotteryCode === 'dlt' ? (
           <div className="number-row number-row--tight">
             {ticket.front_numbers.map((ball) => (
               <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="red" size="sm" />
@@ -2091,7 +2299,7 @@ function SavedSimulationTicketCard({
         )}
       </div>
       <div className="simulation-saved-card__footer">
-        <span>{`${lotteryCode === 'dlt' ? '复式' : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : '直选'} · ${ticket.bet_count} 注`}</span>
+        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : '直选'} · ${ticket.bet_count} 注`}</span>
         <span>{formatCurrency(ticket.amount)}</span>
       </div>
     </article>

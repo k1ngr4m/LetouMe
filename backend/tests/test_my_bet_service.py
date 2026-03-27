@@ -61,6 +61,48 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(hit_result["winning_bet_count"], 1)
         self.assertEqual(hit_result["hit_sum_values"], ["04"])
 
+    def test_build_dlt_dantuo_line_payload_calculates_bet_count_and_amount(self) -> None:
+        payload = self.service._build_dlt_line_payload(
+            {
+                "play_type": "dlt_dantuo",
+                "front_dan": ["01", "02"],
+                "front_tuo": ["03", "04", "05", "06"],
+                "back_dan": ["01"],
+                "back_tuo": ["02", "03"],
+                "multiplier": 2,
+                "is_append": True,
+            },
+            multiplier=2,
+        )
+        self.assertEqual(payload["play_type"], "dlt_dantuo")
+        self.assertEqual(payload["bet_count"], 8)
+        self.assertEqual(payload["amount"], 48)
+
+    def test_dlt_dantuo_settlement_uses_expanded_prize_breakdown(self) -> None:
+        result = self.service._calculate_dlt_line_settlement(
+            line={
+                "play_type": "dlt_dantuo",
+                "front_dan": ["01"],
+                "front_tuo": ["02", "03", "04", "05", "06"],
+                "back_dan": [],
+                "back_tuo": ["07", "08"],
+                "multiplier": 1,
+                "is_append": False,
+            },
+            draw={
+                "period": "26014",
+                "red_balls": ["01", "02", "03", "04", "05"],
+                "blue_balls": ["07", "09"],
+                "prize_breakdown": [
+                    {"prize_level": "二等奖", "prize_type": "basic", "prize_amount": 100},
+                    {"prize_level": "四等奖", "prize_type": "basic", "prize_amount": 20},
+                ],
+            },
+        )
+        self.assertEqual(result["prize_level"], "二等奖")
+        self.assertEqual(result["winning_bet_count"], 5)
+        self.assertEqual(result["prize_amount"], 180)
+
 
 if __name__ == "__main__":
     unittest.main()

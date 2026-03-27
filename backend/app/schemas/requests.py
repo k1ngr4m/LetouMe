@@ -124,6 +124,10 @@ class SimulationTicketPayload(BaseModel):
     play_type: str | None = None
     front_numbers: list[str] = Field(default_factory=list)
     back_numbers: list[str] = Field(default_factory=list)
+    front_dan: list[str] = Field(default_factory=list)
+    front_tuo: list[str] = Field(default_factory=list)
+    back_dan: list[str] = Field(default_factory=list)
+    back_tuo: list[str] = Field(default_factory=list)
     direct_ten_thousands: list[str] = Field(default_factory=list)
     direct_thousands: list[str] = Field(default_factory=list)
     direct_hundreds: list[str] = Field(default_factory=list)
@@ -153,6 +157,10 @@ class MyBetLinePayload(BaseModel):
     play_type: str | None = None
     front_numbers: list[str] = Field(default_factory=list)
     back_numbers: list[str] = Field(default_factory=list)
+    front_dan: list[str] = Field(default_factory=list)
+    front_tuo: list[str] = Field(default_factory=list)
+    back_dan: list[str] = Field(default_factory=list)
+    back_tuo: list[str] = Field(default_factory=list)
     direct_ten_thousands: list[str] = Field(default_factory=list)
     direct_thousands: list[str] = Field(default_factory=list)
     direct_hundreds: list[str] = Field(default_factory=list)
@@ -170,6 +178,10 @@ class MyBetRecordPayload(BaseModel):
     play_type: str | None = None
     front_numbers: list[str] = Field(default_factory=list)
     back_numbers: list[str] = Field(default_factory=list)
+    front_dan: list[str] = Field(default_factory=list)
+    front_tuo: list[str] = Field(default_factory=list)
+    back_dan: list[str] = Field(default_factory=list)
+    back_tuo: list[str] = Field(default_factory=list)
     direct_ten_thousands: list[str] = Field(default_factory=list)
     direct_thousands: list[str] = Field(default_factory=list)
     direct_hundreds: list[str] = Field(default_factory=list)

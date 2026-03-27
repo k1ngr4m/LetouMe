@@ -33,6 +33,7 @@ class SimulationTicketService:
 
     def quote_ticket(self, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = normalize_lottery_code(payload.get("lottery_code"))
+        requested_play_type = str(payload.get("play_type") or ("dlt" if lottery_code == "dlt" else "direct")).strip().lower() or ("dlt" if lottery_code == "dlt" else "direct")
         try:
             if lottery_code == "dlt":
                 ticket_payload = self._build_dlt_ticket_payload(payload)
@@ -43,7 +44,7 @@ class SimulationTicketService:
         except ValueError:
             return {
                 "lottery_code": lottery_code,
-                "play_type": str(payload.get("play_type") or ("dlt" if lottery_code == "dlt" else "direct")).strip().lower() or ("dlt" if lottery_code == "dlt" else "direct"),
+                "play_type": requested_play_type,
                 "bet_count": 0,
                 "amount": 0,
             }
@@ -77,6 +78,12 @@ class SimulationTicketService:
         return normalized
 
     def _build_dlt_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "dlt").strip().lower() or "dlt"
+        if play_type == "dlt_dantuo":
+            return self._build_dlt_dantuo_ticket_payload(payload)
+        if play_type != "dlt":
+            raise ValueError("大乐透玩法仅支持 dlt / dlt_dantuo")
+
         front_numbers = self._normalize_dlt_numbers(payload.get("front_numbers"), zone="front")
         back_numbers = self._normalize_dlt_numbers(payload.get("back_numbers"), zone="back")
         if len(front_numbers) < 5:
@@ -88,6 +95,54 @@ class SimulationTicketService:
             "play_type": "dlt",
             "front_numbers": ",".join(front_numbers),
             "back_numbers": ",".join(back_numbers),
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
+            "group_numbers": None,
+            "bet_count": bet_count,
+            "amount": bet_count * 2,
+        }
+
+    def _build_dlt_dantuo_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        front_dan = self._normalize_dlt_numbers(payload.get("front_dan"), zone="front")
+        front_tuo = self._normalize_dlt_numbers(payload.get("front_tuo"), zone="front")
+        back_dan = self._normalize_dlt_numbers(payload.get("back_dan", []), zone="back")
+        back_tuo = self._normalize_dlt_numbers(payload.get("back_tuo"), zone="back")
+        if len(front_dan) < 1 or len(front_dan) > 4:
+            raise ValueError("前区胆码数量应为 1-4")
+        if len(front_tuo) < 2:
+            raise ValueError("前区拖码至少选择 2 个号码")
+        if len(set(front_dan) & set(front_tuo)) > 0:
+            raise ValueError("前区胆码与拖码不可重复")
+        if len(set([*front_dan, *front_tuo])) < 6:
+            raise ValueError("前区胆码与拖码合计至少 6 个号码")
+        if len(back_dan) > 1:
+            raise ValueError("后区胆码最多 1 个")
+        if len(back_tuo) < 2:
+            raise ValueError("后区拖码至少选择 2 个号码")
+        if len(set(back_dan) & set(back_tuo)) > 0:
+            raise ValueError("后区胆码与拖码不可重复")
+        if len(set([*back_dan, *back_tuo])) < 3:
+            raise ValueError("后区胆码与拖码合计至少 3 个号码")
+        front_pick_count = 5 - len(front_dan)
+        back_pick_count = 2 - len(back_dan)
+        if len(front_tuo) < front_pick_count or len(back_tuo) < back_pick_count:
+            raise ValueError("拖码数量不足以组成有效注单")
+        bet_count = comb(len(front_tuo), front_pick_count) * comb(len(back_tuo), back_pick_count)
+        return {
+            "play_type": "dlt_dantuo",
+            "front_numbers": "",
+            "back_numbers": "",
+            "front_dan": ",".join(front_dan),
+            "front_tuo": ",".join(front_tuo),
+            "back_dan": ",".join(back_dan),
+            "back_tuo": ",".join(back_tuo),
             "direct_hundreds": None,
             "direct_tens": None,
             "direct_units": None,
@@ -180,6 +235,10 @@ class SimulationTicketService:
             "play_type": str(ticket.get("play_type") or "dlt"),
             "front_numbers": [item for item in str(ticket.get("front_numbers") or "").split(",") if item],
             "back_numbers": [item for item in str(ticket.get("back_numbers") or "").split(",") if item],
+            "front_dan": [item for item in str(ticket.get("front_dan") or "").split(",") if item],
+            "front_tuo": [item for item in str(ticket.get("front_tuo") or "").split(",") if item],
+            "back_dan": [item for item in str(ticket.get("back_dan") or "").split(",") if item],
+            "back_tuo": [item for item in str(ticket.get("back_tuo") or "").split(",") if item],
             "direct_ten_thousands": [item for item in str(ticket.get("direct_ten_thousands") or "").split(",") if item],
             "direct_thousands": [item for item in str(ticket.get("direct_thousands") or "").split(",") if item],
             "direct_hundreds": [item for item in str(ticket.get("direct_hundreds") or "").split(",") if item],

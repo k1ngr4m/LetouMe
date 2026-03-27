@@ -761,6 +761,43 @@ beforeEach(() => {
         : (groupCount >= 3 ? (groupCount * (groupCount - 1) * (groupCount - 2)) / 6 : 0)
       return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
     }
+    if (String(payload.play_type || 'dlt') === 'dlt_dantuo') {
+      const frontDanValues = Array.isArray(payload.front_dan) ? payload.front_dan.map(String) : []
+      const frontTuoValues = Array.isArray(payload.front_tuo) ? payload.front_tuo.map(String) : []
+      const backDanValues = Array.isArray(payload.back_dan) ? payload.back_dan.map(String) : []
+      const backTuoValues = Array.isArray(payload.back_tuo) ? payload.back_tuo.map(String) : []
+      const frontDan = frontDanValues.length
+      const frontTuo = frontTuoValues.length
+      const backDan = backDanValues.length
+      const backTuo = backTuoValues.length
+      const hasOverlap = (left: string[], right: string[]) => right.some((item) => left.includes(item))
+      const combination = (total: number, choose: number) => {
+        if (choose < 0 || choose > total) return 0
+        if (choose === 0 || choose === total) return 1
+        const actualChoose = Math.min(choose, total - choose)
+        let result = 1
+        for (let index = 1; index <= actualChoose; index += 1) {
+          result = (result * (total - actualChoose + index)) / index
+        }
+        return Math.round(result)
+      }
+      const frontPickCount = 5 - frontDan
+      const backPickCount = 2 - backDan
+      const betCount = frontDan >= 1 &&
+        frontDan <= 4 &&
+        frontTuo >= 2 &&
+        !hasOverlap(frontDanValues, frontTuoValues) &&
+        new Set([...frontDanValues, ...frontTuoValues]).size >= 6 &&
+        backDan <= 1 &&
+        backTuo >= 2 &&
+        !hasOverlap(backDanValues, backTuoValues) &&
+        new Set([...backDanValues, ...backTuoValues]).size >= 3 &&
+        frontTuo >= frontPickCount &&
+        backTuo >= backPickCount
+        ? combination(frontTuo, frontPickCount) * combination(backTuo, backPickCount)
+        : 0
+      return { lottery_code: 'dlt', play_type: 'dlt_dantuo', bet_count: betCount, amount: betCount * 2 }
+    }
     const frontCount = Array.isArray(payload.front_numbers) ? payload.front_numbers.length : 0
     const backCount = Array.isArray(payload.back_numbers) ? payload.back_numbers.length : 0
     const combination = (total: number, choose: number) => {
@@ -1392,6 +1429,38 @@ describe('HomePage dashboard sidebar', () => {
     }
 
     expect(screen.getByText('已选 18 注，共 36 元')).toBeInTheDocument()
+  })
+
+  it('supports dlt dantuo mode in simulation tab', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    const dltModeSwitch = screen.getByRole('tablist', { name: '大乐透玩法切换' })
+    await userEvent.click(within(dltModeSwitch).getByRole('button', { name: '胆拖' }))
+
+    await userEvent.click(screen.getByRole('button', { name: '前胆 01' }))
+    for (const ball of ['02', '03', '04', '05', '06']) {
+      await userEvent.click(screen.getByRole('button', { name: `前拖 ${ball}` }))
+    }
+    await userEvent.click(screen.getByRole('button', { name: '后胆 01' }))
+    await userEvent.click(screen.getByRole('button', { name: '后拖 07' }))
+    await userEvent.click(screen.getByRole('button', { name: '后拖 08' }))
+
+    expect(screen.getByText('已选 10 注，共 20 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
+    await waitFor(() => {
+      expect(createSimulationTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'dlt',
+          play_type: 'dlt_dantuo',
+          front_dan: ['01'],
+          front_tuo: ['02', '03', '04', '05', '06'],
+          back_dan: ['01'],
+          back_tuo: ['07', '08'],
+        }),
+      )
+    })
   })
 
   it('loads history detail on expand and highlights hit numbers', async () => {
@@ -2273,6 +2342,37 @@ describe('HomePage dashboard sidebar', () => {
               play_type: 'dlt',
               front_numbers: ['01', '02', '03', '04', '05'],
               back_numbers: ['06', '07'],
+            }),
+          ],
+        }),
+      ),
+    )
+  })
+
+  it('supports dlt dantuo create on my-bets tab', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.selectOptions(within(dialog).getByLabelText('玩法'), 'dlt_dantuo')
+    await userEvent.type(within(dialog).getByLabelText('前区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(dialog).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
+    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(dialog).getByLabelText('后区拖码（逗号分隔）'), '07,08')
+    await userEvent.click(within(dialog).getByRole('button', { name: '添加投注' }))
+
+    await waitFor(() =>
+      expect(createMyBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'dlt',
+          lines: [
+            expect.objectContaining({
+              play_type: 'dlt_dantuo',
+              front_dan: ['01'],
+              front_tuo: ['02', '03', '04', '05', '06'],
+              back_dan: ['01'],
+              back_tuo: ['07', '08'],
             }),
           ],
         }),

@@ -8,12 +8,17 @@ import { formatDateTimeLocal } from '../../shared/lib/format'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
 type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
-type LinePlayType = 'dlt' | Pl3PlayType
+type DltPlayType = 'dlt' | 'dlt_dantuo'
+type LinePlayType = DltPlayType | Pl3PlayType
 
 type EditableLine = {
   playType: LinePlayType
   frontNumbersInput: string
   backNumbersInput: string
+  frontDanInput: string
+  frontTuoInput: string
+  backDanInput: string
+  backTuoInput: string
   directTenThousandsInput: string
   directThousandsInput: string
   directHundredsInput: string
@@ -117,6 +122,11 @@ function splitNumbers(value: string) {
   return [...new Set(chunks.map((item) => item.padStart(2, '0')))].sort()
 }
 
+function hasIntersection(left: string[], right: string[]) {
+  const leftSet = new Set(left)
+  return right.some((item) => leftSet.has(item))
+}
+
 function combination(total: number, choose: number) {
   if (choose < 0 || choose > total) return 0
   if (choose === 0 || choose === total) return 1
@@ -133,6 +143,10 @@ function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
     playType: lotteryCode === 'dlt' ? 'dlt' : 'direct',
     frontNumbersInput: '',
     backNumbersInput: '',
+    frontDanInput: '',
+    frontTuoInput: '',
+    backDanInput: '',
+    backTuoInput: '',
     directTenThousandsInput: '',
     directThousandsInput: '',
     directHundredsInput: '',
@@ -190,9 +204,13 @@ function beijingInputToUtcIso(value: string) {
 
 function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableLine {
   return {
-    playType: (lotteryCode === 'dlt' ? 'dlt' : line.play_type) as LinePlayType,
+    playType: (lotteryCode === 'dlt' ? (line.play_type === 'dlt_dantuo' ? 'dlt_dantuo' : 'dlt') : line.play_type) as LinePlayType,
     frontNumbersInput: (line.front_numbers || []).join(','),
     backNumbersInput: (line.back_numbers || []).join(','),
+    frontDanInput: (line.front_dan || []).join(','),
+    frontTuoInput: (line.front_tuo || []).join(','),
+    backDanInput: (line.back_dan || []).join(','),
+    backTuoInput: (line.back_tuo || []).join(','),
     directTenThousandsInput: (line.direct_ten_thousands || []).join(','),
     directThousandsInput: (line.direct_thousands || []).join(','),
     directHundredsInput: (line.direct_hundreds || []).join(','),
@@ -259,6 +277,29 @@ function revokeObjectUrlIfNeeded(value: string) {
 function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
   const multiplier = Math.max(1, Math.min(99, Number(line.multiplier) || 1))
   if (lotteryCode === 'dlt') {
+    if (line.playType === 'dlt_dantuo') {
+      const frontDan = splitNumbers(line.frontDanInput)
+      const frontTuo = splitNumbers(line.frontTuoInput)
+      const backDan = splitNumbers(line.backDanInput)
+      const backTuo = splitNumbers(line.backTuoInput)
+      const frontPickCount = 5 - frontDan.length
+      const backPickCount = 2 - backDan.length
+      const valid =
+        frontDan.length >= 1 &&
+        frontDan.length <= 4 &&
+        frontTuo.length >= 2 &&
+        !hasIntersection(frontDan, frontTuo) &&
+        new Set([...frontDan, ...frontTuo]).size >= 6 &&
+        backDan.length <= 1 &&
+        backTuo.length >= 2 &&
+        !hasIntersection(backDan, backTuo) &&
+        new Set([...backDan, ...backTuo]).size >= 3 &&
+        frontTuo.length >= frontPickCount &&
+        backTuo.length >= backPickCount
+      const betCount = valid ? combination(frontTuo.length, frontPickCount) * combination(backTuo.length, backPickCount) : 0
+      const amount = betCount * 2 * multiplier + (line.isAppend ? betCount * multiplier : 0)
+      return { betCount, amount, valid: betCount > 0 }
+    }
     const front = splitNumbers(line.frontNumbersInput)
     const back = splitNumbers(line.backNumbersInput)
     const betCount = front.length >= 5 && back.length >= 2 ? combination(front.length, 5) * combination(back.length, 2) : 0
@@ -297,6 +338,17 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
 function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLinePayload {
   const normalizedMultiplier = Math.max(1, Math.min(99, Number(line.multiplier) || 1))
   if (lotteryCode === 'dlt') {
+    if (line.playType === 'dlt_dantuo') {
+      return {
+        play_type: 'dlt_dantuo',
+        front_dan: splitNumbers(line.frontDanInput),
+        front_tuo: splitNumbers(line.frontTuoInput),
+        back_dan: splitNumbers(line.backDanInput),
+        back_tuo: splitNumbers(line.backTuoInput),
+        multiplier: normalizedMultiplier,
+        is_append: line.isAppend,
+      }
+    }
     return {
       play_type: 'dlt',
       front_numbers: splitNumbers(line.frontNumbersInput),
@@ -344,6 +396,7 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
 }
 
 function formatPlayType(playType: string) {
+  if (playType === 'dlt_dantuo') return '胆拖'
   if (playType === 'group3') return '组选3'
   if (playType === 'group6') return '组选6'
   if (playType === 'direct_sum') return '直选和值'
@@ -358,6 +411,27 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
     return <span className="my-bets-card__meta">待开奖，暂无开奖号码</span>
   }
   if (lotteryCode === 'dlt') {
+    if (line.play_type === 'dlt_dantuo') {
+      return (
+        <div className="number-row number-row--tight">
+          {(line.front_dan || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-dan-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.front_tuo || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-tuo-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.back_dan || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-dan-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+          ))}
+          <span className="number-row__divider" />
+          {(line.back_tuo || []).map((ball) => (
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-tuo-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+          ))}
+        </div>
+      )
+    }
     return (
       <div className="number-row number-row--tight">
         {(record.actual_result.red_balls || []).map((ball) => (
@@ -871,56 +945,154 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
                       {lotteryCode === 'dlt' ? (
                         <>
-                          <BallPicker
-                            label="前区点击选号"
-                            numbers={dltFrontPool}
-                            selectedInput={line.frontNumbersInput}
-                            onToggle={(value) =>
-                              updateLine(index, (current) => ({ ...current, frontNumbersInput: togglePickFromInput(current.frontNumbersInput, value, dltFrontPool.length) }))
-                            }
-                            color="red"
-                          />
-                          <BallPicker
-                            label="后区点击选号"
-                            numbers={dltBackPool}
-                            selectedInput={line.backNumbersInput}
-                            onToggle={(value) =>
-                              updateLine(index, (current) => ({ ...current, backNumbersInput: togglePickFromInput(current.backNumbersInput, value, dltBackPool.length) }))
-                            }
-                            color="blue"
-                          />
-                          <div className="settings-form-grid">
-                            <label>
-                              前区号码（逗号分隔）
-                              <input
-                                value={line.frontNumbersInput}
-                                onChange={(event) => updateLine(index, (current) => ({ ...current, frontNumbersInput: normalizeDigitsInput(event.target.value) }))}
-                                placeholder="如 01,02,03,04,05"
+                          <label>
+                            玩法
+                            <select value={line.playType} onChange={(event) => updateLine(index, (current) => ({ ...current, playType: event.target.value as LinePlayType }))}>
+                              <option value="dlt">普通复式</option>
+                              <option value="dlt_dantuo">胆拖</option>
+                            </select>
+                          </label>
+                          {line.playType === 'dlt_dantuo' ? (
+                            <>
+                              <BallPicker
+                                label="前区胆码点击选号"
+                                numbers={dltFrontPool}
+                                selectedInput={line.frontDanInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, frontDanInput: togglePickFromInput(current.frontDanInput, value, dltFrontPool.length) }))
+                                }
+                                color="red"
                               />
-                            </label>
-                            <label>
-                              后区号码（逗号分隔）
-                              <input
-                                value={line.backNumbersInput}
-                                onChange={(event) => updateLine(index, (current) => ({ ...current, backNumbersInput: normalizeDigitsInput(event.target.value) }))}
-                                placeholder="如 06,07"
+                              <BallPicker
+                                label="前区拖码点击选号"
+                                numbers={dltFrontPool}
+                                selectedInput={line.frontTuoInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, frontTuoInput: togglePickFromInput(current.frontTuoInput, value, dltFrontPool.length) }))
+                                }
+                                color="red"
                               />
-                            </label>
-                            <label>
-                              倍数
-                              <input
-                                type="number"
-                                min={1}
-                                max={99}
-                                value={line.multiplier}
-                                onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))}
+                              <BallPicker
+                                label="后区胆码点击选号"
+                                numbers={dltBackPool}
+                                selectedInput={line.backDanInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, backDanInput: togglePickFromInput(current.backDanInput, value, dltBackPool.length) }))
+                                }
+                                color="blue"
                               />
-                            </label>
-                            <label className="toggle-chip">
-                              <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
-                              <span>追加投注</span>
-                            </label>
-                          </div>
+                              <BallPicker
+                                label="后区拖码点击选号"
+                                numbers={dltBackPool}
+                                selectedInput={line.backTuoInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, backTuoInput: togglePickFromInput(current.backTuoInput, value, dltBackPool.length) }))
+                                }
+                                color="blue"
+                              />
+                              <div className="settings-form-grid">
+                                <label>
+                                  前区胆码（逗号分隔）
+                                  <input
+                                    value={line.frontDanInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, frontDanInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 01,02"
+                                  />
+                                </label>
+                                <label>
+                                  前区拖码（逗号分隔）
+                                  <input
+                                    value={line.frontTuoInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, frontTuoInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 03,04,05,06"
+                                  />
+                                </label>
+                                <label>
+                                  后区胆码（逗号分隔）
+                                  <input
+                                    value={line.backDanInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, backDanInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 01"
+                                  />
+                                </label>
+                                <label>
+                                  后区拖码（逗号分隔）
+                                  <input
+                                    value={line.backTuoInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, backTuoInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 02,03"
+                                  />
+                                </label>
+                                <label>
+                                  倍数
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={line.multiplier}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))}
+                                  />
+                                </label>
+                                <label className="toggle-chip">
+                                  <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
+                                  <span>追加投注</span>
+                                </label>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <BallPicker
+                                label="前区点击选号"
+                                numbers={dltFrontPool}
+                                selectedInput={line.frontNumbersInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, frontNumbersInput: togglePickFromInput(current.frontNumbersInput, value, dltFrontPool.length) }))
+                                }
+                                color="red"
+                              />
+                              <BallPicker
+                                label="后区点击选号"
+                                numbers={dltBackPool}
+                                selectedInput={line.backNumbersInput}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({ ...current, backNumbersInput: togglePickFromInput(current.backNumbersInput, value, dltBackPool.length) }))
+                                }
+                                color="blue"
+                              />
+                              <div className="settings-form-grid">
+                                <label>
+                                  前区号码（逗号分隔）
+                                  <input
+                                    value={line.frontNumbersInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, frontNumbersInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 01,02,03,04,05"
+                                  />
+                                </label>
+                                <label>
+                                  后区号码（逗号分隔）
+                                  <input
+                                    value={line.backNumbersInput}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, backNumbersInput: normalizeDigitsInput(event.target.value) }))}
+                                    placeholder="如 06,07"
+                                  />
+                                </label>
+                                <label>
+                                  倍数
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={line.multiplier}
+                                    onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))}
+                                  />
+                                </label>
+                                <label className="toggle-chip">
+                                  <input type="checkbox" checked={line.isAppend} onChange={(event) => updateLine(index, (current) => ({ ...current, isAppend: event.target.checked }))} />
+                                  <span>追加投注</span>
+                                </label>
+                              </div>
+                            </>
+                          )}
                         </>
                       ) : lotteryCode === 'pl5' ? (
                         <>

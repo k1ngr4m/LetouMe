@@ -140,6 +140,10 @@ class MyBetService:
             "play_type": str(summary_play_type or "dlt"),
             "front_numbers": str(primary_line.get("front_numbers") or ""),
             "back_numbers": str(primary_line.get("back_numbers") or ""),
+            "front_dan": primary_line.get("front_dan"),
+            "front_tuo": primary_line.get("front_tuo"),
+            "back_dan": primary_line.get("back_dan"),
+            "back_tuo": primary_line.get("back_tuo"),
             "direct_ten_thousands": primary_line.get("direct_ten_thousands"),
             "direct_thousands": primary_line.get("direct_thousands"),
             "direct_hundreds": primary_line.get("direct_hundreds"),
@@ -192,6 +196,10 @@ class MyBetService:
                 "play_type": "dlt",
                 "front_numbers": "",
                 "back_numbers": "",
+                "front_dan": None,
+                "front_tuo": None,
+                "back_dan": None,
+                "back_tuo": None,
                 "direct_ten_thousands": None,
                 "direct_thousands": None,
                 "direct_hundreds": None,
@@ -208,6 +216,10 @@ class MyBetService:
             "play_type": "direct",
             "front_numbers": "",
             "back_numbers": "",
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
             "direct_ten_thousands": "",
             "direct_thousands": "",
             "direct_hundreds": "",
@@ -222,6 +234,11 @@ class MyBetService:
         }
 
     def _build_dlt_line_payload(self, payload: dict[str, Any], *, multiplier: int) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "dlt").strip().lower() or "dlt"
+        if play_type == "dlt_dantuo":
+            return self._build_dlt_dantuo_line_payload(payload, multiplier=multiplier)
+        if play_type != "dlt":
+            raise ValueError("大乐透玩法仅支持 dlt / dlt_dantuo")
         front_numbers = self._normalize_numbers(payload.get("front_numbers"), valid_range=self.FRONT_RANGE)
         back_numbers = self._normalize_numbers(payload.get("back_numbers"), valid_range=self.BACK_RANGE)
         if len(front_numbers) < 5:
@@ -236,6 +253,60 @@ class MyBetService:
             "play_type": "dlt",
             "front_numbers": ",".join(front_numbers),
             "back_numbers": ",".join(back_numbers),
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "group_numbers": None,
+            "sum_values": None,
+            "multiplier": multiplier,
+            "is_append": is_append,
+            "bet_count": bet_count,
+            "amount": base_amount + append_amount,
+        }
+
+    def _build_dlt_dantuo_line_payload(self, payload: dict[str, Any], *, multiplier: int) -> dict[str, Any]:
+        front_dan = self._normalize_numbers(payload.get("front_dan"), valid_range=self.FRONT_RANGE)
+        front_tuo = self._normalize_numbers(payload.get("front_tuo"), valid_range=self.FRONT_RANGE)
+        back_dan = self._normalize_numbers(payload.get("back_dan", []), valid_range=self.BACK_RANGE)
+        back_tuo = self._normalize_numbers(payload.get("back_tuo"), valid_range=self.BACK_RANGE)
+        if len(front_dan) < 1 or len(front_dan) > 4:
+            raise ValueError("前区胆码数量应为 1-4")
+        if len(front_tuo) < 2:
+            raise ValueError("前区拖码至少选择 2 个号码")
+        if len(set(front_dan) & set(front_tuo)) > 0:
+            raise ValueError("前区胆码与拖码不可重复")
+        if len(set([*front_dan, *front_tuo])) < 6:
+            raise ValueError("前区胆码与拖码合计至少 6 个号码")
+        if len(back_dan) > 1:
+            raise ValueError("后区胆码最多 1 个")
+        if len(back_tuo) < 2:
+            raise ValueError("后区拖码至少选择 2 个号码")
+        if len(set(back_dan) & set(back_tuo)) > 0:
+            raise ValueError("后区胆码与拖码不可重复")
+        if len(set([*back_dan, *back_tuo])) < 3:
+            raise ValueError("后区胆码与拖码合计至少 3 个号码")
+        front_pick_count = 5 - len(front_dan)
+        back_pick_count = 2 - len(back_dan)
+        if len(front_tuo) < front_pick_count or len(back_tuo) < back_pick_count:
+            raise ValueError("拖码数量不足以组成有效注单")
+        bet_count = comb(len(front_tuo), front_pick_count) * comb(len(back_tuo), back_pick_count)
+        is_append = bool(payload.get("is_append"))
+        base_amount = bet_count * 2 * multiplier
+        append_amount = bet_count * multiplier if is_append else 0
+        return {
+            "play_type": "dlt_dantuo",
+            "front_numbers": "",
+            "back_numbers": "",
+            "front_dan": ",".join(front_dan),
+            "front_tuo": ",".join(front_tuo),
+            "back_dan": ",".join(back_dan),
+            "back_tuo": ",".join(back_tuo),
             "direct_ten_thousands": None,
             "direct_thousands": None,
             "direct_hundreds": None,
@@ -264,6 +335,10 @@ class MyBetService:
                 "play_type": "direct",
                 "front_numbers": "",
                 "back_numbers": "",
+                "front_dan": None,
+                "front_tuo": None,
+                "back_dan": None,
+                "back_tuo": None,
                 "direct_ten_thousands": None,
                 "direct_thousands": None,
                 "direct_hundreds": ",".join(hundreds),
@@ -288,6 +363,10 @@ class MyBetService:
                 "play_type": play_type,
                 "front_numbers": "",
                 "back_numbers": "",
+                "front_dan": None,
+                "front_tuo": None,
+                "back_dan": None,
+                "back_tuo": None,
                 "direct_ten_thousands": None,
                 "direct_thousands": None,
                 "direct_hundreds": None,
@@ -309,6 +388,10 @@ class MyBetService:
             "play_type": play_type,
             "front_numbers": "",
             "back_numbers": "",
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
             "direct_ten_thousands": None,
             "direct_thousands": None,
             "direct_hundreds": None,
@@ -338,6 +421,10 @@ class MyBetService:
             "play_type": "direct",
             "front_numbers": "",
             "back_numbers": "",
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
             "direct_ten_thousands": ",".join(ten_thousands),
             "direct_thousands": ",".join(thousands),
             "direct_hundreds": ",".join(hundreds),
@@ -461,6 +548,52 @@ class MyBetService:
         return self._calculate_pl5_line_settlement(line, draw)
 
     def _calculate_dlt_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
+        play_type = str(line.get("play_type") or "dlt").strip().lower() or "dlt"
+        if play_type == "dlt_dantuo":
+            hit_result = PredictionService._calculate_dlt_dantuo_hit_result(
+                {
+                    "play_type": "dlt_dantuo",
+                    "front_dan": list(line.get("front_dan") or []),
+                    "front_tuo": list(line.get("front_tuo") or []),
+                    "back_dan": list(line.get("back_dan") or []),
+                    "back_tuo": list(line.get("back_tuo") or []),
+                },
+                draw,
+            )
+            breakdown = {
+                str(item.get("prize_level") or ""): int(item.get("count") or 0)
+                for item in list(hit_result.get("prize_breakdown") or [])
+                if str(item.get("prize_level") or "").strip() and int(item.get("count") or 0) > 0
+            }
+            is_append = bool(line.get("is_append"))
+            total_prize = 0
+            total_winning_bets = 0
+            best_level = None
+            for level in dlt_prize_level_order(draw.get("period")):
+                winning_count = int(breakdown.get(level) or 0)
+                if winning_count <= 0:
+                    continue
+                basic_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="basic")
+                additional_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="additional") if is_append else 0
+                per_bet_amount = basic_amount + additional_amount
+                total_prize += winning_count * per_bet_amount * int(line.get("multiplier") or 1)
+                total_winning_bets += winning_count
+                if best_level is None:
+                    best_level = level
+            return {
+                "winning_bet_count": total_winning_bets,
+                "prize_level": best_level,
+                "prize_amount": total_prize,
+                "hit_front_numbers": list(hit_result.get("red_hits") or []),
+                "hit_back_numbers": list(hit_result.get("blue_hits") or []),
+                "hit_direct_ten_thousands": [],
+                "hit_direct_thousands": [],
+                "hit_direct_hundreds": [],
+                "hit_direct_tens": [],
+                "hit_direct_units": [],
+                "hit_group_numbers": [],
+                "hit_sum_values": [],
+            }
         front_numbers = list(line.get("front_numbers") or [])
         back_numbers = list(line.get("back_numbers") or [])
         draw_red_balls = list(draw.get("red_balls") or [])
@@ -718,6 +851,10 @@ class MyBetService:
                     "play_type": str(record.get("play_type") or "dlt"),
                     "front_numbers": normalize_numbers(record.get("front_numbers")),
                     "back_numbers": normalize_numbers(record.get("back_numbers")),
+                    "front_dan": normalize_numbers(record.get("front_dan")),
+                    "front_tuo": normalize_numbers(record.get("front_tuo")),
+                    "back_dan": normalize_numbers(record.get("back_dan")),
+                    "back_tuo": normalize_numbers(record.get("back_tuo")),
                     "direct_ten_thousands": normalize_numbers(record.get("direct_ten_thousands")),
                     "direct_thousands": normalize_numbers(record.get("direct_thousands")),
                     "direct_hundreds": normalize_numbers(record.get("direct_hundreds")),
@@ -740,6 +877,10 @@ class MyBetService:
             "play_type": str(record.get("play_type") or first_line.get("play_type") or "dlt"),
             "front_numbers": list(first_line.get("front_numbers") or []),
             "back_numbers": list(first_line.get("back_numbers") or []),
+            "front_dan": list(first_line.get("front_dan") or []),
+            "front_tuo": list(first_line.get("front_tuo") or []),
+            "back_dan": list(first_line.get("back_dan") or []),
+            "back_tuo": list(first_line.get("back_tuo") or []),
             "direct_ten_thousands": list(first_line.get("direct_ten_thousands") or []),
             "direct_thousands": list(first_line.get("direct_thousands") or []),
             "direct_hundreds": list(first_line.get("direct_hundreds") or []),
@@ -779,6 +920,10 @@ class MyBetService:
             "play_type": str(line.get("play_type") or "dlt"),
             "front_numbers": normalize_numbers(line.get("front_numbers")),
             "back_numbers": normalize_numbers(line.get("back_numbers")),
+            "front_dan": normalize_numbers(line.get("front_dan")),
+            "front_tuo": normalize_numbers(line.get("front_tuo")),
+            "back_dan": normalize_numbers(line.get("back_dan")),
+            "back_tuo": normalize_numbers(line.get("back_tuo")),
             "direct_ten_thousands": normalize_numbers(line.get("direct_ten_thousands")),
             "direct_thousands": normalize_numbers(line.get("direct_thousands")),
             "direct_hundreds": normalize_numbers(line.get("direct_hundreds")),

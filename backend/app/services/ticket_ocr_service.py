@@ -433,6 +433,48 @@ class TicketOCRService:
             global_multiplier = max(global_multiplier, self._extract_multiplier(line))
 
         for line in text_lines:
+            dantuo_numbers = self._extract_dlt_dantuo_numbers(line)
+            if dantuo_numbers:
+                front_dan, front_tuo, back_dan, back_tuo = dantuo_numbers
+                multiplier = self._extract_multiplier(line) or global_multiplier
+                is_append = "追加" in line
+                front_pick_count = 5 - len(front_dan)
+                back_pick_count = 2 - len(back_dan)
+                if (
+                    1 <= len(front_dan) <= 4
+                    and len(front_tuo) >= 2
+                    and len(set(front_dan) & set(front_tuo)) == 0
+                    and len(set([*front_dan, *front_tuo])) >= 6
+                    and len(back_dan) <= 1
+                    and len(back_tuo) >= 2
+                    and len(set(back_dan) & set(back_tuo)) == 0
+                    and len(set([*back_dan, *back_tuo])) >= 3
+                    and len(front_tuo) >= front_pick_count
+                    and len(back_tuo) >= back_pick_count
+                ):
+                    bet_count = comb(len(front_tuo), front_pick_count) * comb(len(back_tuo), back_pick_count)
+                    amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
+                    parsed_lines.append(
+                        {
+                            "play_type": "dlt_dantuo",
+                            "front_numbers": [],
+                            "back_numbers": [],
+                            "front_dan": front_dan,
+                            "front_tuo": front_tuo,
+                            "back_dan": back_dan,
+                            "back_tuo": back_tuo,
+                            "direct_hundreds": [],
+                            "direct_tens": [],
+                            "direct_units": [],
+                            "group_numbers": [],
+                            "multiplier": multiplier,
+                            "is_append": is_append,
+                            "bet_count": bet_count,
+                            "amount": amount,
+                        }
+                    )
+                    continue
+
             compact_front = self._extract_labeled_compact_numbers(line, label="前区")
             compact_back = self._extract_labeled_compact_numbers(line, label="后区")
             if compact_front:
@@ -452,6 +494,10 @@ class TicketOCRService:
                             "play_type": "dlt",
                             "front_numbers": normalized_front,
                             "back_numbers": normalized_back,
+                            "front_dan": [],
+                            "front_tuo": [],
+                            "back_dan": [],
+                            "back_tuo": [],
                             "direct_hundreds": [],
                             "direct_tens": [],
                             "direct_units": [],
@@ -489,6 +535,10 @@ class TicketOCRService:
                     "play_type": "dlt",
                     "front_numbers": normalized_front,
                     "back_numbers": normalized_back,
+                    "front_dan": [],
+                    "front_tuo": [],
+                    "back_dan": [],
+                    "back_tuo": [],
                     "direct_hundreds": [],
                     "direct_tens": [],
                     "direct_units": [],
@@ -511,6 +561,35 @@ class TicketOCRService:
         if len(compact) % 2 != 0:
             return []
         return [compact[index : index + 2] for index in range(0, len(compact), 2)]
+
+    @staticmethod
+    def _extract_dlt_dantuo_numbers(line: str) -> tuple[list[str], list[str], list[str], list[str]] | None:
+        normalized = str(line or "").replace("（", "(").replace("）", ")")
+        if "胆" not in normalized or "拖" not in normalized:
+            return None
+        front_dan = TicketOCRService._extract_dantuo_zone_numbers(normalized, zone="前", kind="胆")
+        front_tuo = TicketOCRService._extract_dantuo_zone_numbers(normalized, zone="前", kind="拖")
+        back_dan = TicketOCRService._extract_dantuo_zone_numbers(normalized, zone="后", kind="胆")
+        back_tuo = TicketOCRService._extract_dantuo_zone_numbers(normalized, zone="后", kind="拖")
+        if front_dan is None or front_tuo is None or back_dan is None or back_tuo is None:
+            return None
+        return front_dan, front_tuo, back_dan, back_tuo
+
+    @staticmethod
+    def _extract_dantuo_zone_numbers(line: str, *, zone: str, kind: str) -> list[str] | None:
+        patterns = [
+            rf"{zone}\s*区?\s*{kind}\s*[:：]?\s*([0-9][0-9\s,，、/|;；]*)",
+            rf"{zone}{kind}\s*[:：]?\s*([0-9][0-9\s,，、/|;；]*)",
+        ]
+        for pattern in patterns:
+            matched = re.search(pattern, line)
+            if not matched:
+                continue
+            values = sorted({item.zfill(2) for item in re.findall(r"(?<!\d)(\d{1,2})(?!\d)", matched.group(1))})
+            return values
+        if kind == "胆":
+            return []
+        return None
 
     @staticmethod
     def _extract_multiplier(text: str) -> int:

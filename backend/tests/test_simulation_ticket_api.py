@@ -138,6 +138,42 @@ class SimulationTicketApiTests(unittest.TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(len(list_response.json()["tickets"]), 0)
 
+    def test_quote_and_create_dlt_dantuo_ticket(self) -> None:
+        quote_response = self.client.post(
+            "/api/simulation/tickets/quote",
+            json={
+                "lottery_code": "dlt",
+                "play_type": "dlt_dantuo",
+                "front_dan": ["01"],
+                "front_tuo": ["02", "03", "04", "05", "06"],
+                "back_dan": ["01"],
+                "back_tuo": ["07", "08"],
+            },
+        )
+        self.assertEqual(quote_response.status_code, 200)
+        quote = quote_response.json()
+        self.assertEqual(quote["play_type"], "dlt_dantuo")
+        self.assertEqual(quote["bet_count"], 10)
+        self.assertEqual(quote["amount"], 20)
+
+        create_response = self.client.post(
+            "/api/simulation/tickets/create",
+            json={
+                "lottery_code": "dlt",
+                "play_type": "dlt_dantuo",
+                "front_dan": ["01"],
+                "front_tuo": ["02", "03", "04", "05", "06"],
+                "back_dan": ["01"],
+                "back_tuo": ["07", "08"],
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+        ticket = create_response.json()["ticket"]
+        self.assertEqual(ticket["play_type"], "dlt_dantuo")
+        self.assertEqual(ticket["front_dan"], ["01"])
+        self.assertEqual(ticket["front_tuo"], ["02", "03", "04", "05", "06"])
+        self.assertEqual(ticket["back_tuo"], ["07", "08"])
+
 
 if __name__ == "__main__":
     unittest.main()

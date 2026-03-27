@@ -7,6 +7,10 @@ function makeDltSelection(frontNumbers: string[], backNumbers: string[]): Simula
     playType: 'dlt',
     frontNumbers,
     backNumbers,
+    frontDan: [],
+    frontTuo: [],
+    backDan: [],
+    backTuo: [],
     directTenThousands: [],
     directThousands: [],
     directHundreds: [],
@@ -35,6 +39,35 @@ describe('simulation helpers', () => {
     expect(matches[0].blueHits).toEqual(['01', '02'])
   })
 
+  it('calculates dlt dantuo bet count and match prize', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'dlt',
+      playType: 'dlt_dantuo',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: ['01'],
+      frontTuo: ['02', '03', '04', '05', '06'],
+      backDan: ['01'],
+      backTuo: ['07', '08'],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+    }
+    expect(calculateBetCount(selection)).toBe(10)
+    expect(calculateAmount(selection)).toBe(20)
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{ period: '26014', date: '2026-01-02', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['01', '07'] }],
+      30,
+    )
+    expect(matches[0].topPrizeLevel).toBe('一等奖')
+    expect(matches[0].totalWinningBets).toBe(10)
+  })
+
   it('uses old/new dlt prize mapping by period boundary', () => {
     const oldRule = buildSimulationMatches(
       makeDltSelection(['01', '02', '31', '32', '33'], ['01', '02']),
@@ -58,6 +91,10 @@ describe('simulation helpers', () => {
         playType: 'direct',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: [],
         directThousands: [],
         directHundreds: ['00', '01'],
@@ -73,6 +110,10 @@ describe('simulation helpers', () => {
         playType: 'group3',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: [],
         directThousands: [],
         directHundreds: [],
@@ -88,6 +129,10 @@ describe('simulation helpers', () => {
         playType: 'group6',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: [],
         directThousands: [],
         directHundreds: [],
@@ -105,6 +150,10 @@ describe('simulation helpers', () => {
         playType: 'direct',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: [],
         directThousands: [],
         directHundreds: ['04'],
@@ -124,6 +173,10 @@ describe('simulation helpers', () => {
         playType: 'group6',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: [],
         directThousands: [],
         directHundreds: [],
@@ -144,6 +197,10 @@ describe('simulation helpers', () => {
         playType: 'direct',
         frontNumbers: [],
         backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
         directTenThousands: ['01'],
         directThousands: ['02'],
         directHundreds: ['03'],

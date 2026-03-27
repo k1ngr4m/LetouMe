@@ -1,7 +1,7 @@
 import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
-export type SimulationPlayType = 'dlt' | 'direct' | 'group3' | 'group6'
+export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
 export type PrizeLevel =
   | '一等奖'
   | '二等奖'
@@ -27,6 +27,10 @@ export type SimulationSelection = {
   playType: SimulationPlayType
   frontNumbers: string[]
   backNumbers: string[]
+  frontDan: string[]
+  frontTuo: string[]
+  backDan: string[]
+  backTuo: string[]
   directTenThousands: string[]
   directThousands: string[]
   directHundreds: string[]
@@ -54,6 +58,10 @@ export function normalizeSimulationTicket(ticket: SimulationTicketRecord): Simul
     play_type: ticket.play_type || 'dlt',
     front_numbers: (ticket.front_numbers || []).map(padBall).sort(),
     back_numbers: (ticket.back_numbers || []).map(padBall).sort(),
+    front_dan: (ticket.front_dan || []).map(padBall).sort(),
+    front_tuo: (ticket.front_tuo || []).map(padBall).sort(),
+    back_dan: (ticket.back_dan || []).map(padBall).sort(),
+    back_tuo: (ticket.back_tuo || []).map(padBall).sort(),
     direct_ten_thousands: (ticket.direct_ten_thousands || []).map(padBall).sort(),
     direct_thousands: (ticket.direct_thousands || []).map(padBall).sort(),
     direct_hundreds: (ticket.direct_hundreds || []).map(padBall).sort(),
@@ -72,6 +80,21 @@ export function buildBallRange(limit: number, start = 1) {
 
 export function calculateBetCount(selection: SimulationSelection) {
   if (selection.lotteryCode === 'dlt') {
+    if (selection.playType === 'dlt_dantuo') {
+      const frontDanCount = selection.frontDan.length
+      const frontTuoCount = selection.frontTuo.length
+      const backDanCount = selection.backDan.length
+      const backTuoCount = selection.backTuo.length
+      if (frontDanCount < 1 || frontDanCount > 4 || frontTuoCount < 2) return 0
+      if (backDanCount > 1 || backTuoCount < 2) return 0
+      if (hasIntersection(selection.frontDan, selection.frontTuo) || hasIntersection(selection.backDan, selection.backTuo)) return 0
+      if (new Set([...selection.frontDan, ...selection.frontTuo]).size < 6) return 0
+      if (new Set([...selection.backDan, ...selection.backTuo]).size < 3) return 0
+      const frontPickCount = 5 - frontDanCount
+      const backPickCount = 2 - backDanCount
+      if (frontTuoCount < frontPickCount || backTuoCount < backPickCount) return 0
+      return combination(frontTuoCount, frontPickCount) * combination(backTuoCount, backPickCount)
+    }
     const frontCount = selection.frontNumbers.length
     const backCount = selection.backNumbers.length
     if (frontCount < 5 || backCount < 2) return 0
@@ -114,11 +137,41 @@ export function calculateAmount(selection: SimulationSelection) {
 
 export function createRandomSelection(lotteryCode: LotteryCode, playType: SimulationPlayType): SimulationSelection {
   if (lotteryCode === 'dlt') {
+    if (playType === 'dlt_dantuo') {
+      const frontPool = buildBallRange(35)
+      const backPool = buildBallRange(12)
+      const frontDanCount = 2
+      const backDanCount = 1
+      const frontDan = pickRandomBalls(frontPool, frontDanCount)
+      const frontTuo = pickRandomBalls(frontPool.filter((item) => !frontDan.includes(item)), 4)
+      const backDan = pickRandomBalls(backPool, backDanCount)
+      const backTuo = pickRandomBalls(backPool.filter((item) => !backDan.includes(item)), 2)
+      return {
+        lotteryCode,
+        playType,
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan,
+        frontTuo,
+        backDan,
+        backTuo,
+        directTenThousands: [],
+        directThousands: [],
+        directHundreds: [],
+        directTens: [],
+        directUnits: [],
+        groupNumbers: [],
+      }
+    }
     return {
       lotteryCode,
       playType: 'dlt',
       frontNumbers: pickRandomBalls(buildBallRange(35), 5),
       backNumbers: pickRandomBalls(buildBallRange(12), 2),
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
       directTenThousands: [],
       directThousands: [],
       directHundreds: [],
@@ -133,10 +186,14 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     if (lotteryCode === 'pl5') {
       return {
         lotteryCode,
-        playType: 'direct',
-        frontNumbers: [],
-        backNumbers: [],
-        directTenThousands: pickRandomBalls(digits, 1),
+      playType: 'direct',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: pickRandomBalls(digits, 1),
         directThousands: pickRandomBalls(digits, 1),
         directHundreds: pickRandomBalls(digits, 1),
         directTens: pickRandomBalls(digits, 1),
@@ -149,6 +206,10 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       playType,
       frontNumbers: [],
       backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
       directTenThousands: [],
       directThousands: [],
       directHundreds: pickRandomBalls(digits, 1),
@@ -164,6 +225,10 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     playType,
     frontNumbers: [],
     backNumbers: [],
+    frontDan: [],
+    frontTuo: [],
+    backDan: [],
+    backTuo: [],
     directTenThousands: [],
     directThousands: [],
     directHundreds: [],
@@ -181,6 +246,48 @@ export function buildSimulationMatches(selection: SimulationSelection, draws: Lo
 }
 
 function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
+  if (selection.playType === 'dlt_dantuo') {
+    const frontDan = selection.frontDan.map(padBall).sort()
+    const frontTuo = selection.frontTuo.map(padBall).sort()
+    const backDan = selection.backDan.map(padBall).sort()
+    const backTuo = selection.backTuo.map(padBall).sort()
+    const fullFront = sortedUnion(frontDan, frontTuo)
+    const fullBack = sortedUnion(backDan, backTuo)
+    const frontPickCount = 5 - frontDan.length
+    const backPickCount = 2 - backDan.length
+    return draws.slice(0, limit).map((draw) => {
+      const redHits = fullFront.filter((ball) => draw.red_balls.includes(ball))
+      const blueHits = fullBack.filter((ball) => draw.blue_balls.includes(ball))
+      const prizeMap = new Map<PrizeLevel, number>()
+      if (frontPickCount >= 0 && backPickCount >= 0 && frontTuo.length >= frontPickCount && backTuo.length >= backPickCount) {
+        for (const frontPick of combinationsFrom(frontTuo, frontPickCount)) {
+          const pickedFront = [...frontDan, ...frontPick]
+          const redHitCount = pickedFront.filter((ball) => draw.red_balls.includes(ball)).length
+          for (const backPick of combinationsFrom(backTuo, backPickCount)) {
+            const pickedBack = [...backDan, ...backPick]
+            const blueHitCount = pickedBack.filter((ball) => draw.blue_balls.includes(ball)).length
+            const prize = resolveDltPrizeLevel(redHitCount, blueHitCount, draw.period)
+            if (!prize) continue
+            prizeMap.set(prize, (prizeMap.get(prize) || 0) + 1)
+          }
+        }
+      }
+      const winningPrizes = dltPrizeLevelOrder(draw.period)
+        .filter((level) => (prizeMap.get(level) || 0) > 0)
+        .map((level) => ({ level, count: prizeMap.get(level) || 0 }))
+      return {
+        period: draw.period,
+        date: draw.date,
+        redHits,
+        blueHits,
+        digitHits: [],
+        totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
+        topPrizeLevel: winningPrizes[0]?.level || '未中奖',
+        prizes: winningPrizes,
+        actualResult: draw,
+      }
+    })
+  }
   const normalizedFront = selection.frontNumbers.map(padBall).sort()
   const normalizedBack = selection.backNumbers.map(padBall).sort()
   return draws
@@ -303,6 +410,35 @@ function isDltNewRulePeriod(period: string): boolean {
   return normalized >= 26014
 }
 
+function dltPrizeLevelOrder(period: string): PrizeLevel[] {
+  return isDltNewRulePeriod(period)
+    ? ['一等奖', '二等奖', '三等奖', '四等奖', '五等奖', '六等奖', '七等奖']
+    : ['一等奖', '二等奖', '三等奖', '四等奖', '五等奖', '六等奖', '七等奖', '八等奖', '九等奖']
+}
+
+function resolveDltPrizeLevel(redHits: number, blueHits: number, period: string): PrizeLevel | null {
+  if (isDltNewRulePeriod(period)) {
+    if (redHits === 5 && blueHits === 2) return '一等奖'
+    if (redHits === 5 && blueHits === 1) return '二等奖'
+    if ((redHits === 5 && blueHits === 0) || (redHits === 4 && blueHits === 2)) return '三等奖'
+    if (redHits === 4 && blueHits === 1) return '四等奖'
+    if ((redHits === 4 && blueHits === 0) || (redHits === 3 && blueHits === 2)) return '五等奖'
+    if ((redHits === 3 && blueHits === 1) || (redHits === 2 && blueHits === 2)) return '六等奖'
+    if ((redHits === 3 && blueHits === 0) || (redHits === 2 && blueHits === 1) || (redHits === 1 && blueHits === 2) || (redHits === 0 && blueHits === 2)) return '七等奖'
+    return null
+  }
+  if (redHits === 5 && blueHits === 2) return '一等奖'
+  if (redHits === 5 && blueHits === 1) return '二等奖'
+  if (redHits === 5 && blueHits === 0) return '三等奖'
+  if (redHits === 4 && blueHits === 2) return '四等奖'
+  if (redHits === 4 && blueHits === 1) return '五等奖'
+  if (redHits === 3 && blueHits === 2) return '六等奖'
+  if (redHits === 4 && blueHits === 0) return '七等奖'
+  if ((redHits === 3 && blueHits === 1) || (redHits === 2 && blueHits === 2)) return '八等奖'
+  if ((redHits === 3 && blueHits === 0) || (redHits === 2 && blueHits === 1) || (redHits === 1 && blueHits === 2) || (redHits === 0 && blueHits === 2)) return '九等奖'
+  return null
+}
+
 function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits: string[]): SimulationMatchPrize[] {
   if (selection.playType === 'direct') {
     const matched =
@@ -353,6 +489,36 @@ function pickRandomBalls(pool: string[], size: number) {
     result.push(remaining.splice(index, 1)[0])
   }
   return result.sort()
+}
+
+function hasIntersection(left: string[], right: string[]) {
+  const leftSet = new Set(left)
+  return right.some((item) => leftSet.has(item))
+}
+
+function sortedUnion(left: string[], right: string[]) {
+  return Array.from(new Set([...left, ...right])).sort()
+}
+
+function combinationsFrom(values: string[], choose: number): string[][] {
+  if (choose < 0 || choose > values.length) return []
+  if (choose === 0) return [[]]
+  if (choose === values.length) return [values.slice()]
+  const result: string[][] = []
+  const path: string[] = []
+  const dfs = (start: number) => {
+    if (path.length === choose) {
+      result.push(path.slice())
+      return
+    }
+    for (let index = start; index < values.length; index += 1) {
+      path.push(values[index])
+      dfs(index + 1)
+      path.pop()
+    }
+  }
+  dfs(0)
+  return result
 }
 
 function combination(total: number, choose: number) {

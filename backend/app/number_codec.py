@@ -6,6 +6,10 @@ from typing import Any
 NUMBER_FIELD_SPECS: tuple[tuple[str, str], ...] = (
     ("front_numbers", "front"),
     ("back_numbers", "back"),
+    ("front_dan", "front_dan"),
+    ("front_tuo", "front_tuo"),
+    ("back_dan", "back_dan"),
+    ("back_tuo", "back_tuo"),
     ("direct_ten_thousands", "direct_ten_thousands"),
     ("direct_thousands", "direct_thousands"),
     ("direct_hundreds", "direct_hundreds"),
