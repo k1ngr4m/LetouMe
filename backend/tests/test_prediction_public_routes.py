@@ -12,6 +12,11 @@ from backend.app.schemas.requests import PaginationPayload, PredictionsHistoryLi
 
 
 class PredictionPublicRoutesTests(unittest.TestCase):
+    def test_predictions_history_payload_accepts_dlt_compound_filter(self) -> None:
+        payload = PredictionsHistoryListPayload(play_type_filters=["dlt_compound"])
+
+        self.assertEqual(payload.play_type_filters, ["dlt_compound"])
+
     def test_get_current_predictions_hides_inactive_models(self) -> None:
         with patch.object(routes.prediction_service, "get_current_payload") as mocked_get_current:
             mocked_get_current.return_value = {

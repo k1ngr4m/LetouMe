@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from time import perf_counter
+from time import sleep
 from typing import Any
 
 from backend.app.db.connection import get_connection
@@ -14,6 +15,10 @@ from backend.core.model_config import ModelDefinition, ModelRegistry, load_model
 
 
 class PredictionRepository:
+    _RETRYABLE_DB_ERROR_CODES = {1205, 1213}
+    _WRITE_RETRY_DELAY_SECONDS = 0.15
+    _WRITE_RETRY_LIMIT = 3
+
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
         self._registry: ModelRegistry | None = None
@@ -29,6 +34,11 @@ class PredictionRepository:
         if isinstance(value, date):
             return value.isoformat()
         return str(value or "")
+
+    @classmethod
+    def _is_retryable_write_error(cls, exc: Exception) -> bool:
+        error_code = exc.args[0] if getattr(exc, "args", None) else None
+        return isinstance(error_code, int) and error_code in cls._RETRYABLE_DB_ERROR_CODES
 
     def get_current_prediction(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -164,28 +174,47 @@ class PredictionRepository:
         target_key = f"target_period={target_period}"
         summary = f"upsert prediction_batch(archived) {target_key}"
         try:
-            with use_lottery_table_scope(lottery_code):
-                with get_connection() as connection:
-                    self._sync_registry(connection)
-                    batch_id = self._upsert_batch(
-                        connection,
-                        payload=payload,
-                        status="archived",
-                        archive_metadata=True,
-                    )
-                    self.log_repository.log_success(
-                        connection,
-                        table_name="prediction_batch",
-                        action="upsert",
-                        target_key=target_key,
-                        summary=summary,
-                        payload={
-                            "target_period": target_period,
-                            "lottery_code": lottery_code,
-                            "prediction_date": payload.get("prediction_date"),
-                            "batch_id": batch_id,
+            for attempt in range(1, self._WRITE_RETRY_LIMIT + 1):
+                try:
+                    with use_lottery_table_scope(lottery_code):
+                        with get_connection() as connection:
+                            self._sync_registry(connection)
+                            batch_id = self._upsert_batch(
+                                connection,
+                                payload=payload,
+                                status="archived",
+                                archive_metadata=True,
+                            )
+                            self.log_repository.log_success(
+                                connection,
+                                table_name="prediction_batch",
+                                action="upsert",
+                                target_key=target_key,
+                                summary=summary,
+                                payload={
+                                    "target_period": target_period,
+                                    "lottery_code": lottery_code,
+                                    "prediction_date": payload.get("prediction_date"),
+                                    "batch_id": batch_id,
+                                },
+                            )
+                    return
+                except Exception as exc:
+                    if not self._is_retryable_write_error(exc) or attempt >= self._WRITE_RETRY_LIMIT:
+                        raise
+                    self.logger.warning(
+                        "Retrying archived prediction upsert after transient database lock",
+                        extra={
+                            "context": {
+                                "target_period": target_period,
+                                "lottery_code": lottery_code,
+                                "attempt": attempt,
+                                "retry_limit": self._WRITE_RETRY_LIMIT,
+                                "error_code": exc.args[0] if getattr(exc, "args", None) else None,
+                            }
                         },
                     )
+                    sleep(self._WRITE_RETRY_DELAY_SECONDS)
         except Exception as exc:
             self.log_repository.log_failure(
                 table_name="prediction_batch",

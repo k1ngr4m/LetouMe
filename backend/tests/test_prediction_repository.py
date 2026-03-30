@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from contextlib import contextmanager
 import unittest
+from unittest.mock import Mock, patch
 
 from backend.app.repositories.prediction_repository import PredictionRepository
 
@@ -17,6 +19,68 @@ class PredictionRepositoryTests(unittest.TestCase):
         )
         self.assertEqual(repository._serialize_prediction_date("2026-03-26"), "2026-03-26")
         self.assertEqual(repository._serialize_prediction_date(None), "")
+
+    def test_upsert_history_record_retries_retryable_lock_timeout(self) -> None:
+        repository = PredictionRepository(log_repository=Mock())
+        payload = {
+            "lottery_code": "dlt",
+            "target_period": "26029",
+            "prediction_date": "2026-03-30",
+            "models": [],
+        }
+        connection = Mock()
+        attempts = {"count": 0}
+
+        @contextmanager
+        def fake_connection():
+            yield connection
+
+        def fake_upsert_batch(*args, **kwargs):
+            attempts["count"] += 1
+            if attempts["count"] < 3:
+                raise RuntimeError(1205, "Lock wait timeout exceeded; try restarting transaction")
+            return 42
+
+        with (
+            patch("backend.app.repositories.prediction_repository.get_connection", fake_connection),
+            patch.object(repository, "_sync_registry"),
+            patch.object(repository, "_upsert_batch", side_effect=fake_upsert_batch),
+            patch("backend.app.repositories.prediction_repository.sleep"),
+        ):
+            repository.upsert_history_record(payload)
+
+        self.assertEqual(attempts["count"], 3)
+        self.assertEqual(repository.log_repository.log_success.call_count, 1)
+        self.assertEqual(repository.log_repository.log_failure.call_count, 0)
+
+    def test_upsert_history_record_raises_after_retry_limit(self) -> None:
+        repository = PredictionRepository(log_repository=Mock())
+        payload = {
+            "lottery_code": "dlt",
+            "target_period": "26029",
+            "prediction_date": "2026-03-30",
+            "models": [],
+        }
+        connection = Mock()
+
+        @contextmanager
+        def fake_connection():
+            yield connection
+
+        with (
+            patch("backend.app.repositories.prediction_repository.get_connection", fake_connection),
+            patch.object(repository, "_sync_registry"),
+            patch.object(
+                repository,
+                "_upsert_batch",
+                side_effect=RuntimeError(1205, "Lock wait timeout exceeded; try restarting transaction"),
+            ),
+            patch("backend.app.repositories.prediction_repository.sleep"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Lock wait timeout exceeded"):
+                repository.upsert_history_record(payload)
+
+        self.assertEqual(repository.log_repository.log_failure.call_count, 1)
 
 
 if __name__ == "__main__":
