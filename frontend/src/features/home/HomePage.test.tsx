@@ -1547,6 +1547,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
     expect(await screen.findByText('一等奖')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '仅展示中奖期数' })).not.toBeChecked()
 
     await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
 
@@ -1569,6 +1570,51 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
     await waitFor(() => expect(deleteSimulationTicket).toHaveBeenCalledWith(11, 'dlt'))
+  })
+
+  it('filters simulation matches to winning periods only', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 01' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 02' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 03' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 04' }))
+    await userEvent.click(screen.getByRole('button', { name: '前区 05' }))
+    await userEvent.click(screen.getByRole('button', { name: '后区 06' }))
+    await userEvent.click(screen.getByRole('button', { name: '后区 07' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
+
+    expect(await screen.findByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.getByText('第 2026030 期')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '仅展示中奖期数' }))
+
+    expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+    expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
+  })
+
+  it('shows empty state when winning-only filter hides all simulation matches and resets on reselection', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    await userEvent.click(screen.getByRole('button', { name: '百位 00' }))
+    await userEvent.click(screen.getByRole('button', { name: '十位 00' }))
+    await userEvent.click(screen.getByRole('button', { name: '个位 00' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
+
+    expect(await screen.findByText('第 2026031 期')).toBeInTheDocument()
+
+    const winningOnlyToggle = screen.getByRole('checkbox', { name: '仅展示中奖期数' })
+    await userEvent.click(winningOnlyToggle)
+    expect(screen.getByText('当前筛选条件下没有中奖期数。')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '个位 00' }))
+    await userEvent.click(screen.getByRole('button', { name: '个位 01' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
+
+    expect(screen.getByRole('checkbox', { name: '仅展示中奖期数' })).not.toBeChecked()
   })
 
   it('calculates multiple bet count in simulation tab', async () => {

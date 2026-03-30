@@ -1445,6 +1445,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const [selectedSumValues, setSelectedSumValues] = useState<string[]>([])
   const [matchWindow, setMatchWindow] = useState<30 | 50>(30)
   const [showMatches, setShowMatches] = useState(false)
+  const [showWinningOnly, setShowWinningOnly] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const frontOptions = useMemo(() => buildBallRange(35), [])
   const backOptions = useMemo(() => buildBallRange(12), [])
@@ -1511,6 +1512,10 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     () => (showMatches && canSubmit ? buildSimulationMatches(selection, draws, matchWindow) : []),
     [canSubmit, draws, matchWindow, selection, showMatches],
   )
+  const visibleMatches = useMemo(
+    () => (showWinningOnly ? matches.filter((match) => match.totalWinningBets > 0) : matches),
+    [matches, showWinningOnly],
+  )
   const saveMutation = useMutation({
     mutationFn: async () => {
       const response = await apiClient.createSimulationTicket(simulationPayload)
@@ -1531,6 +1536,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
   useEffect(() => {
     setShowMatches(false)
+    setShowWinningOnly(false)
     setMessage(null)
   }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
 
@@ -2202,12 +2208,23 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
         {message ? <div className="simulation-inline-message">{message}</div> : null}
       </StatusCard>
 
-      <StatusCard title="历史匹配结果" subtitle={`将当前选号与近 ${matchWindow} 期开奖数据进行对比，展示命中号码和最高奖级。`}>
+      <StatusCard
+        title="历史匹配结果"
+        subtitle={`将当前选号与近 ${matchWindow} 期开奖数据进行对比，展示命中号码和最高奖级。`}
+        actions={
+          showMatches ? (
+            <label className="toggle-chip">
+              <input type="checkbox" checked={showWinningOnly} onChange={(event) => setShowWinningOnly(event.target.checked)} />
+              <span>仅展示中奖期数</span>
+            </label>
+          ) : undefined
+        }
+      >
         {!showMatches ? (
           <div className="state-shell">点击“历史中奖匹配”后展示对比结果。</div>
-        ) : matches.length ? (
+        ) : visibleMatches.length ? (
           <div className="simulation-match-list">
-            {matches.map((match) => (
+            {visibleMatches.map((match) => (
               <article key={match.period} className="simulation-match-card">
                 <div className="simulation-match-card__header">
                   <div>
@@ -2255,6 +2272,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               </article>
             ))}
           </div>
+        ) : showWinningOnly && matches.length ? (
+          <div className="state-shell">当前筛选条件下没有中奖期数。</div>
         ) : (
           <div className="state-shell">当前历史数据不足以生成匹配结果。</div>
         )}
