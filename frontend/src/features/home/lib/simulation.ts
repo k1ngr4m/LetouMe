@@ -489,8 +489,7 @@ function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits
   if (selection.playType === 'direct_sum') {
     const actualSum = actualDigits.reduce((sum, digit) => sum + Number(digit), 0)
     const normalizedSum = padBall(actualSum)
-    const betCount = Number(PL3_DIRECT_SUM_BET_COUNTS[normalizedSum] || 0)
-    return selection.sumValues.includes(normalizedSum) && betCount > 0 ? [{ level: '直选', count: betCount }] : []
+    return selection.sumValues.includes(normalizedSum) ? [{ level: '直选', count: 1 }] : []
   }
 
   const actualSet = new Set(actualDigits)

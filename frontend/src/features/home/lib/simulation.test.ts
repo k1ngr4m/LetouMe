@@ -251,7 +251,7 @@ describe('simulation helpers', () => {
       30,
     )
     expect(matches[0].topPrizeLevel).toBe('直选')
-    expect(matches[0].totalWinningBets).toBe(63)
-    expect(matches[0].prizes).toEqual([{ level: '直选', count: 63 }])
+    expect(matches[0].totalWinningBets).toBe(1)
+    expect(matches[0].prizes).toEqual([{ level: '直选', count: 1 }])
   })
 })
