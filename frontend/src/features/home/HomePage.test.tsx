@@ -957,24 +957,25 @@ describe('HomePage dashboard sidebar', () => {
 
   it('exports model detail png from list and card views', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
-    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
+    expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
 
     await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
     await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument(), { timeout: 2500 })
 
     await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
     expect(screen.queryByRole('button', { name: /导出详情：/ })).not.toBeInTheDocument()
 
     anchorClickSpy.mockRestore()
-    alertSpy.mockRestore()
   })
 
   it('updates url when switching dashboard tabs', async () => {
@@ -1059,17 +1060,15 @@ describe('HomePage dashboard sidebar', () => {
 
   it('exports prediction summary png from summary card', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '导出统计' }))
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
-    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
+    expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/prediction')
 
     anchorClickSpy.mockRestore()
-    alertSpy.mockRestore()
   })
 
   it('keeps summary model chips visible and marks deselected chips inactive', async () => {
@@ -1209,7 +1208,6 @@ describe('HomePage dashboard sidebar', () => {
 
   it('exports a single history record card png', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
@@ -1217,11 +1215,22 @@ describe('HomePage dashboard sidebar', () => {
 
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
-    expect(alertSpy).toHaveBeenCalledWith('导出成功，已开始下载。')
+    expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
 
     anchorClickSpy.mockRestore()
-    alertSpy.mockRestore()
+  })
+
+  it('shows error toast when export summary fails and auto dismisses it', async () => {
+    toPng.mockRejectedValueOnce(new Error('boom'))
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '导出统计' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('统计导出失败，请稍后重试。'))
+    expect(screen.getByRole('status')).toHaveClass('is-error')
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument(), { timeout: 2500 })
   })
 
   it('paginates history records and supports page size changes', async () => {

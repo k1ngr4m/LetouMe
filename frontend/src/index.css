@@ -4279,6 +4279,56 @@ a {
   background: var(--error-soft-bg);
 }
 
+.export-toast {
+  position: fixed;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 40;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.95rem 1rem;
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid rgba(86, 193, 141, 0.3);
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(14, 92, 67, 0.94), rgba(17, 29, 46, 0.96));
+  box-shadow: 0 18px 36px rgba(6, 12, 20, 0.28);
+  color: #f4fbf7;
+  backdrop-filter: blur(16px);
+  animation: export-toast-enter 0.22s ease-out;
+}
+
+.export-toast.is-error {
+  border-color: rgba(236, 106, 129, 0.3);
+  background:
+    linear-gradient(135deg, rgba(125, 33, 54, 0.94), rgba(33, 19, 35, 0.96));
+  color: #fff5f7;
+}
+
+.export-toast__badge {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.export-toast__message {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+@keyframes export-toast-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 .settings-schedule-detail-cell {
   padding: 0 !important;
   background: transparent;
@@ -5747,6 +5797,13 @@ a {
 }
 
 @media (max-width: 760px) {
+  .export-toast {
+    top: 0.9rem;
+    right: 0.9rem;
+    left: 0.9rem;
+    width: auto;
+  }
+
   .app-shell {
     padding: 0.8rem;
   }

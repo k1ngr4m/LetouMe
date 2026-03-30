@@ -46,6 +46,7 @@ import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const LOTTERY_DEFAULT_PAGE_SIZE = 10
+const EXPORT_TOAST_DURATION_MS = 2000
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
   { value: 'all', label: '全部评分' },
   { value: '0-30', label: '0-30 分' },
@@ -272,9 +273,10 @@ function resolveExportBackgroundColor() {
   return document.documentElement.dataset.theme === 'light' ? '#f8f2ea' : '#101827'
 }
 
-function notifyExportSuccess() {
-  window.alert('导出成功，已开始下载。')
-}
+type ExportToastState = {
+  message: string
+  tone: 'success' | 'error'
+} | null
 
 const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
   0: 2,
@@ -408,6 +410,7 @@ export function HomePage() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
   const [isExportingSummary, setIsExportingSummary] = useState(false)
+  const [exportToast, setExportToast] = useState<ExportToastState>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
@@ -437,6 +440,7 @@ export function HomePage() {
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
   const exportSheetRef = useRef<HTMLDivElement | null>(null)
+  const exportToastTimerRef = useRef<number | null>(null)
   const hasRestoredScrollRef = useRef(false)
   const hasInitializedLotteryRef = useRef(false)
 
@@ -568,6 +572,14 @@ export function HomePage() {
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
     return () => cancelAnimationFrame(frameId)
   }, [navigationState?.scrollY])
+
+  useEffect(() => {
+    return () => {
+      if (exportToastTimerRef.current !== null) {
+        window.clearTimeout(exportToastTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (activeTab !== 'prediction') return
@@ -788,6 +800,17 @@ export function HomePage() {
     })
   }
 
+  function showExportToast(message: string, tone: 'success' | 'error') {
+    if (exportToastTimerRef.current !== null) {
+      window.clearTimeout(exportToastTimerRef.current)
+    }
+    setExportToast({ message, tone })
+    exportToastTimerRef.current = window.setTimeout(() => {
+      setExportToast(null)
+      exportToastTimerRef.current = null
+    }, EXPORT_TOAST_DURATION_MS)
+  }
+
   async function exportModelDetail(modelId: string) {
     if (exportingModelId || isExportingSummary) return
     if (!models.some((model) => model.model_id === modelId)) return
@@ -810,10 +833,10 @@ export function HomePage() {
       link.href = dataUrl
       link.download = fileName
       link.click()
-      notifyExportSuccess()
+      showExportToast('导出成功，已开始下载。', 'success')
     } catch (error) {
       console.error('导出模型详情 PNG 失败', error)
-      window.alert('导出失败，请稍后重试。')
+      showExportToast('导出失败，请稍后重试。', 'error')
     } finally {
       setExportingModelId(null)
     }
@@ -839,10 +862,10 @@ export function HomePage() {
       link.href = dataUrl
       link.download = fileName
       link.click()
-      notifyExportSuccess()
+      showExportToast('导出成功，已开始下载。', 'success')
     } catch (error) {
       console.error('导出预测统计 PNG 失败', error)
-      window.alert('统计导出失败，请稍后重试。')
+      showExportToast('统计导出失败，请稍后重试。', 'error')
     } finally {
       setIsExportingSummary(false)
     }
@@ -879,6 +902,12 @@ export function HomePage() {
 
   return (
     <div className="page-stack">
+      {exportToast ? (
+        <div className={clsx('export-toast', exportToast.tone === 'error' && 'is-error')} role="status" aria-live="polite">
+          <div className="export-toast__badge">{exportToast.tone === 'error' ? '导出失败' : '导出完成'}</div>
+          <div className="export-toast__message">{exportToast.message}</div>
+        </div>
+      ) : null}
       <section className="hero-panel">
         <div className="hero-panel__copy">
           <p className="hero-panel__eyebrow">Prediction Command Center</p>
@@ -1295,6 +1324,7 @@ export function HomePage() {
                       visibleModelIds={historyVisibleModelIds}
                       strategyFilters={historyStrategyFilters}
                       playTypeFilters={historyPlayTypeFilters}
+                      onShowExportToast={showExportToast}
                     />
                   ))}
                 </div>
@@ -3376,12 +3406,14 @@ function HistoryRecordCard({
   visibleModelIds,
   strategyFilters,
   playTypeFilters,
+  onShowExportToast,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
   visibleModelIds: string[]
   strategyFilters: string[]
   playTypeFilters: PredictionPlayType[]
+  onShowExportToast: (message: string, tone: 'success' | 'error') => void
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
@@ -3515,10 +3547,10 @@ function HistoryRecordCard({
       link.href = dataUrl
       link.download = fileName
       link.click()
-      notifyExportSuccess()
+      onShowExportToast('导出成功，已开始下载。', 'success')
     } catch (error) {
       console.error('导出开奖回溯 PNG 失败', error)
-      window.alert('导出失败，请稍后重试。')
+      onShowExportToast('导出失败，请稍后重试。', 'error')
     } finally {
       setIsExportingRecord(false)
     }
