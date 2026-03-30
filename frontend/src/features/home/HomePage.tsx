@@ -15,6 +15,7 @@ import {
   buildSummary,
   buildHistoryHitTrend,
   buildBlueFrequencyChart,
+  buildHistoryPrizeTrend,
   buildOddEvenChart,
   filterPredictionGroupsByPlayType,
   getPredictionPlayTypeLabel,
@@ -739,6 +740,10 @@ export function HomePage() {
     () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
     [filteredHistory, historyVisibleModelIds],
   )
+  const historyPrizeTrend = useMemo(
+    () => buildHistoryPrizeTrend(filteredHistory, historyVisibleModelIds),
+    [filteredHistory, historyVisibleModelIds],
+  )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
   const redChart = buildRedFrequencyChart(chartDraws)
@@ -1220,7 +1225,7 @@ export function HomePage() {
       {activeTab === 'history' ? (
         <div className="page-section">
           <Suspense fallback={<div className="state-shell">正在加载历史图表...</div>}>
-            <HistoryHitTrendCard historyVisibleModels={historyVisibleModels} historyHitTrend={historyHitTrend} />
+            <HistoryHitTrendCard historyVisibleModels={historyVisibleModels} historyHitTrend={historyHitTrend} historyPrizeTrend={historyPrizeTrend} />
           </Suspense>
 
           <StatusCard title="命中回溯" subtitle="按模型和期号筛选历史预测表现。">

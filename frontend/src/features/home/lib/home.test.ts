@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState } from './home'
+import { buildHistoryHitTrend, buildHistoryPrizeTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState } from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -44,6 +44,53 @@ describe('buildHistoryHitTrend', () => {
     expect(result).toEqual([
       { period: '26021', m1: 4, m2: 2 },
       { period: '26022', m1: 3, m2: 0 },
+    ])
+  })
+})
+
+describe('buildHistoryPrizeTrend', () => {
+  it('builds period prize points for selected models', () => {
+    const result = buildHistoryPrizeTrend(
+      [
+        {
+          prediction_date: '2026-03-01',
+          target_period: '26021',
+          actual_result: null,
+          models: [
+            {
+              model_id: 'm1',
+              model_name: 'Model 1',
+              model_provider: 'openai',
+              prize_amount: 305,
+            },
+            {
+              model_id: 'm2',
+              model_name: 'Model 2',
+              model_provider: 'gemini',
+              prize_amount: 15,
+            },
+          ],
+        },
+        {
+          prediction_date: '2026-03-02',
+          target_period: '26022',
+          actual_result: null,
+          models: [
+            {
+              model_id: 'm1',
+              model_name: 'Model 1',
+              model_provider: 'openai',
+              prize_amount: 120,
+            },
+          ],
+        },
+      ],
+      ['m1', 'm2'],
+    )
+
+    expect(result).toEqual([
+      { period: '26021', m1: 305, m2: 15 },
+      { period: '26022', m1: 120, m2: 0 },
     ])
   })
 })

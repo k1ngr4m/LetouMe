@@ -37,6 +37,10 @@ type HistoryModelRef = {
 
 type HistoryTrendItem = Record<string, string | number>
 
+function formatPrizeValue(value: number) {
+  return `${new Intl.NumberFormat('zh-CN').format(Number(value) || 0)} 元`
+}
+
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="panel-card chart-card">
@@ -116,8 +120,24 @@ export function AnalysisChartsPanel({
   )
 }
 
-export function HistoryHitTrendCard({ historyVisibleModels, historyHitTrend }: { historyVisibleModels: HistoryModelRef[]; historyHitTrend: HistoryTrendItem[] }) {
+export function HistoryHitTrendCard({
+  historyVisibleModels,
+  historyHitTrend,
+  historyPrizeTrend,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyHitTrend: HistoryTrendItem[]
+  historyPrizeTrend: HistoryTrendItem[]
+}) {
   const sortedTrendData = [...historyHitTrend].sort((left, right) => {
+    const leftPeriod = Number(left.period)
+    const rightPeriod = Number(right.period)
+    const leftIsNumber = Number.isFinite(leftPeriod)
+    const rightIsNumber = Number.isFinite(rightPeriod)
+    if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
+    return String(left.period || '').localeCompare(String(right.period || ''))
+  })
+  const sortedPrizeData = [...historyPrizeTrend].sort((left, right) => {
     const leftPeriod = Number(left.period)
     const rightPeriod = Number(right.period)
     const leftIsNumber = Number.isFinite(leftPeriod)
@@ -174,6 +194,30 @@ export function HistoryHitTrendCard({ historyVisibleModels, historyHitTrend }: {
                   />
                 ))}
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="history-hit-trend__chart-shell" aria-label="模型奖金趋势图">
+            <p className="history-hit-trend__chart-title">奖金趋势折线</p>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={sortedPrizeData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatPrizeValue(Number(value || 0))} />
+                <Legend />
+                {historyVisibleModels.map((model, index) => (
+                  <Line
+                    key={`prize-${model.model_id}`}
+                    type="monotone"
+                    dataKey={model.model_id}
+                    name={model.model_name}
+                    stroke={getModelTrendColor(index)}
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

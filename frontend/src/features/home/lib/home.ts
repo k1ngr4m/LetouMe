@@ -763,6 +763,32 @@ export function buildHistoryHitTrend(
   })
 }
 
+export function buildHistoryPrizeTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  const seriesModelIds = selectedModelIds.length
+    ? selectedModelIds
+    : Array.from(
+        new Set(
+          (records || []).flatMap((record) => record.models.map((model) => model.model_id)),
+        ),
+      )
+
+  return (records || []).map((record) => {
+    const point: Record<string, string | number> = {
+      period: record.target_period,
+    }
+
+    for (const modelId of seriesModelIds) {
+      const model = record.models.find((item) => item.model_id === modelId)
+      point[modelId] = Number(model?.prize_amount || 0)
+    }
+
+    return point
+  })
+}
+
 export function filterHistoryRecords(history: PredictionsHistoryListResponse, selectedModelIds: string[], periodQuery: string) {
   return (history.predictions_history || [])
     .map((record) => ({
