@@ -17,6 +17,7 @@ function makeDltSelection(frontNumbers: string[], backNumbers: string[]): Simula
     directTens: [],
     directUnits: [],
     groupNumbers: [],
+    sumValues: [],
   }
 }
 
@@ -55,6 +56,7 @@ describe('simulation helpers', () => {
       directTens: [],
       directUnits: [],
       groupNumbers: [],
+      sumValues: [],
     }
     expect(calculateBetCount(selection)).toBe(10)
     expect(calculateAmount(selection)).toBe(20)
@@ -101,6 +103,7 @@ describe('simulation helpers', () => {
         directTens: ['02'],
         directUnits: ['03', '04'],
         groupNumbers: [],
+        sumValues: [],
       }),
     ).toBe(4)
 
@@ -120,6 +123,7 @@ describe('simulation helpers', () => {
         directTens: [],
         directUnits: [],
         groupNumbers: ['01', '02', '03'],
+        sumValues: [],
       }),
     ).toBe(6)
 
@@ -139,6 +143,7 @@ describe('simulation helpers', () => {
         directTens: [],
         directUnits: [],
         groupNumbers: ['01', '02', '03', '04'],
+        sumValues: [],
       }),
     ).toBe(4)
   })
@@ -160,6 +165,7 @@ describe('simulation helpers', () => {
         directTens: ['05'],
         directUnits: ['06'],
         groupNumbers: [],
+        sumValues: [],
       },
       [{ period: '26001', date: '2026-01-01', red_balls: ['04', '05', '06'], blue_balls: [] }],
       30,
@@ -183,6 +189,7 @@ describe('simulation helpers', () => {
         directTens: [],
         directUnits: [],
         groupNumbers: ['01', '02', '03', '04'],
+        sumValues: [],
       },
       [{ period: '26002', date: '2026-01-02', red_balls: ['03', '01', '04'], blue_balls: [] }],
       30,
@@ -207,11 +214,44 @@ describe('simulation helpers', () => {
         directTens: ['04'],
         directUnits: ['05'],
         groupNumbers: [],
+        sumValues: [],
       },
       [{ period: '26003', date: '2026-01-03', red_balls: ['01', '02', '03', '04', '05'], blue_balls: [] }],
       30,
     )
     expect(matches[0].topPrizeLevel).toBe('直选')
     expect(matches[0].digitHits).toEqual(['01', '02', '03', '04', '05'])
+  })
+
+  it('calculates and matches pl3 direct_sum bets', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'pl3',
+      playType: 'direct_sum',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: ['10', '11'],
+    }
+
+    expect(calculateBetCount(selection)).toBe(132)
+    expect(calculateAmount(selection)).toBe(264)
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{ period: '26004', date: '2026-01-04', red_balls: ['01', '02', '07'], blue_balls: [] }],
+      30,
+    )
+    expect(matches[0].topPrizeLevel).toBe('直选')
+    expect(matches[0].totalWinningBets).toBe(63)
+    expect(matches[0].prizes).toEqual([{ level: '直选', count: 63 }])
   })
 })

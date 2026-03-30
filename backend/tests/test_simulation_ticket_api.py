@@ -174,6 +174,36 @@ class SimulationTicketApiTests(unittest.TestCase):
         self.assertEqual(ticket["front_tuo"], ["02", "03", "04", "05", "06"])
         self.assertEqual(ticket["back_tuo"], ["07", "08"])
 
+    def test_quote_and_create_pl3_direct_sum_ticket(self) -> None:
+        quote_response = self.client.post(
+            "/api/simulation/tickets/quote",
+            json={
+                "lottery_code": "pl3",
+                "play_type": "direct_sum",
+                "sum_values": ["10", "11"],
+            },
+        )
+        self.assertEqual(quote_response.status_code, 200)
+        quote = quote_response.json()
+        self.assertEqual(quote["play_type"], "direct_sum")
+        self.assertEqual(quote["bet_count"], 132)
+        self.assertEqual(quote["amount"], 264)
+
+        create_response = self.client.post(
+            "/api/simulation/tickets/create",
+            json={
+                "lottery_code": "pl3",
+                "play_type": "direct_sum",
+                "sum_values": ["10", "11"],
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+        ticket = create_response.json()["ticket"]
+        self.assertEqual(ticket["play_type"], "direct_sum")
+        self.assertEqual(ticket["sum_values"], ["10", "11"])
+        self.assertEqual(ticket["bet_count"], 132)
+        self.assertEqual(ticket["amount"], 264)
+
 
 if __name__ == "__main__":
     unittest.main()

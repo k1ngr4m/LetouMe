@@ -855,11 +855,21 @@ beforeEach(() => {
     const lotteryCode = payload.lottery_code === 'pl3' ? 'pl3' : 'dlt'
     if (lotteryCode === 'pl3') {
       const playType = String(payload.play_type || 'direct')
+      const pl3DirectSumBetCounts: Record<string, number> = {
+        '00': 1, '01': 3, '02': 6, '03': 10, '04': 15, '05': 21, '06': 28, '07': 36, '08': 45, '09': 55,
+        '10': 63, '11': 69, '12': 73, '13': 75, '14': 75, '15': 73, '16': 69, '17': 63, '18': 55, '19': 45,
+        '20': 36, '21': 28, '22': 21, '23': 15, '24': 10, '25': 6, '26': 3, '27': 1,
+      }
       if (playType === 'direct') {
         const hundreds = Array.isArray(payload.direct_hundreds) ? payload.direct_hundreds.length : 0
         const tens = Array.isArray(payload.direct_tens) ? payload.direct_tens.length : 0
         const units = Array.isArray(payload.direct_units) ? payload.direct_units.length : 0
         const betCount = hundreds && tens && units ? hundreds * tens * units : 0
+        return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
+      }
+      if (playType === 'direct_sum') {
+        const sumValues = Array.isArray(payload.sum_values) ? payload.sum_values.map((item) => String(item).padStart(2, '0')) : []
+        const betCount = sumValues.reduce((sum, value) => sum + Number(pl3DirectSumBetCounts[value] || 0), 0)
         return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
       }
       const groupCount = Array.isArray(payload.group_numbers) ? payload.group_numbers.length : 0
@@ -1605,6 +1615,54 @@ describe('HomePage dashboard sidebar', () => {
         }),
       )
     })
+  })
+
+  it('supports pl3 direct_sum mode in simulation tab', async () => {
+    getSimulationTickets
+      .mockResolvedValueOnce({ tickets: [] })
+      .mockResolvedValueOnce({
+        tickets: [
+          {
+            id: 21,
+            lottery_code: 'pl3',
+            play_type: 'direct_sum',
+            sum_values: ['10', '11'],
+            bet_count: 132,
+            amount: 264,
+            created_at: '2026-03-18T00:00:00Z',
+          },
+        ],
+      })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    const pl3ModeSwitch = screen.getByRole('tablist', { name: '排列3玩法切换' })
+    await userEvent.click(within(pl3ModeSwitch).getByRole('button', { name: '和值' }))
+
+    expect(screen.getByRole('button', { name: '和值 10' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '百位 00' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '和值 10' }))
+    await userEvent.click(screen.getByRole('button', { name: '和值 11' }))
+
+    expect(screen.getByText('已选 132 注，共 264 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
+
+    await waitFor(() => {
+      expect(createSimulationTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'pl3',
+          play_type: 'direct_sum',
+          sum_values: ['10', '11'],
+        }),
+      )
+    })
+
+    expect(await screen.findByText('方案 #21')).toBeInTheDocument()
+    expect(screen.getByText('和值 · 132 注')).toBeInTheDocument()
   })
 
   it('loads history detail on expand and highlights hit numbers', async () => {

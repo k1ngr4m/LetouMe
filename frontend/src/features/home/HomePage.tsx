@@ -36,6 +36,7 @@ import {
   buildSimulationMatches,
   createRandomSelection,
   normalizeSimulationTicket,
+  pl3SumOptions,
   type SimulationPlayType,
   type SimulationSelection,
 } from './lib/simulation'
@@ -1434,25 +1435,27 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const [selectedFrontTuo, setSelectedFrontTuo] = useState<string[]>([])
   const [selectedBackDan, setSelectedBackDan] = useState<string[]>([])
   const [selectedBackTuo, setSelectedBackTuo] = useState<string[]>([])
-  const [pl3PlayType, setPl3PlayType] = useState<'direct' | 'group3' | 'group6'>('direct')
+  const [pl3PlayType, setPl3PlayType] = useState<'direct' | 'group3' | 'group6' | 'direct_sum'>('direct')
   const [selectedTenThousands, setSelectedTenThousands] = useState<string[]>([])
   const [selectedThousands, setSelectedThousands] = useState<string[]>([])
   const [selectedHundreds, setSelectedHundreds] = useState<string[]>([])
   const [selectedTens, setSelectedTens] = useState<string[]>([])
   const [selectedUnits, setSelectedUnits] = useState<string[]>([])
   const [selectedGroupNumbers, setSelectedGroupNumbers] = useState<string[]>([])
+  const [selectedSumValues, setSelectedSumValues] = useState<string[]>([])
   const [matchWindow, setMatchWindow] = useState<30 | 50>(30)
   const [showMatches, setShowMatches] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const frontOptions = useMemo(() => buildBallRange(35), [])
   const backOptions = useMemo(() => buildBallRange(12), [])
   const digitOptions = useMemo(() => buildBallRange(10, 0), [])
+  const sumOptions = useMemo(() => pl3SumOptions, [])
   const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
   const isPl3 = lotteryCode === 'pl3'
   const isPl5 = lotteryCode === 'pl5'
   const isDlt = lotteryCode === 'dlt'
   const isDltDantuo = isDlt && dltPlayType === 'dlt_dantuo'
-  const playTypeLabel = pl3PlayType === 'direct' ? '直选' : pl3PlayType === 'group3' ? '组选3' : '组选6'
+  const playTypeLabel = pl3PlayType === 'direct' ? '直选' : pl3PlayType === 'group3' ? '组选3' : pl3PlayType === 'group6' ? '组选6' : '和值'
   const selection = useMemo<SimulationSelection>(() => {
     const playType: SimulationPlayType = lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType
     return {
@@ -1470,8 +1473,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       directTens: selectedTens,
       directUnits: selectedUnits,
       groupNumbers: selectedGroupNumbers,
+      sumValues: selectedSumValues,
     }
-  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
   const simulationPayload = useMemo<SimulationTicketPayload>(
     () => ({
       lottery_code: lotteryCode,
@@ -1488,8 +1492,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       direct_tens: selectedTens,
       direct_units: selectedUnits,
       group_numbers: selectedGroupNumbers,
+      sum_values: selectedSumValues,
     }),
-    [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers],
+    [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues],
   )
   const ticketsQuery = useQuery({
     queryKey: ['simulation-tickets', lotteryCode],
@@ -1527,7 +1532,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   useEffect(() => {
     setShowMatches(false)
     setMessage(null)
-  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers])
+  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
 
   useEffect(() => {
     if (lotteryCode === 'dlt') {
@@ -1553,6 +1558,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedTens([])
     setSelectedUnits([])
     setSelectedGroupNumbers([])
+    setSelectedSumValues([])
   }, [lotteryCode])
 
   function toggleSelection(value: string, zone: 'front' | 'back') {
@@ -1590,6 +1596,14 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedGroupNumbers((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
 
+  function toggleSumSelection(value: string) {
+    setSelectedSumValues((previous) => (
+      previous.includes(value)
+        ? previous.filter((item) => item !== value)
+        : [...previous, value].sort((left, right) => Number(left) - Number(right))
+    ))
+  }
+
   function handleRandomPick() {
     const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType)
     setSelectedFront(randomSelection.frontNumbers)
@@ -1604,6 +1618,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedTens(randomSelection.directTens)
     setSelectedUnits(randomSelection.directUnits)
     setSelectedGroupNumbers(randomSelection.groupNumbers)
+    setSelectedSumValues(randomSelection.sumValues)
     setMessage('已为你生成一组随机机选号码。')
   }
 
@@ -1620,6 +1635,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedTens([])
     setSelectedUnits([])
     setSelectedGroupNumbers([])
+    setSelectedSumValues([])
     setMessage('已清空当前选号。')
   }
 
@@ -1832,6 +1848,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   <button className={clsx('tab-strip__item', pl3PlayType === 'direct' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct')}>
                     直选
                   </button>
+                  <button className={clsx('tab-strip__item', pl3PlayType === 'direct_sum' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct_sum')}>
+                    和值
+                  </button>
                   <button className={clsx('tab-strip__item', pl3PlayType === 'group3' && 'is-active')} type="button" onClick={() => setPl3PlayType('group3')}>
                     组选3
                   </button>
@@ -1910,6 +1929,29 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     </div>
                   </section>
                 </>
+              ) : pl3PlayType === 'direct_sum' ? (
+                <section className="simulation-section">
+                  <div className="simulation-section__header">
+                    <div>
+                      <p className="hero-panel__eyebrow">Sum Value</p>
+                      <h3>和值选号</h3>
+                    </div>
+                    <span>至少 1 个</span>
+                  </div>
+                  <div className="simulation-ball-grid" aria-label="和值选号">
+                    {sumOptions.map((ball) => (
+                      <button
+                        key={`sum-${ball}`}
+                        type="button"
+                        className={clsx('simulation-ball', 'is-front', selectedSumValues.includes(ball) && 'is-selected')}
+                        onClick={() => toggleSumSelection(ball)}
+                        aria-label={`和值 ${ball}`}
+                      >
+                        {ball}
+                      </button>
+                    ))}
+                  </div>
+                </section>
               ) : (
                 <section className="simulation-section">
                   <div className="simulation-section__header">
@@ -2094,7 +2136,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               <>
                 <span>{isPl3 ? `当前玩法：${playTypeLabel}` : '当前玩法：直选'}</span>
                 <div className="number-row number-row--tight">
-                  {(isPl3 ? (pl3PlayType === 'direct' ? selectedHundreds : selectedGroupNumbers) : selectedTenThousands).map((ball) => (
+                  {(isPl3 ? (pl3PlayType === 'direct' ? selectedHundreds : pl3PlayType === 'direct_sum' ? selectedSumValues : selectedGroupNumbers) : selectedTenThousands).map((ball) => (
                     <NumberBall key={`selected-a-${ball}`} value={ball} color="red" size="sm" />
                   ))}
                   {(isPl3 ? pl3PlayType === 'direct' : true) ? <span className="number-row__divider" /> : null}
@@ -2129,6 +2171,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     ? '直选需万位、千位、百位、十位、个位各至少 1 个号码。'
                     : pl3PlayType === 'direct'
                     ? '直选需百位、十位、个位各至少 1 个号码。'
+                    : pl3PlayType === 'direct_sum'
+                      ? '和值至少选择 1 个号码。'
                     : pl3PlayType === 'group3'
                       ? '组选3至少选择 2 个号码。'
                       : '组选6至少选择 3 个号码。'}
@@ -2326,6 +2370,12 @@ function SavedSimulationTicketCard({
               <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="red" size="sm" />
             ))}
           </div>
+        ) : ticket.play_type === 'direct_sum' ? (
+          <div className="number-row number-row--tight">
+            {(ticket.sum_values || []).map((ball) => (
+              <NumberBall key={`${ticket.id}-sum-${ball}`} value={ball} color="red" size="sm" />
+            ))}
+          </div>
         ) : (
           <div className="number-row number-row--tight">
             {(ticket.group_numbers || []).map((ball) => (
@@ -2335,7 +2385,7 @@ function SavedSimulationTicketCard({
         )}
       </div>
       <div className="simulation-saved-card__footer">
-        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : '直选'} · ${ticket.bet_count} 注`}</span>
+        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : ticket.play_type === 'direct_sum' ? '和值' : '直选'} · ${ticket.bet_count} 注`}</span>
         <span>{formatCurrency(ticket.amount)}</span>
       </div>
     </article>

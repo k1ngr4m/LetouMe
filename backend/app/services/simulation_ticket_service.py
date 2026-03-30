@@ -6,12 +6,16 @@ from typing import Any
 
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.simulation_ticket_repository import SimulationTicketRepository
+from backend.app.services.prediction_service import PredictionService
 
 
 class SimulationTicketService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
+    PL3_DIRECT_SUM_BET_COUNTS = {
+        int(sum_value): int(cost / 2) for sum_value, cost in PredictionService.PL3_DIRECT_SUM_COST_RULES.items()
+    }
 
     def __init__(self, repository: SimulationTicketRepository | None = None) -> None:
         self.repository = repository or SimulationTicketRepository()
@@ -155,8 +159,8 @@ class SimulationTicketService:
 
     def _build_pl3_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6")
+        if play_type not in {"direct", "group3", "group6", "direct_sum"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum")
 
         if play_type == "direct":
             hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
@@ -175,6 +179,29 @@ class SimulationTicketService:
                 "direct_tens": ",".join(tens),
                 "direct_units": ",".join(units),
                 "group_numbers": None,
+                "sum_values": None,
+                "bet_count": bet_count,
+                "amount": bet_count * 2,
+            }
+
+        if play_type == "direct_sum":
+            sum_values = self._normalize_sum_values(payload.get("sum_values"))
+            if not sum_values:
+                raise ValueError("和值至少选择 1 个号码")
+            bet_count = sum(int(self.PL3_DIRECT_SUM_BET_COUNTS.get(int(value), 0)) for value in sum_values)
+            if bet_count <= 0:
+                raise ValueError("和值投注注数计算失败")
+            return {
+                "play_type": "direct_sum",
+                "front_numbers": "",
+                "back_numbers": "",
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
+                "direct_hundreds": None,
+                "direct_tens": None,
+                "direct_units": None,
+                "group_numbers": None,
+                "sum_values": ",".join(sum_values),
                 "bet_count": bet_count,
                 "amount": bet_count * 2,
             }
@@ -194,9 +221,18 @@ class SimulationTicketService:
             "direct_tens": None,
             "direct_units": None,
             "group_numbers": ",".join(group_numbers),
+            "sum_values": None,
             "bet_count": bet_count,
             "amount": bet_count * 2,
         }
+
+    def _normalize_sum_values(self, values: Any) -> list[str]:
+        if not isinstance(values, list):
+            raise ValueError("和值格式不正确")
+        normalized = sorted({str(item).zfill(2) for item in values})
+        if any((not value.isdigit()) or int(value) < 0 or int(value) > 27 for value in normalized):
+            raise ValueError("和值超出可选范围")
+        return normalized
 
     def _build_pl5_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
@@ -245,6 +281,7 @@ class SimulationTicketService:
             "direct_tens": [item for item in str(ticket.get("direct_tens") or "").split(",") if item],
             "direct_units": [item for item in str(ticket.get("direct_units") or "").split(",") if item],
             "group_numbers": [item for item in str(ticket.get("group_numbers") or "").split(",") if item],
+            "sum_values": [item for item in str(ticket.get("sum_values") or "").split(",") if item],
             "bet_count": int(ticket.get("bet_count") or 0),
             "amount": int(ticket.get("amount") or 0),
             "created_at": created_at or "",

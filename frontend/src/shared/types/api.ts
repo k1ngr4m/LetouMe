@@ -219,7 +219,7 @@ export type PredictionsHistoryResponse = {
 
 export type SimulationTicketPayload = {
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -232,12 +232,13 @@ export type SimulationTicketPayload = {
   direct_tens?: string[]
   direct_units?: string[]
   group_numbers?: string[]
+  sum_values?: string[]
 }
 
 export type SimulationTicketRecord = {
   id: number
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -250,6 +251,7 @@ export type SimulationTicketRecord = {
   direct_tens?: string[]
   direct_units?: string[]
   group_numbers?: string[]
+  sum_values?: string[]
   bet_count: number
   amount: number
   created_at: string
@@ -265,7 +267,7 @@ export type SimulationTicketCreateResponse = {
 
 export type SimulationTicketQuoteResponse = {
   lottery_code: LotteryCode
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum'
   bet_count: number
   amount: number
 }

@@ -134,6 +134,7 @@ class SimulationTicketPayload(BaseModel):
     direct_tens: list[str] = Field(default_factory=list)
     direct_units: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
+    sum_values: list[str] = Field(default_factory=list)
 
 
 class SimulationTicketQuotePayload(SimulationTicketPayload):

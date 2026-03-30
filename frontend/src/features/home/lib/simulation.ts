@@ -1,7 +1,7 @@
 import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
-export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6'
+export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum'
 export type PrizeLevel =
   | '一等奖'
   | '二等奖'
@@ -37,6 +37,7 @@ export type SimulationSelection = {
   directTens: string[]
   directUnits: string[]
   groupNumbers: string[]
+  sumValues: string[]
 }
 
 export type SimulationMatchRecord = {
@@ -68,11 +69,20 @@ export function normalizeSimulationTicket(ticket: SimulationTicketRecord): Simul
     direct_tens: (ticket.direct_tens || []).map(padBall).sort(),
     direct_units: (ticket.direct_units || []).map(padBall).sort(),
     group_numbers: (ticket.group_numbers || []).map(padBall).sort(),
+    sum_values: (ticket.sum_values || []).map(padBall).sort((left, right) => Number(left) - Number(right)),
     bet_count: Number(ticket.bet_count || 0),
     amount: Number(ticket.amount || 0),
     created_at: ticket.created_at || '',
   }
 }
+
+const PL3_DIRECT_SUM_BET_COUNTS: Record<string, number> = {
+  '00': 1, '01': 3, '02': 6, '03': 10, '04': 15, '05': 21, '06': 28, '07': 36, '08': 45, '09': 55,
+  '10': 63, '11': 69, '12': 73, '13': 75, '14': 75, '15': 73, '16': 69, '17': 63, '18': 55, '19': 45,
+  '20': 36, '21': 28, '22': 21, '23': 15, '24': 10, '25': 6, '26': 3, '27': 1,
+}
+
+export const pl3SumOptions = Array.from({ length: 28 }, (_, index) => padBall(index))
 
 export function buildBallRange(limit: number, start = 1) {
   return Array.from({ length: limit }, (_, index) => padBall(index + start))
@@ -128,6 +138,9 @@ export function calculateBetCount(selection: SimulationSelection) {
     const count = selection.groupNumbers.length
     return count >= 3 ? combination(count, 3) : 0
   }
+  if (selection.playType === 'direct_sum') {
+    return selection.sumValues.reduce((sum, value) => sum + Number(PL3_DIRECT_SUM_BET_COUNTS[padBall(value)] || 0), 0)
+  }
   return 0
 }
 
@@ -161,6 +174,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
         directTens: [],
         directUnits: [],
         groupNumbers: [],
+        sumValues: [],
       }
     }
     return {
@@ -178,6 +192,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       directTens: [],
       directUnits: [],
       groupNumbers: [],
+      sumValues: [],
     }
   }
 
@@ -199,6 +214,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
         directTens: pickRandomBalls(digits, 1),
         directUnits: pickRandomBalls(digits, 1),
         groupNumbers: [],
+        sumValues: [],
       }
     }
     return {
@@ -216,6 +232,27 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       directTens: pickRandomBalls(digits, 1),
       directUnits: pickRandomBalls(digits, 1),
       groupNumbers: [],
+      sumValues: [],
+    }
+  }
+
+  if (playType === 'direct_sum') {
+    return {
+      lotteryCode,
+      playType,
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: pickRandomBalls(pl3SumOptions, 1),
     }
   }
 
@@ -235,6 +272,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     directTens: [],
     directUnits: [],
     groupNumbers: pickRandomBalls(buildBallRange(10, 0), groupSize),
+    sumValues: [],
   }
 }
 
@@ -446,6 +484,13 @@ function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits
       selection.directTens.includes(actualDigits[1]) &&
       selection.directUnits.includes(actualDigits[2])
     return matched ? [{ level: '直选', count: 1 }] : []
+  }
+
+  if (selection.playType === 'direct_sum') {
+    const actualSum = actualDigits.reduce((sum, digit) => sum + Number(digit), 0)
+    const normalizedSum = padBall(actualSum)
+    const betCount = Number(PL3_DIRECT_SUM_BET_COUNTS[normalizedSum] || 0)
+    return selection.sumValues.includes(normalizedSum) && betCount > 0 ? [{ level: '直选', count: betCount }] : []
   }
 
   const actualSet = new Set(actualDigits)
