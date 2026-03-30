@@ -371,6 +371,27 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         for phrase in required_phrases:
             self.assertIn(phrase, template)
 
+    def test_dlt_compound_prompt_template_can_be_formatted(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("dlt", prediction_play_mode="compound")
+        rendered = template.format(
+            target_period="26068",
+            target_date="2026年03月19日",
+            lottery_history=json.dumps(
+                [
+                    {"period": "26067", "date": "2026-03-18", "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["06", "07"]},
+                    {"period": "26066", "date": "2026-03-17", "red_balls": ["08", "09", "10", "11", "12"], "blue_balls": ["01", "02"]},
+                ],
+                ensure_ascii=False,
+                indent=2,
+            ),
+            prediction_date="2026-03-18",
+            model_id="dlt_compound_model_demo",
+            model_name="DLT Compound Demo Model",
+        )
+        self.assertIn("目标期号：26068", rendered)
+        self.assertIn("模型：DLT Compound Demo Model (dlt_compound_model_demo)", rendered)
+        self.assertIn('"period": "26067"', rendered)
+
     def test_validate_prediction_pl3_requires_direct_and_three_digits(self) -> None:
         service = PredictionGenerationService()
         valid_prediction = {

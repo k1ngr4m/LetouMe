@@ -31,6 +31,13 @@
 - 不要输出胆码、拖码字段
 - 不要输出额外解释文本，只输出纯 JSON
 
+## 当前目标
+
+- 目标期号：{target_period}
+- 开奖日期：{target_date}
+- 预测日期：{prediction_date}
+- 模型：{model_name} ({model_id})
+
 ---
 
 ## 数据预处理要求
@@ -102,42 +109,42 @@
 ## 输出 JSON 结构
 
 ```json
-{
+{{
   "predictions": [
-    {
+    {{
       "group_id": 1,
       "play_type": "dlt_compound",
       "strategy": "增强型综合决策者",
       "description": "简要说明",
       "red_balls": ["01", "02", "03", "04", "05", "06"],
       "blue_balls": ["07", "08"]
-    },
-    {
+    }},
+    {{
       "group_id": 2,
       "play_type": "dlt_compound",
       "strategy": "增强型综合决策者",
       "description": "简要说明",
       "red_balls": ["01", "02", "03", "04", "05", "06", "07"],
       "blue_balls": ["08", "09"]
-    },
-    {
+    }},
+    {{
       "group_id": 3,
       "play_type": "dlt_compound",
       "strategy": "增强型综合决策者",
       "description": "简要说明",
       "red_balls": ["01", "02", "03", "04", "05", "06"],
       "blue_balls": ["07", "08", "09"]
-    },
-    {
+    }},
+    {{
       "group_id": 4,
       "play_type": "dlt_compound",
       "strategy": "增强型综合决策者",
       "description": "简要说明",
       "red_balls": ["01", "02", "03", "04", "05", "06", "07"],
       "blue_balls": ["08", "09", "10"]
-    }
+    }}
   ]
-}
+}}
 ```
 
 ## 输出前自检
