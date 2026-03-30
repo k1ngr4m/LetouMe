@@ -2465,4 +2465,28 @@ describe('HomePage dashboard sidebar', () => {
       ),
     )
   })
+
+  it('shows explicit dlt dantuo validation reason when back dan exceeds limit', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.selectOptions(within(dialog).getByLabelText('玩法'), 'dlt_dantuo')
+    await userEvent.type(within(dialog).getByLabelText('前区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(dialog).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
+    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01,02')
+    await userEvent.type(within(dialog).getByLabelText('后区拖码（逗号分隔）'), '07,08')
+
+    expect(within(dialog).getByText('子注单 #1：后区胆码最多 1 个。')).toBeInTheDocument()
+    const submitButton = within(dialog).getByRole('button', { name: '添加投注' })
+    expect(submitButton).toBeDisabled()
+    expect(createMyBet).not.toHaveBeenCalled()
+
+    await userEvent.clear(within(dialog).getByLabelText('后区胆码（逗号分隔）'))
+    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01')
+
+    await waitFor(() => expect(within(dialog).getByText('可提交保存。')).toBeInTheDocument())
+    expect(submitButton).toBeEnabled()
+  })
 })

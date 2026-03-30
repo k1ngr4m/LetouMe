@@ -47,6 +47,7 @@ type LineQuote = {
   betCount: number
   amount: number
   valid: boolean
+  reason?: string
 }
 
 const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
@@ -284,27 +285,48 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
       const backTuo = splitNumbers(line.backTuoInput)
       const frontPickCount = 5 - frontDan.length
       const backPickCount = 2 - backDan.length
-      const valid =
-        frontDan.length >= 1 &&
-        frontDan.length <= 4 &&
-        frontTuo.length >= 2 &&
-        !hasIntersection(frontDan, frontTuo) &&
-        new Set([...frontDan, ...frontTuo]).size >= 6 &&
-        backDan.length <= 1 &&
-        backTuo.length >= 2 &&
-        !hasIntersection(backDan, backTuo) &&
-        new Set([...backDan, ...backTuo]).size >= 3 &&
-        frontTuo.length >= frontPickCount &&
-        backTuo.length >= backPickCount
-      const betCount = valid ? combination(frontTuo.length, frontPickCount) * combination(backTuo.length, backPickCount) : 0
+      if (frontDan.length < 1 || frontDan.length > 4) {
+        return { betCount: 0, amount: 0, valid: false, reason: '前区胆码数量应为 1-4 个。' }
+      }
+      if (frontTuo.length < 2) {
+        return { betCount: 0, amount: 0, valid: false, reason: '前区拖码至少选择 2 个号码。' }
+      }
+      if (hasIntersection(frontDan, frontTuo)) {
+        return { betCount: 0, amount: 0, valid: false, reason: '前区胆码与拖码不可重复。' }
+      }
+      if (new Set([...frontDan, ...frontTuo]).size < 6) {
+        return { betCount: 0, amount: 0, valid: false, reason: '前区胆码与拖码合计至少 6 个号码。' }
+      }
+      if (backDan.length > 1) {
+        return { betCount: 0, amount: 0, valid: false, reason: '后区胆码最多 1 个。' }
+      }
+      if (backTuo.length < 2) {
+        return { betCount: 0, amount: 0, valid: false, reason: '后区拖码至少选择 2 个号码。' }
+      }
+      if (hasIntersection(backDan, backTuo)) {
+        return { betCount: 0, amount: 0, valid: false, reason: '后区胆码与拖码不可重复。' }
+      }
+      if (new Set([...backDan, ...backTuo]).size < 3) {
+        return { betCount: 0, amount: 0, valid: false, reason: '后区胆码与拖码合计至少 3 个号码。' }
+      }
+      if (frontTuo.length < frontPickCount || backTuo.length < backPickCount) {
+        return { betCount: 0, amount: 0, valid: false, reason: '拖码数量不足以组成有效注单。' }
+      }
+      const betCount = combination(frontTuo.length, frontPickCount) * combination(backTuo.length, backPickCount)
       const amount = betCount * 2 * multiplier + (line.isAppend ? betCount * multiplier : 0)
-      return { betCount, amount, valid: betCount > 0 }
+      return { betCount, amount, valid: betCount > 0, reason: betCount > 0 ? undefined : '胆拖号码无效，请检查输入。' }
     }
     const front = splitNumbers(line.frontNumbersInput)
     const back = splitNumbers(line.backNumbersInput)
-    const betCount = front.length >= 5 && back.length >= 2 ? combination(front.length, 5) * combination(back.length, 2) : 0
+    if (front.length < 5) {
+      return { betCount: 0, amount: 0, valid: false, reason: '前区至少选择 5 个号码。' }
+    }
+    if (back.length < 2) {
+      return { betCount: 0, amount: 0, valid: false, reason: '后区至少选择 2 个号码。' }
+    }
+    const betCount = combination(front.length, 5) * combination(back.length, 2)
     const amount = betCount * 2 * multiplier + (line.isAppend ? betCount * multiplier : 0)
-    return { betCount, amount, valid: betCount > 0 }
+    return { betCount, amount, valid: betCount > 0, reason: betCount > 0 ? undefined : '大乐透号码无效，请检查输入。' }
   }
   if (line.playType === 'direct') {
     if (lotteryCode === 'pl5') {
@@ -313,26 +335,38 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
       const hundreds = splitNumbers(line.directHundredsInput)
       const tens = splitNumbers(line.directTensInput)
       const units = splitNumbers(line.directUnitsInput)
+      if (!tenThousands.length || !thousands.length || !hundreds.length || !tens.length || !units.length) {
+        return { betCount: 0, amount: 0, valid: false, reason: '万、千、百、十、个位都需至少选择 1 个号码。' }
+      }
       const betCount = tenThousands.length && thousands.length && hundreds.length && tens.length && units.length
         ? tenThousands.length * thousands.length * hundreds.length * tens.length * units.length
         : 0
-      return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+      return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '直选号码无效，请检查输入。' }
     }
     const hundreds = splitNumbers(line.directHundredsInput)
     const tens = splitNumbers(line.directTensInput)
     const units = splitNumbers(line.directUnitsInput)
+    if (!hundreds.length || !tens.length || !units.length) {
+      return { betCount: 0, amount: 0, valid: false, reason: '百、十、个位都需至少选择 1 个号码。' }
+    }
     const betCount = hundreds.length && tens.length && units.length ? hundreds.length * tens.length * units.length : 0
-    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '直选号码无效，请检查输入。' }
   }
   if (line.playType === 'direct_sum' || line.playType === 'group_sum') {
     const sumValues = splitNumbers(line.sumValuesInput)
+    if (!sumValues.length) {
+      return { betCount: 0, amount: 0, valid: false, reason: '和值至少选择 1 个号码。' }
+    }
     const betCountRule = line.playType === 'direct_sum' ? PL3_DIRECT_SUM_BET_COUNTS : PL3_GROUP_SUM_BET_COUNTS
     const betCount = sumValues.reduce((sum, item) => sum + Number(betCountRule[Number(item)] || 0), 0)
-    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '和值号码无效，请检查输入。' }
   }
   const groups = splitNumbers(line.groupNumbersInput)
+  if ((line.playType === 'group3' && groups.length < 2) || (line.playType === 'group6' && groups.length < 3)) {
+    return { betCount: 0, amount: 0, valid: false, reason: line.playType === 'group3' ? '组选3至少选择 2 个号码。' : '组选6至少选择 3 个号码。' }
+  }
   const betCount = line.playType === 'group3' ? (groups.length >= 2 ? groups.length * (groups.length - 1) : 0) : combination(groups.length, 3)
-  return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0 }
+  return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '组选号码无效，请检查输入。' }
 }
 
 function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLinePayload {
@@ -661,7 +695,15 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const lineQuotes = useMemo(() => form.lines.map((line) => quoteLine(lotteryCode, line)), [form.lines, lotteryCode])
   const totalBetCount = lineQuotes.reduce((sum, item) => sum + item.betCount, 0)
   const totalAmount = lineQuotes.reduce((sum, item) => sum + item.amount, 0)
-  const canSubmit = /^\d+$/.test(form.targetPeriod.trim()) && lineQuotes.length > 0 && lineQuotes.every((item) => item.valid)
+  const hasValidTargetPeriod = /^\d+$/.test(form.targetPeriod.trim())
+  const invalidLineIndex = lineQuotes.findIndex((item) => !item.valid)
+  const invalidLineQuote = invalidLineIndex >= 0 ? lineQuotes[invalidLineIndex] : null
+  const submitHint = !hasValidTargetPeriod
+    ? '请填写有效期号。'
+    : invalidLineQuote
+      ? `子注单 #${invalidLineIndex + 1}：${invalidLineQuote.reason || '请补全号码。'}`
+      : '可提交保存。'
+  const canSubmit = hasValidTargetPeriod && lineQuotes.length > 0 && invalidLineIndex < 0
 
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
@@ -734,7 +776,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) {
-      setMessage('请补全期号和每条子注单的号码。')
+      setMessage(submitHint)
       return
     }
     saveMutation.mutate()
@@ -1297,7 +1339,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               <div className="simulation-summary-bar my-bets-form-summary">
                 <div className="simulation-summary-bar__meta">
                   <strong>{`共 ${form.lines.length} 条子注单 · 预计 ${totalBetCount} 注 / ${totalAmount} 元`}</strong>
-                  <span>{canSubmit ? '可提交保存。' : '请补全期号与子注单号码。'}</span>
+                  <span>{submitHint}</span>
                 </div>
                 <div className="simulation-summary-bar__actions">
                   <button className="ghost-button" type="button" onClick={addLine}>
