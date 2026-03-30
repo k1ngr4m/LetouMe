@@ -31,6 +31,8 @@ export type ModelScore = {
   betSampleSize: number
 }
 
+export type ModelScoreMap = Record<string, ModelScore>
+
 export type BallStatItem = {
   ball: string
   appearanceCount: number
@@ -107,6 +109,17 @@ export function normalizePredictionModelPlayMode(
   if (hasDantuoGroup) return 'dantuo'
   const hasDirectSumGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'direct_sum')
   return hasDirectSumGroup ? 'direct_sum' : 'direct'
+}
+
+export function buildModelScoreKey(model: {
+  model_id?: string | null
+  prediction_play_mode?: string | null
+  predictions?: PredictionGroup[]
+  [key: string]: unknown
+}) {
+  const modelId = String(model.model_id || '').trim()
+  if (!modelId) return ''
+  return `${modelId}::${normalizePredictionModelPlayMode(model)}`
 }
 
 export function groupMatchesPlayTypeFilters(group: PredictionGroup, playTypeFilters: PredictionPlayType[] = []) {
@@ -448,14 +461,29 @@ export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult:
   return '直选'
 }
 
-export function buildModelScores(history: PredictionsHistoryListResponse, models: PredictionModel[]): Record<string, ModelScore> {
-  const result: Record<string, ModelScore> = {}
-  const statsMap = new Map((history.model_stats || []).map((item) => [item.model_id, item]))
+export function resolveModelScore(modelScores: ModelScoreMap, model: {
+  model_id?: string | null
+  prediction_play_mode?: string | null
+  predictions?: PredictionGroup[]
+  [key: string]: unknown
+}) {
+  const modelKey = buildModelScoreKey(model)
+  if (modelKey && modelScores[modelKey]) {
+    return modelScores[modelKey]
+  }
+  const modelId = String(model.model_id || '').trim()
+  return modelScores[modelId]
+}
+
+export function buildModelScores(history: PredictionsHistoryListResponse, models: PredictionModel[]): ModelScoreMap {
+  const result: ModelScoreMap = {}
+  const statsMap = new Map((history.model_stats || []).map((item) => [buildModelScoreKey(item), item]))
 
   for (const model of models) {
-    const stat = statsMap.get(model.model_id)
+    const modelKey = buildModelScoreKey(model)
+    const stat = statsMap.get(modelKey)
     const profile = normalizeScoreProfile(stat?.score_profile || model.score_profile)
-    result[model.model_id] = {
+    const normalizedScore = {
       overallScore: profile.overall_score,
       perBetScore: profile.per_bet_score,
       perPeriodScore: profile.per_period_score,
@@ -469,6 +497,12 @@ export function buildModelScores(history: PredictionsHistoryListResponse, models
       sampleSize: profile.sample_size_periods,
       betSampleSize: profile.sample_size_bets,
     }
+    if (modelKey) {
+      result[modelKey] = normalizedScore
+    }
+    if (!result[model.model_id]) {
+      result[model.model_id] = normalizedScore
+    }
   }
 
   return result
@@ -478,7 +512,7 @@ export function getActualResult(draws: LotteryDraw[], targetPeriod: string) {
   return draws.find((draw) => draw.period === targetPeriod) || null
 }
 
-export function sortModels(models: PredictionModel[], scores: Record<string, ModelScore>, pinnedModelIds: string[]) {
+export function sortModels(models: PredictionModel[], scores: ModelScoreMap, pinnedModelIds: string[]) {
   const pinnedIndex = new Map(pinnedModelIds.map((id, index) => [id, index]))
   return [...models].sort((left, right) => {
     const leftPinned = pinnedIndex.has(left.model_id)
@@ -486,7 +520,7 @@ export function sortModels(models: PredictionModel[], scores: Record<string, Mod
     if (leftPinned && rightPinned) return (pinnedIndex.get(left.model_id) || 0) - (pinnedIndex.get(right.model_id) || 0)
     if (leftPinned) return -1
     if (rightPinned) return 1
-    return (scores[right.model_id]?.overallScore || 0) - (scores[left.model_id]?.overallScore || 0)
+    return (resolveModelScore(scores, right)?.overallScore || 0) - (resolveModelScore(scores, left)?.overallScore || 0)
   })
 }
 
@@ -500,12 +534,12 @@ function matchesScoreRange(score: number, scoreRange: ModelListScoreRange) {
 
 export function filterModels(
   models: PredictionModel[],
-  scores: Record<string, ModelScore>,
+  scores: ModelScoreMap,
   filters: ModelListFilters,
 ) {
   const normalizedQuery = filters.nameQuery.trim().toLowerCase()
   return models.filter((model) => {
-    const score = scores[model.model_id]?.overallScore || 0
+    const score = resolveModelScore(scores, model)?.overallScore || 0
     const modelName = (model.model_name || '').toLowerCase()
     const modelId = (model.model_id || '').toLowerCase()
     const provider = model.model_provider || ''
@@ -533,7 +567,7 @@ export function filterModels(
 
 export function buildSummary(
   models: PredictionModel[],
-  scores: Record<string, ModelScore>,
+  scores: ModelScoreMap,
   selectedIds: string[],
   weighted: boolean,
   commonOnly: boolean,
@@ -568,7 +602,7 @@ export function buildSummary(
     selectedModelCount += 1
     totalGroupCount += activeGroups.length
 
-    const weight = weighted ? (scores[model.model_id]?.overallScore || 0) / 100 || 1 : 1
+    const weight = weighted ? (resolveModelScore(scores, model)?.overallScore || 0) / 100 || 1 : 1
     const redSeen = new Set<string>()
     const blueSeen = new Set<string>()
     const frontDanSeen = new Set<string>()

@@ -25,12 +25,14 @@ import {
   compareNumbers,
   getActualResult,
   type ModelScore,
+  type ModelScoreMap,
   type ModelListScoreRange,
   type PredictionPlayType,
   inferPredictionGroupLotteryCode,
   normalizePredictionModelPlayMode,
   normalizeStrategyLabel,
   normalizePredictionsHistory,
+  resolveModelScore,
 } from './lib/home'
 import {
   buildBallRange,
@@ -1054,7 +1056,7 @@ export function HomePage() {
                         <ModelListCard
                           key={model.model_id}
                           model={model}
-                          score={modelScores[model.model_id]}
+                          score={resolveModelScore(modelScores, model)}
                           isPinned={validPinnedModelIds.includes(model.model_id)}
                           actualResult={actualResult}
                           isActionMenuOpen={activeActionMenuId === model.model_id}
@@ -1418,7 +1420,7 @@ export function HomePage() {
           <div ref={exportSheetRef}>
             <ModelDetailExportSheet
               model={exportModel}
-              score={modelScores[exportModel.model_id]}
+              score={resolveModelScore(modelScores, exportModel)}
               actualResult={actualResult}
               lotteryCode={selectedLottery}
               targetPeriod={currentPredictions.data?.target_period || '-'}
@@ -2518,7 +2520,7 @@ function ModelListTable({
   exportingModelId,
 }: {
   models: PredictionModel[]
-  modelScores: Record<string, ModelScore>
+  modelScores: ModelScoreMap
   validPinnedModelIds: string[]
   actualResult: LotteryDraw | null
   activeActionMenuId: string | null
@@ -2563,7 +2565,7 @@ function ModelListTable({
                   </div>
                 </td>
                 <td>
-                  <ModelScoreInline score={modelScores[model.model_id]} />
+                  <ModelScoreInline score={resolveModelScore(modelScores, model)} />
                 </td>
                 <td>
                   {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
@@ -3146,7 +3148,7 @@ function getScoreViewValue(score: ModelScore | undefined, key: ScoreViewSortKey)
 
 function sortModelsForScoreView(
   models: PredictionModel[],
-  modelScores: Record<string, ModelScore>,
+  modelScores: ModelScoreMap,
   pinnedModelIds: string[],
   sortKey: ScoreViewSortKey,
   sortDirection: ScoreViewSortDirection,
@@ -3166,13 +3168,13 @@ function sortModelsForScoreView(
       return 1
     }
 
-    const leftValue = getScoreViewValue(modelScores[left.model_id], sortKey)
-    const rightValue = getScoreViewValue(modelScores[right.model_id], sortKey)
+    const leftValue = getScoreViewValue(resolveModelScore(modelScores, left), sortKey)
+    const rightValue = getScoreViewValue(resolveModelScore(modelScores, right), sortKey)
     if (leftValue !== rightValue) {
       return leftValue < rightValue ? -1 * directionFactor : 1 * directionFactor
     }
 
-    const overallDiff = (modelScores[right.model_id]?.overallScore || 0) - (modelScores[left.model_id]?.overallScore || 0)
+    const overallDiff = (resolveModelScore(modelScores, right)?.overallScore || 0) - (resolveModelScore(modelScores, left)?.overallScore || 0)
     if (overallDiff !== 0) return overallDiff
     return left.model_name.localeCompare(right.model_name, 'zh-CN')
   })
@@ -3188,7 +3190,7 @@ function ModelScoreComparisonTable({
   onDetail,
 }: {
   models: PredictionModel[]
-  modelScores: Record<string, ModelScore>
+  modelScores: ModelScoreMap
   validPinnedModelIds: string[]
   sortKey: ScoreViewSortKey
   sortDirection: ScoreViewSortDirection
@@ -3227,7 +3229,7 @@ function ModelScoreComparisonTable({
         </thead>
         <tbody>
           {models.map((model) => {
-            const score = modelScores[model.model_id]
+            const score = resolveModelScore(modelScores, model)
             const isPinned = validPinnedModelIds.includes(model.model_id)
             return (
               <tr key={model.model_id}>

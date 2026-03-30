@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildHistoryPrizeTrend, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState } from './home'
+import { buildHistoryHitTrend, buildHistoryPrizeTrend, buildModelScores, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState, resolveModelScore } from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -598,5 +598,91 @@ describe('normalizePredictionModelPlayMode', () => {
         predictions: [{ group_id: 1, play_type: 'dlt_compound', red_balls: ['01', '02', '03', '04', '05', '06'], blue_balls: ['01', '02'] }],
       }),
     ).toBe('compound')
+  })
+})
+
+describe('buildModelScores', () => {
+  it('keeps score profiles separated by prediction play mode for the same model id', () => {
+    const modelScores = buildModelScores(
+      {
+        model_stats: [
+          {
+            model_id: 'm1',
+            model_name: 'Model 1',
+            prediction_play_mode: 'direct',
+            periods: 8,
+            winning_periods: 4,
+            bet_count: 40,
+            winning_bet_count: 8,
+            cost_amount: 80,
+            prize_amount: 110,
+            win_rate_by_period: 0.5,
+            win_rate_by_bet: 0.2,
+            score_profile: {
+              overall_score: 72,
+              per_bet_score: 68,
+              per_period_score: 75,
+              recent_score: 78,
+              long_term_score: 70,
+              component_scores: { profit: 74, hit_rate: 71, stability: 69, ceiling: 80, floor: 58 },
+            } as never,
+          },
+          {
+            model_id: 'm1',
+            model_name: 'Model 1',
+            prediction_play_mode: 'compound',
+            periods: 8,
+            winning_periods: 3,
+            bet_count: 160,
+            winning_bet_count: 6,
+            cost_amount: 320,
+            prize_amount: 90,
+            win_rate_by_period: 0.375,
+            win_rate_by_bet: 0.0375,
+            score_profile: {
+              overall_score: 54,
+              per_bet_score: 49,
+              per_period_score: 58,
+              recent_score: 56,
+              long_term_score: 52,
+              component_scores: { profit: 48, hit_rate: 53, stability: 57, ceiling: 61, floor: 45 },
+            } as never,
+          },
+          {
+            model_id: 'm1',
+            model_name: 'Model 1',
+            prediction_play_mode: 'dantuo',
+            periods: 8,
+            winning_periods: 6,
+            bet_count: 52,
+            winning_bet_count: 12,
+            cost_amount: 104,
+            prize_amount: 260,
+            win_rate_by_period: 0.75,
+            win_rate_by_bet: 0.2308,
+            score_profile: {
+              overall_score: 88,
+              per_bet_score: 84,
+              per_period_score: 90,
+              recent_score: 91,
+              long_term_score: 85,
+              component_scores: { profit: 89, hit_rate: 86, stability: 84, ceiling: 92, floor: 79 },
+            } as never,
+          },
+        ],
+        predictions_history: [],
+        total_count: 0,
+        strategy_options: [],
+      },
+      [
+        { model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', prediction_play_mode: 'direct', predictions: [] },
+        { model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', prediction_play_mode: 'compound', predictions: [] },
+        { model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', prediction_play_mode: 'dantuo', predictions: [] },
+      ],
+    )
+
+    expect(resolveModelScore(modelScores, { model_id: 'm1', prediction_play_mode: 'direct', predictions: [] })?.overallScore).toBe(72)
+    expect(resolveModelScore(modelScores, { model_id: 'm1', prediction_play_mode: 'compound', predictions: [] })?.overallScore).toBe(54)
+    expect(resolveModelScore(modelScores, { model_id: 'm1', prediction_play_mode: 'dantuo', predictions: [] })?.overallScore).toBe(88)
   })
 })

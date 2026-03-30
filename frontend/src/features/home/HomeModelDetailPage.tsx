@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { loadSelectedLottery } from '../../shared/lib/storage'
 import { useHomeData } from './hooks/useHomeData'
-import { buildModelScores, getActualResult, normalizePredictionModelPlayMode } from './lib/home'
+import { buildModelScores, getActualResult, normalizePredictionModelPlayMode, resolveModelScore } from './lib/home'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
 import type { HomeDetailRouteState } from './navigation'
 
@@ -57,7 +57,7 @@ export function HomeModelDetailPage() {
       },
       [selectedModel],
     )
-    return scoreByModelId[selectedModel.model_id]
+    return resolveModelScore(scoreByModelId, selectedModel)
   }, [history?.model_stats, selectedModel])
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 

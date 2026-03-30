@@ -297,67 +297,151 @@ vi.mock('./hooks/useHomeData', () => ({
     const pagedLotteryRecords = lotteryRecords.slice(lotteryOffset, lotteryOffset + lotteryPageSize)
     const currentHistoryPayload = useMemo(
       () => ({
-        model_stats: [
-          {
-            model_id: 'model-a',
-            model_name: '模型A',
-            prediction_play_mode:
-              !isPl3 && simulateDltDantuoCurrentPredictions.current
-                ? 'dantuo'
-                : !isPl3 && simulateDltCompoundCurrentPredictions.current
-                  ? 'compound'
-                  : 'direct',
-            periods: 8,
-            winning_periods: 5,
-            bet_count: 40,
-            winning_bet_count: 10,
-            cost_amount: 80,
-            prize_amount: 160,
-            win_rate_by_period: 0.625,
-            win_rate_by_bet: 0.25,
-            score_profile: {
-              overall_score: 72,
-              per_bet_score: 68,
-              per_period_score: 75,
-              recent_score: 78,
-              long_term_score: 70,
-              component_scores: {
-                profit: 74,
-                hit_rate: 71,
-                stability: 69,
-                ceiling: 80,
-                floor: 58,
+        model_stats: !isPl3 && simulateDltModeCoexistCurrentPredictions.current
+          ? [
+              {
+                model_id: 'model-a',
+                model_name: '模型A',
+                prediction_play_mode: 'direct',
+                periods: 8,
+                winning_periods: 5,
+                bet_count: 40,
+                winning_bet_count: 10,
+                cost_amount: 80,
+                prize_amount: 160,
+                win_rate_by_period: 0.625,
+                win_rate_by_bet: 0.25,
+                score_profile: {
+                  overall_score: 72,
+                  per_bet_score: 68,
+                  per_period_score: 75,
+                  recent_score: 78,
+                  long_term_score: 70,
+                  component_scores: {
+                    profit: 74,
+                    hit_rate: 71,
+                    stability: 69,
+                    ceiling: 80,
+                    floor: 58,
+                  },
+                },
               },
-            },
-          },
-          {
-            model_id: 'model-b',
-            model_name: '模型B',
-            prediction_play_mode: 'direct',
-            periods: 8,
-            winning_periods: 4,
-            bet_count: 40,
-            winning_bet_count: 8,
-            cost_amount: 80,
-            prize_amount: 110,
-            win_rate_by_period: 0.5,
-            win_rate_by_bet: 0.2,
-            score_profile: {
-              overall_score: 61,
-              per_bet_score: 57,
-              per_period_score: 64,
-              recent_score: 59,
-              long_term_score: 63,
-              component_scores: {
-                profit: 60,
-                hit_rate: 62,
-                stability: 58,
-                ceiling: 67,
-                floor: 52,
+              {
+                model_id: 'model-a',
+                model_name: '模型A',
+                prediction_play_mode: 'compound',
+                periods: 8,
+                winning_periods: 3,
+                bet_count: 160,
+                winning_bet_count: 6,
+                cost_amount: 320,
+                prize_amount: 90,
+                win_rate_by_period: 0.375,
+                win_rate_by_bet: 0.0375,
+                score_profile: {
+                  overall_score: 54,
+                  per_bet_score: 49,
+                  per_period_score: 58,
+                  recent_score: 56,
+                  long_term_score: 52,
+                  component_scores: {
+                    profit: 48,
+                    hit_rate: 53,
+                    stability: 57,
+                    ceiling: 61,
+                    floor: 45,
+                  },
+                },
               },
-            },
-          },
-        ],
+              {
+                model_id: 'model-a',
+                model_name: '模型A',
+                prediction_play_mode: 'dantuo',
+                periods: 8,
+                winning_periods: 6,
+                bet_count: 52,
+                winning_bet_count: 12,
+                cost_amount: 104,
+                prize_amount: 260,
+                win_rate_by_period: 0.75,
+                win_rate_by_bet: 0.2308,
+                score_profile: {
+                  overall_score: 88,
+                  per_bet_score: 84,
+                  per_period_score: 90,
+                  recent_score: 91,
+                  long_term_score: 85,
+                  component_scores: {
+                    profit: 89,
+                    hit_rate: 86,
+                    stability: 84,
+                    ceiling: 92,
+                    floor: 79,
+                  },
+                },
+              },
+            ]
+          : [
+              {
+                model_id: 'model-a',
+                model_name: '模型A',
+                prediction_play_mode:
+                  !isPl3 && simulateDltDantuoCurrentPredictions.current
+                    ? 'dantuo'
+                    : !isPl3 && simulateDltCompoundCurrentPredictions.current
+                      ? 'compound'
+                      : 'direct',
+                periods: 8,
+                winning_periods: 5,
+                bet_count: 40,
+                winning_bet_count: 10,
+                cost_amount: 80,
+                prize_amount: 160,
+                win_rate_by_period: 0.625,
+                win_rate_by_bet: 0.25,
+                score_profile: {
+                  overall_score: 72,
+                  per_bet_score: 68,
+                  per_period_score: 75,
+                  recent_score: 78,
+                  long_term_score: 70,
+                  component_scores: {
+                    profit: 74,
+                    hit_rate: 71,
+                    stability: 69,
+                    ceiling: 80,
+                    floor: 58,
+                  },
+                },
+              },
+              {
+                model_id: 'model-b',
+                model_name: '模型B',
+                prediction_play_mode: 'direct',
+                periods: 8,
+                winning_periods: 4,
+                bet_count: 40,
+                winning_bet_count: 8,
+                cost_amount: 80,
+                prize_amount: 110,
+                win_rate_by_period: 0.5,
+                win_rate_by_bet: 0.2,
+                score_profile: {
+                  overall_score: 61,
+                  per_bet_score: 57,
+                  per_period_score: 64,
+                  recent_score: 59,
+                  long_term_score: 63,
+                  component_scores: {
+                    profit: 60,
+                    hit_rate: 62,
+                    stability: 58,
+                    ceiling: 67,
+                    floor: 52,
+                  },
+                },
+              },
+            ],
         predictions_history: pagedHistoryRecords,
         total_count: filteredHistoryRecords.length,
         strategy_options: ['AI 组合策略', '冷号补位', '增强型热号追随者'],
@@ -1156,6 +1240,20 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByText('前胆')).toBeInTheDocument()
     expect(screen.getByText('前拖')).toBeInTheDocument()
+  })
+
+  it('uses separate dlt scores for direct compound and dantuo modes', async () => {
+    simulateDltModeCoexistCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+    expect(screen.getByRole('cell', { name: '综合分 72分' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '复式' }))
+    expect(screen.getByRole('cell', { name: '综合分 54分' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
+    expect(screen.getByRole('cell', { name: '综合分 88分' })).toBeInTheDocument()
   })
 
   it('shows four fixed compound groups in dlt prediction overview', async () => {
