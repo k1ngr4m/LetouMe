@@ -48,7 +48,7 @@ export type PredictionHitResult = {
 
 export type PredictionGroup = {
   group_id: number
-  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo'
+  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound'
   sum_value?: string
   cost_amount?: number
   strategy?: string
@@ -67,7 +67,7 @@ export type PredictionGroup = {
   prize_source?: 'official' | 'fallback' | 'missing' | 'none'
 }
 
-export type PredictionPlayMode = 'direct' | 'direct_sum' | 'dantuo'
+export type PredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
 
 export type ScoreSnapshot = {
   target_period: string

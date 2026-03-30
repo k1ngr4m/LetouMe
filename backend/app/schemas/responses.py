@@ -239,7 +239,7 @@ class ScheduleTaskResponse(BaseModel):
     lottery_code: str = "dlt"
     model_codes: list[str] = Field(default_factory=list)
     generation_mode: str = "current"
-    prediction_play_mode: Literal["direct", "direct_sum", "dantuo"] = "direct"
+    prediction_play_mode: Literal["direct", "direct_sum", "compound", "dantuo"] = "direct"
     overwrite_existing: bool = False
     schedule_mode: str
     preset_type: str | None = None

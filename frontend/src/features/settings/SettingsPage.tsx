@@ -33,7 +33,7 @@ import type {
 type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
-type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'dantuo'
+type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
 type GenerationHistoryRangeMode = 'custom' | 'recent'
 type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
@@ -509,7 +509,9 @@ function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predict
     return predictionPlayMode === 'direct_sum' ? 'direct_sum' : 'direct'
   }
   if (lotteryCode === 'dlt') {
-    return predictionPlayMode === 'dantuo' ? 'dantuo' : 'direct'
+    if (predictionPlayMode === 'dantuo') return 'dantuo'
+    if (predictionPlayMode === 'compound') return 'compound'
+    return 'direct'
   }
   return 'direct'
 }
@@ -520,7 +522,9 @@ function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode,
     return normalizedMode === 'direct_sum' ? '和值' : '直选'
   }
   if (lotteryCode === 'dlt') {
-    return normalizedMode === 'dantuo' ? '胆拖' : '普通'
+    if (normalizedMode === 'dantuo') return '胆拖'
+    if (normalizedMode === 'compound') return '复式'
+    return '普通'
   }
   return '直选'
 }
@@ -3386,6 +3390,7 @@ export function SettingsPage() {
                         ) : (
                           <>
                             <option value="direct">普通</option>
+                            <option value="compound">复式</option>
                             <option value="dantuo">胆拖</option>
                           </>
                         )}
@@ -3566,6 +3571,7 @@ export function SettingsPage() {
                         ) : (
                           <>
                             <option value="direct">普通预测</option>
+                            <option value="compound">复式预测</option>
                             <option value="dantuo">胆拖预测</option>
                           </>
                         )}

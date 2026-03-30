@@ -497,6 +497,14 @@ describe('getPredictionPlayTypeLabel', () => {
         back_tuo: ['02', '03'],
       }),
     ).toBe('胆拖')
+    expect(
+      getPredictionPlayTypeLabel({
+        group_id: 3,
+        play_type: 'dlt_compound',
+        red_balls: ['01', '02', '03', '04', '05', '06'],
+        blue_balls: ['01', '02', '03'],
+      }),
+    ).toBe('复式')
   })
 })
 
@@ -522,5 +530,26 @@ describe('normalizePredictionModelPlayMode', () => {
         predictions: [{ group_id: 1, play_type: 'direct_sum', sum_value: '12', red_balls: [], blue_balls: [], digits: [] }],
       }),
     ).toBe('direct_sum')
+  })
+
+  it('infers compound from explicit mode or group play type', () => {
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm3',
+        prediction_play_mode: 'compound',
+        model_name: 'Model 3',
+        model_provider: 'openai',
+        predictions: [],
+      }),
+    ).toBe('compound')
+
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm4',
+        model_name: 'Model 4',
+        model_provider: 'openai',
+        predictions: [{ group_id: 1, play_type: 'dlt_compound', red_balls: ['01', '02', '03', '04', '05', '06'], blue_balls: ['01', '02'] }],
+      }),
+    ).toBe('compound')
   })
 })

@@ -205,13 +205,16 @@ function DltPredictionModeSwitch({
   value,
   onChange,
 }: {
-  value: 'direct' | 'dantuo'
-  onChange: (value: 'direct' | 'dantuo') => void
+  value: 'direct' | 'compound' | 'dantuo'
+  onChange: (value: 'direct' | 'compound' | 'dantuo') => void
 }) {
   return (
     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="大乐透玩法切换">
       <button className={clsx('tab-strip__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
         普通
+      </button>
+      <button className={clsx('tab-strip__item', value === 'compound' && 'is-active')} type="button" onClick={() => onChange('compound')}>
+        复式
       </button>
       <button className={clsx('tab-strip__item', value === 'dantuo' && 'is-active')} type="button" onClick={() => onChange('dantuo')}>
         胆拖
@@ -237,12 +240,12 @@ type HistoryModelStatView = {
 type HistoryModelRef = {
   model_id: string
   model_name: string
-  prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo'
+  prediction_play_mode?: 'direct' | 'direct_sum' | 'compound' | 'dantuo'
 }
 
 function resolveHistoryModelModeKey(model: {
   model_id: string
-  prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo' | null
+  prediction_play_mode?: 'direct' | 'direct_sum' | 'compound' | 'dantuo' | null
   predictions?: PredictionGroup[]
 }) {
   return `${model.model_id}::${normalizePredictionModelPlayMode(model)}`
@@ -324,6 +327,9 @@ function resolveHistoryPredictionGroupCost(group: PredictionGroup, lotteryCode: 
   const explicitCost = Number(group.cost_amount || 0)
   if (explicitCost > 0) return explicitCost
   const playType = String(group.play_type || 'direct').trim().toLowerCase()
+  if (lotteryCode === 'dlt' && playType === 'dlt_compound') {
+    return combination(group.red_balls.length, 5) * combination(group.blue_balls.length, 2) * 2
+  }
   if (lotteryCode === 'dlt' && playType === 'dlt_dantuo') {
     const frontDan = new Set((group.front_dan || []).map((item) => String(item).padStart(2, '0')))
     const frontTuo = new Set((group.front_tuo || []).map((item) => String(item).padStart(2, '0')))
@@ -414,7 +420,7 @@ export function HomePage() {
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
-  const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'dantuo'>('direct')
+  const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'compound' | 'dantuo'>('direct')
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
@@ -422,7 +428,7 @@ export function HomePage() {
       selectedLottery === 'pl3'
         ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct'])
         : selectedLottery === 'dlt'
-          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : ['direct'])
+          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : dltPredictionMode === 'compound' ? ['dlt_compound'] : ['direct'])
           : [],
     [dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
@@ -431,7 +437,7 @@ export function HomePage() {
       selectedLottery === 'pl3'
         ? (pl3PredictionMode === 'direct_sum' ? ['direct_sum'] : ['direct'])
         : selectedLottery === 'dlt'
-          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : ['direct'])
+          ? (dltPredictionMode === 'dantuo' ? ['dlt_dantuo'] : dltPredictionMode === 'compound' ? ['dlt_compound'] : ['direct'])
           : [],
     [dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
@@ -613,7 +619,7 @@ export function HomePage() {
 
   const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
     const references = new Map<string, HistoryModelRef>()
-    const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' | 'dantuo' }) =>
+    const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' | 'compound' | 'dantuo' }) =>
       `${model.model_id}::${model.prediction_play_mode || 'direct'}`
     for (const stat of history?.model_stats || []) {
       if (!stat.model_id) continue
@@ -922,7 +928,7 @@ export function HomePage() {
                 aria-pressed={selectedLottery === code}
               >
                 <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '支持普通与胆拖预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
+                <span className="chip-button__meta">{code === 'dlt' ? '支持普通、复式与胆拖预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
               </button>
             ))}
           </div>

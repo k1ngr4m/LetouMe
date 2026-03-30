@@ -314,6 +314,9 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             "`digits` 必须是长度为 3 的数组",
             "禁止生成或提及组选",
             "只输出纯 JSON",
+            "核心逻辑",
+            "执行步骤",
+            "增强型综合决策者",
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
@@ -327,6 +330,9 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             "`digits` 必须是空数组 `[]`",
             "禁止输出具体号码组合",
             "只输出纯 JSON",
+            "核心逻辑",
+            "执行步骤",
+            "增强型综合平衡和值",
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
@@ -340,6 +346,27 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             "back_dan",
             "back_tuo",
             "严格输出 JSON",
+            "核心逻辑",
+            "执行步骤",
+            "增强型胆拖综合决策者",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
+    def test_dlt_compound_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("dlt", prediction_play_mode="compound")
+        required_phrases = [
+            "仅输出 4 组预测",
+            "dlt_compound",
+            "6+2",
+            "7+2",
+            "6+3",
+            "7+3",
+            "增强型综合决策者",
+            "核心逻辑",
+            "执行步骤",
+            "核心覆盖",
+            "扩展覆盖",
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
@@ -479,6 +506,109 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertFalse(service._validate_prediction(invalid_front_prediction, lottery_code="dlt", prediction_play_mode="direct"))
         self.assertFalse(service._validate_prediction(invalid_back_prediction, lottery_code="dlt", prediction_play_mode="direct"))
 
+    def test_validate_prediction_dlt_compound_requires_fixed_group_shapes(self) -> None:
+        service = PredictionGenerationService()
+        valid_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["01", "02", "03", "04", "05", "06"],
+                    "blue_balls": ["01", "02"],
+                },
+                {
+                    "group_id": 2,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["07", "08", "09", "10", "11", "12", "13"],
+                    "blue_balls": ["03", "04"],
+                },
+                {
+                    "group_id": 3,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["14", "15", "16", "17", "18", "19"],
+                    "blue_balls": ["05", "06", "07"],
+                },
+                {
+                    "group_id": 4,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["20", "21", "22", "23", "24", "25", "26"],
+                    "blue_balls": ["08", "09", "10"],
+                },
+            ]
+        }
+        invalid_shape_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["01", "02", "03", "04", "05"],
+                    "blue_balls": ["01", "02"],
+                },
+                {
+                    "group_id": 2,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["07", "08", "09", "10", "11", "12", "13"],
+                    "blue_balls": ["03", "04"],
+                },
+                {
+                    "group_id": 3,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["14", "15", "16", "17", "18", "19"],
+                    "blue_balls": ["05", "06", "07"],
+                },
+                {
+                    "group_id": 4,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["20", "21", "22", "23", "24", "25", "26"],
+                    "blue_balls": ["08", "09", "10"],
+                },
+            ]
+        }
+        invalid_strategy_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "dlt_compound",
+                    "strategy": "普通综合决策者",
+                    "red_balls": ["01", "02", "03", "04", "05", "06"],
+                    "blue_balls": ["01", "02"],
+                },
+                {
+                    "group_id": 2,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["07", "08", "09", "10", "11", "12", "13"],
+                    "blue_balls": ["03", "04"],
+                },
+                {
+                    "group_id": 3,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["14", "15", "16", "17", "18", "19"],
+                    "blue_balls": ["05", "06", "07"],
+                },
+                {
+                    "group_id": 4,
+                    "play_type": "dlt_compound",
+                    "strategy": "增强型综合决策者",
+                    "red_balls": ["20", "21", "22", "23", "24", "25", "26"],
+                    "blue_balls": ["08", "09", "10"],
+                },
+            ]
+        }
+
+        self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="dlt", prediction_play_mode="compound"))
+        self.assertFalse(service._validate_prediction(invalid_shape_prediction, lottery_code="dlt", prediction_play_mode="compound"))
+        self.assertFalse(service._validate_prediction(invalid_strategy_prediction, lottery_code="dlt", prediction_play_mode="compound"))
+
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")
         rendered = template.format(
@@ -508,6 +638,9 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             "`digits` 必须是长度为 5 的数组",
             "只输出纯 JSON",
             "输出前自检清单",
+            "核心逻辑",
+            "执行步骤",
+            "增强型综合决策者",
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)

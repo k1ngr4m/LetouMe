@@ -232,8 +232,8 @@ class ScheduleService:
             return "direct"
         normalized_mode = str(prediction_play_mode or "direct").strip().lower() or "direct"
         if lottery_code == "dlt":
-            if normalized_mode not in {"direct", "dantuo"}:
-                raise ValueError("大乐透预测模式仅支持 direct 或 dantuo")
+            if normalized_mode not in {"direct", "compound", "dantuo"}:
+                raise ValueError("大乐透预测模式仅支持 direct / compound / dantuo")
             return normalized_mode
         if lottery_code != "pl3":
             if normalized_mode != "direct":

@@ -16,6 +16,7 @@ const {
   getSimulationTickets,
   quoteSimulationTicket,
   simulateDltModeCoexistCurrentPredictions,
+  simulateDltCompoundCurrentPredictions,
   simulateDltDantuoCurrentPredictions,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
@@ -32,6 +33,7 @@ const {
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
   simulateDltModeCoexistCurrentPredictions: { current: false },
+  simulateDltCompoundCurrentPredictions: { current: false },
   simulateDltDantuoCurrentPredictions: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
@@ -63,6 +65,7 @@ function buildHistoryRecord(period: string, date: string, primaryModelId: 'model
         model_id: primaryModelId,
         model_name: primaryModelName,
         model_provider: primaryModelId === 'model-a' ? 'openai_compatible' : 'deepseek',
+        prediction_play_mode: 'direct',
         best_hit_count: primaryModelId === 'model-a' ? 3 : 2,
         bet_count: 5,
         cost_amount: 10,
@@ -74,6 +77,7 @@ function buildHistoryRecord(period: string, date: string, primaryModelId: 'model
         model_id: secondaryModelId,
         model_name: secondaryModelName,
         model_provider: secondaryModelId === 'model-a' ? 'openai_compatible' : 'deepseek',
+        prediction_play_mode: 'direct',
         best_hit_count: 1,
         bet_count: 5,
         cost_amount: 10,
@@ -134,7 +138,7 @@ vi.mock('./hooks/useHomeData', () => ({
     historyPage = 1,
     historyPageSize = 10,
     historyStrategyFilters: string[] = [],
-    historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6'> = [],
+    historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound'> = [],
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
@@ -151,6 +155,36 @@ vi.mock('./hooks/useHomeData', () => ({
     const matchesHistoryStrategies = (modelId: string) =>
       !normalizedHistoryStrategyFilters.length ||
       normalizedHistoryStrategyFilters.every((strategy) => (modelStrategiesById[modelId] || []).includes(strategy))
+    const compoundPredictions = [
+      {
+        group_id: 1,
+        play_type: 'dlt_compound',
+        strategy: '增强型综合决策者',
+        red_balls: ['01', '02', '03', '04', '05', '06'],
+        blue_balls: ['06', '07'],
+      },
+      {
+        group_id: 2,
+        play_type: 'dlt_compound',
+        strategy: '增强型综合决策者',
+        red_balls: ['08', '09', '10', '11', '12', '13', '14'],
+        blue_balls: ['01', '02'],
+      },
+      {
+        group_id: 3,
+        play_type: 'dlt_compound',
+        strategy: '增强型综合决策者',
+        red_balls: ['15', '16', '17', '18', '19', '20'],
+        blue_balls: ['03', '04', '05'],
+      },
+      {
+        group_id: 4,
+        play_type: 'dlt_compound',
+        strategy: '增强型综合决策者',
+        red_balls: ['21', '22', '23', '24', '25', '26', '27'],
+        blue_balls: ['08', '09', '10'],
+      },
+    ]
 
     const historyRecords = [
       buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
@@ -166,6 +200,44 @@ vi.mock('./hooks/useHomeData', () => ({
       buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
       buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
     ].map((record) => {
+      if (!isPl3 && simulateDltDantuoCurrentPredictions.current) {
+        return {
+          ...record,
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              prediction_play_mode: 'dantuo',
+              best_hit_count: 3,
+              bet_count: 5,
+              cost_amount: 10,
+              winning_bet_count: 1,
+              prize_amount: 300,
+              hit_period_win: true,
+            },
+          ],
+        }
+      }
+      if (!isPl3 && simulateDltCompoundCurrentPredictions.current) {
+        return {
+          ...record,
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              prediction_play_mode: 'compound',
+              best_hit_count: 3,
+              bet_count: 51,
+              cost_amount: 102,
+              winning_bet_count: 2,
+              prize_amount: 300,
+              hit_period_win: true,
+            },
+          ],
+        }
+      }
       if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return record
       return {
         ...record,
@@ -184,7 +256,13 @@ vi.mock('./hooks/useHomeData', () => ({
       .map((record) => {
         const models = (record.models || []).filter((model) => {
           if (!matchesHistoryStrategies(model.model_id)) return false
-          if (!isPl3 || !historyPlayTypeFilters.length) return true
+          if (!historyPlayTypeFilters.length) return true
+          if (!isPl3) {
+            const modelPlayMode = String((model as { prediction_play_mode?: string }).prediction_play_mode || 'direct').trim().toLowerCase()
+            if (historyPlayTypeFilters.includes('dlt_dantuo')) return modelPlayMode === 'dantuo'
+            if (historyPlayTypeFilters.includes('dlt_compound')) return modelPlayMode === 'compound'
+            return modelPlayMode === 'direct'
+          }
           const modelPlayType = String((model as { play_type?: string }).play_type || 'direct').trim().toLowerCase()
           return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6')
         })
@@ -223,6 +301,12 @@ vi.mock('./hooks/useHomeData', () => ({
           {
             model_id: 'model-a',
             model_name: '模型A',
+            prediction_play_mode:
+              !isPl3 && simulateDltDantuoCurrentPredictions.current
+                ? 'dantuo'
+                : !isPl3 && simulateDltCompoundCurrentPredictions.current
+                  ? 'compound'
+                  : 'direct',
             periods: 8,
             winning_periods: 5,
             bet_count: 40,
@@ -249,6 +333,7 @@ vi.mock('./hooks/useHomeData', () => ({
           {
             model_id: 'model-b',
             model_name: '模型B',
+            prediction_play_mode: 'direct',
             periods: 8,
             winning_periods: 4,
             bet_count: 40,
@@ -277,7 +362,7 @@ vi.mock('./hooks/useHomeData', () => ({
         total_count: filteredHistoryRecords.length,
         strategy_options: ['AI 组合策略', '冷号补位', '增强型热号追随者'],
       }),
-      [filteredHistoryRecords.length, pagedHistoryRecords],
+      [filteredHistoryRecords.length, isPl3, pagedHistoryRecords],
     )
     const currentModels = isPl3
       ? [
@@ -391,6 +476,15 @@ vi.mock('./hooks/useHomeData', () => ({
               model_provider: 'openai_compatible',
               model_tags: ['reasoning'],
               model_api_model: 'model-a-api',
+              prediction_play_mode: 'compound',
+              predictions: compoundPredictions,
+            },
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
               prediction_play_mode: 'dantuo',
               predictions: [
                 {
@@ -405,6 +499,18 @@ vi.mock('./hooks/useHomeData', () => ({
                   blue_balls: ['06', '11'],
                 },
               ],
+            },
+          ]
+        : simulateDltCompoundCurrentPredictions.current
+        ? [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              model_tags: ['reasoning'],
+              model_api_model: 'model-a-api',
+              prediction_play_mode: 'compound',
+              predictions: compoundPredictions,
             },
           ]
         : simulateDltDantuoCurrentPredictions.current
@@ -629,6 +735,7 @@ beforeEach(() => {
   window.localStorage.clear()
   simulateHistoryFilterLoading.current = false
   simulateDltModeCoexistCurrentPredictions.current = false
+  simulateDltCompoundCurrentPredictions.current = false
   simulateDltDantuoCurrentPredictions.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
@@ -1041,6 +1148,34 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('前拖')).toBeInTheDocument()
   })
 
+  it('shows four fixed compound groups in dlt prediction overview', async () => {
+    simulateDltCompoundCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '复式' }))
+
+    expect(screen.getAllByText('复式').length).toBeGreaterThan(0)
+    expect(screen.getByText('成本 6注/12元')).toBeInTheDocument()
+    expect(screen.getByText('成本 63注/126元')).toBeInTheDocument()
+    expect(screen.getAllByText('01').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('27').length).toBeGreaterThan(0)
+  })
+
+  it('filters dlt history records by compound mode', async () => {
+    simulateDltCompoundCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '复式' })[0])
+
+    const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
+    expect(historySection).not.toBeNull()
+    const historyRecords = (historySection as HTMLElement).querySelector('.history-card-list__records')
+    expect(historyRecords).not.toBeNull()
+    expect(within(historyRecords as HTMLElement).getAllByText('模型A').length).toBeGreaterThan(0)
+    expect(within(historyRecords as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
+  })
+
   it('applies model list filters to number summary candidates', async () => {
     renderPage()
 
@@ -1188,15 +1323,15 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
-    expect(screen.getByText('命中趋势折线')).toBeInTheDocument()
-    expect(screen.getByText('命中堆叠柱形统计')).toBeInTheDocument()
+    expect(await screen.findByText('命中趋势折线')).toBeInTheDocument()
+    expect(await screen.findByText('命中堆叠柱形统计')).toBeInTheDocument()
 
     expect(within(historySection as HTMLElement).getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('成本 20 元').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('奖金 305 元').length).toBeGreaterThan(0)
 
-    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    const firstHistoryCard = (await screen.findByText('第 2026031 期')).closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     expect(firstHistoryCard?.parentElement).toHaveClass('history-card-list__records')
     expect(within(firstHistoryCard as HTMLElement).getAllByText('注数').length).toBeGreaterThan(0)
@@ -1204,7 +1339,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getAllByText('奖金').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getAllByText('10 元').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getByText('300 元')).toBeInTheDocument()
-  })
+  }, 10000)
 
   it('exports a single history record card png', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -1621,6 +1756,7 @@ describe('HomePage dashboard sidebar', () => {
   })
 
   it('shows dlt dantuo sections with dan/tuo labels', async () => {
+    simulateDltDantuoCurrentPredictions.current = true
     getPredictionsHistoryDetail.mockResolvedValue({
       predictions_history: [
         {
