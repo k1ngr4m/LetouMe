@@ -1141,7 +1141,11 @@ class PredictionService:
             best_hit_count = 0
             model_bet_count = 0
             for group in model.get("predictions", []):
-                hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
+                group_play_type = str(group.get("play_type") or "").strip().lower()
+                if lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}:
+                    hit_result = self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
+                else:
+                    hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
                 trend_hit_count = self._resolve_trend_hit_count(group, actual_result, lottery_code, hit_result=hit_result)
                 group_id = int(group.get("group_id") or 0)
                 if best_group is None or trend_hit_count > best_hit_count or (
@@ -1152,7 +1156,6 @@ class PredictionService:
                 prize_level = self.resolve_prize_level(hit_result, actual_result=actual_result, prediction_group=group)
                 group_cost = self._resolve_prediction_group_cost(group, lottery_code)
                 group_bet_count = self._resolve_prediction_group_bet_count(group, lottery_code, hit_result=hit_result)
-                group_play_type = str(group.get("play_type") or "").strip().lower()
                 if lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}:
                     group_winning_bet_count, group_prize_amount, prize_source = self._resolve_dlt_multi_bet_prize_totals(
                         hit_result=hit_result,

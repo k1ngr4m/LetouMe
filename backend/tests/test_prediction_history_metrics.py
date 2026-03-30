@@ -371,6 +371,13 @@ class _FakeDltCompoundPredictionRepository:
                             "strategy": "增强型综合决策者",
                             "red_balls": ["01", "02", "03", "04", "05", "06"],
                             "blue_balls": ["06", "07", "08"],
+                            "hit_result": {
+                                "red_hits": ["01", "02", "03", "04"],
+                                "red_hit_count": 4,
+                                "blue_hits": ["06", "07"],
+                                "blue_hit_count": 2,
+                                "total_hits": 6,
+                            },
                         }
                     ],
                 }
@@ -620,6 +627,7 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(group["prize_level"], "三等奖")
         self.assertEqual(group["prize_amount"], 11920)
         self.assertEqual(group["prize_source"], "fallback")
+        self.assertEqual(group["hit_result"]["winning_bet_count"], 18)
 
     def test_pl3_history_list_ignores_strategy_filters(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
