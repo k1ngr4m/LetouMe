@@ -445,6 +445,40 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="dlt", prediction_play_mode="dantuo"))
         self.assertFalse(service._validate_prediction(invalid_prediction, lottery_code="dlt", prediction_play_mode="dantuo"))
 
+    def test_validate_prediction_dlt_direct_rejects_out_of_range_numbers(self) -> None:
+        service = PredictionGenerationService()
+        valid_prediction = {
+            "predictions": [
+                {"group_id": 1, "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["01", "02"]},
+                {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+            ]
+        }
+        invalid_front_prediction = {
+            "predictions": [
+                {"group_id": 1, "red_balls": ["01", "02", "03", "04", "36"], "blue_balls": ["01", "02"]},
+                {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+            ]
+        }
+        invalid_back_prediction = {
+            "predictions": [
+                {"group_id": 1, "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["01", "13"]},
+                {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+            ]
+        }
+
+        self.assertTrue(service._validate_prediction(valid_prediction, lottery_code="dlt", prediction_play_mode="direct"))
+        self.assertFalse(service._validate_prediction(invalid_front_prediction, lottery_code="dlt", prediction_play_mode="direct"))
+        self.assertFalse(service._validate_prediction(invalid_back_prediction, lottery_code="dlt", prediction_play_mode="direct"))
+
     def test_pl5_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("pl5")
         rendered = template.format(
@@ -551,6 +585,86 @@ class PredictionGenerationServiceTests(unittest.TestCase):
 
         joined = "\n".join(logs.output)
         self.assertIn("Model prediction validation failed", joined)
+
+    def test_generate_prediction_retries_when_validation_fails_then_succeeds(self) -> None:
+        service = PredictionGenerationService()
+        model = Mock()
+        model.predict.side_effect = [
+            {
+                "predictions": [
+                    {"group_id": 1, "red_balls": ["01", "02", "03", "04", "36"], "blue_balls": ["01", "02"]},
+                    {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                    {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                    {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                    {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+                ]
+            },
+            {
+                "predictions": [
+                    {"group_id": 1, "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["01", "02"]},
+                    {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                    {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                    {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                    {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+                ]
+            },
+        ]
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+
+        prediction = service._generate_prediction(
+            model=model,
+            model_def=model_def,
+            lottery_code="dlt",
+            prediction_play_mode="direct",
+            prompt_template="{target_period}",
+            target_period="2026032",
+            prediction_date="2026-03-18",
+            history_context=[{"period": "2026031"}],
+            target_date="2026-03-19",
+        )
+
+        self.assertEqual(model.predict.call_count, 2)
+        self.assertEqual(prediction["predictions"][0]["red_balls"], ["01", "02", "03", "04", "05"])
+
+    def test_generate_prediction_fails_after_exhausting_invalid_prediction_retries(self) -> None:
+        service = PredictionGenerationService()
+        model = Mock()
+        model.predict.return_value = {
+            "predictions": [
+                {"group_id": 1, "red_balls": ["01", "02", "03", "04", "36"], "blue_balls": ["01", "02"]},
+                {"group_id": 2, "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"]},
+                {"group_id": 3, "red_balls": ["11", "12", "13", "14", "15"], "blue_balls": ["05", "06"]},
+                {"group_id": 4, "red_balls": ["16", "17", "18", "19", "20"], "blue_balls": ["07", "08"]},
+                {"group_id": 5, "red_balls": ["21", "22", "23", "24", "25"], "blue_balls": ["09", "10"]},
+            ]
+        }
+        model_def = ModelDefinition(
+            id="model-a",
+            name="模型A",
+            provider="openai_compatible",
+            model_id="model-a",
+            api_model="gpt-4o-mini",
+        )
+
+        with self.assertRaises(ValueError):
+            service._generate_prediction(
+                model=model,
+                model_def=model_def,
+                lottery_code="dlt",
+                prediction_play_mode="direct",
+                prompt_template="{target_period}",
+                target_period="2026032",
+                prediction_date="2026-03-18",
+                history_context=[{"period": "2026031"}],
+                target_date="2026-03-19",
+            )
+        self.assertEqual(model.predict.call_count, 3)
 
     def test_payload_preview_truncates_long_response(self) -> None:
         preview = PredictionGenerationService._build_payload_preview(

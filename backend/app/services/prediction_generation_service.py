@@ -29,6 +29,7 @@ DEFAULT_BULK_PARALLELISM = 3
 DEFAULT_SINGLE_MODEL_PARALLELISM = 3
 MAX_GENERATION_PARALLELISM = 8
 MAX_BULK_RETRIES_PER_MODEL = 1
+MAX_INVALID_PREDICTION_RETRIES = 2
 SUPPORTED_RECENT_PERIOD_COUNTS = {1, 5, 10, 20}
 
 
@@ -953,70 +954,98 @@ class PredictionGenerationService:
                     "model_provider": model_def.provider,
                     "history_context_count": len(history_context),
                     "prompt_length": len(prompt),
+                    "max_attempts": MAX_INVALID_PREDICTION_RETRIES + 1,
                 }
             },
         )
-        try:
-            raw_prediction = model.predict(prompt)
-        except Exception:
-            self.logger.exception(
-                "Model prediction request failed",
+        attempts = MAX_INVALID_PREDICTION_RETRIES + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                raw_prediction = model.predict(prompt)
+            except Exception:
+                self.logger.exception(
+                    "Model prediction request failed",
+                    extra={
+                        "context": {
+                            "lottery_code": lottery_code,
+                            "prediction_play_mode": prediction_play_mode,
+                            "target_period": target_period,
+                            "model_code": model_def.model_id,
+                            "model_provider": model_def.provider,
+                            "attempt": attempt,
+                            "max_attempts": attempts,
+                        }
+                    },
+                )
+                raise
+            raw_summary = self._build_prediction_payload_summary(raw_prediction)
+            raw_preview = self._build_payload_preview(raw_prediction)
+            self.logger.info(
+                "Model returned prediction payload",
                 extra={
                     "context": {
                         "lottery_code": lottery_code,
-                        "prediction_play_mode": prediction_play_mode,
                         "target_period": target_period,
                         "model_code": model_def.model_id,
-                        "model_provider": model_def.provider,
-                    }
-                },
-            )
-            raise
-        raw_summary = self._build_prediction_payload_summary(raw_prediction)
-        raw_preview = self._build_payload_preview(raw_prediction)
-        self.logger.info(
-            "Model returned prediction payload",
-            extra={
-                "context": {
-                    "lottery_code": lottery_code,
-                    "target_period": target_period,
-                    "model_code": model_def.model_id,
-                    "response_group_count": raw_summary["group_count"],
-                    "response_description_count": raw_summary["description_count"],
-                    "response_strategy_count": raw_summary["strategy_count"],
-                    "response_play_types": raw_summary["play_types"],
-                    "response_preview": raw_preview,
-                }
-            },
-        )
-        try:
-            prediction = self._finalize_prediction(
-                raw_prediction,
-                model_def,
-                prediction_date,
-                target_period,
-                lottery_code=lottery_code,
-                prediction_play_mode=prediction_play_mode,
-            )
-        except Exception:
-            self.logger.exception(
-                "Model prediction normalization failed",
-                extra={
-                    "context": {
-                        "lottery_code": lottery_code,
-                        "prediction_play_mode": prediction_play_mode,
-                        "target_period": target_period,
-                        "model_code": model_def.model_id,
+                        "attempt": attempt,
+                        "max_attempts": attempts,
+                        "response_group_count": raw_summary["group_count"],
+                        "response_description_count": raw_summary["description_count"],
+                        "response_strategy_count": raw_summary["strategy_count"],
+                        "response_play_types": raw_summary["play_types"],
                         "response_preview": raw_preview,
                     }
                 },
             )
-            raise
-        if not self._validate_prediction(
-            prediction,
-            lottery_code=lottery_code,
-            prediction_play_mode=prediction_play_mode,
-        ):
+            try:
+                prediction = self._finalize_prediction(
+                    raw_prediction,
+                    model_def,
+                    prediction_date,
+                    target_period,
+                    lottery_code=lottery_code,
+                    prediction_play_mode=prediction_play_mode,
+                )
+            except Exception:
+                self.logger.exception(
+                    "Model prediction normalization failed",
+                    extra={
+                        "context": {
+                            "lottery_code": lottery_code,
+                            "prediction_play_mode": prediction_play_mode,
+                            "target_period": target_period,
+                            "model_code": model_def.model_id,
+                            "attempt": attempt,
+                            "max_attempts": attempts,
+                            "response_preview": raw_preview,
+                        }
+                    },
+                )
+                raise
+            if self._validate_prediction(
+                prediction,
+                lottery_code=lottery_code,
+                prediction_play_mode=prediction_play_mode,
+            ):
+                normalized_summary = self._build_prediction_payload_summary(prediction)
+                self.logger.info(
+                    "Prediction generation completed",
+                    extra={
+                        "context": {
+                            "lottery_code": lottery_code,
+                            "prediction_play_mode": prediction_play_mode,
+                            "target_period": target_period,
+                            "model_code": model_def.model_id,
+                            "attempt": attempt,
+                            "max_attempts": attempts,
+                            "normalized_group_count": normalized_summary["group_count"],
+                            "normalized_description_count": normalized_summary["description_count"],
+                            "normalized_strategy_count": normalized_summary["strategy_count"],
+                            "normalized_play_types": normalized_summary["play_types"],
+                        }
+                    },
+                )
+                return prediction
             normalized_summary = self._build_prediction_payload_summary(prediction)
             normalized_preview = self._build_payload_preview(prediction)
             self.logger.warning(
@@ -1027,30 +1056,15 @@ class PredictionGenerationService:
                         "prediction_play_mode": prediction_play_mode,
                         "target_period": target_period,
                         "model_code": model_def.model_id,
+                        "attempt": attempt,
+                        "max_attempts": attempts,
                         "response_group_count": normalized_summary["group_count"],
                         "response_play_types": normalized_summary["play_types"],
                         "response_preview": normalized_preview,
                     }
                 },
             )
-            raise ValueError(f"模型返回的预测结构无效: {model_def.model_id}")
-        normalized_summary = self._build_prediction_payload_summary(prediction)
-        self.logger.info(
-            "Prediction generation completed",
-            extra={
-                "context": {
-                    "lottery_code": lottery_code,
-                    "prediction_play_mode": prediction_play_mode,
-                    "target_period": target_period,
-                    "model_code": model_def.model_id,
-                    "normalized_group_count": normalized_summary["group_count"],
-                    "normalized_description_count": normalized_summary["description_count"],
-                    "normalized_strategy_count": normalized_summary["strategy_count"],
-                    "normalized_play_types": normalized_summary["play_types"],
-                }
-            },
-        )
-        return prediction
+        raise ValueError(f"模型返回的预测结构无效: {model_def.model_id}")
 
     @staticmethod
     def _build_payload_preview(payload: Any, limit: int = 1200) -> str:
@@ -1207,7 +1221,11 @@ class PredictionGenerationService:
             blue_balls = self._normalize_blue_balls(group.get("blue_balls", group.get("blue_ball")))
             if len(red_balls) != 5 or red_balls != sorted(red_balls):
                 return False
+            if any((not number.isdigit()) or int(number) not in range(1, 36) for number in red_balls):
+                return False
             if len(blue_balls) != 2 or blue_balls != sorted(blue_balls):
+                return False
+            if any((not number.isdigit()) or int(number) not in range(1, 13) for number in blue_balls):
                 return False
         return True
 
