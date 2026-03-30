@@ -1027,7 +1027,7 @@ class PredictionService:
 
             for metric in group_metrics:
                 group_play_type = str(metric.get("play_type") or "").strip().lower()
-                if lottery_code in {"pl3", "pl5"} or (lottery_code == "dlt" and group_play_type == "dlt_dantuo"):
+                if lottery_code in {"pl3", "pl5"} or (lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}):
                     hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
                 else:
                     base_hit_result = {
@@ -1054,18 +1054,11 @@ class PredictionService:
                 group_bet_count = self._resolve_prediction_group_bet_count(metric, lottery_code, hit_result=hit_result)
                 model_cost_amount += group_cost
                 model_bet_count += group_bet_count
-                if lottery_code == "dlt" and group_play_type == "dlt_dantuo":
-                    breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
-                    group_winning_bet_count = 0
-                    group_prize_amount = 0
-                    for item in breakdown:
-                        level = str((item or {}).get("prize_level") or "").strip()
-                        count = int((item or {}).get("count") or 0)
-                        if not level or count <= 0:
-                            continue
-                        prize_info = self.resolve_prize_amount(actual_result, level)
-                        group_winning_bet_count += count
-                        group_prize_amount += int(prize_info["amount"] or 0) * count
+                if lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}:
+                    group_winning_bet_count, group_prize_amount, _ = self._resolve_dlt_multi_bet_prize_totals(
+                        hit_result=hit_result,
+                        actual_result=actual_result,
+                    )
                     winning_bet_count += group_winning_bet_count
                     prize_amount += group_prize_amount
                 else:
@@ -1104,6 +1097,29 @@ class PredictionService:
             },
         }
 
+    def _resolve_dlt_multi_bet_prize_totals(
+        self,
+        *,
+        hit_result: dict[str, Any],
+        actual_result: dict[str, Any],
+    ) -> tuple[int, int, str]:
+        breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
+        winning_bet_count = 0
+        prize_amount = 0
+        used_fallback = False
+        for item in breakdown:
+            level = str((item or {}).get("prize_level") or "").strip()
+            count = int((item or {}).get("count") or 0)
+            if not level or count <= 0:
+                continue
+            prize_info = self.resolve_prize_amount(actual_result, level)
+            winning_bet_count += count
+            prize_amount += int(prize_info["amount"] or 0) * count
+            used_fallback = used_fallback or prize_info.get("source") == "fallback"
+        if prize_amount <= 0:
+            return winning_bet_count, prize_amount, "none"
+        return winning_bet_count, prize_amount, "fallback" if used_fallback else "official"
+
     def _annotate_history_record(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         if not payload:
             return None
@@ -1137,25 +1153,11 @@ class PredictionService:
                 group_cost = self._resolve_prediction_group_cost(group, lottery_code)
                 group_bet_count = self._resolve_prediction_group_bet_count(group, lottery_code, hit_result=hit_result)
                 group_play_type = str(group.get("play_type") or "").strip().lower()
-                if lottery_code == "dlt" and group_play_type == "dlt_dantuo":
-                    breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
-                    group_winning_bet_count = 0
-                    group_prize_amount = 0
-                    for item in breakdown:
-                        level = str((item or {}).get("prize_level") or "").strip()
-                        count = int((item or {}).get("count") or 0)
-                        if not level or count <= 0:
-                            continue
-                        prize_info = self.resolve_prize_amount(actual_result, level)
-                        group_winning_bet_count += count
-                        group_prize_amount += int(prize_info["amount"] or 0) * count
-                    prize_source = "none"
-                    if group_prize_amount > 0:
-                        prize_source = "fallback" if any(
-                            self.resolve_prize_amount(actual_result, str((item or {}).get("prize_level") or "").strip()).get("source") == "fallback"
-                            for item in breakdown
-                            if int((item or {}).get("count") or 0) > 0
-                        ) else "official"
+                if lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}:
+                    group_winning_bet_count, group_prize_amount, prize_source = self._resolve_dlt_multi_bet_prize_totals(
+                        hit_result=hit_result,
+                        actual_result=actual_result,
+                    )
                     prize_level = str(hit_result.get("best_prize_level") or prize_level or "") or None
                 else:
                     prize_info = self.resolve_prize_amount(actual_result, prize_level)

@@ -343,6 +343,79 @@ class _FakePl3SumMislabelRepository:
         return self.record if target_period == "26061" else None
 
 
+class _FakeDltCompoundPredictionRepository:
+    def __init__(self) -> None:
+        self.record = {
+            "lottery_code": "dlt",
+            "prediction_date": "2026-03-13",
+            "target_period": "26032",
+            "actual_result": {
+                "lottery_code": "dlt",
+                "period": "26032",
+                "date": "2026-03-12",
+                "red_balls": ["01", "02", "03", "04", "09"],
+                "blue_balls": ["06", "07"],
+                "previous_jackpot_pool": 1000000,
+                "prize_breakdown": [],
+            },
+            "models": [
+                {
+                    "model_id": "compound-model",
+                    "prediction_play_mode": "compound",
+                    "model_name": "Compound Model",
+                    "model_provider": "openai",
+                    "predictions": [
+                        {
+                            "group_id": 1,
+                            "play_type": "dlt_compound",
+                            "strategy": "增强型综合决策者",
+                            "red_balls": ["01", "02", "03", "04", "05", "06"],
+                            "blue_balls": ["06", "07", "08"],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def list_history_record_summaries(self, limit: int | None = None, offset: int = 0, lottery_code: str = "dlt") -> list[dict]:
+        return [
+            {
+                "lottery_code": "dlt",
+                "prediction_date": "2026-03-13",
+                "target_period": "26032",
+                "actual_result": self.record["actual_result"],
+                "models": [
+                    {
+                        "model_id": "compound-model",
+                        "prediction_play_mode": "compound",
+                        "model_name": "Compound Model",
+                        "model_provider": "openai",
+                        "best_group": 1,
+                        "best_hit_count": 0,
+                        "group_metrics": [
+                            {
+                                "group_id": 1,
+                                "play_type": "dlt_compound",
+                                "strategy": "增强型综合决策者",
+                                "red_balls": ["01", "02", "03", "04", "05", "06"],
+                                "blue_balls": ["06", "07", "08"],
+                                "red_hit_count": 0,
+                                "blue_hit_count": 0,
+                                "total_hits": 0,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+    def count_history_records(self, lottery_code: str = "dlt") -> int:
+        return 1
+
+    def get_history_record_detail(self, target_period: str, lottery_code: str = "dlt") -> dict | None:
+        return self.record if target_period == "26032" else None
+
+
 class _FakeModelRepository:
     def __init__(self, active_model_codes: set[str]) -> None:
         self.active_model_codes = active_model_codes
@@ -516,6 +589,37 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(prediction_one["prize_source"], "fallback")
         self.assertEqual(prediction_two["cost_amount"], 138)
         self.assertEqual(prediction_two["prize_amount"], 0)
+
+    def test_dlt_compound_history_list_payload_computes_multi_bet_prize_amount(self) -> None:
+        service = PredictionService(prediction_repository=_FakeDltCompoundPredictionRepository())
+
+        payload = service.get_history_list_payload(limit=5, offset=0, lottery_code="dlt", play_type_filters=["dlt_compound"])
+
+        self.assertEqual(payload["total_count"], 1)
+        record = payload["predictions_history"][0]
+        model = record["models"][0]
+        self.assertEqual(model["prediction_play_mode"], "compound")
+        self.assertEqual(model["bet_count"], 18)
+        self.assertEqual(model["winning_bet_count"], 18)
+        self.assertEqual(model["prize_amount"], 11920)
+        self.assertEqual(record["period_summary"]["total_bet_count"], 18)
+        self.assertEqual(record["period_summary"]["total_prize_amount"], 11920)
+
+    def test_dlt_compound_history_detail_payload_computes_group_prize_amount(self) -> None:
+        service = PredictionService(prediction_repository=_FakeDltCompoundPredictionRepository())
+
+        payload = service.get_history_detail_payload("26032", lottery_code="dlt")
+
+        self.assertIsNotNone(payload)
+        model = payload["models"][0]
+        group = model["predictions"][0]
+        self.assertEqual(model["prediction_play_mode"], "compound")
+        self.assertEqual(model["bet_count"], 18)
+        self.assertEqual(model["winning_bet_count"], 18)
+        self.assertEqual(model["prize_amount"], 11920)
+        self.assertEqual(group["prize_level"], "三等奖")
+        self.assertEqual(group["prize_amount"], 11920)
+        self.assertEqual(group["prize_source"], "fallback")
 
     def test_pl3_history_list_ignores_strategy_filters(self) -> None:
         service = PredictionService(prediction_repository=_FakePl3PredictionRepository())
