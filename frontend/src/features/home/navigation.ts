@@ -1,3 +1,5 @@
+import type { PredictionPlayMode } from '../../shared/types/api'
+
 export type HomeTab = 'prediction' | 'analysis' | 'history' | 'simulation' | 'my-bets'
 export type HomeModelView = 'card' | 'list' | 'score'
 export type ScoreViewSortKey =
@@ -15,7 +17,7 @@ export type ScoreViewSortDirection = 'desc' | 'asc'
 
 export type HomeDetailRouteState = {
   scrollY?: number
-  predictionPlayMode?: 'direct' | 'direct_sum' | 'dantuo'
+  predictionPlayMode?: PredictionPlayMode
 }
 
 export type HomeRulesRouteState = {

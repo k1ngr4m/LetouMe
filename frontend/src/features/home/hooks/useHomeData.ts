@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../../shared/api/client'
 import type { LotteryCode } from '../../../shared/types/api'
 import { normalizeCurrentPredictions, normalizeDraw, normalizePredictionsHistoryList } from '../lib/home'
+import type { PredictionPlayType } from '../lib/home'
 
 export function currentPredictionsQueryOptions(lotteryCode: LotteryCode = 'dlt') {
   return {
@@ -15,7 +16,7 @@ export function useHomeData(
   historyPage: number,
   historyPageSize: number,
   historyStrategyFilters: string[],
-  historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo'>,
+  historyPlayTypeFilters: PredictionPlayType[],
   lotteryPage: number,
   lotteryPageSize: number,
   options?: {
