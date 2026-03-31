@@ -7,6 +7,7 @@ import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { formatDateTimeLocal } from '../../shared/lib/format'
+import { useMotion } from '../../shared/theme/MotionProvider'
 import { IMGLOC_CONTENT_BLOCKED_MESSAGE, isImglocContentBlockedError } from './lib/myBetUploadFallback'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
@@ -623,6 +624,7 @@ function BallPicker({
 }
 
 export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: LotteryCode; targetPeriod: string }) {
+  const { motionLevel } = useMotion()
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -743,6 +745,13 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const summary = betsQuery.data?.summary
   const hasRecords = records.length > 0
   const allRecordsExpanded = hasRecords && records.every((record) => Boolean(expandedRecordMap[record.id]))
+  const animationsEnabled = motionLevel !== 'minimal'
+  const motionScale = motionLevel === 'enhanced' ? 1.25 : 1
+  const summaryEnterY = 10 * motionScale
+  const cardEnterY = 12 * motionScale
+  const lineEnterY = 6 * motionScale
+  const modalEnterY = 24 * motionScale
+  const modalExitY = 18 * motionScale
   const summaryCards = useMemo(
     () => [
       {
@@ -902,9 +911,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               <motion.article
                 key={item.key}
                 className={clsx('my-bets-summary-card', item.cardClassName)}
-                initial={{ opacity: 0, y: 10 }}
+                initial={animationsEnabled ? { opacity: 0, y: summaryEnterY } : false}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: index * 0.03 }}
+                transition={{ duration: animationsEnabled ? 0.2 * motionScale : 0, delay: animationsEnabled ? index * 0.03 : 0 }}
               >
                 <span className="my-bets-summary-card__label">{item.label}</span>
                 <span className="my-bets-summary-card__icon" aria-hidden="true">
@@ -929,12 +938,12 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               const isExpanded = Boolean(expandedRecordMap[record.id])
               return (
               <motion.article
-                layout
+                layout={animationsEnabled}
                 key={record.id}
                 className="my-bets-card"
-                initial={{ opacity: 0, y: 12 }}
+                initial={animationsEnabled ? { opacity: 0, y: cardEnterY } : false}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22, delay: Math.min(index * 0.025, 0.22) }}
+                transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, delay: animationsEnabled ? Math.min(index * 0.025, 0.22) : 0 }}
               >
                 <div className="my-bets-card__header">
                   <div>
@@ -973,7 +982,13 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
                 <AnimatePresence initial={false}>
                   {isExpanded && (record.lines || []).length ? (
-                    <motion.div className="my-bets-card__line-list" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }}>
+                    <motion.div
+                      className="my-bets-card__line-list"
+                      initial={animationsEnabled ? { opacity: 0, y: lineEnterY } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={animationsEnabled ? { opacity: 0, y: lineEnterY } : undefined}
+                      transition={{ duration: animationsEnabled ? 0.18 * motionScale : 0 }}
+                    >
                       {(record.lines || []).map((line) => (
                         <div key={`${record.id}-line-${line.line_no}`} className="my-bets-line-card">
                           <span className="my-bets-line-card__label">{`子注单 #${line.line_no} · ${formatPlayType(line.play_type)}`}</span>
@@ -1009,16 +1024,24 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
       <AnimatePresence>
         {formOpen ? (
-          <motion.div className="modal-shell" role="presentation" onClick={closeFormModal} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <motion.div
+            className="modal-shell"
+            role="presentation"
+            onClick={closeFormModal}
+            initial={animationsEnabled ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            exit={animationsEnabled ? { opacity: 0 } : undefined}
+            transition={{ duration: animationsEnabled ? 0.18 * motionScale : 0 }}
+          >
             <motion.div
               className="modal-card modal-card--form my-bets-modal-card"
               role="dialog"
               aria-modal="true"
               onClick={(event) => event.stopPropagation()}
-              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              initial={animationsEnabled ? { opacity: 0, y: modalEnterY, scale: 0.98 } : false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
+              exit={animationsEnabled ? { opacity: 0, y: modalExitY, scale: 0.98 } : undefined}
+              transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, ease: 'easeOut' }}
             >
             <form className="settings-model-form my-bets-modal my-bets-modal__form" onSubmit={submitForm}>
               <div className="modal-card__header my-bets-modal__header">

@@ -3,8 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '../shared/components/AppShell'
 import { AuthProvider } from '../shared/auth/AuthProvider'
 import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
+import { MotionProvider } from '../shared/theme/MotionProvider'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
-import { ThemeToggle } from '../shared/theme/ThemeToggle'
 import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
@@ -30,10 +30,10 @@ function RouteLoadingFallback() {
 export function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <ThemeToggle />
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Routes>
+      <MotionProvider>
+        <AuthProvider>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -170,9 +170,10 @@ export function App() {
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </AuthProvider>
+            </Routes>
+          </Suspense>
+        </AuthProvider>
+      </MotionProvider>
     </ThemeProvider>
   )
 }

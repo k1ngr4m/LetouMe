@@ -3,6 +3,7 @@ import type { LotteryCode } from '../types/api'
 const PINNED_MODELS_KEY_PREFIX = 'letoumePinnedModelIds'
 const SELECTED_LOTTERY_KEY = 'letoumeSelectedLottery'
 const THEME_PREFERENCE_KEY = 'letoumeThemePreference'
+const MOTION_PREFERENCE_KEY = 'letoumeMotionPreference'
 const SETTINGS_TABLE_WIDTHS_KEY_PREFIX = 'letoumeSettingsTableWidths'
 
 export function loadPinnedModels(lotteryCode: LotteryCode = 'dlt') {
@@ -52,6 +53,25 @@ export function loadThemePreference() {
 export function saveThemePreference(theme: 'dark' | 'light') {
   try {
     window.localStorage.setItem(THEME_PREFERENCE_KEY, theme)
+  } catch {
+    // Ignore persistence failures in unsupported environments.
+  }
+}
+
+export type MotionPreference = 'system' | 'minimal' | 'normal' | 'enhanced'
+
+export function loadMotionPreference(): MotionPreference {
+  try {
+    const raw = window.localStorage.getItem(MOTION_PREFERENCE_KEY)
+    return raw === 'minimal' || raw === 'normal' || raw === 'enhanced' || raw === 'system' ? raw : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function saveMotionPreference(preference: MotionPreference) {
+  try {
+    window.localStorage.setItem(MOTION_PREFERENCE_KEY, preference)
   } catch {
     // Ignore persistence failures in unsupported environments.
   }

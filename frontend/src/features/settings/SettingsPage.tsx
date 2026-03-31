@@ -6,6 +6,7 @@ import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
+import { useMotion } from '../../shared/theme/MotionProvider'
 import { loadSettingsTableColumnWidths, saveSettingsTableColumnWidths } from '../../shared/lib/storage'
 import type {
   AuthUser,
@@ -182,6 +183,7 @@ const GENERATION_RECENT_PERIOD_OPTIONS: Array<{ value: GenerationRecentPeriodCou
 
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
+type MotionPreferenceOption = 'system' | 'minimal' | 'normal' | 'enhanced'
 
 const SCHEDULE_COLUMN_DEFAULT_WIDTHS: Record<ScheduleColumnKey, number> = {
   name: 260,
@@ -194,6 +196,13 @@ const SCHEDULE_COLUMN_DEFAULT_WIDTHS: Record<ScheduleColumnKey, number> = {
   enabled: 136,
   actions: 104,
 }
+
+const MOTION_PREFERENCE_OPTIONS: Array<{ value: MotionPreferenceOption; label: string; description: string }> = [
+  { value: 'system', label: '跟随系统', description: '自动读取系统“减少动态效果”设置。' },
+  { value: 'minimal', label: '极简', description: '尽量关闭动画，优先减少干扰。' },
+  { value: 'normal', label: '标准', description: '保持当前推荐的动效节奏。' },
+  { value: 'enhanced', label: '增强', description: '动效更明显，反馈更强。' },
+]
 
 const MAINTENANCE_COLUMN_DEFAULT_WIDTHS: Record<MaintenanceColumnKey, number> = {
   lottery: 110,
@@ -568,6 +577,7 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, hasPermission, logout } = useAuth()
+  const { motionPreference, motionLevel, setMotionPreference } = useMotion()
   const activeTab = getSettingsTabFromPath(location.pathname)
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
@@ -1878,6 +1888,32 @@ export function SettingsPage() {
                       保存基础信息
                     </button>
                   </form>
+                  <section className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--motion">
+                    <div className="panel-card__header">
+                      <div>
+                        <h2 className="panel-card__title">动效分级</h2>
+                        <p className="settings-profile-form-card__hint">当前生效：{motionLevel === 'enhanced' ? '增强' : motionLevel === 'minimal' ? '极简' : '标准'}</p>
+                      </div>
+                    </div>
+                    <div className="settings-motion-switch" role="radiogroup" aria-label="全站动效分级">
+                      {MOTION_PREFERENCE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={motionPreference === option.value}
+                          className={clsx('chip-button', motionPreference === option.value && 'is-active')}
+                          onClick={() => setMotionPreference(option.value)}
+                        >
+                          <span className="chip-button__title">{option.label}</span>
+                          <span className="chip-button__meta">{option.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="settings-inline-hint settings-profile-security-note">
+                      “跟随系统”会读取你设备的“减少动态效果”设置；“极简”适合低性能设备或偏静态体验。
+                    </div>
+                  </section>
                   <form
                     className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--security"
                     onSubmit={(event) => {
