@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 from datetime import datetime, timezone
 from math import comb
@@ -110,6 +111,14 @@ class TicketOCRService:
             raise ValueError("上传图床失败（网络请求异常）") from exc
         if response.status_code >= 400:
             response_text = self._truncate_text(response.text)
+            payload: dict[str, Any] | None = None
+            if response.content and callable(getattr(response, "json", None)):
+                try:
+                    parsed_payload = response.json()
+                    if isinstance(parsed_payload, dict):
+                        payload = parsed_payload
+                except ValueError:
+                    payload = None
             self.logger.error(
                 "Imgloc upload returned non-success status",
                 extra={
@@ -121,6 +130,12 @@ class TicketOCRService:
                     }
                 },
             )
+            if self._is_imgloc_content_blocked(
+                status_code=response.status_code,
+                payload=payload,
+                response_text=response_text,
+            ):
+                raise ValueError("图片被图床风控拦截，请更换清晰票面；可先保存投注不上传图片")
             raise ValueError(f"上传图床失败（HTTP {response.status_code}）")
         try:
             payload = response.json() if response.content else {}
@@ -199,6 +214,21 @@ class TicketOCRService:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
         return ""
+
+    @staticmethod
+    def _is_imgloc_content_blocked(*, status_code: int, payload: dict[str, Any] | None, response_text: str) -> bool:
+        if status_code not in {400, 403}:
+            return False
+        text_candidates = [str(response_text or "").lower()]
+        if isinstance(payload, dict):
+            text_candidates.append(json.dumps(payload, ensure_ascii=False).lower())
+            error = payload.get("error")
+            if isinstance(error, dict):
+                error_code = str(error.get("code") or "").strip()
+                error_message = str(error.get("message") or "").lower()
+                if error_code == "403" and ("inappropriate" in error_message or "suspected" in error_message):
+                    return True
+        return any("suspected inappropriate content" in candidate for candidate in text_candidates)
 
     def _recognize_text_by_baidu(self, *, image_bytes: bytes) -> str:
         access_token = self._get_baidu_access_token()

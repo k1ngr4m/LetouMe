@@ -351,6 +351,23 @@ class TicketOCRServiceTests(unittest.TestCase):
         self.assertIn("HTTP 400", str(context.exception))
 
     @patch("backend.app.services.ticket_ocr_service.requests.post")
+    def test_upload_to_imgloc_returns_content_blocked_detail(self, mocked_post) -> None:
+        mocked_post.return_value = SimpleNamespace(
+            status_code=400,
+            text='{"status_code":400,"error":{"message":"Suspected inappropriate content","code":403},"status_txt":"Bad Request"}',
+            headers={"content-type": "application/json; charset=UTF-8"},
+            content=b'{"status_code":400,"error":{"message":"Suspected inappropriate content","code":403},"status_txt":"Bad Request"}',
+            json=lambda: {
+                "status_code": 400,
+                "error": {"message": "Suspected inappropriate content", "code": 403},
+                "status_txt": "Bad Request",
+            },
+        )
+        with self.assertRaises(ValueError) as context:
+            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="dlt")
+        self.assertEqual(str(context.exception), "图片被图床风控拦截，请更换清晰票面；可先保存投注不上传图片")
+
+    @patch("backend.app.services.ticket_ocr_service.requests.post")
     def test_upload_to_imgloc_returns_parse_failure_detail(self, mocked_post) -> None:
         mocked_post.return_value = SimpleNamespace(
             status_code=200,

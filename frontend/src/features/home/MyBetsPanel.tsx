@@ -5,6 +5,7 @@ import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { formatDateTimeLocal } from '../../shared/lib/format'
+import { IMGLOC_CONTENT_BLOCKED_MESSAGE, isImglocContentBlockedError } from './lib/myBetUploadFallback'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
 type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
@@ -630,9 +631,19 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const saveMutation = useMutation({
     mutationFn: async () => {
       let ticketImageUrl = form.ticketImageUrl
+      let imageUploadWarning: string | null = null
       if (form.sourceType === 'ocr' && form.ticketImageFile) {
-        const uploadResult = await apiClient.uploadMyBetOCRImage(lotteryCode, form.ticketImageFile)
-        ticketImageUrl = uploadResult.ticket_image_url || ''
+        try {
+          const uploadResult = await apiClient.uploadMyBetOCRImage(lotteryCode, form.ticketImageFile)
+          ticketImageUrl = uploadResult.ticket_image_url || ''
+        } catch (error) {
+          const message = error instanceof Error ? error.message : ''
+          if (!isImglocContentBlockedError(message)) {
+            throw error
+          }
+          ticketImageUrl = ''
+          imageUploadWarning = IMGLOC_CONTENT_BLOCKED_MESSAGE
+        }
       }
       const payload: MyBetRecordPayload = {
         lottery_code: lotteryCode,
@@ -647,12 +658,15 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
       }
       if (editingRecord) {
         const updatePayload: MyBetRecordUpdatePayload = { ...payload, record_id: editingRecord.id }
-        return apiClient.updateMyBet(updatePayload)
+        const response = await apiClient.updateMyBet(updatePayload)
+        return { response, imageUploadWarning }
       }
-      return apiClient.createMyBet(payload)
+      const response = await apiClient.createMyBet(payload)
+      return { response, imageUploadWarning }
     },
-    onSuccess: async () => {
-      setMessage(editingRecord ? '投注已更新。' : '投注已添加。')
+    onSuccess: async (result) => {
+      const successMessage = editingRecord ? '投注已更新。' : '投注已添加。'
+      setMessage(result.imageUploadWarning ? `${successMessage}${result.imageUploadWarning}` : successMessage)
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
       setFormOpen(false)
       setEditingRecord(null)
