@@ -972,9 +972,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
       {formOpen ? (
         <div className="modal-shell" role="presentation" onClick={closeFormModal}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <form className="settings-model-form my-bets-modal" onSubmit={submitForm}>
-              <div className="modal-card__header">
+          <div className="modal-card modal-card--form my-bets-modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-model-form my-bets-modal my-bets-modal__form" onSubmit={submitForm}>
+              <div className="modal-card__header my-bets-modal__header">
                 <div>
                   <p className="modal-card__eyebrow">My Bets</p>
                   <h2>{editingRecord ? '编辑投注' : '添加投注'}</h2>
@@ -984,17 +984,17 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </button>
               </div>
 
-              <section className="my-bets-modal__section">
-                <div className="settings-form-grid">
-                  <label>
+              <section className="my-bets-modal__section my-bets-modal__section--base">
+                <div className="settings-form-grid my-bets-modal__grid">
+                  <label className="my-bets-modal__field">
                     目标期号
                     <input value={form.targetPeriod} onChange={(event) => setForm((previous) => ({ ...previous, targetPeriod: event.target.value.replace(/[^\d]/g, '') }))} required />
                   </label>
-                  <label>
+                  <label className="my-bets-modal__field">
                     来源方式
                     <input value={form.sourceType === 'ocr' ? 'OCR识别' : '手动录入'} disabled />
                   </label>
-                  <label>
+                  <label className="my-bets-modal__field">
                     购票时间（北京时间）
                     <input
                       type="datetime-local"
@@ -1003,7 +1003,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
                     />
                   </label>
-                  <label>
+                  <label className="my-bets-modal__field">
                     优惠金额（元）
                     <input
                       type="number"
@@ -1018,7 +1018,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </div>
               </section>
 
-              <section className="my-bets-modal__section">
+              <section className="my-bets-modal__section my-bets-modal__section--image">
                 <div className="my-bets-image-uploader">
                   <div className="my-bets-image-uploader__header">
                     <strong>票据图片</strong>
@@ -1053,11 +1053,11 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </div>
               </section>
 
-              <div className="my-bets-editor-list">
+              <div className="my-bets-editor-list my-bets-modal__editor-list">
                 {form.lines.map((line, index) => {
                   const quote = lineQuotes[index] || { betCount: 0, amount: 0, valid: false }
                   return (
-                    <section key={`edit-line-${index}`} className="simulation-section">
+                    <section key={`edit-line-${index}`} className="simulation-section my-bets-modal__line-section">
                       <div className="simulation-section__header">
                         <div>
                           <h3>{`子注单 #${index + 1}`}</h3>
@@ -1128,7 +1128,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                                 }
                                 color="blue"
                               />
-                              <div className="settings-form-grid">
+                              <div className="settings-form-grid my-bets-modal__grid">
                                 <label>
                                   前区胆码（逗号分隔）
                                   <input
@@ -1197,7 +1197,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                                 }
                                 color="blue"
                               />
-                              <div className="settings-form-grid">
+                              <div className="settings-form-grid my-bets-modal__grid">
                                 <label>
                                   前区号码（逗号分隔）
                                   <input
@@ -1273,7 +1273,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsInput: togglePickFromInput(current.directUnitsInput, value, pl3Pool.length) }))}
                             color="red"
                           />
-                          <div className="settings-form-grid">
+                          <div className="settings-form-grid my-bets-modal__grid">
                             <label>
                               万位号码（逗号分隔）
                               <input value={line.directTenThousandsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTenThousandsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 00,01" />
@@ -1325,7 +1325,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsInput: togglePickFromInput(current.directUnitsInput, value, pl3Pool.length) }))}
                             color="red"
                           />
-                          <div className="settings-form-grid">
+                          <div className="settings-form-grid my-bets-modal__grid">
                             <label>
                               百位号码（逗号分隔）
                               <input value={line.directHundredsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 00,01" />
@@ -1353,7 +1353,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             onToggle={(value) => updateLine(index, (current) => ({ ...current, sumValuesInput: togglePickFromInput(current.sumValuesInput, value, pl3SumPool.length) }))}
                             color="red"
                           />
-                          <div className="settings-form-grid">
+                          <div className="settings-form-grid my-bets-modal__grid">
                             <label>
                               和值号码（逗号分隔）
                               <input value={line.sumValuesInput} onChange={(event) => updateLine(index, (current) => ({ ...current, sumValuesInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 10,11,12" />
@@ -1373,7 +1373,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                             onToggle={(value) => updateLine(index, (current) => ({ ...current, groupNumbersInput: togglePickFromInput(current.groupNumbersInput, value, pl3Pool.length) }))}
                             color="red"
                           />
-                          <div className="settings-form-grid">
+                          <div className="settings-form-grid my-bets-modal__grid">
                             <label>
                               组选号码（逗号分隔）
                               <input value={line.groupNumbersInput} onChange={(event) => updateLine(index, (current) => ({ ...current, groupNumbersInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 01,08,09" />
@@ -1390,7 +1390,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 })}
               </div>
 
-              <div className="simulation-summary-bar my-bets-form-summary">
+              <div className="simulation-summary-bar my-bets-form-summary my-bets-modal__footer">
                 <div className="simulation-summary-bar__meta">
                   <strong>{`共 ${form.lines.length} 条子注单 · 预计 ${totalBetCount} 注 / ${totalAmount} 元（实付 ${netTotalAmount} 元）`}</strong>
                   <span>{submitHint}</span>
