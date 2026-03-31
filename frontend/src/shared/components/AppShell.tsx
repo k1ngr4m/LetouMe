@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom'
 import type { PropsWithChildren } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { SunMoon } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
+import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, logout, hasPermission } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const canOpenSettings = hasPermission('basic_profile')
+  const nextThemeLabel = theme === 'dark' ? '切换浅色' : '切换深色'
 
   return (
     <div className="app-shell">
@@ -28,6 +32,9 @@ export function AppShell({ children }: PropsWithChildren) {
               设置中心
             </NavLink>
           ) : null}
+          <button className="icon-button app-nav__theme-toggle" type="button" onClick={toggleTheme} aria-label={nextThemeLabel} title={nextThemeLabel}>
+            <SunMoon size={16} aria-hidden="true" />
+          </button>
           <span className="app-nav__meta">{user?.nickname || user?.username || '-'}</span>
           <button
             className="ghost-button"

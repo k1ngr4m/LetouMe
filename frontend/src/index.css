@@ -742,6 +742,13 @@ a {
   padding: 0.2rem 0.4rem;
 }
 
+.app-nav__theme-toggle {
+  width: 2rem;
+  height: 2rem;
+  color: var(--text-1);
+  background: var(--ghost-bg);
+}
+
 .app-nav__link {
   padding: 0.72rem 1rem;
   border-radius: 999px;
