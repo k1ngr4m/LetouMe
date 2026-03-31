@@ -16,7 +16,7 @@ export function AppShell({ children }: PropsWithChildren) {
           <span className="app-header__mark">L</span>
           <div>
             <p className="app-header__eyebrow">LetouMe</p>
-            <h1 className="app-header__title">大乐透 AI 控制台</h1>
+            <h1 className="app-header__title">乐透么</h1>
           </div>
         </div>
         <nav className="app-nav">

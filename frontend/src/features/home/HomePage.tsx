@@ -940,7 +940,7 @@ export function HomePage() {
               </button>
             ))}
           </div>
-          <h2 className="hero-panel__title">{lotteryLabel}AI预测</h2>
+          <h2 className="hero-panel__title">{lotteryLabel}</h2>
           <p className="hero-panel__description">
             当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>，下期开奖日{' '}
             <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>。
