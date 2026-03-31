@@ -54,9 +54,14 @@ class MyBetService:
     def list_records(self, user_id: int, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         records = [self._serialize_with_settlement(item, lottery_code=normalized_code) for item in self.repository.list_records(user_id, lottery_code=normalized_code)]
+        total_amount = sum(int(item.get("amount") or 0) for item in records)
+        total_discount_amount = sum(int(item.get("discount_amount") or 0) for item in records)
+        total_net_amount = sum(int(item.get("net_amount") or 0) for item in records)
         summary = {
             "total_count": len(records),
-            "total_amount": sum(int(item.get("amount") or 0) for item in records),
+            "total_amount": total_amount,
+            "total_discount_amount": total_discount_amount,
+            "total_net_amount": total_net_amount,
             "total_prize_amount": sum(int(item.get("prize_amount") or 0) for item in records),
             "total_net_profit": sum(int(item.get("net_profit") or 0) for item in records),
             "settled_count": sum(1 for item in records if item.get("settlement_status") == "settled"),
@@ -133,6 +138,11 @@ class MyBetService:
         source_type = str(payload.get("source_type") or "manual").strip().lower() or "manual"
         if source_type not in {"manual", "ocr"}:
             source_type = "manual"
+        discount_amount = int(payload.get("discount_amount") or 0)
+        if discount_amount < 0:
+            raise ValueError("优惠金额不能为负数")
+        if discount_amount > total_amount:
+            raise ValueError("优惠金额不能超过下注金额")
 
         return {
             "lottery_code": lottery_code,
@@ -155,6 +165,7 @@ class MyBetService:
             "is_append": summary_is_append,
             "bet_count": total_bet_count,
             "amount": total_amount,
+            "discount_amount": discount_amount,
             "source_type": source_type,
             "ticket_image_url": str(payload.get("ticket_image_url") or ""),
             "ocr_text": str(payload.get("ocr_text") or ""),
@@ -468,24 +479,26 @@ class MyBetService:
     def _calculate_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         target_period = str(record.get("target_period") or "")
         if not target_period:
+            net_amount = int(record.get("net_amount") or 0)
             return {
                 "settlement_status": "pending",
                 "winning_bet_count": 0,
                 "prize_level": None,
                 "prize_amount": 0,
-                "net_profit": -int(record.get("amount") or 0),
+                "net_profit": -net_amount,
                 "settled_at": None,
                 "actual_result": None,
                 "lines": list(record.get("lines") or []),
             }
         draw = self.lottery_repository.get_draw_by_period(target_period, lottery_code=lottery_code)
         if not draw:
+            net_amount = int(record.get("net_amount") or 0)
             return {
                 "settlement_status": "pending",
                 "winning_bet_count": 0,
                 "prize_level": None,
                 "prize_amount": 0,
-                "net_profit": -int(record.get("amount") or 0),
+                "net_profit": -net_amount,
                 "settled_at": None,
                 "actual_result": None,
                 "lines": list(record.get("lines") or []),
@@ -534,7 +547,7 @@ class MyBetService:
             "winning_bet_count": total_winning_bets,
             "prize_level": best_level,
             "prize_amount": total_prize_amount,
-            "net_profit": total_prize_amount - int(record.get("amount") or 0),
+            "net_profit": total_prize_amount - int(record.get("net_amount") or 0),
             "settled_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code, target_period=target_period),
             "lines": lines_with_hits,
@@ -870,6 +883,10 @@ class MyBetService:
             ]
 
         first_line = lines[0]
+        amount = int(record.get("amount") or 0)
+        discount_amount = int(record.get("discount_amount") or 0)
+        discount_amount = min(max(discount_amount, 0), amount)
+        net_amount = amount - discount_amount
         return {
             "id": int(record.get("id") or 0),
             "lottery_code": str(record.get("lottery_code") or "dlt"),
@@ -891,7 +908,9 @@ class MyBetService:
             "multiplier": int(record.get("multiplier") or first_line.get("multiplier") or 1),
             "is_append": bool(record.get("is_append") if record.get("is_append") is not None else first_line.get("is_append")),
             "bet_count": int(record.get("bet_count") or 0),
-            "amount": int(record.get("amount") or 0),
+            "amount": amount,
+            "discount_amount": discount_amount,
+            "net_amount": net_amount,
             "source_type": str(record.get("source_type") or "manual"),
             "ticket_image_url": str(record.get("ticket_image_url") or ""),
             "ocr_text": str(record.get("ocr_text") or ""),

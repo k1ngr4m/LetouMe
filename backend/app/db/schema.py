@@ -357,6 +357,7 @@ SCHEMA_STATEMENTS = [
         is_append TINYINT(1) NOT NULL DEFAULT 0,
         bet_count INT NOT NULL DEFAULT 0,
         amount INT NOT NULL DEFAULT 0,
+        discount_amount INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
@@ -701,6 +702,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         is_append TINYINT(1) NOT NULL DEFAULT 0,
         bet_count INT NOT NULL DEFAULT 0,
         amount INT NOT NULL DEFAULT 0,
+        discount_amount INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
@@ -887,6 +889,7 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     "my_bet_record": {
         "direct_ten_thousands": "ALTER TABLE my_bet_record ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
         "direct_thousands": "ALTER TABLE my_bet_record ADD COLUMN direct_thousands VARCHAR(255) NULL AFTER direct_ten_thousands",
+        "discount_amount": "ALTER TABLE my_bet_record ADD COLUMN discount_amount INT NOT NULL DEFAULT 0 AFTER amount",
     },
     "my_bet_record_line": {
         "direct_ten_thousands": "ALTER TABLE my_bet_record_line ADD COLUMN direct_ten_thousands VARCHAR(255) NULL AFTER back_numbers",
@@ -944,6 +947,12 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
         "ticket_purchased_at": (
             f"ALTER TABLE {_table_prefix}my_bet_record_meta "
             "ADD COLUMN ticket_purchased_at DATETIME NULL AFTER ocr_recognized_at"
+        ),
+    }
+    SCHEMA_MIGRATIONS[f"{_table_prefix}my_bet_record"] = {
+        "discount_amount": (
+            f"ALTER TABLE {_table_prefix}my_bet_record "
+            "ADD COLUMN discount_amount INT NOT NULL DEFAULT 0 AFTER amount"
         ),
     }
     SCHEMA_MIGRATIONS[f"{_table_prefix}prediction_model_run"] = {

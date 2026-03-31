@@ -297,6 +297,7 @@ export type MyBetRecordPayload = {
   ocr_provider?: string | null
   ocr_recognized_at?: string | null
   ticket_purchased_at?: string | null
+  discount_amount?: number
   lines?: MyBetLinePayload[]
 }
 
@@ -376,6 +377,8 @@ export type MyBetRecord = {
   is_append: boolean
   bet_count: number
   amount: number
+  discount_amount: number
+  net_amount: number
   settlement_status: 'pending' | 'settled'
   winning_bet_count: number
   prize_level: string | null
@@ -397,6 +400,8 @@ export type MyBetRecord = {
 export type MyBetSummary = {
   total_count: number
   total_amount: number
+  total_discount_amount: number
+  total_net_amount: number
   total_prize_amount: number
   total_net_profit: number
   settled_count: number

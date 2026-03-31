@@ -34,6 +34,7 @@ type EditableLine = {
 type BetFormState = {
   targetPeriod: string
   sourceType: 'manual' | 'ocr'
+  discountAmountInput: string
   ticketImageUrl: string
   ticketImageFile: File | null
   ticketImagePreviewUrl: string
@@ -165,6 +166,7 @@ function createDefaultFormState(targetPeriod: string, lotteryCode: LotteryCode):
   return {
     targetPeriod,
     sourceType: 'manual',
+    discountAmountInput: '0',
     ticketImageUrl: '',
     ticketImageFile: null,
     ticketImagePreviewUrl: '',
@@ -233,6 +235,7 @@ function buildFormFromRecord(record: MyBetRecord): BetFormState {
   return {
     targetPeriod: record.target_period,
     sourceType: record.source_type || 'manual',
+    discountAmountInput: String(Math.max(0, Number(record.discount_amount) || 0)),
     ticketImageUrl: record.ticket_image_url || '',
     ticketImageFile: null,
     ticketImagePreviewUrl: record.ticket_image_url || '',
@@ -248,6 +251,7 @@ function buildFormFromOCRDraft(lotteryCode: LotteryCode, draft: MyBetOCRDraftRes
   return {
     targetPeriod: draft.target_period || '',
     sourceType: 'ocr',
+    discountAmountInput: '0',
     ticketImageUrl: draft.ticket_image_url || '',
     ticketImageFile: imageFile,
     ticketImagePreviewUrl: imagePreviewUrl || draft.ticket_image_url || '',
@@ -368,6 +372,14 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
   }
   const betCount = line.playType === 'group3' ? (groups.length >= 2 ? groups.length * (groups.length - 1) : 0) : combination(groups.length, 3)
   return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '组选号码无效，请检查输入。' }
+}
+
+function parseDiscountAmount(value: string): number {
+  const normalized = String(value || '').trim()
+  if (!normalized) return 0
+  const parsed = Number.parseInt(normalized, 10)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, parsed)
 }
 
 function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLinePayload {
@@ -648,6 +660,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
       const payload: MyBetRecordPayload = {
         lottery_code: lotteryCode,
         target_period: form.targetPeriod.trim(),
+        discount_amount: parseDiscountAmount(form.discountAmountInput),
         source_type: form.sourceType,
         ticket_image_url: ticketImageUrl,
         ocr_text: form.ocrText,
@@ -709,15 +722,20 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const lineQuotes = useMemo(() => form.lines.map((line) => quoteLine(lotteryCode, line)), [form.lines, lotteryCode])
   const totalBetCount = lineQuotes.reduce((sum, item) => sum + item.betCount, 0)
   const totalAmount = lineQuotes.reduce((sum, item) => sum + item.amount, 0)
+  const discountAmount = parseDiscountAmount(form.discountAmountInput)
+  const netTotalAmount = Math.max(0, totalAmount - discountAmount)
+  const discountValidationError = discountAmount > totalAmount ? '优惠金额不能超过预计下注金额。' : null
   const hasValidTargetPeriod = /^\d+$/.test(form.targetPeriod.trim())
   const invalidLineIndex = lineQuotes.findIndex((item) => !item.valid)
   const invalidLineQuote = invalidLineIndex >= 0 ? lineQuotes[invalidLineIndex] : null
   const submitHint = !hasValidTargetPeriod
     ? '请填写有效期号。'
+    : discountValidationError
+      ? discountValidationError
     : invalidLineQuote
       ? `子注单 #${invalidLineIndex + 1}：${invalidLineQuote.reason || '请补全号码。'}`
       : '可提交保存。'
-  const canSubmit = hasValidTargetPeriod && lineQuotes.length > 0 && invalidLineIndex < 0
+  const canSubmit = hasValidTargetPeriod && lineQuotes.length > 0 && invalidLineIndex < 0 && !discountValidationError
 
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
@@ -861,6 +879,14 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
             <strong>{formatCurrency(summary?.total_amount || 0)}</strong>
           </article>
           <article className="my-bets-summary-card">
+            <span>总优惠</span>
+            <strong>{formatCurrency(summary?.total_discount_amount || 0)}</strong>
+          </article>
+          <article className="my-bets-summary-card">
+            <span>净投入</span>
+            <strong>{formatCurrency(summary?.total_net_amount || 0)}</strong>
+          </article>
+          <article className="my-bets-summary-card">
             <span>总奖金</span>
             <strong>{formatCurrency(summary?.total_prize_amount || 0)}</strong>
           </article>
@@ -925,6 +951,8 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
                 <div className="my-bets-card__metrics">
                   <span>{`总投入 ${formatCurrency(record.amount)}`}</span>
+                  <span>{`优惠 ${formatCurrency(record.discount_amount || 0)}`}</span>
+                  <span>{`净投入 ${formatCurrency(record.net_amount || Math.max(0, record.amount - (record.discount_amount || 0)))}`}</span>
                   <span>{`总奖金 ${formatCurrency(record.prize_amount)}`}</span>
                   <span className={clsx(record.net_profit >= 0 ? 'is-profit' : 'is-loss')}>{`盈亏 ${formatCurrency(record.net_profit)}`}</span>
                   <span>{record.prize_level ? `${record.prize_level} · 中 ${record.winning_bet_count} 注` : '未中奖'}</span>
@@ -973,6 +1001,18 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       step={60}
                       value={form.ticketPurchasedAt}
                       onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    优惠金额（元）
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={form.discountAmountInput}
+                      onChange={(event) =>
+                        setForm((previous) => ({ ...previous, discountAmountInput: event.target.value.replace(/[^\d]/g, '') || '0' }))
+                      }
                     />
                   </label>
                 </div>
@@ -1352,7 +1392,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
 
               <div className="simulation-summary-bar my-bets-form-summary">
                 <div className="simulation-summary-bar__meta">
-                  <strong>{`共 ${form.lines.length} 条子注单 · 预计 ${totalBetCount} 注 / ${totalAmount} 元`}</strong>
+                  <strong>{`共 ${form.lines.length} 条子注单 · 预计 ${totalBetCount} 注 / ${totalAmount} 元（实付 ${netTotalAmount} 元）`}</strong>
                   <span>{submitHint}</span>
                 </div>
                 <div className="simulation-summary-bar__actions">

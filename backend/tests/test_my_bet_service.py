@@ -103,6 +103,99 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["winning_bet_count"], 5)
         self.assertEqual(result["prize_amount"], 180)
 
+    def test_build_payload_accepts_discount_amount_within_total(self) -> None:
+        payload = self.service._build_payload(
+            {
+                "target_period": "26040",
+                "discount_amount": 6,
+                "lines": [
+                    {
+                        "play_type": "dlt",
+                        "front_numbers": ["01", "02", "03", "04", "05"],
+                        "back_numbers": ["01", "02"],
+                        "multiplier": 3,
+                    }
+                ],
+            },
+            lottery_code="dlt",
+        )
+        self.assertEqual(payload["amount"], 6)
+        self.assertEqual(payload["discount_amount"], 6)
+
+    def test_build_payload_rejects_discount_amount_out_of_range(self) -> None:
+        with self.assertRaisesRegex(ValueError, "优惠金额不能为负数"):
+            self.service._build_payload(
+                {
+                    "target_period": "26040",
+                    "discount_amount": -1,
+                    "lines": [
+                        {
+                            "play_type": "dlt",
+                            "front_numbers": ["01", "02", "03", "04", "05"],
+                            "back_numbers": ["01", "02"],
+                            "multiplier": 1,
+                        }
+                    ],
+                },
+                lottery_code="dlt",
+            )
+
+        with self.assertRaisesRegex(ValueError, "优惠金额不能超过下注金额"):
+            self.service._build_payload(
+                {
+                    "target_period": "26040",
+                    "discount_amount": 100,
+                    "lines": [
+                        {
+                            "play_type": "dlt",
+                            "front_numbers": ["01", "02", "03", "04", "05"],
+                            "back_numbers": ["01", "02"],
+                            "multiplier": 1,
+                        }
+                    ],
+                },
+                lottery_code="dlt",
+            )
+
+    def test_serialize_with_settlement_uses_net_amount_for_pending_profit(self) -> None:
+        self.service.lottery_repository = type(
+            "FakeLotteryRepository",
+            (),
+            {
+                "get_draw_by_period": staticmethod(lambda *args, **kwargs: None),
+                "get_previous_draw_by_period": staticmethod(lambda *args, **kwargs: None),
+            },
+        )()
+        record = {
+            "id": 1,
+            "lottery_code": "dlt",
+            "target_period": "26040",
+            "play_type": "dlt",
+            "multiplier": 1,
+            "is_append": 0,
+            "bet_count": 1,
+            "amount": 10,
+            "discount_amount": 4,
+            "source_type": "manual",
+            "created_at": "2026-03-31T00:00:00Z",
+            "updated_at": "2026-03-31T00:00:00Z",
+            "lines": [
+                {
+                    "line_no": 1,
+                    "play_type": "dlt",
+                    "front_numbers": "01,02,03,04,05",
+                    "back_numbers": "01,02",
+                    "multiplier": 1,
+                    "is_append": 0,
+                    "bet_count": 1,
+                    "amount": 10,
+                }
+            ],
+        }
+        result = self.service._serialize_with_settlement(record, lottery_code="dlt")
+        self.assertEqual(result["net_amount"], 6)
+        self.assertEqual(result["net_profit"], -6)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -170,6 +170,8 @@ class MyBetRecordResponse(BaseModel):
     is_append: bool = False
     bet_count: int = 0
     amount: int = 0
+    discount_amount: int = 0
+    net_amount: int = 0
     settlement_status: str = "pending"
     winning_bet_count: int = 0
     prize_level: str | None = None
@@ -191,6 +193,8 @@ class MyBetRecordResponse(BaseModel):
 class MyBetSummaryResponse(BaseModel):
     total_count: int = 0
     total_amount: int = 0
+    total_discount_amount: int = 0
+    total_net_amount: int = 0
     total_prize_amount: int = 0
     total_net_profit: int = 0
     settled_count: int = 0

@@ -23,6 +23,7 @@ class MyBetRepository:
                             record.is_append,
                             record.bet_count,
                             record.amount,
+                            record.discount_amount,
                             record.created_at,
                             record.updated_at,
                             meta.source_type,
@@ -59,8 +60,9 @@ class MyBetRepository:
                             multiplier,
                             is_append,
                             bet_count,
-                            amount
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            amount,
+                            discount_amount
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
@@ -70,6 +72,7 @@ class MyBetRepository:
                             1 if bool(payload.get("is_append")) else 0,
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
+                            int(payload.get("discount_amount") or 0),
                         ),
                     )
                     record_id = int(cursor.lastrowid)
@@ -91,7 +94,8 @@ class MyBetRepository:
                             multiplier = ?,
                             is_append = ?,
                             bet_count = ?,
-                            amount = ?
+                            amount = ?,
+                            discount_amount = ?
                         WHERE id = ? AND user_id = ?
                         """,
                         (
@@ -101,6 +105,7 @@ class MyBetRepository:
                             1 if bool(payload.get("is_append")) else 0,
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
+                            int(payload.get("discount_amount") or 0),
                             record_id,
                             user_id,
                         ),
@@ -126,6 +131,7 @@ class MyBetRepository:
                             record.is_append,
                             record.bet_count,
                             record.amount,
+                            record.discount_amount,
                             record.created_at,
                             record.updated_at,
                             meta.source_type,
