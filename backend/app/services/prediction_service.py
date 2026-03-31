@@ -1348,6 +1348,7 @@ class PredictionService:
                     limit=120,
                     offset=0,
                     lottery_code=normalized_code,
+                    compact_for_scoring=True,
                 )
                 summary_records = summary_payload.get("records", [])
             else:

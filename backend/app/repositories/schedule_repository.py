@@ -248,51 +248,20 @@ class ScheduleRepository:
     def list_due_tasks(self, due_before: datetime) -> list[dict[str, Any]]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT *
-                    FROM scheduled_task
-                    WHERE is_active = 1
-                      AND next_run_at IS NOT NULL
-                      AND next_run_at <= ?
-                    ORDER BY next_run_at ASC, id ASC
-                    """,
-                    (due_before,),
-                )
-                rows = cursor.fetchall()
-                task_ids = [int(row["id"]) for row in rows]
-                model_codes_by_task = self._load_task_model_codes(cursor, task_ids)
-                weekdays_by_task = self._load_task_weekdays(cursor, task_ids)
-                return [
-                    self._serialize_task(
-                        row,
-                        model_codes=model_codes_by_task.get(int(row["id"])),
-                        weekdays=weekdays_by_task.get(int(row["id"])),
-                    )
-                    for row in rows
-                ]
+                # Keep due-task scan lean: use id-only read first, then fetch full rows for matched ids.
+                # This avoids wide-row SELECT * scans on the hot scheduler polling path.
+                due_task_ids = self._find_due_task_ids(cursor, due_before=due_before)
+                return self._fetch_tasks_with_relations(cursor, due_task_ids)
 
     def claim_due_tasks(self, *, due_before: datetime, claim_until: datetime) -> list[dict[str, Any]]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT *
-                    FROM scheduled_task
-                    WHERE is_active = 1
-                      AND next_run_at IS NOT NULL
-                      AND next_run_at <= ?
-                    ORDER BY next_run_at ASC, id ASC
-                    """,
-                    (due_before,),
-                )
-                candidate_rows = cursor.fetchall()
-                if not candidate_rows:
+                candidate_task_ids = self._find_due_task_ids(cursor, due_before=due_before)
+                if not candidate_task_ids:
                     return []
 
                 claimed_ids: list[int] = []
-                for row in candidate_rows:
-                    task_id = int(row["id"])
+                for task_id in candidate_task_ids:
                     cursor.execute(
                         """
                         UPDATE scheduled_task
@@ -314,30 +283,46 @@ class ScheduleRepository:
                     if cursor.rowcount > 0:
                         claimed_ids.append(task_id)
 
-                if not claimed_ids:
-                    return []
+                return self._fetch_tasks_with_relations(cursor, claimed_ids)
 
-                placeholders = ", ".join("?" for _ in claimed_ids)
-                cursor.execute(
-                    f"""
-                    SELECT *
-                    FROM scheduled_task
-                    WHERE id IN ({placeholders})
-                    ORDER BY next_run_at ASC, id ASC
-                    """,
-                    tuple(claimed_ids),
-                )
-                rows = cursor.fetchall()
-                model_codes_by_task = self._load_task_model_codes(cursor, claimed_ids)
-                weekdays_by_task = self._load_task_weekdays(cursor, claimed_ids)
-                return [
-                    self._serialize_task(
-                        row,
-                        model_codes=model_codes_by_task.get(int(row["id"])),
-                        weekdays=weekdays_by_task.get(int(row["id"])),
-                    )
-                    for row in rows
-                ]
+    def _find_due_task_ids(self, cursor: Any, *, due_before: datetime) -> list[int]:
+        cursor.execute(
+            """
+            SELECT id
+            FROM scheduled_task
+            WHERE is_active = 1
+              AND next_run_at IS NOT NULL
+              AND next_run_at <= ?
+            ORDER BY next_run_at ASC, id ASC
+            """,
+            (due_before,),
+        )
+        return [int(row["id"]) for row in cursor.fetchall()]
+
+    def _fetch_tasks_with_relations(self, cursor: Any, task_ids: list[int]) -> list[dict[str, Any]]:
+        if not task_ids:
+            return []
+        placeholders = ", ".join("?" for _ in task_ids)
+        cursor.execute(
+            f"""
+            SELECT *
+            FROM scheduled_task
+            WHERE id IN ({placeholders})
+            ORDER BY next_run_at ASC, id ASC
+            """,
+            tuple(task_ids),
+        )
+        rows = cursor.fetchall()
+        model_codes_by_task = self._load_task_model_codes(cursor, task_ids)
+        weekdays_by_task = self._load_task_weekdays(cursor, task_ids)
+        return [
+            self._serialize_task(
+                row,
+                model_codes=model_codes_by_task.get(int(row["id"])),
+                weekdays=weekdays_by_task.get(int(row["id"])),
+            )
+            for row in rows
+        ]
 
     def _serialize_task(
         self,

@@ -276,6 +276,8 @@ class PredictionRepository:
         limit: int | None = None,
         offset: int = 0,
         lottery_code: str = "dlt",
+        *,
+        compact_for_scoring: bool = False,
     ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         sql = """
@@ -306,10 +308,10 @@ class PredictionRepository:
                     batch_ids = [int(row["id"]) for row in batch_rows]
                     issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
                     actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids, lottery_code=normalized_code)
-                    model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids)
+                    model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids, include_extended_meta=not compact_for_scoring)
                     model_run_ids = [int(row["id"]) for row in model_rows]
-                    summaries_by_run = self._fetch_model_summaries(cursor, model_run_ids)
-                    groups_by_run = self._fetch_groups(cursor, model_run_ids)
+                    summaries_by_run = {} if compact_for_scoring else self._fetch_model_summaries(cursor, model_run_ids)
+                    groups_by_run = self._fetch_groups(cursor, model_run_ids, compact_for_scoring=compact_for_scoring)
                     group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
         duration_ms = round((perf_counter() - started_at) * 1000, 2)
         self.logger.debug(
@@ -320,6 +322,7 @@ class PredictionRepository:
                     "model_run_count": len(model_rows),
                     "group_metric_count": sum(len(items) for items in group_metrics_by_run.values()),
                     "db_query_ms": duration_ms,
+                    "compact_for_scoring": compact_for_scoring,
                 }
             },
         )
@@ -339,7 +342,7 @@ class PredictionRepository:
                     "model_id": row["model_id"],
                     "prediction_play_mode": str(row.get("prediction_play_mode") or "direct"),
                     "model_name": row["model_name"],
-                    "model_provider": row["model_provider"],
+                    "model_provider": row.get("model_provider"),
                     "model_version": row.get("model_version"),
                     "model_api_model": row.get("model_api_model"),
                     "best_group": summary.get("best_group"),
@@ -998,10 +1001,28 @@ class PredictionRepository:
         return payload
 
     @staticmethod
-    def _fetch_model_runs_by_batch(cursor, batch_ids: list[int]) -> list[dict[str, Any]]:
+    def _fetch_model_runs_by_batch(cursor, batch_ids: list[int], *, include_extended_meta: bool = True) -> list[dict[str, Any]]:
         if not batch_ids:
             return []
         placeholders = ", ".join("?" for _ in batch_ids)
+        if not include_extended_meta:
+            cursor.execute(
+                f"""
+                SELECT
+                    pmr.id,
+                    pmr.prediction_batch_id,
+                    pmr.display_order,
+                    pmr.prediction_play_mode,
+                    am.model_code AS model_id,
+                    am.display_name AS model_name
+                FROM prediction_model_run pmr
+                INNER JOIN ai_model am ON am.id = pmr.model_id
+                WHERE pmr.prediction_batch_id IN ({placeholders})
+                ORDER BY pmr.prediction_batch_id ASC, pmr.display_order ASC, pmr.id ASC
+                """,
+                tuple(batch_ids),
+            )
+            return cursor.fetchall()
         cursor.execute(
             f"""
             SELECT
@@ -1046,23 +1067,49 @@ class PredictionRepository:
             result.setdefault(row["model_code"], []).append(row["tag_code"])
         return result
 
-    def _fetch_groups(self, cursor, model_run_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    def _fetch_groups(
+        self,
+        cursor,
+        model_run_ids: list[int],
+        *,
+        compact_for_scoring: bool = False,
+    ) -> dict[int, list[dict[str, Any]]]:
         if not model_run_ids:
             return {}
         placeholders = ", ".join("?" for _ in model_run_ids)
-        cursor.execute(
-            f"""
-            SELECT id, model_run_id, group_no, play_type, sum_value, strategy_text, description_text
-            FROM prediction_group
-            WHERE model_run_id IN ({placeholders})
-            ORDER BY model_run_id ASC, group_no ASC
-            """,
-            tuple(model_run_ids),
-        )
+        if compact_for_scoring:
+            cursor.execute(
+                f"""
+                SELECT id, model_run_id, group_no, play_type, sum_value
+                FROM prediction_group
+                WHERE model_run_id IN ({placeholders})
+                ORDER BY model_run_id ASC, group_no ASC
+                """,
+                tuple(model_run_ids),
+            )
+        else:
+            cursor.execute(
+                f"""
+                SELECT id, model_run_id, group_no, play_type, sum_value, strategy_text, description_text
+                FROM prediction_group
+                WHERE model_run_id IN ({placeholders})
+                ORDER BY model_run_id ASC, group_no ASC
+                """,
+                tuple(model_run_ids),
+            )
         group_rows = cursor.fetchall()
         group_ids = [int(row["id"]) for row in group_rows]
-        numbers_by_group = self._fetch_group_numbers(cursor, group_ids)
-        hit_by_group = self._fetch_hit_summaries(cursor, group_ids)
+        if compact_for_scoring:
+            number_group_ids = [
+                int(row["id"])
+                for row in group_rows
+                if str(row.get("play_type") or "").strip().lower() in {"dlt_dantuo", "dlt_compound"}
+            ]
+            numbers_by_group = self._fetch_group_numbers(cursor, number_group_ids)
+            hit_by_group: dict[int, dict[str, Any]] = {}
+        else:
+            numbers_by_group = self._fetch_group_numbers(cursor, group_ids)
+            hit_by_group = self._fetch_hit_summaries(cursor, group_ids)
 
         groups_by_run: dict[int, list[dict[str, Any]]] = {}
         for row in group_rows:
