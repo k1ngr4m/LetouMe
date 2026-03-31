@@ -104,7 +104,7 @@ export function HomeModelDetailPage() {
     <div className="page-stack model-detail-page">
       <section className="panel-card model-detail-page__hero">
         <div className="model-detail-page__hero-top">
-          <button className="ghost-button" type="button" onClick={handleBack}>
+          <button className="ghost-button model-detail-page__back-button" type="button" onClick={handleBack}>
             返回总览
           </button>
           <span className="model-detail-page__path">预测总览 / 模型详情</span>
@@ -127,12 +127,12 @@ export function HomeModelDetailPage() {
             </div>
           </div>
           <div className="model-detail-page__hero-side">
-            <article className="model-detail-page__metric-card">
+            <article className="model-detail-page__metric-card model-detail-page__metric-card--target">
               <span>目标期号</span>
               <strong>{currentPredictions.data?.target_period || '-'}</strong>
               <small>预测日期 {currentPredictions.data?.prediction_date || '-'}</small>
             </article>
-            <article className="model-detail-page__metric-card">
+            <article className="model-detail-page__metric-card model-detail-page__metric-card--score">
               <span>能力摘要</span>
               <strong>{selectedScore?.perPeriodScore || 0}</strong>
               <small>按期分 / ROI 近期 {Math.round((selectedScore?.recentWindow.roi || 0) * 100)}%</small>

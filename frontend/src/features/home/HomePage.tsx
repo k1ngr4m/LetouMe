@@ -947,7 +947,7 @@ export function HomePage() {
           </p>
         </div>
         <div className="hero-panel__summary" aria-label="当前预测摘要">
-          <article className="hero-panel__summary-card">
+          <article className="hero-panel__summary-card hero-panel__summary-card--key">
             <span>目标期号</span>
             <strong>{currentPredictions.data?.target_period || '-'}</strong>
           </article>
@@ -955,12 +955,12 @@ export function HomePage() {
             <span>预测日期</span>
             <strong>{currentPredictions.data?.prediction_date || '-'}</strong>
           </article>
-          <article className="hero-panel__summary-card">
+          <article className="hero-panel__summary-card hero-panel__summary-card--status">
             <span>开奖状态</span>
             <strong>{actualResult ? '已开奖' : '待开奖'}</strong>
             <small>{actualResult ? '已可查看命中结果' : '等待官方开奖结果'}</small>
           </article>
-          <article className="hero-panel__summary-card">
+          <article className="hero-panel__summary-card hero-panel__summary-card--key">
             <span>模型覆盖</span>
             <strong>{models.length}</strong>
             <small>当前参与预测的活跃模型</small>
@@ -988,12 +988,12 @@ export function HomePage() {
           </aside>
 
           <div className="page-section dashboard-content">
-            <section ref={modelSectionRef} data-section="models">
+            <section ref={modelSectionRef} data-section="models" className="prediction-overview-section prediction-overview-section--models">
               <StatusCard
                 title="模型列表"
                 subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
-                  <div className="toolbar-inline">
+                  <div className="toolbar-inline prediction-overview-toolbar">
                     {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
                     {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
                     <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
@@ -1109,18 +1109,18 @@ export function HomePage() {
               </StatusCard>
             </section>
 
-            <section ref={weightsSectionRef} data-section="weights">
+            <section ref={weightsSectionRef} data-section="weights" className="prediction-overview-section prediction-overview-section--summary">
               <StatusCard
                 title="预测统计"
                 subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
-                  <div className="toolbar-inline">
+                  <div className="toolbar-inline prediction-summary-toolbar">
                     <label className="toggle-chip">
                       <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
                       <span>仅共同号码</span>
                     </label>
                     <button
-                      className="icon-button"
+                      className="icon-button prediction-summary__export-button"
                       onClick={exportPredictionSummary}
                       aria-label="导出统计"
                       title={isExportingSummary ? '导出中...' : '导出统计'}
