@@ -311,7 +311,7 @@ class TicketOCRServiceTests(unittest.TestCase):
 
     def test_extract_ticket_purchased_at_supports_compact_yy_datetime(self) -> None:
         purchased_at = self.service._extract_ticket_purchased_at(ocr_text="01-408168-1010000226/03/1314:04:47")
-        self.assertEqual(purchased_at, "2026-03-13T06:04:47Z")
+        self.assertEqual(purchased_at, "2026-03-13T14:04:47+08:00")
 
     def test_extract_ticket_purchased_at_returns_none_when_missing(self) -> None:
         purchased_at = self.service._extract_ticket_purchased_at(ocr_text="2026年03月14日开奖")

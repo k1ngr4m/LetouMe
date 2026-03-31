@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from math import comb
 from time import perf_counter
 from typing import Any
@@ -18,7 +18,6 @@ from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
 
 BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
-UTC = timezone.utc
 
 
 class TicketOCRService:
@@ -315,12 +314,16 @@ class TicketOCRService:
         if not target_period:
             warnings.append("未稳定识别到期号，请手动补录")
         return {
-            "recognized_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "recognized_at": self._current_beijing_iso_timestamp(),
             "ticket_purchased_at": self._extract_ticket_purchased_at(ocr_text=ocr_text),
             "target_period": target_period,
             "lines": lines,
             "warnings": warnings,
         }
+
+    @staticmethod
+    def _current_beijing_iso_timestamp() -> str:
+        return datetime.now(BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
     @staticmethod
     def _extract_target_period(*, ocr_text: str) -> str:
@@ -366,7 +369,7 @@ class TicketOCRService:
                 )
             except ValueError:
                 continue
-            return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            return parsed.strftime("%Y-%m-%dT%H:%M:%S+08:00")
         return None
 
     def _parse_pl3_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:

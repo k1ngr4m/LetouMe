@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from math import comb
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from backend.app.dlt_rules import (
     DLT_OLD_FIXED_PRIZE_RULES,
@@ -30,6 +31,7 @@ def build_pl3_group_sum_bet_counts() -> dict[int, int]:
 
 
 class MyBetService:
+    BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
@@ -108,7 +110,7 @@ class MyBetService:
             "ticket_image_url": str(draft.get("ticket_image_url") or ""),
             "ocr_text": str(draft.get("ocr_text") or ""),
             "ocr_provider": str(draft.get("ocr_provider") or "baidu"),
-            "ocr_recognized_at": str(draft.get("ocr_recognized_at") or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "ocr_recognized_at": str(draft.get("ocr_recognized_at") or datetime.now(self.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")),
             "ticket_purchased_at": str(draft.get("ticket_purchased_at") or "") or None,
             "lines": serialized_lines,
             "warnings": warnings,
@@ -851,9 +853,13 @@ class MyBetService:
         if isinstance(updated_at, datetime):
             updated_at = updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
         if isinstance(ocr_recognized_at, datetime):
-            ocr_recognized_at = ocr_recognized_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            if ocr_recognized_at.tzinfo is None:
+                ocr_recognized_at = ocr_recognized_at.replace(tzinfo=MyBetService.BEIJING_TIMEZONE)
+            ocr_recognized_at = ocr_recognized_at.astimezone(MyBetService.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
         if isinstance(ticket_purchased_at, datetime):
-            ticket_purchased_at = ticket_purchased_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            if ticket_purchased_at.tzinfo is None:
+                ticket_purchased_at = ticket_purchased_at.replace(tzinfo=MyBetService.BEIJING_TIMEZONE)
+            ticket_purchased_at = ticket_purchased_at.astimezone(MyBetService.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
         raw_lines = record.get("lines") if isinstance(record.get("lines"), list) else []
         lines = [MyBetService._serialize_line(item) for item in raw_lines]
