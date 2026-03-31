@@ -18,6 +18,7 @@ class PredictionRepository:
     _RETRYABLE_DB_ERROR_CODES = {1205, 1213}
     _WRITE_RETRY_DELAY_SECONDS = 0.15
     _WRITE_RETRY_LIMIT = 3
+    _IN_QUERY_CHUNK_SIZE = 200
 
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
@@ -795,16 +796,28 @@ class PredictionRepository:
         lottery_codes = model_payload.get("lottery_codes") or (definition.lottery_codes if definition else ["dlt"])
 
         with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO model_provider (provider_code, provider_name)
-                VALUES (?, ?)
-                ON DUPLICATE KEY UPDATE provider_name = VALUES(provider_name)
-                """,
-                (provider_code, provider_name),
-            )
-            cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (provider_code,))
-            provider_id = int(cursor.fetchone()["id"])
+            cursor.execute("SELECT id, provider_name FROM model_provider WHERE provider_code = ? LIMIT 1", (provider_code,))
+            provider_row = cursor.fetchone()
+            if provider_row:
+                provider_id = int(provider_row["id"])
+                if str(provider_row.get("provider_name") or "") != provider_name:
+                    cursor.execute(
+                        """
+                        UPDATE model_provider
+                        SET provider_name = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (provider_name, provider_id),
+                    )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO model_provider (provider_code, provider_name)
+                    VALUES (?, ?)
+                    """,
+                    (provider_code, provider_name),
+                )
+                provider_id = int(cursor.lastrowid)
             provider_model_name = api_model_name or model_code
             cursor.execute(
                 """
@@ -1124,53 +1137,57 @@ class PredictionRepository:
     def _fetch_group_numbers(cursor, group_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
         if not group_ids:
             return {}
-        placeholders = ", ".join("?" for _ in group_ids)
-        cursor.execute(
-            f"""
-            SELECT prediction_group_id, ball_color, ball_position, ball_value
-            FROM prediction_group_number
-            WHERE prediction_group_id IN ({placeholders})
-            ORDER BY prediction_group_id ASC, ball_color ASC, ball_position ASC
-            """,
-            tuple(group_ids),
-        )
         result: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
-            result.setdefault(int(row["prediction_group_id"]), []).append(row)
+        for chunk in PredictionRepository._iter_chunks(group_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT prediction_group_id, ball_color, ball_position, ball_value
+                FROM prediction_group_number
+                WHERE prediction_group_id IN ({placeholders})
+                ORDER BY prediction_group_id ASC, ball_color ASC, ball_position ASC
+                """,
+                tuple(chunk),
+            )
+            for row in cursor.fetchall():
+                result.setdefault(int(row["prediction_group_id"]), []).append(row)
         return result
 
     @staticmethod
     def _fetch_hit_summaries(cursor, group_ids: list[int]) -> dict[int, dict[str, Any]]:
         if not group_ids:
             return {}
-        placeholders = ", ".join("?" for _ in group_ids)
-        cursor.execute(
-            f"""
-            SELECT id, prediction_group_id, red_hit_count, blue_hit_count
-            FROM prediction_hit_summary
-            WHERE prediction_group_id IN ({placeholders})
-            """,
-            tuple(group_ids),
-        )
-        summary_rows = cursor.fetchall()
+        summary_rows: list[dict[str, Any]] = []
+        for chunk in PredictionRepository._iter_chunks(group_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT id, prediction_group_id, red_hit_count, blue_hit_count
+                FROM prediction_hit_summary
+                WHERE prediction_group_id IN ({placeholders})
+                """,
+                tuple(chunk),
+            )
+            summary_rows.extend(cursor.fetchall())
         if not summary_rows:
             return {}
 
         summary_ids = [int(row["id"]) for row in summary_rows]
-        placeholders = ", ".join("?" for _ in summary_ids)
-        cursor.execute(
-            f"""
-            SELECT hit_summary_id, ball_color, ball_position, ball_value
-            FROM prediction_hit_number
-            WHERE hit_summary_id IN ({placeholders})
-            ORDER BY hit_summary_id ASC, ball_color ASC, ball_position ASC, ball_value ASC
-            """,
-            tuple(summary_ids),
-        )
         hits_by_summary: dict[int, dict[str, list[str]]] = {}
-        for row in cursor.fetchall():
-            entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": [], "digit": []})
-            entry[row["ball_color"]].append(row["ball_value"])
+        for chunk in PredictionRepository._iter_chunks(summary_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT hit_summary_id, ball_color, ball_position, ball_value
+                FROM prediction_hit_number
+                WHERE hit_summary_id IN ({placeholders})
+                ORDER BY hit_summary_id ASC, ball_color ASC, ball_position ASC, ball_value ASC
+                """,
+                tuple(chunk),
+            )
+            for row in cursor.fetchall():
+                entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": [], "digit": []})
+                entry[row["ball_color"]].append(row["ball_value"])
 
         result: dict[int, dict[str, Any]] = {}
         for row in summary_rows:
@@ -1238,41 +1255,43 @@ class PredictionRepository:
         if not rows:
             return {}
         draw_result_ids = [int(row["draw_result_id"]) for row in rows]
-        placeholders = ", ".join("?" for _ in draw_result_ids)
-        cursor.execute(
-            f"""
-            SELECT draw_result_id, ball_color, ball_position, ball_value
-            FROM draw_result_number
-            WHERE draw_result_id IN ({placeholders})
-            ORDER BY draw_result_id ASC, ball_color ASC, ball_position ASC
-            """,
-            tuple(draw_result_ids),
-        )
         numbers_by_result: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
-            numbers_by_result.setdefault(int(row["draw_result_id"]), []).append(row)
-
-        placeholders = ", ".join("?" for _ in draw_result_ids)
-        cursor.execute(
-            f"""
-            SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
-            FROM draw_result_prize
-            WHERE draw_result_id IN ({placeholders})
-            ORDER BY draw_result_id ASC, id ASC
-            """,
-            tuple(draw_result_ids),
-        )
-        prizes_by_result: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
-            prizes_by_result.setdefault(int(row["draw_result_id"]), []).append(
-                {
-                    "prize_level": row["prize_level"],
-                    "prize_type": row["prize_type"],
-                    "winner_count": int(row.get("winner_count") or 0),
-                    "prize_amount": int(row.get("prize_amount") or 0),
-                    "total_amount": int(row.get("total_amount") or 0),
-                }
+        for chunk in PredictionRepository._iter_chunks(draw_result_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT draw_result_id, ball_color, ball_position, ball_value
+                FROM draw_result_number
+                WHERE draw_result_id IN ({placeholders})
+                ORDER BY draw_result_id ASC, ball_color ASC, ball_position ASC
+                """,
+                tuple(chunk),
             )
+            for row in cursor.fetchall():
+                numbers_by_result.setdefault(int(row["draw_result_id"]), []).append(row)
+
+        prizes_by_result: dict[int, list[dict[str, Any]]] = {}
+        for chunk in PredictionRepository._iter_chunks(draw_result_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
+                FROM draw_result_prize
+                WHERE draw_result_id IN ({placeholders})
+                ORDER BY draw_result_id ASC, id ASC
+                """,
+                tuple(chunk),
+            )
+            for row in cursor.fetchall():
+                prizes_by_result.setdefault(int(row["draw_result_id"]), []).append(
+                    {
+                        "prize_level": row["prize_level"],
+                        "prize_type": row["prize_type"],
+                        "winner_count": int(row.get("winner_count") or 0),
+                        "prize_amount": int(row.get("prize_amount") or 0),
+                        "total_amount": int(row.get("total_amount") or 0),
+                    }
+                )
 
         result: dict[int, dict[str, Any]] = {}
         for row in rows:
@@ -1293,6 +1312,12 @@ class PredictionRepository:
                 "prize_breakdown": prizes_by_result.get(int(row["draw_result_id"]), []),
             }
         return result
+
+    @staticmethod
+    def _iter_chunks(values: list[Any], chunk_size: int) -> list[list[Any]]:
+        if chunk_size <= 0:
+            return [values]
+        return [values[index : index + chunk_size] for index in range(0, len(values), chunk_size)]
 
 
 def _load_registry() -> ModelRegistry | None:

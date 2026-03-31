@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from threading import Lock
+from time import monotonic
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
@@ -29,6 +30,9 @@ SUPPORTED_API_FORMATS = (
 )
 _bootstrap_ready = False
 _bootstrap_lock = Lock()
+_registry_cache_lock = Lock()
+_registry_cache_entry: tuple[float, "ModelRegistry"] | None = None
+MODEL_REGISTRY_CACHE_TTL_SECONDS = 60
 
 DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
     {
@@ -322,6 +326,7 @@ def bootstrap_default_models() -> None:
                             (model_db_id, normalize_lottery_code(lottery_code)),
                         )
         _bootstrap_ready = True
+        invalidate_model_registry_cache()
 
 
 def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
@@ -357,7 +362,21 @@ def _provider_name(provider_code: str) -> str:
     return provider_code.replace("_", " ").title()
 
 
-def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
+def invalidate_model_registry_cache() -> None:
+    global _registry_cache_entry
+    with _registry_cache_lock:
+        _registry_cache_entry = None
+
+
+def load_model_registry(_config_path: str | None = None, *, use_cache: bool = True) -> ModelRegistry:
+    global _registry_cache_entry
+    if use_cache:
+        now = monotonic()
+        with _registry_cache_lock:
+            cached = _registry_cache_entry
+            if cached and cached[0] > now:
+                return cached[1]
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -415,7 +434,11 @@ def load_model_registry(_config_path: str | None = None) -> ModelRegistry:
             is_deleted=bool(row.get("is_deleted")),
             extra=extra_options_by_provider_id.get(int(row["provider_id"]), {}) if row.get("provider_id") is not None else {},
         )
-    return ModelRegistry(definitions=definitions)
+    registry = ModelRegistry(definitions=definitions)
+    if use_cache:
+        with _registry_cache_lock:
+            _registry_cache_entry = (monotonic() + MODEL_REGISTRY_CACHE_TTL_SECONDS, registry)
+    return registry
 
 
 def _fetch_tags(cursor, model_codes: list[str]) -> dict[str, list[str]]:

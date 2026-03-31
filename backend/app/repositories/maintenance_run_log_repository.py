@@ -69,7 +69,16 @@ class MaintenanceRunLogRepository:
                     """,
                     (task_id, lottery_code, trigger_type, task_type, mode, model_code, status, _parse_datetime(created_at)),
                 )
-        return self.get_by_task_id(task_id) or {}
+        return {
+            "task_id": task_id,
+            "lottery_code": lottery_code,
+            "trigger_type": trigger_type,
+            "task_type": task_type,
+            "mode": mode,
+            "model_code": model_code,
+            "status": status,
+            "created_at": created_at,
+        }
 
     def update_by_task_id(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         fields = {
@@ -101,14 +110,12 @@ class MaintenanceRunLogRepository:
                     """,
                     params,
                 )
-                if cursor.rowcount == 0 and not self._exists_by_task_id(cursor, task_id):
+                if cursor.rowcount == 0:
                     raise KeyError(task_id)
-        return self.get_by_task_id(task_id) or {}
-
-    @staticmethod
-    def _exists_by_task_id(cursor, task_id: str) -> bool:
-        cursor.execute("SELECT task_id FROM maintenance_run_log WHERE task_id = ? LIMIT 1", (task_id,))
-        return bool(cursor.fetchone())
+        return {
+            "task_id": task_id,
+            **fields,
+        }
 
     def get_by_task_id(self, task_id: str) -> dict[str, Any] | None:
         with get_connection() as connection:

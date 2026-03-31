@@ -9,6 +9,9 @@ from backend.app.lotteries import display_period, normalize_lottery_code, storag
 from backend.app.repositories.write_log_repository import WriteLogRepository
 
 
+IN_QUERY_CHUNK_SIZE = 200
+
+
 class LotteryRepository:
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
@@ -262,45 +265,47 @@ class LotteryRepository:
     def _fetch_draw_numbers(cursor, draw_result_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
         if not draw_result_ids:
             return {}
-        placeholders = ", ".join("?" for _ in draw_result_ids)
-        cursor.execute(
-            f"""
-            SELECT draw_result_id, ball_color, ball_position, ball_value
-            FROM draw_result_number
-            WHERE draw_result_id IN ({placeholders})
-            ORDER BY draw_result_id, ball_color, ball_position
-            """,
-            tuple(draw_result_ids),
-        )
         numbers_by_result: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
-            numbers_by_result.setdefault(row["draw_result_id"], []).append(row)
+        for chunk in _iter_chunks(draw_result_ids, IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT draw_result_id, ball_color, ball_position, ball_value
+                FROM draw_result_number
+                WHERE draw_result_id IN ({placeholders})
+                ORDER BY draw_result_id, ball_color, ball_position
+                """,
+                tuple(chunk),
+            )
+            for row in cursor.fetchall():
+                numbers_by_result.setdefault(row["draw_result_id"], []).append(row)
         return numbers_by_result
 
     @staticmethod
     def _fetch_draw_prizes(cursor, draw_result_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
         if not draw_result_ids:
             return {}
-        placeholders = ", ".join("?" for _ in draw_result_ids)
-        cursor.execute(
-            f"""
-            SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
-            FROM draw_result_prize
-            WHERE draw_result_id IN ({placeholders})
-            """,
-            tuple(draw_result_ids),
-        )
         prizes_by_result: dict[int, list[dict[str, Any]]] = {}
-        for row in cursor.fetchall():
-            prizes_by_result.setdefault(row["draw_result_id"], []).append(
-                {
-                    "prize_level": str(row.get("prize_level") or ""),
-                    "prize_type": str(row.get("prize_type") or "basic"),
-                    "winner_count": int(row.get("winner_count") or 0),
-                    "prize_amount": int(row.get("prize_amount") or 0),
-                    "total_amount": int(row.get("total_amount") or 0),
-                }
+        for chunk in _iter_chunks(draw_result_ids, IN_QUERY_CHUNK_SIZE):
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
+                FROM draw_result_prize
+                WHERE draw_result_id IN ({placeholders})
+                """,
+                tuple(chunk),
             )
+            for row in cursor.fetchall():
+                prizes_by_result.setdefault(row["draw_result_id"], []).append(
+                    {
+                        "prize_level": str(row.get("prize_level") or ""),
+                        "prize_type": str(row.get("prize_type") or "basic"),
+                        "winner_count": int(row.get("winner_count") or 0),
+                        "prize_amount": int(row.get("prize_amount") or 0),
+                        "total_amount": int(row.get("total_amount") or 0),
+                    }
+                )
         return prizes_by_result
 
     @staticmethod
@@ -342,17 +347,39 @@ def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str,
         with connection.cursor() as cursor:
             cursor.execute(
                 """
+                SELECT id, draw_date, status
+                FROM draw_issue
+                WHERE issue_no = ?
+                LIMIT 1
+                """,
+                (stored_issue_no,),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                issue_id = int(existing["id"])
+                existing_draw_date = str(existing.get("draw_date") or "")
+                next_draw_date = str(draw_date or "")
+                existing_status = str(existing.get("status") or "")
+                if existing_draw_date != next_draw_date or existing_status != status:
+                    cursor.execute(
+                        """
+                        UPDATE draw_issue
+                        SET draw_date = ?,
+                            status = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (draw_date, status, issue_id),
+                    )
+                return issue_id
+            cursor.execute(
+                """
                 INSERT INTO draw_issue (issue_no, draw_date, status, updated_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE
-                    draw_date = VALUES(draw_date),
-                    status = VALUES(status),
-                    updated_at = CURRENT_TIMESTAMP
                 """,
                 (stored_issue_no, draw_date, status),
             )
-            cursor.execute("SELECT id FROM draw_issue WHERE issue_no = ?", (stored_issue_no,))
-            return int(cursor.fetchone()["id"])
+            return int(cursor.lastrowid)
 
 
 def _insert_number_rows(
@@ -411,3 +438,9 @@ def _parse_timestamp(value: str) -> datetime | str:
         except ValueError:
             continue
     return value
+
+
+def _iter_chunks(values: list[Any], chunk_size: int) -> list[list[Any]]:
+    if chunk_size <= 0:
+        return [values]
+    return [values[index : index + chunk_size] for index in range(0, len(values), chunk_size)]
