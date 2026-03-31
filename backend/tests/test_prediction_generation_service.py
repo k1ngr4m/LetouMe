@@ -11,6 +11,23 @@ from backend.core.model_config import ModelDefinition
 
 
 class PredictionGenerationServiceTests(unittest.TestCase):
+    def test_load_model_registry_cached_reuses_registry_within_ttl(self) -> None:
+        service = PredictionGenerationService()
+        with patch("backend.app.services.prediction_generation_service.load_model_registry", side_effect=[Mock(name="registry-1"), Mock(name="registry-2")]) as load_registry:
+            first = service._load_model_registry_cached()
+            second = service._load_model_registry_cached()
+
+        self.assertIs(first, second)
+        self.assertEqual(load_registry.call_count, 1)
+
+    def test_provider_failure_circuit_blocks_during_cooldown(self) -> None:
+        service = PredictionGenerationService()
+        service._record_provider_failure("aimixhub")
+        service._record_provider_failure("aimixhub")
+
+        with self.assertRaisesRegex(ValueError, "熔断冷却中"):
+            service._raise_if_provider_in_cooldown("aimixhub")
+
     def test_generate_for_models_tracks_completed_count_and_retry_failure_reasons(self) -> None:
         service = PredictionGenerationService()
         progress_updates: list[dict] = []

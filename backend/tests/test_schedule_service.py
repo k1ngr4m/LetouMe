@@ -121,6 +121,7 @@ class ScheduleServiceTestCase(unittest.TestCase):
             mode="current",
             prediction_play_mode="direct_sum",
             overwrite=True,
+            parallelism=1,
             progress_callback=progress_callback,
         )
 

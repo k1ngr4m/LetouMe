@@ -30,6 +30,8 @@ def _format_datetime(value: Any) -> str | None:
 
 
 class ScheduleRepository:
+    CLAIMED_RUN_STATUS = "claiming"
+
     def list_tasks(self) -> list[dict[str, Any]]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -261,6 +263,73 @@ class ScheduleRepository:
                 task_ids = [int(row["id"]) for row in rows]
                 model_codes_by_task = self._load_task_model_codes(cursor, task_ids)
                 weekdays_by_task = self._load_task_weekdays(cursor, task_ids)
+                return [
+                    self._serialize_task(
+                        row,
+                        model_codes=model_codes_by_task.get(int(row["id"])),
+                        weekdays=weekdays_by_task.get(int(row["id"])),
+                    )
+                    for row in rows
+                ]
+
+    def claim_due_tasks(self, *, due_before: datetime, claim_until: datetime) -> list[dict[str, Any]]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT *
+                    FROM scheduled_task
+                    WHERE is_active = 1
+                      AND next_run_at IS NOT NULL
+                      AND next_run_at <= ?
+                    ORDER BY next_run_at ASC, id ASC
+                    """,
+                    (due_before,),
+                )
+                candidate_rows = cursor.fetchall()
+                if not candidate_rows:
+                    return []
+
+                claimed_ids: list[int] = []
+                for row in candidate_rows:
+                    task_id = int(row["id"])
+                    cursor.execute(
+                        """
+                        UPDATE scheduled_task
+                        SET next_run_at = ?,
+                            last_run_status = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                          AND is_active = 1
+                          AND next_run_at IS NOT NULL
+                          AND next_run_at <= ?
+                        """,
+                        (
+                            claim_until,
+                            self.CLAIMED_RUN_STATUS,
+                            task_id,
+                            due_before,
+                        ),
+                    )
+                    if cursor.rowcount > 0:
+                        claimed_ids.append(task_id)
+
+                if not claimed_ids:
+                    return []
+
+                placeholders = ", ".join("?" for _ in claimed_ids)
+                cursor.execute(
+                    f"""
+                    SELECT *
+                    FROM scheduled_task
+                    WHERE id IN ({placeholders})
+                    ORDER BY next_run_at ASC, id ASC
+                    """,
+                    tuple(claimed_ids),
+                )
+                rows = cursor.fetchall()
+                model_codes_by_task = self._load_task_model_codes(cursor, claimed_ids)
+                weekdays_by_task = self._load_task_weekdays(cursor, claimed_ids)
                 return [
                     self._serialize_task(
                         row,

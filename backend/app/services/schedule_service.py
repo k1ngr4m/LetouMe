@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+from random import uniform
 from datetime import datetime, timedelta, timezone
 from threading import Lock, Thread
 from time import sleep
 from uuid import uuid4
 from typing import Any
 from zoneinfo import ZoneInfo
+from time import monotonic
 
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
@@ -21,6 +23,9 @@ CRON_FIELD_PATTERN = re.compile(r"^\*|\d+(?:-\d+)?(?:/\d+)?(?:,\d+(?:-\d+)?(?:/\
 WEEKDAY_LABELS = {0: "周一", 1: "周二", 2: "周三", 3: "周四", 4: "周五", 5: "周六", 6: "周日"}
 BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
+ACTIVE_MODEL_CODES_CACHE_TTL_SECONDS = 60
+SCHEDULE_TASK_DISPATCH_JITTER_SECONDS = 0.4
+SCHEDULE_MODEL_PARALLELISM_LIMIT = 2
 
 
 class ScheduleService:
@@ -35,6 +40,7 @@ class ScheduleService:
         self._thread: Thread | None = None
         self._lock = Lock()
         self._started = False
+        self._active_model_codes_cache: tuple[float, set[str]] | None = None
 
     def start(self) -> None:
         with self._lock:
@@ -78,9 +84,12 @@ class ScheduleService:
     def _loop(self) -> None:
         while True:
             try:
-                due_tasks = self.repository.list_due_tasks(self._utc_now().replace(tzinfo=None))
+                due_before = self._utc_now().replace(tzinfo=None)
+                claim_until = (self._utc_now() + timedelta(minutes=1)).replace(tzinfo=None)
+                due_tasks = self.repository.claim_due_tasks(due_before=due_before, claim_until=claim_until)
                 for task in due_tasks:
                     self._trigger_task(task)
+                    sleep(uniform(0.0, SCHEDULE_TASK_DISPATCH_JITTER_SECONDS))
             except Exception:
                 self.logger.exception("Scheduled task loop failed")
             sleep(15)
@@ -119,7 +128,7 @@ class ScheduleService:
             return
 
         model_codes = [str(code).strip() for code in task.get("model_codes") or [] if str(code).strip()]
-        active_model_codes = self.prediction_generation_service.model_repository.list_active_model_codes()
+        active_model_codes = self._get_active_model_codes_cached()
         filtered_model_codes = [code for code in model_codes if code in active_model_codes]
         if filtered_model_codes != model_codes:
             refreshed_task = self.repository.set_task_model_codes(
@@ -154,9 +163,19 @@ class ScheduleService:
                 mode=task.get("generation_mode") or "current",
                 prediction_play_mode=str(task.get("prediction_play_mode") or "direct"),
                 overwrite=bool(task.get("overwrite_existing")),
+                parallelism=min(len(model_codes), SCHEDULE_MODEL_PARALLELISM_LIMIT),
                 progress_callback=progress_callback,
             ),
         )
+
+    def _get_active_model_codes_cached(self) -> set[str]:
+        now = monotonic()
+        cached = self._active_model_codes_cache
+        if cached and cached[0] > now:
+            return set(cached[1])
+        active_codes = set(self.prediction_generation_service.model_repository.list_active_model_codes())
+        self._active_model_codes_cache = (now + ACTIVE_MODEL_CODES_CACHE_TTL_SECONDS, active_codes)
+        return set(active_codes)
 
     def _normalize_payload(self, payload: dict[str, Any], *, task_code: str) -> dict[str, Any]:
         task_type = str(payload.get("task_type") or "").strip()

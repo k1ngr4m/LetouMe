@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock, local
+from time import monotonic
 from typing import Any, Callable
 
 from backend.app.db.connection import ensure_schema
@@ -32,6 +33,8 @@ MAX_GENERATION_PARALLELISM = 8
 MAX_BULK_RETRIES_PER_MODEL = 1
 MAX_INVALID_PREDICTION_RETRIES = 2
 SUPPORTED_RECENT_PERIOD_COUNTS = {1, 5, 10, 20}
+MODEL_REGISTRY_CACHE_TTL_SECONDS = 60
+PROVIDER_FAILURE_COOLDOWN_SECONDS = 300
 
 
 @dataclass
@@ -71,6 +74,10 @@ class PredictionGenerationService:
         self.prediction_repository = prediction_repository or PredictionRepository()
         self.model_repository = model_repository or ModelRepository()
         self.logger = get_logger("services.prediction_generation")
+        self._model_registry_cache: tuple[float, Any] | None = None
+        self._model_registry_lock = Lock()
+        self._provider_failure_state: dict[str, tuple[int, float]] = {}
+        self._provider_failure_lock = Lock()
 
     def generate_current_for_model(
         self,
@@ -850,10 +857,14 @@ class PredictionGenerationService:
         return str(min(selected_periods)), str(max(selected_periods))
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
+        self._raise_if_provider_in_cooldown(model_def.provider)
         model = ModelFactory().create(model_def)
         ok, message = model.health_check()
         if not ok:
+            if self._is_transient_provider_error(message):
+                self._record_provider_failure(model_def.provider)
             raise ValueError(f"模型健康检查失败: {message}")
+        self._record_provider_success(model_def.provider)
         return model
 
     def validate_model(self, model_code: str, lottery_code: str = "dlt") -> dict[str, Any]:
@@ -871,7 +882,7 @@ class PredictionGenerationService:
 
     def _get_model_definition(self, model_code: str, lottery_code: str = "dlt") -> ModelDefinition:
         self.validate_model(model_code, lottery_code=lottery_code)
-        registry = load_model_registry()
+        registry = self._load_model_registry_cached()
         try:
             model_def = registry.get(model_code)
             if not model_def.supports_lottery(lottery_code):
@@ -879,6 +890,17 @@ class PredictionGenerationService:
             return model_def
         except KeyError as exc:
             raise KeyError(model_code) from exc
+
+    def _load_model_registry_cached(self) -> Any:
+        now = monotonic()
+        with self._model_registry_lock:
+            cached = self._model_registry_cache
+            if cached and cached[0] > now:
+                return cached[1]
+        registry = load_model_registry()
+        with self._model_registry_lock:
+            self._model_registry_cache = (now + MODEL_REGISTRY_CACHE_TTL_SECONDS, registry)
+        return registry
 
     @staticmethod
     def _load_prompt_template(lottery_code: str = "dlt", prediction_play_mode: str = "direct") -> str:
@@ -967,8 +989,14 @@ class PredictionGenerationService:
         attempts = MAX_INVALID_PREDICTION_RETRIES + 1
         for attempt in range(1, attempts + 1):
             try:
+                self._raise_if_provider_in_cooldown(model_def.provider)
                 raw_prediction = model.predict(prompt)
             except Exception:
+                provider_error = self._extract_provider_error_from_exception()
+                if self._is_transient_provider_error(provider_error):
+                    self._record_provider_failure(model_def.provider)
+                else:
+                    self._record_provider_success(model_def.provider)
                 self.logger.exception(
                     "Model prediction request failed",
                     extra={
@@ -984,6 +1012,7 @@ class PredictionGenerationService:
                     },
                 )
                 raise
+            self._record_provider_success(model_def.provider)
             raw_summary = self._build_prediction_payload_summary(raw_prediction)
             raw_preview = self._build_payload_preview(raw_prediction)
             self.logger.info(
@@ -1071,6 +1100,73 @@ class PredictionGenerationService:
                 },
             )
         raise ValueError(f"模型返回的预测结构无效: {model_def.model_id}")
+
+    @staticmethod
+    def _extract_provider_error_from_exception() -> str:
+        import traceback
+
+        return traceback.format_exc()
+
+    @staticmethod
+    def _is_transient_provider_error(message: Any) -> bool:
+        text = str(message or "").lower()
+        if not text:
+            return False
+        transient_markers = (
+            "502",
+            "503",
+            "504",
+            "bad gateway",
+            "gateway timeout",
+            "service unavailable",
+            "internalservererror",
+            "temporarily unavailable",
+        )
+        return any(marker in text for marker in transient_markers)
+
+    def _raise_if_provider_in_cooldown(self, provider_code: str) -> None:
+        provider = str(provider_code or "").strip().lower()
+        if not provider:
+            return
+        with self._provider_failure_lock:
+            state = self._provider_failure_state.get(provider)
+            if not state:
+                return
+            _, cooldown_until = state
+        if monotonic() < cooldown_until:
+            raise ValueError(f"供应商[{provider}]处于熔断冷却中，请稍后重试")
+
+    def _record_provider_failure(self, provider_code: str) -> None:
+        provider = str(provider_code or "").strip().lower()
+        if not provider:
+            return
+        now = monotonic()
+        with self._provider_failure_lock:
+            failures, cooldown_until = self._provider_failure_state.get(provider, (0, 0.0))
+            if cooldown_until > 0 and now >= cooldown_until:
+                failures = 0
+            failures += 1
+            if failures >= 2:
+                cooldown_until = now + PROVIDER_FAILURE_COOLDOWN_SECONDS
+                self.logger.warning(
+                    "Provider failure circuit opened",
+                    extra={
+                        "context": {
+                            "provider_code": provider,
+                            "cooldown_seconds": PROVIDER_FAILURE_COOLDOWN_SECONDS,
+                            "failure_count": failures,
+                        }
+                    },
+                )
+            self._provider_failure_state[provider] = (failures, cooldown_until)
+
+    def _record_provider_success(self, provider_code: str) -> None:
+        provider = str(provider_code or "").strip().lower()
+        if not provider:
+            return
+        with self._provider_failure_lock:
+            if provider in self._provider_failure_state:
+                self._provider_failure_state.pop(provider, None)
 
     @staticmethod
     def _build_payload_preview(payload: Any, limit: int = 1200) -> str:
