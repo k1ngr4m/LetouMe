@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
+import { AnimatePresence, motion } from 'framer-motion'
+import { CalendarClock, ChevronDown, ChevronUp, Coins, Gift, ImageIcon, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -741,6 +743,30 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const summary = betsQuery.data?.summary
   const hasRecords = records.length > 0
   const allRecordsExpanded = hasRecords && records.every((record) => Boolean(expandedRecordMap[record.id]))
+  const summaryCards = useMemo(
+    () => [
+      {
+        key: 'total-count',
+        label: '投注笔数',
+        value: summary?.total_count || 0,
+        meta: `已结算 ${summary?.settled_count || 0} · 待开奖 ${summary?.pending_count || 0}`,
+        icon: ReceiptText,
+      },
+      { key: 'total-amount', label: '总投入', value: formatCurrency(summary?.total_amount || 0), icon: Wallet },
+      { key: 'discount', label: '总优惠', value: formatCurrency(summary?.total_discount_amount || 0), icon: Gift },
+      { key: 'net-amount', label: '净投入', value: formatCurrency(summary?.total_net_amount || 0), icon: Coins, cardClassName: 'is-emphasis' },
+      { key: 'prize', label: '总奖金', value: formatCurrency(summary?.total_prize_amount || 0), icon: Trophy },
+      {
+        key: 'profit',
+        label: '累计盈亏',
+        value: formatCurrency(summary?.total_net_profit || 0),
+        valueClassName: clsx((summary?.total_net_profit || 0) >= 0 ? 'is-profit' : 'is-loss'),
+        icon: Ticket,
+        cardClassName: 'is-emphasis',
+      },
+    ],
+    [summary],
+  )
 
   useEffect(() => {
     setExpandedRecordMap((previous) => {
@@ -863,37 +889,32 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               </button>
             ) : null}
             <button className="primary-button" type="button" onClick={() => openCreateModal()}>
+              <Plus size={16} aria-hidden="true" />
               添加投注
             </button>
           </div>
         }
       >
         <div className="my-bets-summary-grid">
-          <article className="my-bets-summary-card">
-            <span>投注笔数</span>
-            <strong>{summary?.total_count || 0}</strong>
-            <small>{`已结算 ${summary?.settled_count || 0} · 待开奖 ${summary?.pending_count || 0}`}</small>
-          </article>
-          <article className="my-bets-summary-card">
-            <span>总投入</span>
-            <strong>{formatCurrency(summary?.total_amount || 0)}</strong>
-          </article>
-          <article className="my-bets-summary-card">
-            <span>总优惠</span>
-            <strong>{formatCurrency(summary?.total_discount_amount || 0)}</strong>
-          </article>
-          <article className="my-bets-summary-card">
-            <span>净投入</span>
-            <strong>{formatCurrency(summary?.total_net_amount || 0)}</strong>
-          </article>
-          <article className="my-bets-summary-card">
-            <span>总奖金</span>
-            <strong>{formatCurrency(summary?.total_prize_amount || 0)}</strong>
-          </article>
-          <article className="my-bets-summary-card">
-            <span>累计盈亏</span>
-            <strong className={clsx((summary?.total_net_profit || 0) >= 0 ? 'is-profit' : 'is-loss')}>{formatCurrency(summary?.total_net_profit || 0)}</strong>
-          </article>
+          {summaryCards.map((item, index) => {
+            const Icon = item.icon
+            return (
+              <motion.article
+                key={item.key}
+                className={clsx('my-bets-summary-card', item.cardClassName)}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: index * 0.03 }}
+              >
+                <span className="my-bets-summary-card__label">{item.label}</span>
+                <span className="my-bets-summary-card__icon" aria-hidden="true">
+                  <Icon size={16} />
+                </span>
+                <strong className={item.valueClassName}>{item.value}</strong>
+                {item.meta ? <small>{item.meta}</small> : null}
+              </motion.article>
+            )
+          })}
         </div>
 
         {message ? <div className="simulation-inline-message">{message}</div> : null}
@@ -904,10 +925,17 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
           <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
         ) : records.length ? (
           <div className="my-bets-list">
-            {records.map((record) => {
+            {records.map((record, index) => {
               const isExpanded = Boolean(expandedRecordMap[record.id])
               return (
-              <article key={record.id} className="my-bets-card">
+              <motion.article
+                layout
+                key={record.id}
+                className="my-bets-card"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, delay: Math.min(index * 0.025, 0.22) }}
+              >
                 <div className="my-bets-card__header">
                   <div>
                     <p className="hero-panel__eyebrow">{`第 ${record.target_period} 期`}</p>
@@ -916,7 +944,10 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       {record.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : null}
                       {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                     </div>
-                    <span className="my-bets-card__meta">{`投注时间：${formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}`}</span>
+                    <span className="my-bets-card__meta my-bets-card__meta--with-icon">
+                      <CalendarClock size={14} aria-hidden="true" />
+                      {`投注时间：${formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}`}
+                    </span>
                     {isExpanded ? (
                       <div className="my-bets-card__draw">
                         <span className="my-bets-card__meta">开奖号码：</span>
@@ -926,28 +957,33 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                   </div>
                   <div className="my-bets-card__actions">
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => toggleRecordExpanded(record.id)}>
+                      {isExpanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
                       {isExpanded ? '收起详情' : '展开详情'}
                     </button>
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditModal(record)}>
+                      <PencilLine size={14} aria-hidden="true" />
                       编辑
                     </button>
                     <button className="ghost-button ghost-button--compact" type="button" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)}>
+                      <Trash2 size={14} aria-hidden="true" />
                       删除
                     </button>
                   </div>
                 </div>
 
-                {isExpanded && (record.lines || []).length ? (
-                  <div className="my-bets-card__line-list">
-                    {(record.lines || []).map((line) => (
-                      <div key={`${record.id}-line-${line.line_no}`} className="my-bets-line-card">
-                        <span className="my-bets-line-card__label">{`子注单 #${line.line_no} · ${formatPlayType(line.play_type)}`}</span>
-                        {renderLineNumbers(record.id, line, lotteryCode, Boolean(record.actual_result))}
-                        <span className="my-bets-card__meta">{`${line.bet_count} 注 × ${line.multiplier} 倍${line.is_append ? '（追加）' : ''} · ${formatCurrency(line.amount)}`}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <AnimatePresence initial={false}>
+                  {isExpanded && (record.lines || []).length ? (
+                    <motion.div className="my-bets-card__line-list" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }}>
+                      {(record.lines || []).map((line) => (
+                        <div key={`${record.id}-line-${line.line_no}`} className="my-bets-line-card">
+                          <span className="my-bets-line-card__label">{`子注单 #${line.line_no} · ${formatPlayType(line.play_type)}`}</span>
+                          {renderLineNumbers(record.id, line, lotteryCode, Boolean(record.actual_result))}
+                          <span className="my-bets-card__meta">{`${line.bet_count} 注 × ${line.multiplier} 倍${line.is_append ? '（追加）' : ''} · ${formatCurrency(line.amount)}`}</span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
                 <div className="my-bets-card__metrics">
                   <span>{`总投入 ${formatCurrency(record.amount)}`}</span>
@@ -958,11 +994,12 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                   <span>{record.prize_level ? `${record.prize_level} · 中 ${record.winning_bet_count} 注` : '未中奖'}</span>
                 </div>
                 {record.ticket_image_url ? (
-                  <a className="my-bets-card__meta" href={record.ticket_image_url} target="_blank" rel="noreferrer">
+                  <a className="my-bets-card__meta my-bets-card__meta--with-icon" href={record.ticket_image_url} target="_blank" rel="noreferrer">
+                    <ImageIcon size={14} aria-hidden="true" />
                     查看票据图片
                   </a>
                 ) : null}
-              </article>
+              </motion.article>
             )})}
           </div>
         ) : (
@@ -970,9 +1007,19 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         )}
       </StatusCard>
 
-      {formOpen ? (
-        <div className="modal-shell" role="presentation" onClick={closeFormModal}>
-          <div className="modal-card modal-card--form my-bets-modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+      <AnimatePresence>
+        {formOpen ? (
+          <motion.div className="modal-shell" role="presentation" onClick={closeFormModal} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            <motion.div
+              className="modal-card modal-card--form my-bets-modal-card"
+              role="dialog"
+              aria-modal="true"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
             <form className="settings-model-form my-bets-modal my-bets-modal__form" onSubmit={submitForm}>
               <div className="modal-card__header my-bets-modal__header">
                 <div>
@@ -1021,7 +1068,10 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               <section className="my-bets-modal__section my-bets-modal__section--image">
                 <div className="my-bets-image-uploader">
                   <div className="my-bets-image-uploader__header">
-                    <strong>票据图片</strong>
+                    <strong>
+                      <ImageIcon size={15} aria-hidden="true" />
+                      票据图片
+                    </strong>
                     <span>图片先缓存本地，点击“开始OCR识别”后填充表单，保存投注时再上传图床。</span>
                   </div>
                   <div className="my-bets-image-uploader__actions">
@@ -1032,6 +1082,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       disabled={!form.ticketImageFile || !form.ticketImagePreviewUrl || ocrMutation.isPending}
                       onClick={() => ocrMutation.mutate()}
                     >
+                      <ScanLine size={16} aria-hidden="true" />
                       {ocrMutation.isPending ? '识别中...' : '开始OCR识别'}
                     </button>
                     <button className="ghost-button ghost-button--compact" type="button" onClick={clearEditImage} disabled={!form.ticketImagePreviewUrl && !form.ticketImageUrl}>
@@ -1397,17 +1448,20 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </div>
                 <div className="simulation-summary-bar__actions">
                   <button className="ghost-button" type="button" onClick={addLine}>
+                    <Plus size={16} aria-hidden="true" />
                     添加子注单
                   </button>
                   <button className="primary-button" type="submit" disabled={!canSubmit || saveMutation.isPending}>
+                    <Sparkles size={16} aria-hidden="true" />
                     {saveMutation.isPending ? '保存中...' : editingRecord ? '保存修改' : '添加投注'}
                   </button>
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   )
 }

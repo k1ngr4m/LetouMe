@@ -5395,9 +5395,64 @@ a {
 }
 
 .my-bets-summary-card {
-  padding: 0.9rem 1rem;
+  padding: 1rem 1.05rem;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.42rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.my-bets-summary-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -40% -70% 40%;
+  height: 120px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(114, 172, 255, 0.2), transparent 70%);
+}
+
+.my-bets-summary-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(140, 188, 255, 0.28);
+  box-shadow: 0 16px 26px rgba(8, 14, 24, 0.24);
+}
+
+.my-bets-summary-card__label {
+  font-size: 0.79rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--text-2) 88%, #cdd9f2 12%);
+}
+
+.my-bets-summary-card__icon {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.8rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(215, 231, 255, 0.9);
+}
+
+.my-bets-summary-card strong {
+  font-size: 1.22rem;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+}
+
+.my-bets-summary-card.is-emphasis {
+  border-color: rgba(126, 186, 255, 0.35);
+  background:
+    radial-gradient(circle at 100% -20%, rgba(92, 166, 255, 0.2), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.my-bets-summary-card.is-emphasis strong {
+  font-size: 1.3rem;
 }
 
 .my-bets-summary-card span,
@@ -5425,6 +5480,13 @@ a {
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.my-bets-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(133, 177, 244, 0.22);
+  box-shadow: 0 14px 30px rgba(7, 13, 24, 0.25);
 }
 
 .my-bets-card__header,
@@ -5446,6 +5508,12 @@ a {
   justify-content: flex-end;
 }
 
+.my-bets-card__actions .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
 .my-bets-card__title-row {
   justify-content: flex-start;
 }
@@ -5454,6 +5522,12 @@ a {
   margin-top: 0.4rem;
   display: grid;
   gap: 0.25rem;
+}
+
+.my-bets-card__meta--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .my-bets-status {
@@ -5502,7 +5576,7 @@ a {
 
 .my-bets-modal {
   display: grid;
-  gap: 1rem;
+  gap: 1.08rem;
 }
 
 .my-bets-modal-card {
@@ -5521,7 +5595,7 @@ a {
 .my-bets-modal__form {
   max-height: calc(100vh - 4rem);
   overflow: auto;
-  padding-right: 0.2rem;
+  padding-right: 0.28rem;
 }
 
 .my-bets-modal__header {
@@ -5534,7 +5608,7 @@ a {
 }
 
 .my-bets-modal__section {
-  padding: 1rem;
+  padding: 1.1rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.024));
@@ -5546,7 +5620,7 @@ a {
 }
 
 .my-bets-modal__grid {
-  row-gap: 0.85rem;
+  row-gap: 0.92rem;
 }
 
 .my-bets-modal__field {
@@ -5601,12 +5675,18 @@ a {
 
 .my-bets-image-uploader {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.82rem;
 }
 
 .my-bets-image-uploader__header {
   display: grid;
   gap: 0.25rem;
+}
+
+.my-bets-image-uploader__header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .my-bets-image-uploader__header span,
@@ -5618,9 +5698,17 @@ a {
 
 .my-bets-image-uploader__actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.56rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.my-bets-image-uploader__actions .primary-button,
+.my-bets-modal__footer .ghost-button,
+.my-bets-modal__footer .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .my-bets-image-uploader__actions input[type='file'] {
@@ -5700,19 +5788,21 @@ a {
 
 .my-bets-modal__editor-list {
   display: grid;
-  gap: 0.82rem;
+  gap: 0.92rem;
 }
 
 .my-bets-modal__line-section {
   border-radius: 1.1rem;
   border-color: rgba(255, 255, 255, 0.11);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+  padding: 1rem;
 }
 
 .my-bets-modal__footer {
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+  padding: 1rem;
 }
 
 .is-profit {
@@ -5729,9 +5819,32 @@ a {
   background: rgba(255, 255, 255, 0.72);
 }
 
+:root[data-theme='light'] .my-bets-summary-card:hover {
+  border-color: rgba(86, 150, 240, 0.28);
+  box-shadow: 0 14px 24px rgba(78, 109, 157, 0.16);
+}
+
+:root[data-theme='light'] .my-bets-summary-card.is-emphasis {
+  border-color: rgba(86, 150, 240, 0.3);
+  background:
+    radial-gradient(circle at 100% -20%, rgba(92, 166, 255, 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 252, 255, 0.92));
+}
+
+:root[data-theme='light'] .my-bets-summary-card__icon {
+  border-color: rgba(133, 150, 178, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(67, 95, 141, 0.9);
+}
+
 :root[data-theme='light'] .my-bets-line-card {
   border-color: rgba(133, 150, 178, 0.16);
   background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme='light'] .my-bets-card:hover {
+  border-color: rgba(98, 152, 232, 0.24);
+  box-shadow: 0 14px 26px rgba(74, 105, 146, 0.15);
 }
 
 :root[data-theme='light'] .my-bets-modal__section {
@@ -6197,6 +6310,20 @@ a {
 
   .search-input {
     max-width: none;
+  }
+
+  .my-bets-card__actions .ghost-button,
+  .my-bets-modal__footer .ghost-button,
+  .my-bets-modal__footer .primary-button,
+  .my-bets-image-uploader__actions .primary-button,
+  .my-bets-image-uploader__actions .ghost-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .my-bets-modal__footer .primary-button,
+  .my-bets-image-uploader__actions .primary-button {
+    order: -1;
   }
 
   .model-detail-modal {
