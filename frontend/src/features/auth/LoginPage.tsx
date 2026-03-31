@@ -57,69 +57,83 @@ export function LoginPage() {
       <div className="landing-page-stack">
         <SiteDisclaimer />
         <section className="landing-panel landing-panel--auth">
-        <div className="landing-panel__copy landing-panel__copy--auth">
-          <p className="landing-panel__eyebrow">Authentication</p>
-          <h1 className="landing-panel__title landing-panel__title--auth">欢迎回到 LetouMe</h1>
-          {/*<p className="landing-panel__description">登录后即可进入控制台，查看预测结果、模型配置与系统设置。</p>*/}
-          <div className="auth-highlight-list" aria-label="登录后可用功能">
-            <div className="auth-highlight-card">
-              <strong>实时预测</strong>
-              <span>快速进入大乐透预测与历史数据视图。</span>
+          <div className="landing-panel__copy landing-panel__copy--auth">
+            <p className="landing-panel__eyebrow">Authentication</p>
+            <h1 className="landing-panel__title landing-panel__title--auth">欢迎回到 LetouMe</h1>
+            <p className="landing-panel__description auth-hero-description">进入统一控制台，查看预测、历史表现与策略结果。</p>
+            <div className="auth-hero-metrics" aria-label="平台能力概览">
+              <article className="auth-hero-metric">
+                <span>模型编排</span>
+                <strong>多 Provider 并行</strong>
+              </article>
+              <article className="auth-hero-metric">
+                <span>预测输出</span>
+                <strong>普通 / 复式 / 胆拖</strong>
+              </article>
+              <article className="auth-hero-metric">
+                <span>数据链路</span>
+                <strong>抓取 · 归档 · 分析</strong>
+              </article>
             </div>
-            <div className="auth-highlight-card">
-              <strong>模型管理</strong>
-              <span>统一查看模型状态、参数和策略配置。</span>
-            </div>
-            <div className="auth-highlight-card">
-              <strong>账号安全</strong>
-              <span>在个人设置中维护资料与密码信息。</span>
-            </div>
-          </div>
-        </div>
-        <div className="auth-panel">
-          <div className="auth-panel__header">
-            <p className="auth-panel__eyebrow">Sign In</p>
-            <h2 className="auth-panel__title">账号登录</h2>
-            <p className="auth-panel__subtitle">请输入你的系统账号和密码继续使用平台。</p>
-          </div>
-          <form className="auth-form auth-form--card" onSubmit={handleSubmit}>
-            <label className="auth-field">
-              <span className="auth-field__label">用户名</span>
-              <input className="auth-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="请输入用户名" />
-            </label>
-            <label className="auth-field">
-              <span className="auth-field__label">密码</span>
-              <div className="auth-input-wrap">
-                <input
-                  className="auth-input auth-input--password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="请输入密码"
-                />
-                <button
-                  className="auth-input-toggle"
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                  title={showPassword ? '隐藏密码' : '显示密码'}
-                >
-                  <PasswordToggleIcon visible={showPassword} />
-                </button>
+            <div className="auth-highlight-list" aria-label="登录后可用功能">
+              <div className="auth-highlight-card">
+                <strong>实时预测</strong>
+                <span>快速进入大乐透预测与历史数据视图。</span>
               </div>
-            </label>
-            {error ? <p className="landing-panel__error landing-panel__error--auth">登录失败：{error}</p> : null}
-            <button className="landing-panel__button landing-panel__button--auth" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '登录中...' : '登录'}
-            </button>
-          </form>
-          <div className="auth-panel__footer">
-            <span>还没有账号？</span>
-            <Link className="ghost-button auth-panel__link" to="/register">
-              立即注册
-            </Link>
+              <div className="auth-highlight-card">
+                <strong>模型管理</strong>
+                <span>统一查看模型状态、参数和策略配置。</span>
+              </div>
+              <div className="auth-highlight-card">
+                <strong>账号安全</strong>
+                <span>在个人设置中维护资料与密码信息。</span>
+              </div>
+            </div>
           </div>
-        </div>
+          <div className="auth-panel">
+            <div className="auth-panel__header">
+              <p className="auth-panel__eyebrow">Sign In</p>
+              <h2 className="auth-panel__title">账号登录</h2>
+              <p className="auth-panel__subtitle">请输入你的系统账号和密码继续使用平台。</p>
+            </div>
+            <form className="auth-form auth-form--card" onSubmit={handleSubmit}>
+              <label className="auth-field">
+                <span className="auth-field__label">用户名</span>
+                <input className="auth-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="请输入用户名" />
+              </label>
+              <label className="auth-field">
+                <span className="auth-field__label">密码</span>
+                <div className="auth-input-wrap">
+                  <input
+                    className="auth-input auth-input--password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="请输入密码"
+                  />
+                  <button
+                    className="auth-input-toggle"
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    title={showPassword ? '隐藏密码' : '显示密码'}
+                  >
+                    <PasswordToggleIcon visible={showPassword} />
+                  </button>
+                </div>
+              </label>
+              {error ? <p className="landing-panel__error landing-panel__error--auth">登录失败：{error}</p> : null}
+              <button className="landing-panel__button landing-panel__button--auth" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? '登录中...' : '登录'}
+              </button>
+            </form>
+            <div className="auth-panel__footer">
+              <span>还没有账号？</span>
+              <Link className="ghost-button auth-panel__link" to="/register">
+                立即注册
+              </Link>
+            </div>
+          </div>
         </section>
       </div>
     </div>
