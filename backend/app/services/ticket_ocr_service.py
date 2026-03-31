@@ -428,50 +428,98 @@ class TicketOCRService:
         parsed_lines: list[dict[str, Any]] = []
         pending_front_numbers: list[str] = []
         pending_back_numbers: list[str] = []
+        pending_front_dan: list[str] | None = None
+        pending_front_tuo: list[str] | None = None
+        pending_back_dan: list[str] | None = None
+        pending_back_tuo: list[str] | None = None
+        collecting_labeled_front_numbers = False
+        collecting_labeled_back_numbers = False
         global_multiplier = 1
         for line in text_lines:
             global_multiplier = max(global_multiplier, self._extract_multiplier(line))
 
         for line in text_lines:
+            suite_single_numbers = self._extract_suite_single_numbers(line)
+            if suite_single_numbers:
+                front_numbers, back_numbers = suite_single_numbers
+                multiplier = self._extract_multiplier(line) or global_multiplier
+                is_append = "追加" in line
+                parsed_lines.append(
+                    self._build_dlt_line(
+                        front_numbers=front_numbers,
+                        back_numbers=back_numbers,
+                        multiplier=multiplier,
+                        is_append=is_append,
+                    )
+                )
+                collecting_labeled_front_numbers = False
+                collecting_labeled_back_numbers = False
+                continue
+
+            dantuo_parts = self._extract_dlt_dantuo_parts(line)
+            if dantuo_parts:
+                if "front_dan" in dantuo_parts:
+                    pending_front_dan = dantuo_parts["front_dan"]
+                if "front_tuo" in dantuo_parts:
+                    pending_front_tuo = dantuo_parts["front_tuo"]
+                if "back_dan" in dantuo_parts:
+                    pending_back_dan = dantuo_parts["back_dan"]
+                if "back_tuo" in dantuo_parts:
+                    pending_back_tuo = dantuo_parts["back_tuo"]
+                if pending_front_tuo is not None and pending_front_dan is None:
+                    pending_front_dan = []
+                if pending_back_tuo is not None and pending_back_dan is None:
+                    pending_back_dan = []
+                if (
+                    pending_front_dan is not None
+                    and pending_front_tuo is not None
+                    and pending_back_dan is not None
+                    and pending_back_tuo is not None
+                ):
+                    multiplier = self._extract_multiplier(line) or global_multiplier
+                    is_append = "追加" in line
+                    if self._is_valid_dlt_dantuo_numbers(
+                        front_dan=pending_front_dan,
+                        front_tuo=pending_front_tuo,
+                        back_dan=pending_back_dan,
+                        back_tuo=pending_back_tuo,
+                    ):
+                        parsed_lines.append(
+                            self._build_dlt_dantuo_line(
+                                front_dan=pending_front_dan,
+                                front_tuo=pending_front_tuo,
+                                back_dan=pending_back_dan,
+                                back_tuo=pending_back_tuo,
+                                multiplier=multiplier,
+                                is_append=is_append,
+                            )
+                        )
+                    pending_front_dan = None
+                    pending_front_tuo = None
+                    pending_back_dan = None
+                    pending_back_tuo = None
+                    continue
+
             dantuo_numbers = self._extract_dlt_dantuo_numbers(line)
             if dantuo_numbers:
                 front_dan, front_tuo, back_dan, back_tuo = dantuo_numbers
                 multiplier = self._extract_multiplier(line) or global_multiplier
                 is_append = "追加" in line
-                front_pick_count = 5 - len(front_dan)
-                back_pick_count = 2 - len(back_dan)
-                if (
-                    1 <= len(front_dan) <= 4
-                    and len(front_tuo) >= 2
-                    and len(set(front_dan) & set(front_tuo)) == 0
-                    and len(set([*front_dan, *front_tuo])) >= 6
-                    and len(back_dan) <= 1
-                    and len(back_tuo) >= 2
-                    and len(set(back_dan) & set(back_tuo)) == 0
-                    and len(set([*back_dan, *back_tuo])) >= 3
-                    and len(front_tuo) >= front_pick_count
-                    and len(back_tuo) >= back_pick_count
+                if self._is_valid_dlt_dantuo_numbers(
+                    front_dan=front_dan,
+                    front_tuo=front_tuo,
+                    back_dan=back_dan,
+                    back_tuo=back_tuo,
                 ):
-                    bet_count = comb(len(front_tuo), front_pick_count) * comb(len(back_tuo), back_pick_count)
-                    amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
                     parsed_lines.append(
-                        {
-                            "play_type": "dlt_dantuo",
-                            "front_numbers": [],
-                            "back_numbers": [],
-                            "front_dan": front_dan,
-                            "front_tuo": front_tuo,
-                            "back_dan": back_dan,
-                            "back_tuo": back_tuo,
-                            "direct_hundreds": [],
-                            "direct_tens": [],
-                            "direct_units": [],
-                            "group_numbers": [],
-                            "multiplier": multiplier,
-                            "is_append": is_append,
-                            "bet_count": bet_count,
-                            "amount": amount,
-                        }
+                        self._build_dlt_dantuo_line(
+                            front_dan=front_dan,
+                            front_tuo=front_tuo,
+                            back_dan=back_dan,
+                            back_tuo=back_tuo,
+                            multiplier=multiplier,
+                            is_append=is_append,
+                        )
                     )
                     continue
 
@@ -479,37 +527,47 @@ class TicketOCRService:
             compact_back = self._extract_labeled_compact_numbers(line, label="后区")
             if compact_front:
                 pending_front_numbers = compact_front
+                collecting_labeled_front_numbers = False
+            elif "前区" in line:
+                collecting_labeled_front_numbers = True
+                pending_front_numbers = []
+            elif collecting_labeled_front_numbers:
+                inline_front_numbers = self._extract_inline_zone_numbers(line)
+                if inline_front_numbers:
+                    pending_front_numbers.extend(inline_front_numbers)
+                elif re.search(r"[\u4e00-\u9fff]", line):
+                    collecting_labeled_front_numbers = False
             if compact_back:
                 pending_back_numbers = compact_back
+                collecting_labeled_back_numbers = False
+            elif "后区" in line:
+                collecting_labeled_front_numbers = False
+                collecting_labeled_back_numbers = True
+                pending_back_numbers = []
+            elif collecting_labeled_back_numbers:
+                inline_back_numbers = self._extract_inline_zone_numbers(line)
+                if inline_back_numbers:
+                    pending_back_numbers.extend(inline_back_numbers)
+                elif re.search(r"[\u4e00-\u9fff]", line):
+                    collecting_labeled_back_numbers = False
             if pending_front_numbers and pending_back_numbers:
                 multiplier = self._extract_multiplier(line) or global_multiplier
                 normalized_front = sorted(set(pending_front_numbers))
                 normalized_back = sorted(set(pending_back_numbers))
                 if len(normalized_front) >= 5 and len(normalized_back) >= 2:
                     is_append = "追加" in line
-                    bet_count = comb(len(normalized_front), 5) * comb(len(normalized_back), 2)
-                    amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
                     parsed_lines.append(
-                        {
-                            "play_type": "dlt",
-                            "front_numbers": normalized_front,
-                            "back_numbers": normalized_back,
-                            "front_dan": [],
-                            "front_tuo": [],
-                            "back_dan": [],
-                            "back_tuo": [],
-                            "direct_hundreds": [],
-                            "direct_tens": [],
-                            "direct_units": [],
-                            "group_numbers": [],
-                            "multiplier": multiplier,
-                            "is_append": is_append,
-                            "bet_count": bet_count,
-                            "amount": amount,
-                        }
+                        self._build_dlt_line(
+                            front_numbers=normalized_front,
+                            back_numbers=normalized_back,
+                            multiplier=multiplier,
+                            is_append=is_append,
+                        )
                     )
                     pending_front_numbers = []
                     pending_back_numbers = []
+                    collecting_labeled_front_numbers = False
+                    collecting_labeled_back_numbers = False
                 continue
 
             segments = [segment for segment in re.split(r"[+|｜]", line) if segment.strip()]
@@ -528,26 +586,13 @@ class TicketOCRService:
                 continue
             multiplier = self._extract_multiplier(line) or global_multiplier
             is_append = "追加" in line
-            bet_count = comb(len(normalized_front), 5) * comb(len(normalized_back), 2)
-            amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
             parsed_lines.append(
-                {
-                    "play_type": "dlt",
-                    "front_numbers": normalized_front,
-                    "back_numbers": normalized_back,
-                    "front_dan": [],
-                    "front_tuo": [],
-                    "back_dan": [],
-                    "back_tuo": [],
-                    "direct_hundreds": [],
-                    "direct_tens": [],
-                    "direct_units": [],
-                    "group_numbers": [],
-                    "multiplier": multiplier,
-                    "is_append": is_append,
-                    "bet_count": bet_count,
-                    "amount": amount,
-                }
+                self._build_dlt_line(
+                    front_numbers=normalized_front,
+                    back_numbers=normalized_back,
+                    multiplier=multiplier,
+                    is_append=is_append,
+                )
             )
         return parsed_lines
 
@@ -561,6 +606,133 @@ class TicketOCRService:
         if len(compact) % 2 != 0:
             return []
         return [compact[index : index + 2] for index in range(0, len(compact), 2)]
+
+    @staticmethod
+    def _extract_inline_zone_numbers(line: str) -> list[str]:
+        normalized = str(line or "").strip()
+        if re.fullmatch(r"\d+", normalized):
+            if len(normalized) % 2 != 0:
+                return []
+            return [normalized[index : index + 2] for index in range(0, len(normalized), 2)]
+        return re.findall(r"(?<!\d)(\d{2})(?!\d)", normalized)
+
+    @staticmethod
+    def _extract_suite_single_numbers(line: str) -> tuple[list[str], list[str]] | None:
+        normalized = str(line or "").replace("＋", "+").strip()
+        normalized = re.sub(r"^\s*(?:[①②③④⑤⑥⑦⑧⑨⑩]|[0-9]{1,2}[).、．])\s*", "", normalized)
+        matched = re.search(r"(?<!\d)(\d{10})\s*\+\s*(\d{4})(?!\d)", normalized)
+        if not matched:
+            return None
+        compact_front, compact_back = matched.groups()
+        front_numbers = [compact_front[index : index + 2] for index in range(0, len(compact_front), 2)]
+        back_numbers = [compact_back[index : index + 2] for index in range(0, len(compact_back), 2)]
+        normalized_front = sorted(set(front_numbers))
+        normalized_back = sorted(set(back_numbers))
+        if len(normalized_front) != 5 or len(normalized_back) != 2:
+            return None
+        return normalized_front, normalized_back
+
+    @staticmethod
+    def _build_dlt_line(
+        *,
+        front_numbers: list[str],
+        back_numbers: list[str],
+        multiplier: int,
+        is_append: bool,
+    ) -> dict[str, Any]:
+        bet_count = comb(len(front_numbers), 5) * comb(len(back_numbers), 2)
+        amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
+        return {
+            "play_type": "dlt",
+            "front_numbers": front_numbers,
+            "back_numbers": back_numbers,
+            "front_dan": [],
+            "front_tuo": [],
+            "back_dan": [],
+            "back_tuo": [],
+            "direct_hundreds": [],
+            "direct_tens": [],
+            "direct_units": [],
+            "group_numbers": [],
+            "multiplier": multiplier,
+            "is_append": is_append,
+            "bet_count": bet_count,
+            "amount": amount,
+        }
+
+    @staticmethod
+    def _extract_dlt_dantuo_parts(line: str) -> dict[str, list[str]]:
+        normalized = str(line or "").replace("（", "(").replace("）", ")")
+        extracted: dict[str, list[str]] = {}
+        candidates = [
+            ("front_dan", "前", "胆"),
+            ("front_tuo", "前", "拖"),
+            ("back_dan", "后", "胆"),
+            ("back_tuo", "后", "拖"),
+        ]
+        for key, zone, kind in candidates:
+            if not re.search(rf"{zone}\s*区?\s*{kind}|{zone}{kind}", normalized):
+                continue
+            numbers = TicketOCRService._extract_dantuo_zone_numbers(normalized, zone=zone, kind=kind)
+            if numbers is None:
+                continue
+            extracted[key] = numbers
+        return extracted
+
+    @staticmethod
+    def _is_valid_dlt_dantuo_numbers(
+        *,
+        front_dan: list[str],
+        front_tuo: list[str],
+        back_dan: list[str],
+        back_tuo: list[str],
+    ) -> bool:
+        front_pick_count = 5 - len(front_dan)
+        back_pick_count = 2 - len(back_dan)
+        return (
+            1 <= len(front_dan) <= 4
+            and len(front_tuo) >= 2
+            and len(set(front_dan) & set(front_tuo)) == 0
+            and len(set([*front_dan, *front_tuo])) >= 6
+            and len(back_dan) <= 1
+            and len(back_tuo) >= 2
+            and len(set(back_dan) & set(back_tuo)) == 0
+            and len(set([*back_dan, *back_tuo])) >= 3
+            and len(front_tuo) >= front_pick_count
+            and len(back_tuo) >= back_pick_count
+        )
+
+    @staticmethod
+    def _build_dlt_dantuo_line(
+        *,
+        front_dan: list[str],
+        front_tuo: list[str],
+        back_dan: list[str],
+        back_tuo: list[str],
+        multiplier: int,
+        is_append: bool,
+    ) -> dict[str, Any]:
+        front_pick_count = 5 - len(front_dan)
+        back_pick_count = 2 - len(back_dan)
+        bet_count = comb(len(front_tuo), front_pick_count) * comb(len(back_tuo), back_pick_count)
+        amount = bet_count * 2 * multiplier + (bet_count * multiplier if is_append else 0)
+        return {
+            "play_type": "dlt_dantuo",
+            "front_numbers": [],
+            "back_numbers": [],
+            "front_dan": front_dan,
+            "front_tuo": front_tuo,
+            "back_dan": back_dan,
+            "back_tuo": back_tuo,
+            "direct_hundreds": [],
+            "direct_tens": [],
+            "direct_units": [],
+            "group_numbers": [],
+            "multiplier": multiplier,
+            "is_append": is_append,
+            "bet_count": bet_count,
+            "amount": amount,
+        }
 
     @staticmethod
     def _extract_dlt_dantuo_numbers(line: str) -> tuple[list[str], list[str], list[str], list[str]] | None:
@@ -585,7 +757,14 @@ class TicketOCRService:
             matched = re.search(pattern, line)
             if not matched:
                 continue
-            values = sorted({item.zfill(2) for item in re.findall(r"(?<!\d)(\d{1,2})(?!\d)", matched.group(1))})
+            raw_numbers = matched.group(1).strip()
+            if re.fullmatch(r"\d+", raw_numbers):
+                if len(raw_numbers) % 2 != 0:
+                    return []
+                tokens = [raw_numbers[index : index + 2] for index in range(0, len(raw_numbers), 2)]
+            else:
+                tokens = re.findall(r"(?<!\d)(\d{1,2})(?!\d)", raw_numbers)
+            values = sorted({item.zfill(2) for item in tokens})
             return values
         if kind == "胆":
             return []

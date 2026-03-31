@@ -72,6 +72,243 @@ class TicketOCRServiceTests(unittest.TestCase):
         self.assertEqual(lines[0]["bet_count"], 18)
         self.assertEqual(lines[0]["amount"], 36)
 
+    def test_parse_dlt_lines_supports_suite_ticket_mode(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "体彩",
+                "超级大乐透幸运",
+                "第26033期",
+                "套餐票",
+                "1倍",
+                "合计58元",
+                "①1415263235+0307",
+                "②0210131822+1011",
+                "③1315162731+0512",
+                "④0310161721+0609",
+                "⑤0813152529+0106",
+                "⑥0211152023+0112",
+                "⑦0126282933+0209",
+                "⑧0615162234+0210",
+                "前区03050822262934",
+                "后区",
+                "01",
+                "05",
+            ]
+        )
+
+        self.assertEqual(len(lines), 9)
+        for line in lines[:8]:
+            self.assertEqual(line["play_type"], "dlt")
+            self.assertEqual(len(line["front_numbers"]), 5)
+            self.assertEqual(len(line["back_numbers"]), 2)
+            self.assertEqual(line["multiplier"], 1)
+            self.assertEqual(line["bet_count"], 1)
+            self.assertEqual(line["amount"], 2)
+        self.assertEqual(lines[-1]["front_numbers"], ["03", "05", "08", "22", "26", "29", "34"])
+        self.assertEqual(lines[-1]["back_numbers"], ["01", "05"])
+        self.assertEqual(lines[-1]["bet_count"], 21)
+        self.assertEqual(lines[-1]["amount"], 42)
+
+    def test_parse_dlt_lines_supports_suite_ticket_number_prefix_variants(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "1)1415263235+0307",
+                "2.0210131822+1011",
+            ]
+        )
+
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]["front_numbers"], ["14", "15", "26", "32", "35"])
+        self.assertEqual(lines[0]["back_numbers"], ["03", "07"])
+        self.assertEqual(lines[1]["front_numbers"], ["02", "10", "13", "18", "22"])
+        self.assertEqual(lines[1]["back_numbers"], ["10", "11"])
+
+    def test_parse_dlt_lines_supports_compact_dantuo_ticket(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "体彩",
+                "超级大乐透",
+                "第26032期",
+                "中国体育彩票",
+                "2026年03月28日开奖",
+                "910330-245161-115329-500142516935 5r23ew",
+                "胆拖票",
+                "1倍",
+                "合计40元",
+                "前区胆0715",
+                "☆",
+                "前区拖0923282933",
+                "后区胆04",
+                "后区拖0511",
+                "中国体育彩票",
+                "感谢您为公益事业贡献14.40元",
+            ]
+        )
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["play_type"], "dlt_dantuo")
+        self.assertEqual(lines[0]["front_dan"], ["07", "15"])
+        self.assertEqual(lines[0]["front_tuo"], ["09", "23", "28", "29", "33"])
+        self.assertEqual(lines[0]["back_dan"], ["04"])
+        self.assertEqual(lines[0]["back_tuo"], ["05", "11"])
+        self.assertEqual(lines[0]["multiplier"], 1)
+        self.assertEqual(lines[0]["bet_count"], 20)
+        self.assertEqual(lines[0]["amount"], 40)
+
+    def test_parse_dlt_lines_ignores_invalid_odd_length_compact_dantuo(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "前区胆071",
+                "前区拖0923282933",
+                "后区胆04",
+                "后区拖0511",
+            ]
+        )
+
+        self.assertEqual(lines, [])
+
+    def test_parse_dlt_lines_supports_compound_ticket_sample_1(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "-2",
+                "体彩",
+                "超级大乐透",
+                "第26029期",
+                "2026年03月21日开奖",
+                "六中国体育彩票",
+                "910330-243161-115284-363099748182 d46xPg",
+                "复式票",
+                "1倍",
+                "合计36元",
+                "前区071019202629",
+                "后区010609",
+            ]
+        )
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["play_type"], "dlt")
+        self.assertEqual(lines[0]["front_numbers"], ["07", "10", "19", "20", "26", "29"])
+        self.assertEqual(lines[0]["back_numbers"], ["01", "06", "09"])
+        self.assertEqual(lines[0]["bet_count"], 18)
+        self.assertEqual(lines[0]["amount"], 36)
+
+    def test_parse_dlt_lines_supports_suite_and_multiline_blocks_sample_2(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "R",
+                "T",
+                "Y",
+                "U",
+                "1",
+                "F",
+                "G",
+                "H",
+                "J",
+                "K",
+                "C",
+                "V",
+                "B",
+                "N",
+                "M",
+                "体彩",
+                "超级大乐透幸运",
+                "套餐",
+                "第26030期",
+                "2026年03月23日开奖",
+                "982332-603230-000929-918020",
+                "350964",
+                "wExaMQ",
+                "套餐票",
+                "1倍",
+                "合计88元",
+                "①0228293035+0210",
+                "②0103132933+0204",
+                "③1421252629+1011",
+                "④0104172126+0307",
+                "⑤0709162829+0810",
+                "前区",
+                "01020811162224",
+                "后区",
+                "0212",
+                "前区",
+                "010225282932",
+                "后区",
+                "030407",
+                "公益体彩",
+                "乐善人生",
+            ]
+        )
+
+        self.assertEqual(len(lines), 7)
+        self.assertEqual(lines[5]["front_numbers"], ["01", "02", "08", "11", "16", "22", "24"])
+        self.assertEqual(lines[5]["back_numbers"], ["02", "12"])
+        self.assertEqual(lines[5]["bet_count"], 21)
+        self.assertEqual(lines[5]["amount"], 42)
+        self.assertEqual(lines[6]["front_numbers"], ["01", "02", "25", "28", "29", "32"])
+        self.assertEqual(lines[6]["back_numbers"], ["03", "04", "07"])
+        self.assertEqual(lines[6]["bet_count"], 18)
+        self.assertEqual(lines[6]["amount"], 36)
+
+    def test_parse_dlt_lines_supports_compound_ticket_sample_3(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "体彩",
+                "超级大乐透",
+                "第26030期",
+                "2026年03月23日开奖",
+                "910330-243961-115307-459120159222 TMTAyg",
+                "复式票",
+                "1倍",
+                "合计36元",
+                "前区050910152329",
+                "后区040509",
+            ]
+        )
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["front_numbers"], ["05", "09", "10", "15", "23", "29"])
+        self.assertEqual(lines[0]["back_numbers"], ["04", "05", "09"])
+        self.assertEqual(lines[0]["bet_count"], 18)
+        self.assertEqual(lines[0]["amount"], 36)
+
+    def test_parse_dlt_lines_supports_suite_and_multiple_blocks_sample_4(self) -> None:
+        lines = self.service._parse_dlt_lines(
+            text_lines=[
+                "体彩",
+                "超级大乐透幸运",
+                "套",
+                "26001",
+                "2026年03月25日开奖",
+                "体彩票",
+                "982332-603250-000828-443857360365 RxLsg",
+                "套餐察",
+                "1倍",
+                "合计88元",
+                "①1011182125+0506",
+                "②0405081720+0609",
+                "③0616173435+0204",
+                "④0406192631+0710",
+                "⑤0203263233+0308",
+                "中国体育彩票",
+                "前区05101522262934",
+                "后区0305",
+                "前区",
+                "011214161825",
+                "后区020410",
+                "公益体彩",
+            ]
+        )
+
+        self.assertEqual(len(lines), 7)
+        self.assertEqual(lines[5]["front_numbers"], ["05", "10", "15", "22", "26", "29", "34"])
+        self.assertEqual(lines[5]["back_numbers"], ["03", "05"])
+        self.assertEqual(lines[5]["bet_count"], 21)
+        self.assertEqual(lines[5]["amount"], 42)
+        self.assertEqual(lines[6]["front_numbers"], ["01", "12", "14", "16", "18", "25"])
+        self.assertEqual(lines[6]["back_numbers"], ["02", "04", "10"])
+        self.assertEqual(lines[6]["bet_count"], 18)
+        self.assertEqual(lines[6]["amount"], 36)
+
     def test_extract_ticket_purchased_at_supports_compact_yy_datetime(self) -> None:
         purchased_at = self.service._extract_ticket_purchased_at(ocr_text="01-408168-1010000226/03/1314:04:47")
         self.assertEqual(purchased_at, "2026-03-13T06:04:47Z")
