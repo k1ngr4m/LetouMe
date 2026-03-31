@@ -6,10 +6,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from backend.app.db.connection import ensure_schema
-from backend.core.model_config import load_model_registry
+from backend.core.model_config import invalidate_model_registry_cache, load_model_registry
 
 
 class ModelScopeConfigUnitTests(unittest.TestCase):
+    def setUp(self) -> None:
+        invalidate_model_registry_cache()
+
     def test_load_registry_does_not_bootstrap_default_models(self) -> None:
         connection = MagicMock()
         cursor = MagicMock()
@@ -72,9 +75,48 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
         self.assertNotIn("mp.extra_options_json", executed_sql)
         self.assertNotIn("am.provider_id", executed_sql)
 
+    def test_load_registry_uses_short_ttl_cache(self) -> None:
+        connection = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchall.side_effect = [
+            [
+                {
+                    "model_code": "cached-model",
+                    "display_name": "Cached Model",
+                    "provider_code": "openai_compatible",
+                    "api_format": "openai_compatible",
+                    "provider_id": 1,
+                    "provider_base_url": "https://example.com/v1",
+                    "provider_api_key": "",
+                    "api_model_name": "cached-api-model",
+                    "provider_model_name": "cached-provider-model",
+                    "version": "1",
+                    "base_url": "",
+                    "api_key": "",
+                    "app_code": "",
+                    "temperature": 0.5,
+                    "is_active": 1,
+                    "is_deleted": 0,
+                }
+            ],
+            [],
+            [{"model_code": "cached-model", "lottery_code": "dlt"}],
+            [],
+        ]
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.__enter__.return_value = connection
+
+        with patch("backend.core.model_config.get_connection", return_value=connection) as get_connection:
+            first = load_model_registry()
+            second = load_model_registry()
+
+        self.assertIs(first, second)
+        self.assertEqual(get_connection.call_count, 1)
+
 
 class ModelScopeConfigTests(unittest.TestCase):
     def setUp(self) -> None:
+        invalidate_model_registry_cache()
         database_url = os.getenv("MYSQL_TEST_DATABASE_URL")
         if not database_url:
             self.skipTest("MYSQL_TEST_DATABASE_URL is required for MySQL integration tests")

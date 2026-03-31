@@ -6,7 +6,7 @@ from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.lotteries import SUPPORTED_LOTTERY_CODES, normalize_lottery_code
-from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_API_FORMATS
+from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_API_FORMATS, invalidate_model_registry_cache
 
 
 PROVIDER_LABELS = {
@@ -109,6 +109,7 @@ class ModelRepository:
                 cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
                 model_id = int(cursor.fetchone()["id"])
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
+        invalidate_model_registry_cache()
         return self.get_model(model_code) or {}
 
     def update_model(self, model_code: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -160,6 +161,7 @@ class ModelRepository:
                     ),
                 )
                 self._save_lotteries(cursor, model_id, self._normalize_lottery_codes(payload.get("lottery_codes")))
+        invalidate_model_registry_cache()
         return self.get_model(next_model_code) or {}
 
     def set_model_active(self, model_code: str, is_active: bool) -> dict[str, Any]:
@@ -177,6 +179,7 @@ class ModelRepository:
                     raise KeyError(model_code)
                 if not is_active:
                     self._remove_model_from_prediction_tasks(cursor, model_code)
+        invalidate_model_registry_cache()
         return self.get_model(model_code) or {}
 
     def soft_delete_model(self, model_code: str) -> dict[str, Any]:
@@ -192,10 +195,13 @@ class ModelRepository:
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(model_code)
+        invalidate_model_registry_cache()
         return self.get_model(model_code) or {}
 
     def restore_model(self, model_code: str) -> dict[str, Any]:
-        return self._update_flag(model_code, "is_deleted", 0)
+        result = self._update_flag(model_code, "is_deleted", 0)
+        invalidate_model_registry_cache()
+        return result
 
     def list_providers(self) -> list[dict[str, Any]]:
         with get_connection() as connection:
@@ -300,6 +306,7 @@ class ModelRepository:
                 provider_id = int(cursor.fetchone()["id"])
                 self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
                 self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
+        invalidate_model_registry_cache()
         return self.get_provider(normalized["code"]) or {}
 
     def update_provider(self, provider_code: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -338,6 +345,7 @@ class ModelRepository:
                 if "model_configs" in normalized:
                     self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
                 self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
+        invalidate_model_registry_cache()
         return self.get_provider(provider_code) or {}
 
     def delete_provider(self, provider_code: str) -> dict[str, Any]:
@@ -364,6 +372,7 @@ class ModelRepository:
                     """,
                     (provider_id,),
                 )
+        invalidate_model_registry_cache()
         return {"provider_code": provider_code, "success": True}
 
     def list_active_model_codes(self) -> set[str]:

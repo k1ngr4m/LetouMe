@@ -11,7 +11,7 @@ from backend.app.lotteries import display_period, normalize_digit_balls, normali
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.lottery_repository import _insert_number_rows, _upsert_issue
 from backend.app.repositories.write_log_repository import WriteLogRepository
-from backend.core.model_config import ModelDefinition, ModelRegistry, load_model_registry
+from backend.core.model_config import ModelDefinition, ModelRegistry, invalidate_model_registry_cache, load_model_registry
 
 
 class PredictionRepository:
@@ -896,6 +896,7 @@ class PredictionRepository:
                     """,
                     (model_db_id, normalize_lottery_code(str(lottery_code))),
                 )
+            invalidate_model_registry_cache()
             return model_db_id
 
     def _upsert_model_definition(self, connection, definition: ModelDefinition) -> None:
