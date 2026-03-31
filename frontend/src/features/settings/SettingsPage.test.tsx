@@ -9,6 +9,7 @@ const { apiClientMock } = vi.hoisted(() => ({
   apiClientMock: {
     getSettingsModels: vi.fn(),
     getSettingsProviders: vi.fn(),
+    discoverSettingsProviderModels: vi.fn(),
     listUsers: vi.fn(),
     listRoles: vi.fn(),
     listPermissions: vi.fn(),

@@ -54,12 +54,34 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json()["updated_at"], str)
 
-    def test_list_providers_includes_deepseek(self) -> None:
+    def test_list_providers_includes_deepseek_and_lmstudio(self) -> None:
         response = self.client.post("/api/settings/providers/list", json={})
 
         self.assertEqual(response.status_code, 200)
         providers = response.json()["providers"]
         self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
+        self.assertTrue(any(provider["code"] == "lmstudio" and provider["name"] == "LM Studio" for provider in providers))
+
+    def test_discover_provider_models_endpoint_returns_result(self) -> None:
+        with patch("backend.app.api.routes.model_service.discover_provider_models") as discover_provider_models:
+            discover_provider_models.return_value = {
+                "models": [
+                    {"model_id": "letou_qwen_7b", "display_name": "letou_qwen_7b"},
+                ]
+            }
+
+            response = self.client.post(
+                "/api/settings/providers/models/discover",
+                json={
+                    "provider": "lmstudio",
+                    "base_url": "http://127.0.0.1:1234/v1",
+                    "api_key": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["models"][0]["model_id"], "letou_qwen_7b")
+        discover_provider_models.assert_called_once()
 
     def test_create_update_and_delete_provider(self) -> None:
         create_response = self.client.post(

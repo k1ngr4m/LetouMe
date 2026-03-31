@@ -4,10 +4,12 @@ from datetime import datetime
 from time import perf_counter
 from typing import Any
 
+from openai import OpenAI
+
 from backend.app.cache import runtime_cache
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.model_repository import ModelRepository
-from backend.core.model_config import ModelDefinition
+from backend.core.model_config import LMSTUDIO_BASE_URL, ModelDefinition
 from backend.core.model_factory import ModelFactory
 
 
@@ -91,9 +93,9 @@ class ModelService:
         api_format = str(payload.get("api_format") or "").strip().lower() or None
         temperature = self._normalize_temperature(payload.get("temperature"))
         if not provider:
-            raise ValueError("Provider 不能为空")
+            raise ValueError("Provider cannot be empty")
         if not api_model_name:
-            raise ValueError("API 模型名不能为空")
+            raise ValueError("API model name cannot be empty")
 
         started_at = perf_counter()
         model_definition = ModelDefinition(
@@ -113,15 +115,37 @@ class ModelService:
         duration_ms = int((perf_counter() - started_at) * 1000)
         return {"ok": bool(ok), "message": str(message or ""), "duration_ms": max(duration_ms, 0)}
 
+    def discover_provider_models(self, payload: dict[str, Any]) -> dict[str, Any]:
+        provider = str(payload.get("provider") or "").strip().lower()
+        if not provider:
+            raise ValueError("Provider cannot be empty")
+
+        client = self._build_openai_client(
+            provider=provider,
+            base_url=str(payload.get("base_url") or "").strip(),
+            api_key=str(payload.get("api_key") or "").strip(),
+        )
+        response = client.models.list()
+        data = getattr(response, "data", None) or []
+        discovered: dict[str, dict[str, str]] = {}
+        for item in data:
+            model_id = str(getattr(item, "id", "") or "").strip()
+            if not model_id:
+                continue
+            discovered[model_id] = {"model_id": model_id, "display_name": model_id}
+        if not discovered:
+            raise ValueError("No available models were found")
+        return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
     def bulk_action(self, model_codes: list[str], action: str, updates: dict[str, Any] | None = None) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
         unique_codes = list(dict.fromkeys(normalized_codes))
         if not unique_codes:
-            raise ValueError("请选择至少一个模型")
+            raise ValueError("Please select at least one model")
 
         supported_actions = {"enable", "disable", "delete", "restore", "edit"}
         if action not in supported_actions:
-            raise ValueError("不支持的批量操作")
+            raise ValueError("Unsupported bulk action")
 
         summary = {
             "selected_count": len(unique_codes),
@@ -135,7 +159,7 @@ class ModelService:
 
         normalized_updates = self._normalize_bulk_updates(updates or {}) if action == "edit" else {}
         if action == "edit" and not normalized_updates:
-            raise ValueError("请至少选择一个可批量修改的字段")
+            raise ValueError("Please select at least one editable field")
 
         for model_code in unique_codes:
             model = self.get_model(model_code)
@@ -235,7 +259,7 @@ class ModelService:
         try:
             return float(value)
         except (TypeError, ValueError) as exc:
-            raise ValueError("temperature 必须是数字") from exc
+            raise ValueError("Temperature must be numeric") from exc
 
     @staticmethod
     def _normalize_provider_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:
@@ -251,6 +275,17 @@ class ModelService:
         normalized["extra_options"] = payload.get("extra_options") or {}
         normalized["model_configs"] = payload.get("model_configs") or []
         return normalized
+
+    @staticmethod
+    def _build_openai_client(*, provider: str, base_url: str, api_key: str) -> OpenAI:
+        normalized_provider = str(provider or "").strip().lower()
+        normalized_base_url = base_url or (LMSTUDIO_BASE_URL if normalized_provider == "lmstudio" else "")
+        normalized_api_key = api_key or ("lm-studio" if normalized_provider == "lmstudio" else "")
+        if not normalized_base_url:
+            raise ValueError("Base URL cannot be empty")
+        if not normalized_api_key and normalized_provider != "lmstudio":
+            raise ValueError("API key cannot be empty")
+        return OpenAI(api_key=normalized_api_key, base_url=normalized_base_url)
 
     @staticmethod
     def _build_model_code(provider_code: str, model_segment: str) -> str:

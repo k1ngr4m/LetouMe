@@ -35,6 +35,12 @@ class ProviderCodePayload(BaseModel):
     provider_code: str
 
 
+class ProviderModelDiscoveryPayload(BaseModel):
+    provider: str
+    base_url: str | None = ""
+    api_key: str | None = ""
+
+
 class ModelUpdatePayload(ModelSettingsPayload):
     original_model_code: str
     model_code: str

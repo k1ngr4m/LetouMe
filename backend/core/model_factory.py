@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from typing import Any
-
 from openai import OpenAI
 
 from backend.core.model_config import ModelDefinition
@@ -25,6 +23,7 @@ class ModelFactory:
             "gemini": GeminiModel,
             "anthropic": AnthropicModel,
             "deepseek": DeepSeekModel,
+            "lmstudio": OpenAICompatibleModel,
             "openai_compatible": OpenAICompatibleModel,
         }
         self._api_format_routes = {
@@ -40,12 +39,24 @@ class ModelFactory:
         provider = (definition.provider or "").strip().lower()
         model_cls = self._api_format_routes.get(api_format) or self._provider_routes.get(provider)
         if model_cls is None:
-            raise ValueError(f"不支持的模型供应商: {provider}")
+            raise ValueError(f"Unsupported model provider: {provider}")
 
         api_key = definition.api_key()
-        if not api_key:
-            raise EnvironmentError(f"模型缺少 API Key 配置: {definition.model_id}")
+        if self._requires_api_key(definition) and not api_key:
+            raise EnvironmentError(f"Missing API key for model: {definition.model_id}")
 
-        base_url = definition.base_url()
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = OpenAI(
+            api_key=api_key or self._fallback_api_key(definition),
+            base_url=definition.base_url(),
+        )
         return model_cls(definition, client)
+
+    @staticmethod
+    def _requires_api_key(definition: ModelDefinition) -> bool:
+        return (definition.provider or "").strip().lower() != "lmstudio"
+
+    @staticmethod
+    def _fallback_api_key(definition: ModelDefinition) -> str:
+        if (definition.provider or "").strip().lower() == "lmstudio":
+            return "lm-studio"
+        return ""

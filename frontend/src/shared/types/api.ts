@@ -489,6 +489,21 @@ export type SettingsProviderListResponse = {
   providers: SettingsProvider[]
 }
 
+export type SettingsProviderModelDiscoveryPayload = {
+  provider: string
+  base_url?: string
+  api_key?: string
+}
+
+export type SettingsProviderDiscoveredModel = {
+  model_id: string
+  display_name: string
+}
+
+export type SettingsProviderModelDiscoveryResponse = {
+  models: SettingsProviderDiscoveredModel[]
+}
+
 export type SettingsModelPayload = {
   model_code?: string
   display_name: string

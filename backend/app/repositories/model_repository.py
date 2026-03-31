@@ -6,7 +6,7 @@ from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.lotteries import SUPPORTED_LOTTERY_CODES, normalize_lottery_code
-from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, SUPPORTED_API_FORMATS, invalidate_model_registry_cache
+from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, LMSTUDIO_BASE_URL, SUPPORTED_API_FORMATS, invalidate_model_registry_cache
 
 
 PROVIDER_LABELS = {
@@ -14,6 +14,7 @@ PROVIDER_LABELS = {
     "anthropic": "Anthropic",
     "gemini": "Gemini",
     "deepseek": "DeepSeek",
+    "lmstudio": "LM Studio",
     "openai_compatible": "OpenAI Compatible",
 }
 PROVIDER_CODE_PATTERN = re.compile(r"^[a-z0-9-]+$")
@@ -42,6 +43,15 @@ PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
             {"model_id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6"},
             {"model_id": "claude-opus-4-6", "display_name": "Claude Opus 4.6"},
         ],
+    },
+    "lmstudio": {
+        "provider_name": "LM Studio",
+        "website_url": "https://lmstudio.ai",
+        "api_format": "openai_compatible",
+        "base_url": LMSTUDIO_BASE_URL,
+        "remark": "Local OpenAI-compatible server",
+        "is_system_preset": True,
+        "model_configs": [],
     },
 }
 
@@ -519,7 +529,7 @@ class ModelRepository:
 
     def _upsert_provider(self, cursor, provider_code: str) -> int:
         provider_name = PROVIDER_LABELS.get(provider_code, provider_code.replace("-", " ").replace("_", " ").title())
-        provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL
+        provider_base_url = LMSTUDIO_BASE_URL if provider_code == "lmstudio" else (DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL)
         cursor.execute(
             """
             INSERT INTO model_provider (provider_code, provider_name, api_format, base_url, is_deleted)
@@ -917,6 +927,8 @@ class ModelRepository:
             return text
         if provider_default_base_url:
             return provider_default_base_url
+        if provider_code == "lmstudio":
+            return LMSTUDIO_BASE_URL
         return DEEPSEEK_BASE_URL if provider_code == "deepseek" else DEFAULT_BASE_URL
 
     @staticmethod

@@ -40,6 +40,8 @@ import type {
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProvider,
+  SettingsProviderModelDiscoveryPayload,
+  SettingsProviderModelDiscoveryResponse,
   SettingsProviderListResponse,
   SettingsProviderPayload,
   SimulationTicketCreateResponse,
@@ -291,6 +293,12 @@ export const apiClient = {
     return requestJson<SettingsProvider>('/api/settings/providers/detail', {
       method: 'POST',
       body: JSON.stringify({ provider_code: providerCode }),
+    })
+  },
+  discoverSettingsProviderModels(payload: SettingsProviderModelDiscoveryPayload) {
+    return requestJson<SettingsProviderModelDiscoveryResponse>('/api/settings/providers/models/discover', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
   createSettingsProvider(payload: SettingsProviderPayload) {

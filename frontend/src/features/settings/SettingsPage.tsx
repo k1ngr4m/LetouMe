@@ -26,6 +26,7 @@ import type {
   SchedulePresetType,
   SettingsModel,
   SettingsModelPayload,
+  SettingsProviderDiscoveredModel,
   SettingsProvider,
   SettingsProviderPayload,
   LotteryCode,
@@ -120,6 +121,9 @@ const EMPTY_PROVIDER_FORM: SettingsProviderPayload = {
   extra_options: {},
   model_configs: [],
 }
+
+const LMSTUDIO_PROVIDER_CODE = 'lmstudio'
+const LMSTUDIO_DEFAULT_BASE_URL = 'http://127.0.0.1:1234/v1'
 
 const EMPTY_BULK_EDIT_FORM: BulkEditForm = {
   providerEnabled: false,
@@ -588,6 +592,7 @@ export function SettingsPage() {
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
+  const [lmStudioDiscoveredModels, setLmStudioDiscoveredModels] = useState<SettingsProviderDiscoveredModel[]>([])
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
@@ -703,14 +708,15 @@ export function SettingsPage() {
     setModelForm((previous) => {
       if (previous.provider) return previous
       const deepseekProvider = providerList.find((provider) => provider.code === 'deepseek')
+      const lmStudioProvider = providerList.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
       const aiMixHubProvider = providerList.find((provider) => provider.code === 'aimixhub')
-      const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub')
-      const firstProvider = customProvider || deepseekProvider || aiMixHubProvider || providerList[0]
+      const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub' && provider.code !== LMSTUDIO_PROVIDER_CODE)
+      const firstProvider = customProvider || lmStudioProvider || deepseekProvider || aiMixHubProvider || providerList[0]
       return {
         ...previous,
         provider: firstProvider.code,
         api_format: firstProvider.api_format,
-        base_url: firstProvider.base_url || '',
+        base_url: firstProvider.code === LMSTUDIO_PROVIDER_CODE ? (firstProvider.base_url || LMSTUDIO_DEFAULT_BASE_URL) : (firstProvider.base_url || ''),
       }
     })
     setBulkEditForm((previous) => (previous.provider ? previous : { ...previous, provider: providerList[0].code }))
@@ -853,10 +859,12 @@ export function SettingsPage() {
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
   const createModeProviders = useMemo(() => {
     const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
+    const lmStudioProvider = providers.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
     const aiMixHubProvider = providers.find((provider) => provider.code === 'aimixhub')
-    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub')
+    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub' && provider.code !== LMSTUDIO_PROVIDER_CODE)
     const result: Array<SettingsProvider & { display_name: string }> = []
     if (customProvider) result.push({ ...customProvider, display_name: '自定义供应商' })
+    if (lmStudioProvider) result.push({ ...lmStudioProvider, display_name: 'LM Studio' })
     if (deepseekProvider) result.push({ ...deepseekProvider, display_name: 'DeepSeek' })
     if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AiMixHub' })
     return result
@@ -866,6 +874,7 @@ export function SettingsPage() {
     : providers.map((provider) => ({ ...provider, display_name: provider.name }))
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
   const selectedProvider = providerMap[modelForm.provider]
+  const isLmStudioProvider = modelForm.provider === LMSTUDIO_PROVIDER_CODE
   const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
   const shouldShowModelAppCode = modelForm.provider === 'aimixhub'
   const users = usersQuery.data?.users ?? EMPTY_USERS
@@ -1022,6 +1031,22 @@ export function SettingsPage() {
         status: 'error',
         message: error instanceof Error ? error.message : '连通性测试失败',
       })
+    },
+  })
+  const discoverLmStudioModelsMutation = useMutation({
+    mutationFn: () => apiClient.discoverSettingsProviderModels({
+      provider: modelForm.provider.trim(),
+      base_url: modelForm.base_url.trim(),
+      api_key: modelForm.api_key.trim(),
+    }),
+    onSuccess: (result) => {
+      setLmStudioDiscoveredModels(result.models || [])
+      setMessage(`已从 LM Studio 拉取 ${result.models.length} 个模型`)
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '拉取 LM Studio 模型失败')
+      setMessageType('error')
     },
   })
 
@@ -1298,11 +1323,12 @@ export function SettingsPage() {
     setModelMode('create')
     setSelectedModelCode(null)
     const defaultProvider = createModeProviders[0] || providers[0]
+    setLmStudioDiscoveredModels([])
     setModelForm({
       ...EMPTY_MODEL_FORM,
       provider: defaultProvider?.code || '',
       api_format: defaultProvider?.api_format || 'openai_compatible',
-      base_url: defaultProvider?.base_url || '',
+      base_url: defaultProvider?.code === LMSTUDIO_PROVIDER_CODE ? (defaultProvider?.base_url || LMSTUDIO_DEFAULT_BASE_URL) : (defaultProvider?.base_url || ''),
       temperature: 0.3,
       lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
     })
@@ -1519,6 +1545,10 @@ export function SettingsPage() {
     const model = await apiClient.getSettingsModel(modelCode)
     setModelMode('edit')
     setSelectedModelCode(modelCode)
+    setLmStudioDiscoveredModels(model.provider === LMSTUDIO_PROVIDER_CODE ? [{
+      model_id: model.api_model_name,
+      display_name: model.provider_model_name || model.api_model_name,
+    }] : [])
     setModelForm({
       model_code: model.model_code,
       display_name: model.display_name,
@@ -1541,6 +1571,7 @@ export function SettingsPage() {
   function closeModelModal() {
     setModelModalOpen(false)
     setModelConnectivityResult(null)
+    setLmStudioDiscoveredModels([])
   }
 
   function selectRole(role: RoleItem) {
@@ -1628,11 +1659,13 @@ export function SettingsPage() {
 
   function handleModelProviderChange(providerCode: string) {
     const provider = providerMap[providerCode]
+    setLmStudioDiscoveredModels([])
     setModelForm((previous) => ({
       ...previous,
       provider: providerCode,
       api_format: provider?.api_format || 'openai_compatible',
-      base_url: provider?.base_url || previous.base_url,
+      base_url: providerCode === LMSTUDIO_PROVIDER_CODE ? (provider?.base_url || LMSTUDIO_DEFAULT_BASE_URL) : (provider?.base_url || previous.base_url),
+      api_key: providerCode === LMSTUDIO_PROVIDER_CODE ? '' : previous.api_key,
       provider_model_id: null,
       provider_model_name: '',
       api_model_name: '',
@@ -1645,6 +1678,17 @@ export function SettingsPage() {
     setModelForm((previous) => ({
       ...previous,
       provider_model_id: Number.isFinite(providerModelId) ? providerModelId : null,
+      provider_model_name: modelConfig?.model_id || '',
+      api_model_name: modelConfig?.model_id || previous.api_model_name,
+      display_name: modelMode === 'create' && !previous.display_name ? (modelConfig?.display_name || previous.display_name) : previous.display_name,
+    }))
+  }
+
+  function handleLmStudioDiscoveredModelChange(modelId: string) {
+    const modelConfig = lmStudioDiscoveredModels.find((item) => item.model_id === modelId)
+    setModelForm((previous) => ({
+      ...previous,
+      provider_model_id: null,
       provider_model_name: modelConfig?.model_id || '',
       api_model_name: modelConfig?.model_id || previous.api_model_name,
       display_name: modelMode === 'create' && !previous.display_name ? (modelConfig?.display_name || previous.display_name) : previous.display_name,
@@ -3025,6 +3069,7 @@ export function SettingsPage() {
                     <select
                       value={modelForm.api_format || selectedProvider?.api_format || 'openai_compatible'}
                       onChange={(event) => setModelForm((previous) => ({ ...previous, api_format: event.target.value as SettingsProviderPayload['api_format'] }))}
+                      disabled={isLmStudioProvider}
                     >
                       <option value="openai_responses">OpenAI Responses</option>
                       <option value="openai_compatible">OpenAI Compatible</option>
@@ -3051,6 +3096,36 @@ export function SettingsPage() {
                     <span>API 模型名</span>
                     <input value={modelForm.api_model_name} onChange={(event) => setModelForm((previous) => ({ ...previous, api_model_name: event.target.value }))} required />
                   </label>
+                  {isLmStudioProvider ? (
+                    <>
+                      <label className="field">
+                        <span>LM Studio 已加载模型</span>
+                        <select
+                          aria-label="LM Studio 已加载模型"
+                          value={modelForm.provider_model_name || ''}
+                          onChange={(event) => handleLmStudioDiscoveredModelChange(event.target.value)}
+                        >
+                          <option value="">请选择已加载模型</option>
+                          {lmStudioDiscoveredModels.map((modelConfig) => (
+                            <option key={modelConfig.model_id} value={modelConfig.model_id}>
+                              {modelConfig.display_name} ({modelConfig.model_id})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="field">
+                        <span>&nbsp;</span>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => discoverLmStudioModelsMutation.mutate()}
+                          disabled={discoverLmStudioModelsMutation.isPending}
+                        >
+                          {discoverLmStudioModelsMutation.isPending ? '加载中...' : '从 LM Studio 拉取模型'}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </section>
 
@@ -3065,9 +3140,10 @@ export function SettingsPage() {
                     <input value={modelForm.base_url} onChange={(event) => setModelForm((previous) => ({ ...previous, base_url: event.target.value }))} />
                   </label>
                   <label className="field model-config-modal__field--full">
-                    <span>API Key</span>
+                    <span>{isLmStudioProvider ? 'API Key（可选）' : 'API Key'}</span>
                     <input value={modelForm.api_key} onChange={(event) => setModelForm((previous) => ({ ...previous, api_key: event.target.value }))} />
                   </label>
+                  {isLmStudioProvider ? <div className="settings-inline-hint">LM Studio 本地服务可不填写 API Key。</div> : null}
                   {shouldShowModelAppCode ? (
                     <label className="field">
                       <span>APP Code</span>

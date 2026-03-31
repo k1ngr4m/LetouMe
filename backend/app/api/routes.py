@@ -33,6 +33,7 @@ from backend.app.schemas.model_settings import (
     ModelListResponse,
     ModelResponse,
     ModelSettingsPayload,
+    ProviderModelDiscoveryResponse,
     ProviderListResponse,
 )
 from backend.app.schemas.requests import (
@@ -50,6 +51,7 @@ from backend.app.schemas.requests import (
     ModelUpdatePayload,
     ProviderCodePayload,
     ProviderCreatePayload,
+    ProviderModelDiscoveryPayload,
     ProviderUpdatePayload,
     LotteryFetchTaskPayload,
     MaintenanceRunLogListPayload,
@@ -419,6 +421,14 @@ def get_settings_provider(payload: ProviderCodePayload, _: dict = Depends(requir
     if not provider:
         raise HTTPException(status_code=404, detail="供应商不存在")
     return provider
+
+
+@router.post("/settings/providers/models/discover", response_model=ProviderModelDiscoveryResponse)
+def discover_settings_provider_models(payload: ProviderModelDiscoveryPayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        return model_service.discover_provider_models(payload.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/settings/providers/create")

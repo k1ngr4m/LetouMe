@@ -53,6 +53,15 @@ class ModelConnectivityTestResponse(BaseModel):
     duration_ms: int = 0
 
 
+class ProviderDiscoveredModelResponse(BaseModel):
+    model_id: str
+    display_name: str
+
+
+class ProviderModelDiscoveryResponse(BaseModel):
+    models: list[ProviderDiscoveredModelResponse] = Field(default_factory=list)
+
+
 class ProviderListResponse(BaseModel):
     providers: list[dict[str, Any]] = Field(default_factory=list)
 

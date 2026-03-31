@@ -14,11 +14,13 @@ from backend.app.lotteries import normalize_lottery_code
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1"
 SUPPORTED_PROVIDERS = (
     "openai",
     "anthropic",
     "gemini",
     "deepseek",
+    "lmstudio",
     "openai_compatible",
 )
 SUPPORTED_API_FORMATS = (
@@ -237,7 +239,7 @@ def bootstrap_default_models() -> None:
                 provider_ids: dict[str, int] = {}
                 for provider_code in SUPPORTED_PROVIDERS:
                     provider_name = _provider_name(provider_code)
-                    provider_base_url = DEEPSEEK_BASE_URL if provider_code == "deepseek" else None
+                    provider_base_url = LMSTUDIO_BASE_URL if provider_code == "lmstudio" else (DEEPSEEK_BASE_URL if provider_code == "deepseek" else None)
                     cursor.execute(
                         """
                         INSERT INTO model_provider (provider_code, provider_name, base_url)
@@ -359,6 +361,8 @@ def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
 def _provider_name(provider_code: str) -> str:
     if provider_code == "deepseek":
         return "DeepSeek"
+    if provider_code == "lmstudio":
+        return "LM Studio"
     return provider_code.replace("_", " ").title()
 
 
