@@ -59,6 +59,10 @@ export function HomeModelDetailPage() {
     )
     return resolveModelScore(scoreByModelId, selectedModel)
   }, [history?.model_stats, selectedModel])
+  const scoreSummaryLine = useMemo(() => {
+    if (!selectedScore) return ''
+    return `综合 ${selectedScore.overallScore} · 按注 ${selectedScore.perBetScore} · 按期 ${selectedScore.perPeriodScore}`
+  }, [selectedScore])
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   function handleBack() {
@@ -111,17 +115,16 @@ export function HomeModelDetailPage() {
         </div>
         <div className="model-detail-page__hero-main">
           <div className="model-detail-page__hero-copy">
-            <p className="modal-card__eyebrow">Model Detail</p>
             <div className="model-detail-page__title-row">
               <h2>{selectedModel.model_name}</h2>
               {selectedScore ? <span className="model-detail-page__score-badge">综合 {selectedScore.overallScore}</span> : null}
             </div>
             <p className="model-detail-page__description">
-              查看当前目标期 <strong>{currentPredictions.data?.target_period || '-'}</strong> 下该模型的能力画像与全部预测组合。
+              目标期 <strong>{currentPredictions.data?.target_period || '-'}</strong>，查看该模型本期预测组合与能力摘要。
             </p>
             <div className="model-detail-page__meta">
               <span>{selectedModel.model_provider}</span>
-              <span>{selectedModel.predictions.length} 组预测</span>
+              <span>{selectedModel.predictions.length}组预测</span>
               {selectedScore ? <span>近期 {selectedScore.recentScore} / 长期 {selectedScore.longTermScore}</span> : null}
               <span>{actualResult ? '已开奖' : '待开奖'}</span>
             </div>
@@ -151,7 +154,7 @@ export function HomeModelDetailPage() {
             aria-controls="model-detail-score-showcase"
           >
             <span>{isScoreExpanded ? '收起能力画像' : '展开能力画像'}</span>
-            <small>综合分、按注分、按期分、近期/长期与上下限都在这里看。</small>
+            <small>{scoreSummaryLine || '综合分、按注分、按期分与近期/长期窗口明细。'}</small>
           </button>
           {isScoreExpanded ? (
             <div id="model-detail-score-showcase">
@@ -161,10 +164,16 @@ export function HomeModelDetailPage() {
         </section>
       ) : null}
 
-      <StatusCard title="本期预测组" subtitle="展示该模型当前期号下的全部预测组合与命中情况。">
+      <StatusCard title="本期预测组">
         <div className="detail-group-list model-detail-page__group-list">
           {selectedModel.predictions.map((group) => (
-            <PredictionGroupCard key={`${selectedModel.model_id}-${group.group_id}`} group={group} actualResult={actualResult} />
+            <PredictionGroupCard
+              key={`${selectedModel.model_id}-${group.group_id}`}
+              group={group}
+              actualResult={actualResult}
+              compact
+              showDescriptionInCompact
+            />
           ))}
         </div>
       </StatusCard>

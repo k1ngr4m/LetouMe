@@ -4750,7 +4750,7 @@ a {
 .model-detail-page__hero-main {
   margin-top: 1rem;
   justify-content: space-between;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 .model-detail-page__hero-copy {
@@ -4776,7 +4776,8 @@ a {
 .model-detail-page__description {
   margin: 0;
   color: var(--text-2);
-  line-height: 1.65;
+  line-height: 1.56;
+  max-width: 52ch;
 }
 
 .model-detail-page__score-badge {
@@ -4801,11 +4802,17 @@ a {
 .model-detail-page__meta span {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   min-height: 1.9rem;
   padding: 0.32rem 0.62rem;
   border-radius: 999px;
   color: var(--text-2);
   font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.model-detail-page__meta {
+  align-items: center;
 }
 
 .model-detail-page__hero-side {
@@ -4814,13 +4821,19 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: min(100%, 20rem);
   flex: 0 1 26rem;
+  align-self: flex-start;
 }
 
 .model-detail-page__metric-card {
   padding: 1rem;
   border-radius: 1.15rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
   gap: 0.2rem;
+  min-height: 0;
+  height: auto;
 }
 
 .model-detail-page__metric-card span,
@@ -8356,13 +8369,158 @@ a {
     gap: 0.35rem;
   }
 
-  .model-detail-page__hero-main,
-  .model-detail-page__hero-top {
-    flex-direction: column;
-    align-items: stretch;
+  .model-detail-page {
+    gap: 0.72rem;
   }
 
-  .model-detail-page__hero-side,
+  .model-detail-page__hero {
+    padding: 0.82rem;
+    border-radius: 1rem;
+    background: linear-gradient(180deg, rgba(13, 21, 36, 0.96), rgba(10, 16, 29, 0.96));
+    box-shadow: 0 14px 34px rgba(6, 12, 22, 0.24);
+  }
+
+  .model-detail-page__hero-top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.52rem;
+  }
+
+  .model-detail-page__path {
+    display: none;
+  }
+
+  .model-detail-page__back-button {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 1.9rem;
+    padding: 0.26rem 0.62rem;
+    border-radius: 0.68rem;
+    font-size: 0.76rem;
+  }
+
+  .model-detail-page__hero-main {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0.52rem;
+    gap: 0.58rem;
+  }
+
+  .model-detail-page__hero-copy {
+    min-width: 0;
+    gap: 0.34rem;
+  }
+
+  .model-detail-page__title-row {
+    gap: 0.48rem;
+  }
+
+  .model-detail-page__title-row h2 {
+    font-size: 1.24rem;
+    letter-spacing: -0.02em;
+  }
+
+  .model-detail-page__score-badge {
+    min-height: 1.72rem;
+    padding: 0.28rem 0.58rem;
+    font-size: 0.74rem;
+  }
+
+  .model-detail-page__description {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    max-width: none;
+  }
+
+  .model-detail-page__meta {
+    gap: 0.3rem;
+    align-items: center;
+  }
+
+  .model-detail-page__meta span {
+    min-height: 1.48rem;
+    padding: 0.16rem 0.44rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    line-height: 1.1;
+  }
+
+  .model-detail-page__hero-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.42rem;
+    min-width: 0;
+    align-self: stretch;
+  }
+
+  .model-detail-page__metric-card {
+    padding: 0.52rem 0.58rem;
+    border-radius: 0.78rem;
+    gap: 0.08rem;
+  }
+
+  .model-detail-page__metric-card span,
+  .model-detail-page__metric-card small {
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+
+  .model-detail-page__metric-card strong {
+    font-size: 0.94rem;
+    line-height: 1.14;
+  }
+
+  .model-detail-page__panel {
+    padding: 0.76rem;
+    border-radius: 1rem;
+  }
+
+  .model-detail-page__section-toggle {
+    padding: 0.5rem 0.58rem;
+    border-radius: 0.72rem;
+    gap: 0.16rem;
+  }
+
+  .model-detail-page__section-toggle span {
+    font-size: 0.82rem;
+  }
+
+  .model-detail-page__section-toggle small {
+    font-size: 0.7rem;
+    line-height: 1.32;
+  }
+
+  .model-detail-page .score-showcase {
+    margin-top: 0.45rem;
+    gap: 0.55rem;
+  }
+
+  .model-detail-page .score-showcase__hero {
+    padding: 0.72rem;
+    border-radius: 0.88rem;
+  }
+
+  .model-detail-page .score-showcase__triplet {
+    margin-top: 0.44rem;
+    gap: 0.36rem;
+  }
+
+  .model-detail-page .score-showcase__triplet span,
+  .model-detail-page .score-showcase__window,
+  .model-detail-page .score-showcase__limit-card,
+  .model-detail-page .score-showcase__component {
+    border-radius: 0.78rem;
+  }
+
+  .model-detail-page .score-showcase__component {
+    padding: 0.62rem 0.7rem;
+  }
+
+  .model-detail-page .score-showcase__window,
+  .model-detail-page .score-showcase__limit-card {
+    padding: 0.66rem 0.72rem;
+  }
+
   .model-detail-page .score-showcase__components,
   .model-detail-page__group-list,
   .model-detail-page .score-showcase__windows,
@@ -8375,8 +8533,64 @@ a {
     gap: 0.35rem;
   }
 
-  .model-detail-page__back-button {
+  .model-detail-page > .panel-card {
+    padding: 0.84rem;
+    border-radius: 1rem;
+  }
+
+  .model-detail-page > .panel-card .panel-card__header {
+    gap: 0.45rem;
+    margin-bottom: 0.16rem;
+  }
+
+  .model-detail-page > .panel-card .panel-card__title {
+    font-size: 0.98rem;
+  }
+
+  .model-detail-page .detail-group-list {
+    margin-top: 0.36rem;
+    gap: 0.46rem;
+  }
+
+  .model-detail-page .prediction-group-card {
+    padding: 0.72rem;
+    border-radius: 0.88rem;
+  }
+
+  .model-detail-page .prediction-group-card__header {
+    gap: 0.34rem;
+  }
+
+  .model-detail-page .prediction-group-card__badge,
+  .model-detail-page .prediction-group-card__play-type {
+    min-height: 1.34rem;
+    padding: 0.16rem 0.46rem;
+    font-size: 0.7rem;
+  }
+
+  .model-detail-page .prediction-group-card__strategy {
+    display: block;
     width: 100%;
+    margin-top: 0.02rem;
+    font-size: 0.82rem;
+    line-height: 1.32;
+  }
+
+  .model-detail-page .prediction-group-card__desc--compact {
+    margin-top: 0.34rem;
+    font-size: 0.72rem;
+    line-height: 1.28;
+    -webkit-line-clamp: 2;
+  }
+
+  .model-detail-page .prediction-group-card .number-ball {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.84rem;
+  }
+
+  .model-detail-page .prediction-group-card .number-row {
+    margin-top: 0.42rem;
   }
 
   .settings-schedule-detail-grid {
@@ -9423,6 +9637,50 @@ a {
 
   .hero-metric-card em {
     font-size: 0.9rem;
+  }
+
+  .model-detail-page {
+    gap: 0.62rem;
+  }
+
+  .model-detail-page__hero {
+    padding: 0.8rem;
+    border-radius: 1rem;
+  }
+
+  .model-detail-page__title-row h2 {
+    font-size: 1.12rem;
+  }
+
+  .model-detail-page__description {
+    font-size: 0.8rem;
+    line-height: 1.42;
+  }
+
+  .model-detail-page__meta span {
+    font-size: 0.66rem;
+    min-height: 1.5rem;
+    padding: 0.18rem 0.44rem;
+  }
+
+  .model-detail-page__hero-side {
+    gap: 0.44rem;
+  }
+
+  .model-detail-page__metric-card {
+    padding: 0.58rem 0.62rem;
+  }
+
+  .model-detail-page__panel,
+  .model-detail-page > .panel-card {
+    padding: 0.72rem;
+    border-radius: 0.92rem;
+  }
+
+  .model-detail-page .prediction-group-card .number-ball {
+    width: 1.9rem;
+    height: 1.9rem;
+    font-size: 0.8rem;
   }
 }
 
