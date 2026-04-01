@@ -1461,9 +1461,15 @@ export function HomePage() {
                             </button>
                             {isHistoryStatMenuOpen ? (
                               <div id={menuPanelId} className="history-stat-card__menu-panel" role="menu" aria-label={`${item.model_name} 补充指标`}>
-                                <span className="history-metric-pill">按注 {item.score_profile?.per_bet_score || 0}</span>
-                                <span className="history-metric-pill">按期 {item.score_profile?.per_period_score || 0}</span>
-                                <span className="history-metric-pill">近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
+                                <div className="history-stat-card__menu-group">
+                                  <span className="history-stat-card__menu-label">评分类</span>
+                                  <span className="history-metric-pill">按注 {item.score_profile?.per_bet_score || 0}</span>
+                                  <span className="history-metric-pill">按期 {item.score_profile?.per_period_score || 0}</span>
+                                </div>
+                                <div className="history-stat-card__menu-group">
+                                  <span className="history-stat-card__menu-label">趋势类</span>
+                                  <span className="history-metric-pill">近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
+                                </div>
                               </div>
                             ) : null}
                           </div>
