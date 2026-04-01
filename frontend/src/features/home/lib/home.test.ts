@@ -404,7 +404,7 @@ describe('resolveHistoryFallbackState', () => {
     expect(result.needsHistoryFallbackPrompt).toBe(false)
   })
 
-  it('prompts before fallback when manual filter is active and no intersection', () => {
+  it('auto-falls back when manual filter is active and no intersection', () => {
     const result = resolveHistoryFallbackState({
       hasHistoryRecords: true,
       hasManualModelFilter: true,
@@ -414,8 +414,8 @@ describe('resolveHistoryFallbackState', () => {
       historyFallbackEnabled: false,
     })
 
-    expect(result.useHistoryFallbackModels).toBe(false)
-    expect(result.needsHistoryFallbackPrompt).toBe(true)
+    expect(result.useHistoryFallbackModels).toBe(true)
+    expect(result.needsHistoryFallbackPrompt).toBe(false)
   })
 
   it('enables manual fallback after user confirms', () => {

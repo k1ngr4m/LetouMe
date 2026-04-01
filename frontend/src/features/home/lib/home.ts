@@ -852,10 +852,10 @@ export function resolveHistoryFallbackState({
   const hasModelCandidates = filteredModelIds.length > 0 && historyModelIds.length > 0
   const noIntersection = hasModelCandidates && !hasHistoryModelIntersection
   const autoFallbackWithoutManualFilter = !hasManualModelFilter && noIntersection
-  const manualFallbackEnabled = hasManualModelFilter && historyFallbackEnabled
+  const autoFallbackWithManualFilter = hasManualModelFilter && noIntersection
 
-  const useHistoryFallbackModels = noCurrentModelData || autoFallbackWithoutManualFilter || (manualFallbackEnabled && noIntersection)
-  const needsHistoryFallbackPrompt = hasHistoryRecords && hasManualModelFilter && !noCurrentModelData && noIntersection && !historyFallbackEnabled
+  const useHistoryFallbackModels = noCurrentModelData || autoFallbackWithoutManualFilter || autoFallbackWithManualFilter
+  const needsHistoryFallbackPrompt = hasHistoryRecords && hasManualModelFilter && !noCurrentModelData && noIntersection && !historyFallbackEnabled && !autoFallbackWithManualFilter
 
   return {
     useHistoryFallbackModels,
