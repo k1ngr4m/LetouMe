@@ -2004,7 +2004,7 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard
                 title="模型管理"
-                subtitle="统一管理全部模型目录、彩种覆盖、Provider 连接与运行状态。"
+                // subtitle="统一管理全部模型目录、彩种覆盖、Provider 连接与运行状态。"
                 actions={
                   <div className="toolbar-inline settings-model-toolbar">
                     <div className="settings-model-toolbar__actions">
@@ -2133,7 +2133,10 @@ export function SettingsPage() {
                       <tbody>
                         {visibleModels.length ? (
                           visibleModels.map((model) => (
-                            <tr key={model.model_code}>
+                            <tr
+                              key={model.model_code}
+                              className={clsx(modelActionMenu === `list:${model.model_code}` && 'is-menu-open')}
+                            >
                               <td className="settings-model-table__select-cell">
                                 <input
                                   type="checkbox"

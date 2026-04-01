@@ -3601,6 +3601,7 @@ a {
 
 .settings-action-menu__panel {
   min-width: 12rem;
+  z-index: 320;
 }
 
 .settings-sort-menu {
@@ -3652,6 +3653,15 @@ a {
   transition:
     background-color var(--motion-base) var(--motion-ease-standard),
     transform var(--motion-base) var(--motion-ease-standard);
+}
+
+.settings-model-table tbody tr.is-menu-open {
+  z-index: 260;
+}
+
+.settings-model-table tbody tr.is-menu-open td {
+  position: relative;
+  z-index: 260;
 }
 
 .settings-model-table tbody tr:hover {
