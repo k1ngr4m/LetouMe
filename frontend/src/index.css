@@ -8403,12 +8403,14 @@ a {
   .model-detail-page__hero-main {
     flex-direction: column;
     align-items: stretch;
+    justify-content: flex-start;
     margin-top: 0.52rem;
     gap: 0.58rem;
   }
 
   .model-detail-page__hero-copy {
     min-width: 0;
+    flex: 0 1 auto;
     gap: 0.34rem;
   }
 
@@ -8450,13 +8452,17 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.42rem;
     min-width: 0;
+    flex: 0 0 auto;
     align-self: stretch;
+    align-items: start;
+    grid-auto-rows: minmax(0, auto);
   }
 
   .model-detail-page__metric-card {
     padding: 0.52rem 0.58rem;
     border-radius: 0.78rem;
     gap: 0.08rem;
+    align-self: stretch;
   }
 
   .model-detail-page__metric-card span,
@@ -8581,6 +8587,11 @@ a {
     font-size: 0.72rem;
     line-height: 1.28;
     -webkit-line-clamp: 2;
+  }
+
+  .model-detail-page__hero::before,
+  .model-detail-page__hero::after {
+    display: none;
   }
 
   .model-detail-page .prediction-group-card .number-ball {
