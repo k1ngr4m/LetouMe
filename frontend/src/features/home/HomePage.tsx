@@ -2725,7 +2725,7 @@ function ModelListTable({
                 </td>
                 <td className="home-model-list-table__col--actions">
                   <div className="home-model-list-table__actions">
-                    <div className="action-menu">
+                    <div className={clsx('action-menu', activeActionMenuId === model.model_id && 'is-open')}>
                       <button
                         className="icon-button home-model-list-table__menu-button"
                         onClick={() => onToggleActionMenu(model.model_id)}

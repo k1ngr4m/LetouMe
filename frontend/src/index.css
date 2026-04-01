@@ -2388,6 +2388,8 @@ a {
   align-items: center;
   justify-content: flex-end;
   white-space: nowrap;
+  position: relative;
+  z-index: 1;
 }
 
 .home-model-list-table__actions .icon-button {
@@ -2624,11 +2626,15 @@ a {
   position: relative;
 }
 
+.action-menu.is-open {
+  z-index: 120;
+}
+
 .action-menu__panel {
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  z-index: 10;
+  z-index: 121;
   min-width: 11rem;
   padding: 0.4rem;
   border: 1px solid var(--border-1);
