@@ -158,7 +158,7 @@ export function HomeModelDetailPage() {
           </button>
           {isScoreExpanded ? (
             <div id="model-detail-score-showcase">
-              <ModelScoreShowcase score={selectedScore} compact={false} lotteryCode={selectedLottery} />
+              <ModelScoreShowcase score={selectedScore} compact lotteryCode={selectedLottery} />
             </div>
           ) : null}
         </section>
