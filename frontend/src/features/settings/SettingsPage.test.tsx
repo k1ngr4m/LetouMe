@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from './SettingsPage'
+import { MotionProvider } from '../../shared/theme/MotionProvider'
 
 const { apiClientMock } = vi.hoisted(() => ({
   apiClientMock: {
@@ -81,10 +82,12 @@ function renderPage(initialEntry = '/settings/profile') {
 
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <SettingsPage />
-        <LocationDisplay />
-      </MemoryRouter>
+      <MotionProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <SettingsPage />
+          <LocationDisplay />
+        </MemoryRouter>
+      </MotionProvider>
     </QueryClientProvider>,
   )
 }
@@ -293,6 +296,25 @@ describe('SettingsPage model management view switch', () => {
 
     await screen.findByRole('button', { name: '基础信息' })
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
+  })
+
+  it('renders profile information architecture sections', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage('/settings/profile')
+
+    await screen.findByText('账号概览')
+    expect(screen.getByRole('heading', { name: '修改昵称' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '动效分级' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '修改密码' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: '全站动效分级' })).toBeInTheDocument()
+    expect(screen.getByLabelText('当前密码')).toBeInTheDocument()
+    expect(screen.getByLabelText('确认新密码')).toBeInTheDocument()
   })
 
   it('opens generate prediction modal from list view', async () => {

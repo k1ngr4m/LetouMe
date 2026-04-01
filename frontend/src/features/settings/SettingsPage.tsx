@@ -1868,7 +1868,7 @@ export function SettingsPage() {
 
       {message ? <div className={clsx('banner-message', messageType === 'error' && 'is-error')}>{message}</div> : null}
 
-      <section className="settings-center-layout">
+      <section className="settings-center-layout settings-center-layout--shell">
         <aside className="settings-center-sidebar" aria-label="设置导航">
           {availableTabs.map((tab) => (
               <button
@@ -1881,120 +1881,124 @@ export function SettingsPage() {
           ))}
         </aside>
 
-        <div className="settings-center-content">
+        <div className="settings-center-content settings-center-content--shell">
           {activeTab === 'profile' ? (
             <div className="page-section">
               <StatusCard title="基础信息" subtitle="修改昵称和密码，登录账号仅用于身份识别。">
                 <div className="settings-profile-grid">
-                  <section className="settings-profile-hero">
-                    <div className="settings-profile-hero__main">
-                      <p className="settings-profile-hero__eyebrow">账号概览</p>
-                      <h2>{user?.nickname || user?.username || '未命名用户'}</h2>
-                      <p className="settings-profile-hero__description">当前账号用于登录和身份识别，昵称会展示在系统内的个人信息区域。</p>
-                    </div>
-                    <div className="settings-profile-hero__badges">
-                      <span className="status-pill">{user?.role_name || '未分配角色'}</span>
-                      <span className={clsx('status-pill', user?.is_active ? 'is-active' : 'is-muted')}>
-                        {user?.is_active ? '状态正常' : '已停用'}
-                      </span>
-                    </div>
-                    <div className="settings-profile-summary">
-                      <article className="settings-profile-summary__item">
-                        <span>账号</span>
-                        <strong>{user?.username || '-'}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>昵称</span>
-                        <strong>{user?.nickname || '-'}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>角色</span>
-                        <strong>{user?.role_name || '-'}</strong>
-                      </article>
-                      <article className="settings-profile-summary__item">
-                        <span>权限数</span>
-                        <strong>{user?.permissions?.length || 0}</strong>
-                      </article>
-                    </div>
-                  </section>
-                  <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={(event) => { event.preventDefault(); profileMutation.mutate() }}>
-                    <div className="panel-card__header">
-                      <div>
-                        <h2 className="panel-card__title">修改昵称</h2>
-                        <p className="settings-profile-form-card__hint">更新系统内展示名称，不影响登录账号。</p>
+                  <div className="settings-profile-layout">
+                    <section className="settings-profile-hero settings-profile-layout__main">
+                      <div className="settings-profile-hero__main">
+                        <p className="settings-profile-hero__eyebrow">账号概览</p>
+                        <h2>{user?.nickname || user?.username || '未命名用户'}</h2>
+                        <p className="settings-profile-hero__description">当前账号用于登录和身份识别，昵称会展示在系统内的个人信息区域。</p>
                       </div>
-                    </div>
-                    <label className="field">
-                      <span>昵称</span>
-                      <input value={profileNickname} onChange={(event) => setProfileNickname(event.target.value)} required />
-                    </label>
-                    <button className="primary-button" type="submit" disabled={profileMutation.isPending}>
-                      保存基础信息
-                    </button>
-                  </form>
-                  <section className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--motion">
-                    <div className="panel-card__header">
-                      <div>
-                        <h2 className="panel-card__title">动效分级</h2>
-                        <p className="settings-profile-form-card__hint">当前生效：{motionLevel === 'enhanced' ? '增强' : motionLevel === 'minimal' ? '极简' : '标准'}</p>
+                      <div className="settings-profile-hero__badges">
+                        <span className="status-pill">{user?.role_name || '未分配角色'}</span>
+                        <span className={clsx('status-pill', user?.is_active ? 'is-active' : 'is-muted')}>
+                          {user?.is_active ? '状态正常' : '已停用'}
+                        </span>
                       </div>
-                    </div>
-                    <div className="settings-motion-switch" role="radiogroup" aria-label="全站动效分级">
-                      {MOTION_PREFERENCE_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={motionPreference === option.value}
-                          className={clsx('chip-button', motionPreference === option.value && 'is-active')}
-                          onClick={() => setMotionPreference(option.value)}
-                        >
-                          <span className="chip-button__title">{option.label}</span>
-                          <span className="chip-button__meta">{option.description}</span>
+                      <div className="settings-profile-summary">
+                        <article className="settings-profile-summary__item">
+                          <span>账号</span>
+                          <strong>{user?.username || '-'}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>昵称</span>
+                          <strong>{user?.nickname || '-'}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>角色</span>
+                          <strong>{user?.role_name || '-'}</strong>
+                        </article>
+                        <article className="settings-profile-summary__item">
+                          <span>权限数</span>
+                          <strong>{user?.permissions?.length || 0}</strong>
+                        </article>
+                      </div>
+                    </section>
+                    <div className="settings-profile-layout__actions">
+                      <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={(event) => { event.preventDefault(); profileMutation.mutate() }}>
+                        <div className="panel-card__header">
+                          <div>
+                            <h2 className="panel-card__title">修改昵称</h2>
+                            <p className="settings-profile-form-card__hint">更新系统内展示名称，不影响登录账号。</p>
+                          </div>
+                        </div>
+                        <label className="field">
+                          <span>昵称</span>
+                          <input value={profileNickname} onChange={(event) => setProfileNickname(event.target.value)} required />
+                        </label>
+                        <button className="primary-button" type="submit" disabled={profileMutation.isPending}>
+                          保存基础信息
                         </button>
-                      ))}
+                      </form>
+                      <section className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--motion">
+                        <div className="panel-card__header">
+                          <div>
+                            <h2 className="panel-card__title">动效分级</h2>
+                            <p className="settings-profile-form-card__hint">当前生效：{motionLevel === 'enhanced' ? '增强' : motionLevel === 'minimal' ? '极简' : '标准'}</p>
+                          </div>
+                        </div>
+                        <div className="settings-motion-switch" role="radiogroup" aria-label="全站动效分级">
+                          {MOTION_PREFERENCE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={motionPreference === option.value}
+                              className={clsx('chip-button', motionPreference === option.value && 'is-active')}
+                              onClick={() => setMotionPreference(option.value)}
+                            >
+                              <span className="chip-button__title">{option.label}</span>
+                              <span className="chip-button__meta">{option.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="settings-inline-hint settings-profile-security-note">
+                          “跟随系统”会读取你设备的“减少动态效果”设置；“极简”适合低性能设备或偏静态体验。
+                        </div>
+                      </section>
                     </div>
-                    <div className="settings-inline-hint settings-profile-security-note">
-                      “跟随系统”会读取你设备的“减少动态效果”设置；“极简”适合低性能设备或偏静态体验。
-                    </div>
-                  </section>
-                  <form
-                    className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--security"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      if (passwordForm.new_password !== passwordForm.confirm_password) {
-                        setMessage('两次输入的新密码不一致')
-                        setMessageType('error')
-                        return
-                      }
-                      passwordMutation.mutate()
-                    }}
-                  >
-                    <div className="panel-card__header">
-                      <div>
-                        <h2 className="panel-card__title">修改密码</h2>
-                        <p className="settings-profile-form-card__hint">为确保账号安全，修改密码后需要重新登录。</p>
+                    <form
+                      className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--security settings-profile-layout__security"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        if (passwordForm.new_password !== passwordForm.confirm_password) {
+                          setMessage('两次输入的新密码不一致')
+                          setMessageType('error')
+                          return
+                        }
+                        passwordMutation.mutate()
+                      }}
+                    >
+                      <div className="panel-card__header">
+                        <div>
+                          <h2 className="panel-card__title">修改密码</h2>
+                          <p className="settings-profile-form-card__hint">为确保账号安全，修改密码后需要重新登录。</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="settings-inline-hint settings-profile-security-note">
-                      建议使用更长且不重复的密码，并定期更新账号凭证。
-                    </div>
-                    <label className="field">
-                      <span>当前密码</span>
-                      <input type="password" value={passwordForm.current_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, current_password: event.target.value }))} required />
-                    </label>
-                    <label className="field">
-                      <span>新密码</span>
-                      <input type="password" value={passwordForm.new_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, new_password: event.target.value }))} required />
-                    </label>
-                    <label className="field">
-                      <span>确认新密码</span>
-                      <input type="password" value={passwordForm.confirm_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, confirm_password: event.target.value }))} required />
-                    </label>
-                    <button className="primary-button" type="submit" disabled={passwordMutation.isPending}>
-                      更新密码
-                    </button>
-                  </form>
+                      <div className="settings-inline-hint settings-profile-security-note">
+                        建议使用更长且不重复的密码，并定期更新账号凭证。
+                      </div>
+                      <label className="field">
+                        <span>当前密码</span>
+                        <input type="password" value={passwordForm.current_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, current_password: event.target.value }))} required />
+                      </label>
+                      <label className="field">
+                        <span>新密码</span>
+                        <input type="password" value={passwordForm.new_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, new_password: event.target.value }))} required />
+                      </label>
+                      <label className="field">
+                        <span>确认新密码</span>
+                        <input type="password" value={passwordForm.confirm_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, confirm_password: event.target.value }))} required />
+                      </label>
+                      <button className="primary-button" type="submit" disabled={passwordMutation.isPending}>
+                        更新密码
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </StatusCard>
             </div>
