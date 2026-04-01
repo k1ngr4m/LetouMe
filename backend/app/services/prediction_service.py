@@ -25,6 +25,7 @@ class PredictionService:
     BET_COST = 2
     DEFAULT_STRATEGY_LABEL = "AI 组合策略"
     RECENT_SCORE_WINDOW = 20
+    SCORE_PROFILE_HISTORY_LIMIT = 80
     FIXED_PRIZE_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
     PL3_FIXED_PRIZE_RULES = {
         "直选": 1040,
@@ -1345,7 +1346,7 @@ class PredictionService:
         def load_profiles() -> dict[str, dict[str, Any]]:
             if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
                 summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(
-                    limit=120,
+                    limit=self.SCORE_PROFILE_HISTORY_LIMIT,
                     offset=0,
                     lottery_code=normalized_code,
                     compact_for_scoring=True,
@@ -1353,7 +1354,7 @@ class PredictionService:
                 summary_records = summary_payload.get("records", [])
             else:
                 summary_records = self.prediction_repository.list_history_record_summaries(
-                    limit=120,
+                    limit=self.SCORE_PROFILE_HISTORY_LIMIT,
                     offset=0,
                     lottery_code=normalized_code,
                 )
@@ -1725,6 +1726,7 @@ class PredictionService:
         runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:current:")
         runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:history:full:")
         runtime_cache.invalidate_prefix(f"predictions:{normalized_code}:history:list:")
+        runtime_cache.invalidate_prefix("prediction-repo:")
         if target_period:
             runtime_cache.delete(f"predictions:{normalized_code}:history:detail:{target_period}")
         else:

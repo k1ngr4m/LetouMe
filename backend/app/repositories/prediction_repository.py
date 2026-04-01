@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date, datetime
 from time import perf_counter
 from time import sleep
 from typing import Any
 
+from backend.app.cache import runtime_cache
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.lotteries import display_period, normalize_digit_balls, normalize_group_digits, normalize_lottery_code, storage_issue_no
@@ -19,6 +21,8 @@ class PredictionRepository:
     _WRITE_RETRY_DELAY_SECONDS = 0.15
     _WRITE_RETRY_LIMIT = 3
     _IN_QUERY_CHUNK_SIZE = 200
+    _MODEL_RUNS_COMPACT_CACHE_TTL_SECONDS = 90
+    _GROUP_NUMBERS_CHUNK_CACHE_TTL_SECONDS = 45
 
     def __init__(self, log_repository: WriteLogRepository | None = None) -> None:
         self.log_repository = log_repository or WriteLogRepository()
@@ -1006,6 +1010,14 @@ class PredictionRepository:
             return []
         placeholders = ", ".join("?" for _ in batch_ids)
         if not include_extended_meta:
+            normalized_batch_ids = tuple(sorted({int(batch_id) for batch_id in batch_ids}))
+            cache_key = PredictionRepository._build_id_set_cache_key(
+                "prediction-repo:model-runs:compact",
+                normalized_batch_ids,
+            )
+            cached_rows = runtime_cache.get(cache_key)
+            if isinstance(cached_rows, list):
+                return cached_rows
             cursor.execute(
                 f"""
                 SELECT
@@ -1020,9 +1032,15 @@ class PredictionRepository:
                 WHERE pmr.prediction_batch_id IN ({placeholders})
                 ORDER BY pmr.prediction_batch_id ASC, pmr.display_order ASC, pmr.id ASC
                 """,
-                tuple(batch_ids),
+                normalized_batch_ids,
             )
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            runtime_cache.set(
+                cache_key,
+                rows,
+                ttl_seconds=PredictionRepository._MODEL_RUNS_COMPACT_CACHE_TTL_SECONDS,
+            )
+            return rows
         cursor.execute(
             f"""
             SELECT
@@ -1187,7 +1205,18 @@ class PredictionRepository:
             return {}
         result: dict[int, list[dict[str, Any]]] = {}
         for chunk in PredictionRepository._iter_chunks(group_ids, PredictionRepository._IN_QUERY_CHUNK_SIZE):
-            placeholders = ", ".join("?" for _ in chunk)
+            normalized_chunk = tuple(sorted({int(group_id) for group_id in chunk}))
+            cache_key = PredictionRepository._build_id_set_cache_key(
+                "prediction-repo:group-numbers:chunk",
+                normalized_chunk,
+            )
+            cached_chunk = runtime_cache.get(cache_key)
+            if isinstance(cached_chunk, dict):
+                for group_id, rows in cached_chunk.items():
+                    result[int(group_id)] = list(rows)
+                continue
+
+            placeholders = ", ".join("?" for _ in normalized_chunk)
             cursor.execute(
                 f"""
                 SELECT prediction_group_id, ball_color, ball_position, ball_value
@@ -1195,11 +1224,25 @@ class PredictionRepository:
                 WHERE prediction_group_id IN ({placeholders})
                 ORDER BY prediction_group_id ASC, ball_color ASC, ball_position ASC
                 """,
-                tuple(chunk),
+                normalized_chunk,
             )
+            chunk_result: dict[int, list[dict[str, Any]]] = {}
             for row in cursor.fetchall():
-                result.setdefault(int(row["prediction_group_id"]), []).append(row)
+                chunk_result.setdefault(int(row["prediction_group_id"]), []).append(row)
+            runtime_cache.set(
+                cache_key,
+                chunk_result,
+                ttl_seconds=PredictionRepository._GROUP_NUMBERS_CHUNK_CACHE_TTL_SECONDS,
+            )
+            for group_id, rows in chunk_result.items():
+                result[group_id] = rows
         return result
+
+    @staticmethod
+    def _build_id_set_cache_key(prefix: str, ids: tuple[int, ...]) -> str:
+        digest_source = ",".join(str(item) for item in ids)
+        digest = hashlib.sha1(digest_source.encode("utf-8")).hexdigest()[:16]
+        return f"{prefix}:{len(ids)}:{digest}"
 
     @staticmethod
     def _fetch_hit_summaries(cursor, group_ids: list[int]) -> dict[int, dict[str, Any]]:
