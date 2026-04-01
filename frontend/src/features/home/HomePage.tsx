@@ -728,6 +728,7 @@ export function HomePage() {
       selectedTags.length ||
       selectedScoreRange !== 'all',
   )
+  const shouldShowAllActiveHistoryModels = !hasManualModelFilter && summarySelectedModelIds === null
   const { useHistoryFallbackModels, needsHistoryFallbackPrompt } = resolveHistoryFallbackState({
     hasHistoryRecords: Boolean(history?.predictions_history?.length),
     hasManualModelFilter,
@@ -737,18 +738,26 @@ export function HomePage() {
     historyFallbackEnabled,
   })
   const historyVisibleModelIds = useMemo(
-    () =>
-      useHistoryFallbackModels
+    () => {
+      if (shouldShowAllActiveHistoryModels) {
+        return [...new Set(historyAllModelRefs.map((item) => item.model_id))]
+      }
+      return useHistoryFallbackModels
         ? [...new Set(historyAllModelRefs.map((item) => item.model_id))]
-        : effectiveSelectedModelIds,
-    [effectiveSelectedModelIds, historyAllModelRefs, useHistoryFallbackModels],
+        : effectiveSelectedModelIds
+    },
+    [effectiveSelectedModelIds, historyAllModelRefs, shouldShowAllActiveHistoryModels, useHistoryFallbackModels],
   )
   const historyVisibleModels = useMemo<HistoryModelRef[]>(
-    () =>
-      useHistoryFallbackModels
+    () => {
+      if (shouldShowAllActiveHistoryModels) {
+        return historyAllModelRefs
+      }
+      return useHistoryFallbackModels
         ? historyAllModelRefs
-        : effectiveSelectedModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name })),
-    [effectiveSelectedModels, historyAllModelRefs, useHistoryFallbackModels],
+        : effectiveSelectedModels.map((model) => ({ model_id: model.model_id, model_name: model.model_name }))
+    },
+    [effectiveSelectedModels, historyAllModelRefs, shouldShowAllActiveHistoryModels, useHistoryFallbackModels],
   )
   const summaryStrategyOptions = useMemo(
     () =>

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from backend.app.services.prediction_service import PredictionService
+from backend.app.cache import runtime_cache
 
 
 class _FakePredictionRepository:
@@ -430,9 +431,43 @@ class _FakeModelRepository:
     def list_active_model_codes(self) -> set[str]:
         return set(self.active_model_codes)
 
+    def list_models(self, include_deleted: bool = False) -> list[dict]:
+        all_models = [
+            {
+                "model_code": "model-a",
+                "display_name": "模型A",
+                "is_active": "model-a" in self.active_model_codes,
+                "is_deleted": False,
+                "lottery_codes": ["dlt"],
+            },
+            {
+                "model_code": "model-b",
+                "display_name": "模型B",
+                "is_active": "model-b" in self.active_model_codes,
+                "is_deleted": False,
+                "lottery_codes": ["dlt"],
+            },
+            {
+                "model_code": "model-c",
+                "display_name": "模型C",
+                "is_active": "model-c" in self.active_model_codes,
+                "is_deleted": False,
+                "lottery_codes": ["dlt"],
+            },
+            {
+                "model_code": "model-pl3-only",
+                "display_name": "排列3专属模型",
+                "is_active": "model-pl3-only" in self.active_model_codes,
+                "is_deleted": False,
+                "lottery_codes": ["pl3"],
+            },
+        ]
+        return [item for item in all_models if include_deleted or not item["is_deleted"]]
+
 
 class PredictionHistoryMetricsTests(unittest.TestCase):
     def setUp(self) -> None:
+        runtime_cache.clear()
         self.service = PredictionService(prediction_repository=_FakePredictionRepository())
 
     def test_history_list_payload_contains_cost_prize_and_win_rates(self) -> None:
@@ -726,6 +761,22 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual([item["model_id"] for item in payload["predictions_history"][0]["models"]], ["model-a"])
         self.assertEqual([item["model_id"] for item in payload["model_stats"]], ["model-a"])
         self.assertEqual(payload["strategy_options"], ["AI 组合策略", "增强型热号追随者"])
+
+    def test_history_payload_appends_enabled_models_for_same_lottery(self) -> None:
+        service = PredictionService(
+            prediction_repository=_FakePredictionRepository(),
+            model_repository=_FakeModelRepository({"model-a", "model-b", "model-c", "model-pl3-only"}),
+        )
+
+        payload = service.get_history_list_payload(lottery_code="dlt", include_inactive_models=False)
+
+        model_stats_ids = [item["model_id"] for item in payload["model_stats"]]
+        self.assertIn("model-c", model_stats_ids)
+        self.assertNotIn("model-pl3-only", model_stats_ids)
+        model_c = next(item for item in payload["model_stats"] if item["model_id"] == "model-c")
+        self.assertEqual(model_c["periods"], 0)
+        self.assertEqual(model_c["bet_count"], 0)
+        self.assertEqual(model_c["prize_amount"], 0)
 
     def test_history_detail_returns_none_when_only_inactive_models_remain(self) -> None:
         service = PredictionService(

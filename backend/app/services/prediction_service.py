@@ -936,11 +936,17 @@ class PredictionService:
         else:
             filtered_total_count = self.prediction_repository.count_history_records(lottery_code=lottery_code)
         score_profiles = self._build_score_profiles(records)
+        model_stats = self._build_model_stats(records, score_profiles)
+        if not include_inactive_models:
+            model_stats = self._merge_active_models_into_history_stats(
+                model_stats=model_stats,
+                lottery_code=normalized_code,
+            )
         payload = {
             "lottery_code": normalized_code,
             "predictions_history": [self._build_history_summary(record, score_profiles) for record in records],
             "total_count": filtered_total_count,
-            "model_stats": self._build_model_stats(records, score_profiles),
+            "model_stats": model_stats,
             "strategy_options": [] if normalized_code in {"pl3", "pl5"} else self._list_history_strategy_options(
                 lottery_code=lottery_code,
                 records=records,
@@ -971,6 +977,45 @@ class PredictionService:
             },
         )
         return payload
+
+    def _merge_active_models_into_history_stats(
+        self,
+        *,
+        model_stats: list[dict[str, Any]],
+        lottery_code: str,
+    ) -> list[dict[str, Any]]:
+        existing_model_ids = {str(item.get("model_id") or "") for item in model_stats if item.get("model_id")}
+        merged_stats = list(model_stats)
+        for model_ref in self._list_active_model_refs_for_lottery(lottery_code):
+            model_id = str(model_ref.get("model_id") or "")
+            if not model_id or model_id in existing_model_ids:
+                continue
+            merged_stats.append(
+                {
+                    "model_id": model_id,
+                    "prediction_play_mode": "direct",
+                    "model_name": str(model_ref.get("model_name") or model_id),
+                    "periods": 0,
+                    "winning_periods": 0,
+                    "bet_count": 0,
+                    "winning_bet_count": 0,
+                    "cost_amount": 0,
+                    "prize_amount": 0,
+                    "win_rate_by_period": 0,
+                    "win_rate_by_bet": 0,
+                    "score_profile": self._empty_score_profile(),
+                }
+            )
+        merged_stats.sort(
+            key=lambda item: (
+                int(item.get("score_profile", {}).get("overall_score", 0)),
+                int(item.get("prize_amount") or 0),
+                float(item.get("win_rate_by_period") or 0),
+                str(item.get("model_name") or item.get("model_id") or ""),
+            ),
+            reverse=True,
+        )
+        return merged_stats
 
     def _annotate_history_summary_record(
         self,
@@ -1631,6 +1676,35 @@ class PredictionService:
     @staticmethod
     def _filter_models_by_active_status(models: list[dict[str, Any]], active_model_codes: set[str]) -> list[dict[str, Any]]:
         return [model for model in models if str(model.get("model_id") or "") in active_model_codes]
+
+    def _list_active_model_refs_for_lottery(self, lottery_code: str) -> list[dict[str, str]]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        list_models = getattr(self.model_repository, "list_models", None)
+        if callable(list_models):
+            refs: dict[str, dict[str, str]] = {}
+            for model in list_models(include_deleted=False):
+                if not bool(model.get("is_active")):
+                    continue
+                model_lottery_codes = model.get("lottery_codes") or ["dlt"]
+                normalized_lotteries = {
+                    normalize_lottery_code(code)
+                    for code in model_lottery_codes
+                    if str(code or "").strip()
+                }
+                if normalized_code not in normalized_lotteries:
+                    continue
+                model_id = str(model.get("model_code") or "").strip()
+                if not model_id:
+                    continue
+                refs[model_id] = {
+                    "model_id": model_id,
+                    "model_name": str(model.get("display_name") or model_id),
+                }
+            return list(refs.values())
+        return [
+            {"model_id": model_code, "model_name": model_code}
+            for model_code in sorted(self._get_active_model_codes())
+        ]
 
     def _get_active_model_codes(self) -> set[str]:
         return self.model_repository.list_active_model_codes()
