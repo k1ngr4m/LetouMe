@@ -2699,8 +2699,9 @@ function ModelListTable({
         <tbody>
           {models.map((model) => {
             const isPinned = validPinnedModelIds.includes(model.model_id)
+            const isActionMenuOpen = activeActionMenuId === model.model_id
             return (
-              <tr key={model.model_id}>
+              <tr key={model.model_id} className={clsx(isActionMenuOpen && 'is-menu-open')}>
                 <td>
                   <div className="home-model-list-table__title">
                     <button
@@ -2725,18 +2726,18 @@ function ModelListTable({
                 </td>
                 <td className="home-model-list-table__col--actions">
                   <div className="home-model-list-table__actions">
-                    <div className={clsx('action-menu', activeActionMenuId === model.model_id && 'is-open')}>
+                    <div className={clsx('action-menu', isActionMenuOpen && 'is-open')}>
                       <button
                         className="icon-button home-model-list-table__menu-button"
                         onClick={() => onToggleActionMenu(model.model_id)}
-                        aria-expanded={activeActionMenuId === model.model_id}
+                        aria-expanded={isActionMenuOpen}
                         aria-label={`更多操作：${model.model_name}`}
                         title="更多操作"
                         type="button"
                       >
                         <MoreMenuIcon />
                       </button>
-                      {activeActionMenuId === model.model_id ? (
+                      {isActionMenuOpen ? (
                         <div className="action-menu__panel">
                           <div className="action-menu__group action-menu__group--primary">
                             <button className="action-menu__item" type="button" onClick={() => onDetail(model.model_id)}>
