@@ -1076,7 +1076,9 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('is-active')
     expect(screen.getByRole('columnheader', { name: '模型' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: '预测号码' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: '评分摘要' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: '评分摘要' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/综合 \d+ · 按注 \d+/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/按期 \d+ · 近期\/长期 \d+\/\d+/).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('button', { name: /查看详情：/ }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('模型A').length).toBeGreaterThan(0)
 
@@ -1160,7 +1162,8 @@ describe('HomePage dashboard sidebar', () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '导出详情：模型A' }))
+    await userEvent.click(screen.getByRole('button', { name: '更多操作：模型A' }))
+    await userEvent.click(screen.getByRole('button', { name: '导出详情' }))
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')

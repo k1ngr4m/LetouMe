@@ -2691,9 +2691,7 @@ function ModelListTable({
           <tr>
             <th>模型</th>
             <th>预测号码</th>
-            <th>评分摘要</th>
-            <th>状态</th>
-            <th>操作</th>
+            <th className="home-model-list-table__col--actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -2703,8 +2701,17 @@ function ModelListTable({
               <tr key={model.model_id}>
                 <td>
                   <div className="home-model-list-table__title">
-                    <strong>{model.model_name}</strong>
+                    <button
+                      className="home-model-list-table__model-link"
+                      onClick={() => onDetail(model.model_id)}
+                      aria-label={`查看详情：${model.model_name}`}
+                      title="查看详情"
+                      type="button"
+                    >
+                      {model.model_name}
+                    </button>
                     <span>{model.model_provider}</span>
+                    <ModelScoreInlineCompact score={resolveModelScore(modelScores, model)} />
                   </div>
                 </td>
                 <td>
@@ -2714,35 +2721,8 @@ function ModelListTable({
                     ))}
                   </div>
                 </td>
-                <td>
-                  <ModelScoreInline score={resolveModelScore(modelScores, model)} />
-                </td>
-                <td>
-                  {isPinned ? <span className="status-pill is-active">已置顶</span> : null}
-                </td>
-                <td>
+                <td className="home-model-list-table__col--actions">
                   <div className="home-model-list-table__actions">
-                    <button
-                      className="icon-button home-model-list-table__detail-button"
-                      onClick={() => onDetail(model.model_id)}
-                      aria-label={`查看详情：${model.model_name}`}
-                      title="查看详情"
-                      type="button"
-                    >
-                      <DetailIcon />
-                    </button>
-                    {!hideExport ? (
-                      <button
-                        className="icon-button home-model-list-table__export-button"
-                        onClick={() => onExport(model.model_id)}
-                        aria-label={`导出详情：${model.model_name}`}
-                        title={exportingModelId === model.model_id ? '导出中...' : '导出详情'}
-                        type="button"
-                        disabled={exportingModelId === model.model_id}
-                      >
-                        <ExportIcon />
-                      </button>
-                    ) : null}
                     <div className="action-menu">
                       <button
                         className="icon-button home-model-list-table__menu-button"
@@ -2756,6 +2736,19 @@ function ModelListTable({
                       </button>
                       {activeActionMenuId === model.model_id ? (
                         <div className="action-menu__panel">
+                          <button className="action-menu__item" type="button" onClick={() => onDetail(model.model_id)}>
+                            查看详情
+                          </button>
+                          {!hideExport ? (
+                            <button
+                              className="action-menu__item"
+                              type="button"
+                              onClick={() => onExport(model.model_id)}
+                              disabled={exportingModelId === model.model_id}
+                            >
+                              {exportingModelId === model.model_id ? '导出中...' : '导出详情'}
+                            </button>
+                          ) : null}
                           <button className="action-menu__item" type="button" onClick={() => onPin(model.model_id)}>
                             {isPinned ? '取消置顶' : '置顶'}
                           </button>
@@ -3375,8 +3368,8 @@ function ModelScoreComparisonTable({
                 </div>
               </th>
             ))}
-            <th>状态</th>
-            <th>操作</th>
+            <th className="score-view-table__col--status">状态</th>
+            <th className="score-view-table__col--actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -3387,7 +3380,15 @@ function ModelScoreComparisonTable({
               <tr key={model.model_id}>
                 <td>
                   <div className="score-view-table__model">
-                    <strong>{model.model_name}</strong>
+                    <button
+                      className="score-view-table__model-link"
+                      type="button"
+                      onClick={() => onDetail(model.model_id)}
+                      aria-label={`查看详情：${model.model_name}`}
+                      title="查看详情"
+                    >
+                      {model.model_name}
+                    </button>
                     <span>{model.model_provider}</span>
                   </div>
                 </td>
@@ -3396,8 +3397,8 @@ function ModelScoreComparisonTable({
                     <ScoreMetricCell label={column.label} value={getScoreViewValue(score, column.key)} />
                   </td>
                 ))}
-                <td>{isPinned ? <span className="status-pill is-active">已置顶</span> : <span className="score-view-table__status">普通</span>}</td>
-                <td>
+                <td className="score-view-table__col--status">{isPinned ? <span className="status-pill is-active">已置顶</span> : <span className="score-view-table__status">普通</span>}</td>
+                <td className="score-view-table__col--actions">
                   <button
                     className="icon-button score-view-table__detail-button"
                     type="button"
@@ -3461,6 +3462,17 @@ function ModelScoreInline({ score }: { score?: ModelScore }) {
       <span className="score-inline__pill">按注 {score.perBetScore}</span>
       <span className="score-inline__pill">按期 {score.perPeriodScore}</span>
       <span className="score-inline__pill">近期/长期 {score.recentScore}/{score.longTermScore}</span>
+    </div>
+  )
+}
+
+function ModelScoreInlineCompact({ score }: { score?: ModelScore }) {
+  if (!score) return null
+
+  return (
+    <div className="score-inline-compact" aria-label="评分摘要">
+      <span>{`综合 ${score.overallScore} · 按注 ${score.perBetScore}`}</span>
+      <span>{`按期 ${score.perPeriodScore} · 近期/长期 ${score.recentScore}/${score.longTermScore}`}</span>
     </div>
   )
 }
