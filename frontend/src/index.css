@@ -6828,6 +6828,12 @@ a {
 }
 
 @media (max-width: 760px) {
+  .modal-shell {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0.45rem 0.45rem max(0.45rem, env(safe-area-inset-bottom, 0px));
+  }
+
   .export-toast {
     top: 0.9rem;
     right: 0.9rem;
@@ -7114,6 +7120,151 @@ a {
     order: -1;
   }
 
+  .my-bets-modal-card {
+    width: calc(100vw - 0.32rem);
+    max-height: calc(100dvh - 0.5rem);
+    border-radius: 1rem 1rem 0.76rem 0.76rem;
+    border-bottom-left-radius: max(0.76rem, env(safe-area-inset-bottom, 0px));
+    border-bottom-right-radius: max(0.76rem, env(safe-area-inset-bottom, 0px));
+    padding: 0.72rem;
+  }
+
+  .my-bets-modal__form {
+    max-height: calc(100dvh - 1.05rem);
+    padding-right: 0;
+    overscroll-behavior: contain;
+  }
+
+  .my-bets-modal__header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.72rem;
+    padding: 0.1rem 0 0.82rem;
+    margin: -0.1rem 0 0;
+    backdrop-filter: blur(10px);
+  }
+
+  .my-bets-modal__header::before {
+    content: '';
+    display: block;
+    width: 2.5rem;
+    height: 0.26rem;
+    border-radius: 999px;
+    margin: 0 auto 0.55rem;
+    background: linear-gradient(90deg, rgba(120, 142, 190, 0.45), rgba(198, 214, 255, 0.72), rgba(120, 142, 190, 0.45));
+    box-shadow: 0 0 0 1px rgba(156, 176, 225, 0.18);
+    flex-basis: 100%;
+  }
+
+  .my-bets-modal__header h2 {
+    font-size: 1.2rem;
+    line-height: 1.28;
+  }
+
+  .my-bets-modal__header .ghost-button--compact {
+    min-height: 2.2rem;
+    min-width: 3.1rem;
+    padding: 0.3rem 0.72rem;
+  }
+
+  .my-bets-modal__section,
+  .my-bets-modal__line-section {
+    border-radius: 0.98rem;
+    padding: 0.82rem;
+  }
+
+  .my-bets-modal__editor-list {
+    gap: 0.74rem;
+  }
+
+  .my-bets-modal__grid {
+    grid-template-columns: 1fr;
+    row-gap: 0.76rem;
+  }
+
+  .my-bets-modal__field {
+    gap: 0.38rem;
+    font-size: 0.8rem;
+  }
+
+  .my-bets-modal__field input,
+  .my-bets-modal__field select,
+  .my-bets-modal__line-section input,
+  .my-bets-modal__line-section select {
+    height: 2.72rem;
+    font-size: 0.95rem;
+    border-radius: 0.82rem;
+  }
+
+  .my-bets-image-uploader__header span,
+  .my-bets-image-uploader__placeholder,
+  .my-bets-picker__label {
+    font-size: 0.79rem;
+    line-height: 1.45;
+  }
+
+  .my-bets-image-uploader__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.52rem;
+    align-items: stretch;
+  }
+
+  .my-bets-image-uploader__actions input[type='file'] {
+    max-width: none;
+    width: 100%;
+  }
+
+  .my-bets-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.36rem;
+  }
+
+  .my-bets-picker__ball {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.38rem;
+    height: 2.38rem;
+    padding: 0;
+    font-size: 0.78rem;
+  }
+
+  .my-bets-modal__footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin-top: 0.18rem;
+    border-top-left-radius: 0.92rem;
+    border-top-right-radius: 0.92rem;
+    padding: 0.8rem;
+    backdrop-filter: blur(12px);
+  }
+
+  .my-bets-modal__footer .simulation-summary-bar__meta strong {
+    font-size: 0.91rem;
+    line-height: 1.36;
+  }
+
+  .my-bets-modal__footer .simulation-summary-bar__meta span {
+    font-size: 0.76rem;
+    line-height: 1.4;
+  }
+
+  .my-bets-modal__footer .simulation-summary-bar__actions {
+    gap: 0.5rem;
+  }
+
+  .my-bets-modal__footer .ghost-button,
+  .my-bets-modal__footer .primary-button,
+  .my-bets-image-uploader__actions .primary-button,
+  .my-bets-image-uploader__actions .ghost-button {
+    min-height: 2.78rem;
+    border-radius: 0.86rem;
+    font-size: 0.93rem;
+  }
+
   .model-detail-modal {
     padding: 1rem;
   }
@@ -7163,6 +7314,10 @@ a {
 }
 
 @media (max-width: 640px) {
+  .modal-shell {
+    padding: 0.25rem 0.25rem max(0.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
   .app-preference-panel {
     top: 0.7rem;
     right: 0.7rem;
@@ -7195,6 +7350,48 @@ a {
 
   .lottery-switch {
     grid-template-columns: 1fr;
+  }
+
+  .my-bets-modal-card {
+    width: calc(100vw - 0.12rem);
+    max-height: calc(100dvh - 0.24rem);
+    border-radius: 0.92rem 0.92rem 0.72rem 0.72rem;
+    padding: 0.62rem;
+  }
+
+  .my-bets-modal__form {
+    max-height: calc(100dvh - 0.62rem);
+  }
+
+  .my-bets-modal__header {
+    padding-bottom: 0.7rem;
+  }
+
+  .my-bets-modal__header::before {
+    margin-bottom: 0.48rem;
+  }
+
+  .my-bets-modal__header h2 {
+    font-size: 1.08rem;
+  }
+
+  .my-bets-modal__section,
+  .my-bets-modal__line-section,
+  .my-bets-modal__footer {
+    padding: 0.7rem;
+  }
+
+  .my-bets-picker__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .my-bets-picker__ball {
+    min-height: 2.28rem;
+    height: 2.28rem;
+  }
+
+  .my-bets-image-uploader__actions input[type='file'] {
+    font-size: 0.78rem;
   }
 
   .chip-button {
