@@ -51,6 +51,9 @@ const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const LOTTERY_DEFAULT_PAGE_SIZE = 10
 const EXPORT_TOAST_DURATION_MS = 2000
+const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
+const MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT = 4
+const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
   { value: 'all', label: '全部评分' },
   { value: '0-30', label: '0-30 分' },
@@ -111,6 +114,16 @@ function HomeFilterIcon() {
       <path d="M4 5.5h12" />
       <path d="M6.8 10h6.4" />
       <path d="M8.8 14.5h2.4" />
+    </HomeSvgIcon>
+  )
+}
+
+function HomeCommonOnlyIcon() {
+  return (
+    <HomeSvgIcon>
+      <circle cx="7.2" cy="10" r="3.1" />
+      <circle cx="12.8" cy="10" r="3.1" />
+      <path d="m8.8 10 1 1 1.8-2" />
     </HomeSvgIcon>
   )
 }
@@ -280,6 +293,14 @@ function resolveExportBackgroundColor() {
   return document.documentElement.dataset.theme === 'light' ? '#f8f2ea' : '#101827'
 }
 
+function isMobileExportDisabled() {
+  if (typeof window === 'undefined') return false
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(`(max-width: ${MOBILE_EXPORT_MAX_WIDTH}px)`).matches
+  }
+  return window.innerWidth <= MOBILE_EXPORT_MAX_WIDTH
+}
+
 type ExportToastState = {
   message: string
   tone: 'success' | 'error'
@@ -427,6 +448,8 @@ export function HomePage() {
   const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'compound' | 'dantuo'>('direct')
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
+  const [isSummaryModelChipsExpanded, setIsSummaryModelChipsExpanded] = useState(false)
+  const [isSummaryStrategyExpanded, setIsSummaryStrategyExpanded] = useState(false)
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
     () =>
       selectedLottery === 'pl3'
@@ -550,6 +573,8 @@ export function HomePage() {
     setLotteryPage(1)
     setSummaryStrategyFilters([])
     setHistoryStrategyFilters([])
+    setIsSummaryModelChipsExpanded(false)
+    setIsSummaryStrategyExpanded(false)
   }, [selectedLottery])
 
   useEffect(() => {
@@ -558,6 +583,8 @@ export function HomePage() {
       setHistoryPage(1)
       setSummaryStrategyFilters([])
       setHistoryStrategyFilters([])
+      setIsSummaryModelChipsExpanded(false)
+      setIsSummaryStrategyExpanded(false)
       return
     }
     if (selectedLottery === 'dlt') {
@@ -566,6 +593,8 @@ export function HomePage() {
       setHistoryPage(1)
       setSummaryStrategyFilters([])
       setHistoryStrategyFilters([])
+      setIsSummaryModelChipsExpanded(false)
+      setIsSummaryStrategyExpanded(false)
       return
     }
     if (dltPredictionMode !== 'direct') {
@@ -707,6 +736,12 @@ export function HomePage() {
   }, [summaryStrategyOptions])
 
   useEffect(() => {
+    if (summaryStrategyOptions.length <= MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT && isSummaryStrategyExpanded) {
+      setIsSummaryStrategyExpanded(false)
+    }
+  }, [isSummaryStrategyExpanded, summaryStrategyOptions.length])
+
+  useEffect(() => {
     if (predictionsHistory.isFetching && !historyStrategyOptions.length) return
     setHistoryStrategyFilters((previous) => {
       const next = previous.filter((item) => historyStrategyOptions.includes(item))
@@ -727,6 +762,12 @@ export function HomePage() {
     [filteredModels, summaryPlayTypeFilters],
   )
 
+  useEffect(() => {
+    if (summarySelectableModels.length <= MOBILE_SUMMARY_MODEL_CHIP_LIMIT && isSummaryModelChipsExpanded) {
+      setIsSummaryModelChipsExpanded(false)
+    }
+  }, [isSummaryModelChipsExpanded, summarySelectableModels.length])
+
   const { selectedSummaryIds, summary, filteredHistory } = buildHistoryState(
     historyPeriodQuery,
     commonOnly,
@@ -737,6 +778,29 @@ export function HomePage() {
     summaryPlayTypeFilters,
   )
   const summaryModels = summarySelectableModels.filter((model) => selectedSummaryIds.includes(model.model_id))
+  const summaryVisibleModelChips = useMemo(() => {
+    if (isSummaryModelChipsExpanded || summarySelectableModels.length <= MOBILE_SUMMARY_MODEL_CHIP_LIMIT) {
+      return summarySelectableModels
+    }
+    const lead = summarySelectableModels.slice(0, MOBILE_SUMMARY_MODEL_CHIP_LIMIT)
+    const selectedHidden = summarySelectableModels.filter(
+      (model) => selectedSummaryIds.includes(model.model_id) && !lead.some((item) => item.model_id === model.model_id),
+    )
+    return [...lead, ...selectedHidden]
+  }, [isSummaryModelChipsExpanded, selectedSummaryIds, summarySelectableModels])
+  const canExpandSummaryModelChips = summarySelectableModels.length > MOBILE_SUMMARY_MODEL_CHIP_LIMIT
+  const summaryVisibleStrategyOptions = useMemo(() => {
+    if (isSummaryStrategyExpanded || summaryStrategyOptions.length <= MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT) {
+      return summaryStrategyOptions
+    }
+    const lead = summaryStrategyOptions.slice(0, MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT)
+    const selectedHidden = summaryStrategyOptions.filter((item) => summaryStrategyFilters.includes(item) && !lead.includes(item))
+    return [...lead, ...selectedHidden]
+  }, [isSummaryStrategyExpanded, summaryStrategyFilters, summaryStrategyOptions])
+  const canExpandSummaryStrategyOptions = summaryStrategyOptions.length > MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT
+  const summaryHiddenModelChipCount = Math.max(0, summarySelectableModels.length - summaryVisibleModelChips.length)
+  const summaryHiddenStrategyChipCount = Math.max(0, summaryStrategyOptions.length - summaryVisibleStrategyOptions.length)
+  const mobileExportDisabled = isMobileExportDisabled()
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const historyHitTrend = useMemo(
     () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
@@ -826,6 +890,7 @@ export function HomePage() {
   }
 
   async function exportModelDetail(modelId: string) {
+    if (isMobileExportDisabled()) return
     if (exportingModelId || isExportingSummary) return
     if (!models.some((model) => model.model_id === modelId)) return
     setActiveActionMenuId(null)
@@ -857,6 +922,7 @@ export function HomePage() {
   }
 
   async function exportPredictionSummary() {
+    if (isMobileExportDisabled()) return
     if (isExportingSummary || exportingModelId || !canExportSummary) return
     setIsExportingSummary(true)
     try {
@@ -926,6 +992,7 @@ export function HomePage() {
         <div className="hero-panel__grid">
           <div className="hero-panel__main">
             <p className="hero-panel__eyebrow">Prediction Command Center</p>
+            <h2 className="hero-panel__title">{lotteryLabel}</h2>
             <div className="hero-switch" role="tablist" aria-label="彩种切换">
               {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
                 <button
@@ -940,7 +1007,6 @@ export function HomePage() {
                 </button>
               ))}
             </div>
-            <h2 className="hero-panel__title">{lotteryLabel}</h2>
             {/*<div className="hero-panel__lead">*/}
             {/*  <p>*/}
             {/*    <span>当前目标期</span>*/}
@@ -1077,6 +1143,7 @@ export function HomePage() {
                           onDetail={() => openModelDetail(model.model_id)}
                           onExport={() => exportModelDetail(model.model_id)}
                           isExporting={exportingModelId === model.model_id}
+                          hideExport={mobileExportDisabled}
                         />
                       ))
                     ) : (
@@ -1114,6 +1181,7 @@ export function HomePage() {
                     onDetail={openModelDetail}
                     onExport={exportModelDetail}
                     exportingModelId={exportingModelId}
+                    hideExport={mobileExportDisabled}
                   />
                 )}
               </StatusCard>
@@ -1124,44 +1192,106 @@ export function HomePage() {
                 title="预测统计"
                 // subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
-                  <div className="toolbar-inline prediction-summary-toolbar">
-                    <div className="prediction-summary-toolbar__group prediction-summary-toolbar__group--toggle">
-                      <label className="toggle-chip">
-                        <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
-                        <span>仅共同号码</span>
-                      </label>
-                    </div>
-                    <button
-                      className="icon-button prediction-summary__export-button prediction-summary-toolbar__export"
-                      onClick={exportPredictionSummary}
-                      aria-label="导出统计"
-                      title={isExportingSummary ? '导出中...' : '导出统计'}
-                      type="button"
-                      disabled={isExportingSummary || exportingModelId !== null || !canExportSummary}
-                    >
-                      <ExportIcon />
-                      <span>{isExportingSummary ? '导出中' : '导出'}</span>
-                    </button>
+                  <div className={clsx('toolbar-inline prediction-summary-toolbar', mobileExportDisabled && 'is-mobile-compact')}>
+                    {!mobileExportDisabled ? (
+                      <div className="prediction-summary-toolbar__group prediction-summary-toolbar__group--toggle">
+                        <button
+                          type="button"
+                          className={clsx('toggle-chip prediction-summary-toolbar__common-toggle', commonOnly && 'is-active')}
+                          onClick={() => setCommonOnly((value) => !value)}
+                          aria-pressed={commonOnly}
+                          aria-label={commonOnly ? '已启用仅共同号码' : '启用仅共同号码'}
+                          title={commonOnly ? '已启用仅共同号码' : '启用仅共同号码'}
+                        >
+                          <HomeCommonOnlyIcon />
+                          <span className="prediction-summary-toolbar__common-text">仅共同号码</span>
+                        </button>
+                      </div>
+                    ) : null}
+                    {mobileExportDisabled ? (
+                      <button
+                        type="button"
+                        className={clsx('toggle-chip prediction-summary-toolbar__common-toggle', commonOnly && 'is-active')}
+                        onClick={() => setCommonOnly((value) => !value)}
+                        aria-pressed={commonOnly}
+                        aria-label={commonOnly ? '已启用仅共同号码' : '启用仅共同号码'}
+                        title={commonOnly ? '已启用仅共同号码' : '启用仅共同号码'}
+                      >
+                        <HomeCommonOnlyIcon />
+                        <span className="prediction-summary-toolbar__common-text">仅共同号码</span>
+                      </button>
+                    ) : null}
+                    {!mobileExportDisabled ? (
+                      <button
+                        className="icon-button prediction-summary__export-button prediction-summary-toolbar__export"
+                        onClick={exportPredictionSummary}
+                        aria-label="导出统计"
+                        title={isExportingSummary ? '导出中...' : '导出统计'}
+                        type="button"
+                        disabled={isExportingSummary || exportingModelId !== null || !canExportSummary}
+                      >
+                        <ExportIcon />
+                        <span>{isExportingSummary ? '导出中' : '导出'}</span>
+                      </button>
+                    ) : null}
                   </div>
                 }
               >
-                <div className="filter-chip-group">
-                  {summarySelectableModels.map((model) => (
+                <div className={clsx('prediction-summary-model-filter', isSummaryModelChipsExpanded && 'is-expanded')}>
+                  <div className="filter-chip-group prediction-summary-model-filter__chips">
+                    {summaryVisibleModelChips.map((model) => (
+                      <button
+                        key={model.model_id}
+                        className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) ? 'is-active' : 'is-inactive')}
+                        onClick={() => toggleSummaryModel(model.model_id)}
+                        type="button"
+                      >
+                        {model.model_name}
+                      </button>
+                    ))}
+                  </div>
+                  {canExpandSummaryModelChips ? (
                     <button
-                      key={model.model_id}
-                      className={clsx('filter-chip', selectedSummaryIds.includes(model.model_id) ? 'is-active' : 'is-inactive')}
-                      onClick={() => toggleSummaryModel(model.model_id)}
+                      className="ghost-button ghost-button--compact prediction-summary-mobile-toggle"
+                      type="button"
+                      onClick={() => setIsSummaryModelChipsExpanded((value) => !value)}
+                      aria-expanded={isSummaryModelChipsExpanded}
+                      aria-label={isSummaryModelChipsExpanded ? '收起模型筛选' : `展开更多模型，剩余 ${summaryHiddenModelChipCount} 项`}
+                      title={isSummaryModelChipsExpanded ? '收起模型筛选' : `展开更多模型（+${summaryHiddenModelChipCount}）`}
                     >
-                      {model.model_name}
+                      <HomeChevronIcon open={isSummaryModelChipsExpanded} />
+                      {!isSummaryModelChipsExpanded && summaryHiddenModelChipCount > 0 ? (
+                        <span className="prediction-summary-mobile-toggle__badge">+{summaryHiddenModelChipCount}</span>
+                      ) : null}
                     </button>
-                  ))}
+                  ) : null}
                 </div>
                 {showDltStrategyFilters ? (
-                  <div className="history-strategy-filter">
-                    <span className="history-strategy-filter__label">方案筛选</span>
+                  <div className={clsx('history-strategy-filter prediction-summary-strategy-filter', isSummaryStrategyExpanded && 'is-expanded')}>
+                    <div className="prediction-summary-strategy-filter__header">
+                      <span className="history-strategy-filter__label">方案筛选</span>
+                      {canExpandSummaryStrategyOptions ? (
+                        <button
+                          className="ghost-button ghost-button--compact prediction-summary-mobile-toggle"
+                          type="button"
+                          onClick={() => setIsSummaryStrategyExpanded((value) => !value)}
+                          aria-expanded={isSummaryStrategyExpanded}
+                          aria-label={isSummaryStrategyExpanded ? '收起方案筛选' : `展开方案筛选，剩余 ${summaryHiddenStrategyChipCount} 项`}
+                          title={isSummaryStrategyExpanded ? '收起方案筛选' : `展开方案筛选（+${summaryHiddenStrategyChipCount}）`}
+                        >
+                          <HomeChevronIcon open={isSummaryStrategyExpanded} />
+                          {!isSummaryStrategyExpanded && summaryHiddenStrategyChipCount > 0 ? (
+                            <span className="prediction-summary-mobile-toggle__badge">+{summaryHiddenStrategyChipCount}</span>
+                          ) : null}
+                          {!isSummaryStrategyExpanded && summaryStrategyFilters.length ? (
+                            <span className="prediction-summary-mobile-toggle__badge prediction-summary-mobile-toggle__badge--active">{summaryStrategyFilters.length}</span>
+                          ) : null}
+                        </button>
+                      ) : null}
+                    </div>
                     {summaryStrategyOptions.length ? (
-                      <div className="filter-chip-group">
-                        {summaryStrategyOptions.map((strategy) => (
+                      <div className="filter-chip-group prediction-summary-strategy-filter__chips">
+                        {summaryVisibleStrategyOptions.map((strategy) => (
                           <button
                             key={`summary-strategy-${strategy}`}
                             className={clsx('filter-chip', summaryStrategyFilters.includes(strategy) && 'is-active')}
@@ -1352,6 +1482,7 @@ export function HomePage() {
                       strategyFilters={historyStrategyFilters}
                       playTypeFilters={historyPlayTypeFilters}
                       onShowExportToast={showExportToast}
+                      hideExport={mobileExportDisabled}
                     />
                   ))}
                 </div>
@@ -2442,6 +2573,7 @@ function ModelListCard({
   onDetail,
   onExport,
   isExporting,
+  hideExport,
 }: {
   model: PredictionModel
   score?: ModelScore
@@ -2453,6 +2585,7 @@ function ModelListCard({
   onDetail: () => void
   onExport: () => void
   isExporting: boolean
+  hideExport: boolean
 }) {
   return (
     <article className="model-list-card">
@@ -2476,16 +2609,18 @@ function ModelListCard({
           >
             <DetailIcon />
           </button>
-          <button
-            className="icon-button model-list-card__export-button"
-            onClick={onExport}
-            aria-label={`导出详情：${model.model_name}`}
-            title={isExporting ? '导出中...' : '导出详情'}
-            type="button"
-            disabled={isExporting}
-          >
-            <ExportIcon />
-          </button>
+          {!hideExport ? (
+            <button
+              className="icon-button model-list-card__export-button"
+              onClick={onExport}
+              aria-label={`导出详情：${model.model_name}`}
+              title={isExporting ? '导出中...' : '导出详情'}
+              type="button"
+              disabled={isExporting}
+            >
+              <ExportIcon />
+            </button>
+          ) : null}
           <div className="action-menu">
             <button
               className="icon-button"
@@ -2531,6 +2666,7 @@ function ModelListTable({
   onDetail,
   onExport,
   exportingModelId,
+  hideExport,
 }: {
   models: PredictionModel[]
   modelScores: ModelScoreMap
@@ -2542,6 +2678,7 @@ function ModelListTable({
   onDetail: (modelId: string) => void
   onExport: (modelId: string) => void
   exportingModelId: string | null
+  hideExport: boolean
 }) {
   if (!models.length) {
     return <div className="state-shell">没有符合当前筛选条件的模型。</div>
@@ -2594,16 +2731,18 @@ function ModelListTable({
                     >
                       <DetailIcon />
                     </button>
-                    <button
-                      className="icon-button home-model-list-table__export-button"
-                      onClick={() => onExport(model.model_id)}
-                      aria-label={`导出详情：${model.model_name}`}
-                      title={exportingModelId === model.model_id ? '导出中...' : '导出详情'}
-                      type="button"
-                      disabled={exportingModelId === model.model_id}
-                    >
-                      <ExportIcon />
-                    </button>
+                    {!hideExport ? (
+                      <button
+                        className="icon-button home-model-list-table__export-button"
+                        onClick={() => onExport(model.model_id)}
+                        aria-label={`导出详情：${model.model_name}`}
+                        title={exportingModelId === model.model_id ? '导出中...' : '导出详情'}
+                        type="button"
+                        disabled={exportingModelId === model.model_id}
+                      >
+                        <ExportIcon />
+                      </button>
+                    ) : null}
                     <div className="action-menu">
                       <button
                         className="icon-button home-model-list-table__menu-button"
@@ -3502,6 +3641,7 @@ function HistoryRecordCard({
   strategyFilters,
   playTypeFilters,
   onShowExportToast,
+  hideExport,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
@@ -3509,6 +3649,7 @@ function HistoryRecordCard({
   strategyFilters: string[]
   playTypeFilters: PredictionPlayType[]
   onShowExportToast: (message: string, tone: 'success' | 'error') => void
+  hideExport: boolean
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
@@ -3624,6 +3765,7 @@ function HistoryRecordCard({
   }
 
   async function exportHistoryRecord() {
+    if (isMobileExportDisabled()) return
     if (isExportingRecord) return
     setIsExportingRecord(true)
     try {
@@ -3659,16 +3801,18 @@ function HistoryRecordCard({
           <h3>开奖回溯</h3>
         </div>
         <div className="history-record-card__actions">
-          <button
-            type="button"
-            className="ghost-button ghost-button--compact history-record-card__bulk-toggle"
-            onClick={exportHistoryRecord}
-            aria-label={`导出开奖回溯：第 ${record.target_period} 期`}
-            title={isExportingRecord ? `导出中：第 ${record.target_period} 期` : `导出开奖回溯：第 ${record.target_period} 期`}
-            disabled={isExportingRecord}
-          >
-            导出
-          </button>
+          {!hideExport ? (
+            <button
+              type="button"
+              className="ghost-button ghost-button--compact history-record-card__bulk-toggle history-record-card__export-button"
+              onClick={exportHistoryRecord}
+              aria-label={`导出开奖回溯：第 ${record.target_period} 期`}
+              title={isExportingRecord ? `导出中：第 ${record.target_period} 期` : `导出开奖回溯：第 ${record.target_period} 期`}
+              disabled={isExportingRecord}
+            >
+              导出
+            </button>
+          ) : null}
           {allListModelModeKeys.length ? (
             <button
               type="button"
