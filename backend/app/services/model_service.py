@@ -280,12 +280,15 @@ class ModelService:
     def _build_openai_client(*, provider: str, base_url: str, api_key: str) -> OpenAI:
         normalized_provider = str(provider or "").strip().lower()
         normalized_base_url = base_url or (LMSTUDIO_BASE_URL if normalized_provider == "lmstudio" else "")
-        normalized_api_key = api_key or ("lm-studio" if normalized_provider == "lmstudio" else "")
         if not normalized_base_url:
             raise ValueError("Base URL cannot be empty")
-        if not normalized_api_key and normalized_provider != "lmstudio":
+        if not str(api_key or "").strip() and normalized_provider != "lmstudio":
             raise ValueError("API key cannot be empty")
-        return OpenAI(api_key=normalized_api_key, base_url=normalized_base_url)
+        return ModelFactory.build_openai_client(
+            provider=normalized_provider,
+            base_url=normalized_base_url,
+            api_key=api_key,
+        )
 
     @staticmethod
     def _build_model_code(provider_code: str, model_segment: str) -> str:
