@@ -1122,7 +1122,7 @@ export function HomePage() {
             <section ref={weightsSectionRef} data-section="weights" className="prediction-overview-section prediction-overview-section--summary">
               <StatusCard
                 title="预测统计"
-                subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
+                // subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
                   <div className="toolbar-inline prediction-summary-toolbar">
                     <div className="prediction-summary-toolbar__group prediction-summary-toolbar__group--toggle">
