@@ -2416,10 +2416,22 @@ export function SettingsPage() {
                       <span>当前显示 {maintenanceLogs.length} 条</span>
                     </div>
                     <div className="table-shell settings-model-table-shell">
-                      <table className="history-table settings-model-table settings-schedule-table">
+                      <table className="history-table settings-model-table settings-schedule-table settings-maintenance-log-table">
+                        <colgroup>
+                          <col className="settings-maintenance-log-table__col-started" />
+                          <col className="settings-maintenance-log-table__col-finished" />
+                          <col className="settings-maintenance-log-table__col-lottery" />
+                          <col className="settings-maintenance-log-table__col-task-type" />
+                          <col className="settings-maintenance-log-table__col-trigger" />
+                          <col className="settings-maintenance-log-table__col-status" />
+                          <col className="settings-maintenance-log-table__col-summary" />
+                          <col className="settings-maintenance-log-table__col-detail" />
+                          <col className="settings-maintenance-log-table__col-error" />
+                        </colgroup>
                         <thead>
                           <tr>
-                            <th>执行时间</th>
+                            <th>开始时间</th>
+                            <th>结束时间</th>
                             <th>彩种</th>
                             <th>任务类型</th>
                             <th>触发方式</th>
@@ -2432,7 +2444,7 @@ export function SettingsPage() {
                         <tbody>
                           {maintenanceLogsQuery.isLoading ? (
                             <tr>
-                              <td colSpan={8}>日志加载中...</td>
+                              <td colSpan={9}>日志加载中...</td>
                             </tr>
                           ) : maintenanceLogs.length ? (
                             maintenanceLogs.map((item: MaintenanceRunLog) => (
@@ -2446,10 +2458,8 @@ export function SettingsPage() {
                                   : item.latest_period || '-'
                                 return (
                                   <tr key={item.id}>
-                                    <td>
-                                      <strong>{formatDateTimeLocal(item.started_at || item.created_at)}</strong>
-                                      <span>{item.finished_at ? `结束：${formatDateTimeLocal(item.finished_at)}` : '-'}</span>
-                                    </td>
+                                    <td className="settings-maintenance-log-table__time">{formatDateTimeLocal(item.started_at || item.created_at)}</td>
+                                    <td className="settings-maintenance-log-table__time">{item.finished_at ? formatDateTimeLocal(item.finished_at) : '-'}</td>
                                     <td>{getLotteryLabel(item.lottery_code)}</td>
                                     <td>{getMaintenanceTaskTypeLabel(taskType)}</td>
                                     <td>{getMaintenanceTriggerLabel(item.trigger_type)}</td>
@@ -2459,15 +2469,17 @@ export function SettingsPage() {
                                       </span>
                                     </td>
                                     <td>{summaryText}</td>
-                                    <td>{detailText}</td>
-                                    <td>{item.error_message || '-'}</td>
+                                    <td className="settings-maintenance-log-table__detail">{detailText}</td>
+                                    <td className="settings-maintenance-log-table__error" title={item.error_message || undefined}>
+                                      <span>{item.error_message || '-'}</span>
+                                    </td>
                                   </tr>
                                 )
                               })()
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={8}>暂无日志</td>
+                              <td colSpan={9}>暂无日志</td>
                             </tr>
                           )}
                         </tbody>

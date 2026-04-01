@@ -5528,6 +5528,76 @@ a {
   min-width: 100%;
 }
 
+.settings-maintenance-log-table {
+  width: 100%;
+  min-width: 76rem;
+}
+
+.settings-maintenance-log-table__col-started,
+.settings-maintenance-log-table__col-finished {
+  width: 10.5rem;
+}
+
+.settings-maintenance-log-table__col-lottery {
+  width: 5rem;
+}
+
+.settings-maintenance-log-table__col-task-type,
+.settings-maintenance-log-table__col-trigger {
+  width: 6.25rem;
+}
+
+.settings-maintenance-log-table__col-status {
+  width: 6rem;
+}
+
+.settings-maintenance-log-table__col-summary {
+  width: 6.8rem;
+}
+
+.settings-maintenance-log-table__col-detail {
+  width: 12rem;
+}
+
+.settings-maintenance-log-table__col-error {
+  width: auto;
+}
+
+.settings-maintenance-log-table td,
+.settings-maintenance-log-table th {
+  white-space: nowrap;
+}
+
+.settings-maintenance-log-table__time,
+.settings-maintenance-log-table td:nth-child(3),
+.settings-maintenance-log-table td:nth-child(4),
+.settings-maintenance-log-table td:nth-child(5),
+.settings-maintenance-log-table td:nth-child(6),
+.settings-maintenance-log-table td:nth-child(7) {
+  white-space: nowrap;
+}
+
+.settings-maintenance-log-table__detail {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.settings-maintenance-log-table__error {
+  white-space: normal;
+  min-width: 19rem;
+  max-width: 44rem;
+}
+
+.settings-maintenance-log-table__error span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .settings-schedule-table--task-list th,
 .settings-schedule-table--task-list td,
 .settings-maintenance-table--task-list th,

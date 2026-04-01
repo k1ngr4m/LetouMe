@@ -678,6 +678,8 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '数据维护' }))
+    expect(screen.getByRole('columnheader', { name: '开始时间' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '结束时间' })).toBeInTheDocument()
     expect(screen.getByText('预测生成')).toBeInTheDocument()
     expect(screen.getByText('2 / 1 / 0')).toBeInTheDocument()
     expect(screen.getByText('历史重算 · 批量模型')).toBeInTheDocument()
