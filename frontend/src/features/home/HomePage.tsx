@@ -52,7 +52,6 @@ const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const LOTTERY_DEFAULT_PAGE_SIZE = 10
 const EXPORT_TOAST_DURATION_MS = 2000
 const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
-const MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT = 4
 const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
   { value: 'all', label: '全部评分' },
@@ -449,7 +448,6 @@ export function HomePage() {
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const [isSummaryModelChipsExpanded, setIsSummaryModelChipsExpanded] = useState(false)
-  const [isSummaryStrategyExpanded, setIsSummaryStrategyExpanded] = useState(false)
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
     () =>
       selectedLottery === 'pl3'
@@ -574,7 +572,6 @@ export function HomePage() {
     setSummaryStrategyFilters([])
     setHistoryStrategyFilters([])
     setIsSummaryModelChipsExpanded(false)
-    setIsSummaryStrategyExpanded(false)
   }, [selectedLottery])
 
   useEffect(() => {
@@ -584,7 +581,6 @@ export function HomePage() {
       setSummaryStrategyFilters([])
       setHistoryStrategyFilters([])
       setIsSummaryModelChipsExpanded(false)
-      setIsSummaryStrategyExpanded(false)
       return
     }
     if (selectedLottery === 'dlt') {
@@ -594,7 +590,6 @@ export function HomePage() {
       setSummaryStrategyFilters([])
       setHistoryStrategyFilters([])
       setIsSummaryModelChipsExpanded(false)
-      setIsSummaryStrategyExpanded(false)
       return
     }
     if (dltPredictionMode !== 'direct') {
@@ -736,12 +731,6 @@ export function HomePage() {
   }, [summaryStrategyOptions])
 
   useEffect(() => {
-    if (summaryStrategyOptions.length <= MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT && isSummaryStrategyExpanded) {
-      setIsSummaryStrategyExpanded(false)
-    }
-  }, [isSummaryStrategyExpanded, summaryStrategyOptions.length])
-
-  useEffect(() => {
     if (predictionsHistory.isFetching && !historyStrategyOptions.length) return
     setHistoryStrategyFilters((previous) => {
       const next = previous.filter((item) => historyStrategyOptions.includes(item))
@@ -789,17 +778,8 @@ export function HomePage() {
     return [...lead, ...selectedHidden]
   }, [isSummaryModelChipsExpanded, selectedSummaryIds, summarySelectableModels])
   const canExpandSummaryModelChips = summarySelectableModels.length > MOBILE_SUMMARY_MODEL_CHIP_LIMIT
-  const summaryVisibleStrategyOptions = useMemo(() => {
-    if (isSummaryStrategyExpanded || summaryStrategyOptions.length <= MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT) {
-      return summaryStrategyOptions
-    }
-    const lead = summaryStrategyOptions.slice(0, MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT)
-    const selectedHidden = summaryStrategyOptions.filter((item) => summaryStrategyFilters.includes(item) && !lead.includes(item))
-    return [...lead, ...selectedHidden]
-  }, [isSummaryStrategyExpanded, summaryStrategyFilters, summaryStrategyOptions])
-  const canExpandSummaryStrategyOptions = summaryStrategyOptions.length > MOBILE_SUMMARY_STRATEGY_CHIP_LIMIT
+  const summaryVisibleStrategyOptions = summaryStrategyOptions
   const summaryHiddenModelChipCount = Math.max(0, summarySelectableModels.length - summaryVisibleModelChips.length)
-  const summaryHiddenStrategyChipCount = Math.max(0, summaryStrategyOptions.length - summaryVisibleStrategyOptions.length)
   const mobileExportDisabled = isMobileExportDisabled()
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const historyHitTrend = useMemo(
@@ -1252,7 +1232,7 @@ export function HomePage() {
                   </div>
                   {canExpandSummaryModelChips ? (
                     <button
-                      className="ghost-button ghost-button--compact prediction-summary-mobile-toggle"
+                      className="ghost-button ghost-button--compact prediction-summary-mobile-toggle prediction-summary-mobile-toggle--icon-only"
                       type="button"
                       onClick={() => setIsSummaryModelChipsExpanded((value) => !value)}
                       aria-expanded={isSummaryModelChipsExpanded}
@@ -1267,27 +1247,9 @@ export function HomePage() {
                   ) : null}
                 </div>
                 {showDltStrategyFilters ? (
-                  <div className={clsx('history-strategy-filter prediction-summary-strategy-filter', isSummaryStrategyExpanded && 'is-expanded')}>
+                  <div className="history-strategy-filter prediction-summary-strategy-filter">
                     <div className="prediction-summary-strategy-filter__header">
                       <span className="history-strategy-filter__label">方案筛选</span>
-                      {canExpandSummaryStrategyOptions ? (
-                        <button
-                          className="ghost-button ghost-button--compact prediction-summary-mobile-toggle"
-                          type="button"
-                          onClick={() => setIsSummaryStrategyExpanded((value) => !value)}
-                          aria-expanded={isSummaryStrategyExpanded}
-                          aria-label={isSummaryStrategyExpanded ? '收起方案筛选' : `展开方案筛选，剩余 ${summaryHiddenStrategyChipCount} 项`}
-                          title={isSummaryStrategyExpanded ? '收起方案筛选' : `展开方案筛选（+${summaryHiddenStrategyChipCount}）`}
-                        >
-                          <HomeChevronIcon open={isSummaryStrategyExpanded} />
-                          {!isSummaryStrategyExpanded && summaryHiddenStrategyChipCount > 0 ? (
-                            <span className="prediction-summary-mobile-toggle__badge">+{summaryHiddenStrategyChipCount}</span>
-                          ) : null}
-                          {!isSummaryStrategyExpanded && summaryStrategyFilters.length ? (
-                            <span className="prediction-summary-mobile-toggle__badge prediction-summary-mobile-toggle__badge--active">{summaryStrategyFilters.length}</span>
-                          ) : null}
-                        </button>
-                      ) : null}
                     </div>
                     {summaryStrategyOptions.length ? (
                       <div className="filter-chip-group prediction-summary-strategy-filter__chips">

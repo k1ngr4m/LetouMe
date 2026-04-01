@@ -1605,6 +1605,26 @@ a {
   height: 0.92rem;
 }
 
+.prediction-summary-mobile-toggle--icon-only {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0;
+  border-radius: 0.62rem;
+  position: relative;
+  justify-self: start;
+  gap: 0;
+  border: 1px solid rgba(134, 166, 232, 0.22);
+  background: linear-gradient(180deg, rgba(66, 90, 132, 0.2), rgba(33, 47, 76, 0.28));
+  box-shadow: 0 6px 14px rgba(7, 12, 23, 0.22);
+}
+
+.prediction-summary-mobile-toggle--icon-only svg {
+  width: 0.84rem;
+  height: 0.84rem;
+}
+
 .prediction-summary-mobile-toggle__badge {
   min-width: 1.28rem;
   height: 1.28rem;
@@ -1619,6 +1639,18 @@ a {
   color: #f6f8ff;
   background: rgba(123, 156, 224, 0.28);
   border: 1px solid rgba(160, 188, 246, 0.28);
+}
+
+.prediction-summary-mobile-toggle--icon-only .prediction-summary-mobile-toggle__badge {
+  position: absolute;
+  right: -0.28rem;
+  top: -0.28rem;
+  min-width: 0.98rem;
+  height: 0.98rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  letter-spacing: 0;
 }
 
 .prediction-summary-mobile-toggle__badge--active {
@@ -7444,10 +7476,27 @@ a {
     font-size: 0.7rem;
   }
 
+  .prediction-summary-mobile-toggle--icon-only {
+    width: 1.78rem;
+    min-width: 1.78rem;
+    height: 1.78rem;
+    min-height: 1.78rem;
+    padding: 0;
+    border-radius: 0.58rem;
+  }
+
   .prediction-summary-mobile-toggle__badge {
     min-width: 1.18rem;
     height: 1.18rem;
     font-size: 0.62rem;
+  }
+
+  .prediction-summary-mobile-toggle--icon-only .prediction-summary-mobile-toggle__badge {
+    min-width: 0.92rem;
+    height: 0.92rem;
+    font-size: 0.54rem;
+    right: -0.24rem;
+    top: -0.24rem;
   }
 
   .prediction-summary-strategy-filter__header {
@@ -7878,6 +7927,22 @@ a {
 
   .score-inline-compact span:last-child {
     font-weight: 500;
+  }
+
+  .prediction-group-card.is-compact .prediction-group-card__header {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 0.24rem;
+  }
+
+  .prediction-group-card.is-compact .prediction-group-card__strategy {
+    order: 10;
+    flex: 0 0 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.28;
+    margin-top: 0.04rem;
   }
 
   .history-record-card__model-expand-indicator {
@@ -8371,6 +8436,22 @@ a {
     min-height: 1.72rem;
     padding: 0.18rem 0.52rem;
     font-size: 0.66rem;
+  }
+
+  .prediction-summary-mobile-toggle--icon-only {
+    width: 1.68rem;
+    min-width: 1.68rem;
+    height: 1.68rem;
+    min-height: 1.68rem;
+    border-radius: 0.52rem;
+  }
+
+  .prediction-summary-mobile-toggle--icon-only .prediction-summary-mobile-toggle__badge {
+    min-width: 0.86rem;
+    height: 0.86rem;
+    font-size: 0.52rem;
+    right: -0.2rem;
+    top: -0.2rem;
   }
 
   .my-bets-card__actions {
