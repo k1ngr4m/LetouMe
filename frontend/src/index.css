@@ -3835,9 +3835,9 @@ a {
 
 .history-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 0.7rem;
-  margin-bottom: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.56rem;
+  margin-bottom: 0.72rem;
 }
 
 .history-stat-card,
@@ -3849,7 +3849,15 @@ a {
 }
 
 .history-stat-card {
-  padding: 0.7rem 0.82rem;
+  position: relative;
+  padding: 0.58rem 0.64rem;
+  border-color: rgba(255, 255, 255, 0.058);
+  background: rgba(255, 255, 255, 0.018);
+  backdrop-filter: blur(4px);
+}
+
+.history-stat-card.is-menu-open {
+  z-index: 22;
 }
 
 .history-stat-card__header,
@@ -3864,8 +3872,8 @@ a {
 
 .history-stat-card__header {
   justify-content: space-between;
-  gap: 0.45rem;
-  margin-bottom: 0.45rem;
+  gap: 0.36rem;
+  margin-bottom: 0.36rem;
   align-items: center;
 }
 
@@ -3875,11 +3883,33 @@ a {
   line-height: 1.2;
 }
 
+.history-stat-card__header strong {
+  font-size: 1.02rem;
+}
+
+.history-stat-card__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.history-stat-card__score {
+  color: var(--text-1);
+  font-size: 0.96rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
 .history-stat-card__metrics,
 .history-record-card__summary,
 .history-record-card__detail-summary {
   color: var(--text-2);
   font-size: 0.84rem;
+}
+
+.history-stat-card__metrics--core {
+  gap: 0.32rem;
 }
 
 .history-record-card__summary,
@@ -3891,13 +3921,49 @@ a {
 .history-metric-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 1.56rem;
-  padding: 0.2rem 0.44rem;
+  min-height: 1.42rem;
+  padding: 0.16rem 0.42rem;
   border-radius: 999px;
   color: var(--text-2);
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.032);
+  border: 1px solid rgba(255, 255, 255, 0.048);
   line-height: 1.15;
+  font-size: 0.78rem;
+}
+
+.history-stat-card__more-button {
+  width: 1.72rem;
+  height: 1.72rem;
+  border-radius: 0.56rem;
+  border: 1px solid rgba(136, 166, 230, 0.18);
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.history-stat-card__menu {
+  position: relative;
+}
+
+.history-stat-card__menu-panel {
+  position: absolute;
+  top: calc(100% + 0.36rem);
+  right: 0;
+  z-index: 24;
+  min-width: 10.2rem;
+  max-width: min(15rem, calc(100vw - 1.6rem));
+  padding: 0.34rem;
+  border-radius: 0.76rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(12, 19, 31, 0.96), rgba(13, 20, 34, 0.94));
+  box-shadow: 0 14px 28px rgba(7, 12, 21, 0.32);
+  display: grid;
+  gap: 0.24rem;
+}
+
+.history-stat-card__menu-panel .history-metric-pill {
+  width: 100%;
+  min-height: 1.5rem;
+  justify-content: flex-start;
+  border-radius: 0.6rem;
 }
 
 .history-record-card__title-block {
@@ -7826,6 +7892,59 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .history-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.46rem;
+    margin-bottom: 0.62rem;
+  }
+
+  .history-stat-card {
+    padding: 0.5rem 0.52rem;
+    border-radius: 0.74rem;
+  }
+
+  .history-stat-card__header {
+    margin-bottom: 0.32rem;
+    align-items: flex-start;
+  }
+
+  .history-stat-card__header strong {
+    font-size: 0.92rem;
+    line-height: 1.18;
+  }
+
+  .history-stat-card__score {
+    font-size: 0.82rem;
+  }
+
+  .history-stat-card__more-button {
+    width: 1.54rem;
+    height: 1.54rem;
+    border-radius: 0.5rem;
+  }
+
+  .history-stat-card__metrics--core {
+    gap: 0.24rem;
+  }
+
+  .history-stat-card__metrics--core .history-metric-pill {
+    min-height: 1.3rem;
+    padding: 0.12rem 0.36rem;
+    font-size: 0.72rem;
+  }
+
+  .history-stat-card__menu-panel {
+    min-width: 8.8rem;
+    padding: 0.3rem;
+    border-radius: 0.64rem;
+    gap: 0.2rem;
+  }
+
+  .history-stat-card__menu-panel .history-metric-pill {
+    min-height: 1.36rem;
+    font-size: 0.7rem;
+  }
+
   .home-model-list-table__groups {
     gap: 0.35rem;
   }
@@ -8436,6 +8555,29 @@ a {
     min-height: 1.72rem;
     padding: 0.18rem 0.52rem;
     font-size: 0.66rem;
+  }
+
+  .history-stat-card__header strong {
+    font-size: 0.88rem;
+  }
+
+  .history-stat-card__score {
+    font-size: 0.76rem;
+  }
+
+  .history-stat-card__metrics--core .history-metric-pill {
+    min-height: 1.22rem;
+    padding: 0.1rem 0.32rem;
+    font-size: 0.68rem;
+  }
+
+  .history-stat-card__more-button {
+    width: 1.44rem;
+    height: 1.44rem;
+  }
+
+  .history-stat-card__menu-panel {
+    min-width: 8.3rem;
   }
 
   .prediction-summary-mobile-toggle--icon-only {

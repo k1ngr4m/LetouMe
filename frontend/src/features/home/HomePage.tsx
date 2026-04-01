@@ -438,6 +438,7 @@ export function HomePage() {
   const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
+  const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
   const [isExportingSummary, setIsExportingSummary] = useState(false)
   const [exportToast, setExportToast] = useState<ExportToastState>(null)
@@ -614,6 +615,29 @@ export function HomePage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!activeHistoryStatMenuId) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Element | null
+      if (target?.closest('.history-stat-card__menu')) return
+      setActiveHistoryStatMenuId(null)
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setActiveHistoryStatMenuId(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [activeHistoryStatMenuId])
 
   useEffect(() => {
     if (activeTab !== 'prediction') return
@@ -1414,21 +1438,44 @@ export function HomePage() {
             <div className="history-card-list">
               {historyModelStats.length ? (
                 <div className="history-stats-grid">
-                  {historyModelStats.map((item) => (
-                    <article key={item.model_id} className="history-stat-card">
+                  {historyModelStats.map((item) => {
+                    const isHistoryStatMenuOpen = activeHistoryStatMenuId === item.model_id
+                    const menuPanelId = `history-stat-card-menu-${item.model_id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+                    return (
+                    <article key={item.model_id} className={clsx('history-stat-card', isHistoryStatMenuOpen && 'is-menu-open')}>
                       <div className="history-stat-card__header">
                         <strong>{item.model_name}</strong>
-                        <span>综合分 {item.score_profile?.overall_score || 0}</span>
+                        <div className="history-stat-card__head-actions">
+                          <span className="history-stat-card__score">综合分 {item.score_profile?.overall_score || 0}</span>
+                          <div className={clsx('history-stat-card__menu', isHistoryStatMenuOpen && 'is-open')}>
+                            <button
+                              className="icon-button history-stat-card__more-button"
+                              type="button"
+                              aria-label={isHistoryStatMenuOpen ? `收起 ${item.model_name} 更多指标` : `展开 ${item.model_name} 更多指标`}
+                              title={isHistoryStatMenuOpen ? '收起更多指标' : '查看更多指标'}
+                              aria-expanded={isHistoryStatMenuOpen}
+                              aria-controls={menuPanelId}
+                              onClick={() => setActiveHistoryStatMenuId((currentId) => (currentId === item.model_id ? null : item.model_id))}
+                            >
+                              <MoreMenuIcon />
+                            </button>
+                            {isHistoryStatMenuOpen ? (
+                              <div id={menuPanelId} className="history-stat-card__menu-panel" role="menu" aria-label={`${item.model_name} 补充指标`}>
+                                <span className="history-metric-pill">按注 {item.score_profile?.per_bet_score || 0}</span>
+                                <span className="history-metric-pill">按期 {item.score_profile?.per_period_score || 0}</span>
+                                <span className="history-metric-pill">近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                      <div className="history-stat-card__metrics">
-                        <span className="history-metric-pill">按注 {item.score_profile?.per_bet_score || 0}</span>
-                        <span className="history-metric-pill">按期 {item.score_profile?.per_period_score || 0}</span>
+                      <div className="history-stat-card__metrics history-stat-card__metrics--core">
                         <span className="history-metric-pill">按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
                         <span className="history-metric-pill">按注中奖率 {formatPercent(item.win_rate_by_bet)}</span>
-                        <span className="history-metric-pill">近期/长期 {item.score_profile?.recent_score || 0}/{item.score_profile?.long_term_score || 0}</span>
                       </div>
                     </article>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : null}
               {!historyVisibleModels.length ? <div className="state-shell">当前筛选条件下没有可展示的模型。</div> : null}
