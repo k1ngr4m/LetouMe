@@ -2634,9 +2634,11 @@ function ModelListCard({
             </button>
             {isActionMenuOpen ? (
               <div className="action-menu__panel">
-                <button className="action-menu__item" type="button" onClick={onPin}>
-                  {isPinned ? '取消置顶' : '置顶'}
-                </button>
+                <div className="action-menu__group action-menu__group--secondary">
+                  <button className="action-menu__item" type="button" onClick={onPin}>
+                    {isPinned ? '取消置顶' : '置顶'}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -2736,22 +2738,26 @@ function ModelListTable({
                       </button>
                       {activeActionMenuId === model.model_id ? (
                         <div className="action-menu__panel">
-                          <button className="action-menu__item" type="button" onClick={() => onDetail(model.model_id)}>
-                            查看详情
-                          </button>
-                          {!hideExport ? (
-                            <button
-                              className="action-menu__item"
-                              type="button"
-                              onClick={() => onExport(model.model_id)}
-                              disabled={exportingModelId === model.model_id}
-                            >
-                              {exportingModelId === model.model_id ? '导出中...' : '导出详情'}
+                          <div className="action-menu__group action-menu__group--primary">
+                            <button className="action-menu__item" type="button" onClick={() => onDetail(model.model_id)}>
+                              查看详情
                             </button>
-                          ) : null}
-                          <button className="action-menu__item" type="button" onClick={() => onPin(model.model_id)}>
-                            {isPinned ? '取消置顶' : '置顶'}
-                          </button>
+                            {!hideExport ? (
+                              <button
+                                className="action-menu__item"
+                                type="button"
+                                onClick={() => onExport(model.model_id)}
+                                disabled={exportingModelId === model.model_id}
+                              >
+                                {exportingModelId === model.model_id ? '导出中...' : '导出详情'}
+                              </button>
+                            ) : null}
+                          </div>
+                          <div className="action-menu__group action-menu__group--secondary">
+                            <button className="action-menu__item" type="button" onClick={() => onPin(model.model_id)}>
+                              {isPinned ? '取消置顶' : '置顶'}
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                     </div>
