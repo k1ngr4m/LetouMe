@@ -4055,6 +4055,10 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.history-record-card__model-grid--summary {
+  margin-top: 0.4rem;
+}
+
 .history-record-card__model-expand-indicator {
   width: 1.9rem;
   min-height: 100%;
@@ -7904,9 +7908,31 @@ a {
   }
 
   .history-card-list__records,
-  .history-record-card__model-grid,
   .history-record-card__detail-rate-grid {
     grid-template-columns: 1fr;
+  }
+
+  .history-record-card__model-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.24rem;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell {
+    padding: 0.2rem 0.24rem;
+    border-radius: 0.62rem;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell small {
+    font-size: 0.64rem;
+    line-height: 1.05;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell strong {
+    white-space: nowrap;
+    font-size: 0.72rem;
+    line-height: 1.08;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .history-stats-grid {
@@ -8090,10 +8116,6 @@ a {
     min-height: 1.7rem;
     justify-content: flex-start;
     padding: 0 0.45rem;
-  }
-
-  .history-record-card__metric-cell strong {
-    white-space: normal;
   }
 
   .simulation-summary-bar__actions,
@@ -8599,6 +8621,18 @@ a {
 
   .history-stat-card__menu-panel {
     min-width: 8.3rem;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell {
+    padding: 0.16rem 0.2rem;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell small {
+    font-size: 0.6rem;
+  }
+
+  .history-record-card__model-grid .history-record-card__metric-cell strong {
+    font-size: 0.68rem;
   }
 
   .prediction-summary-mobile-toggle--icon-only {

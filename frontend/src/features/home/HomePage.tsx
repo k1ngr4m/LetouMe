@@ -4007,10 +4007,19 @@ function HistoryRecordCard({
                           </span>
                         </div>
                       </div>
-                      <div className="history-record-card__detail-summary">
-                        <span className="history-metric-pill">{filteredDetailBetCount} 注</span>
-                        <span className="history-metric-pill">成本 {formatCurrency(filteredDetailCostAmount)}</span>
-                        <span className="history-metric-pill">奖金 {formatCurrency(filteredDetailPrizeAmount)}</span>
+                      <div className="history-record-card__model-grid history-record-card__model-grid--summary">
+                        <span className="history-record-card__metric-cell">
+                          <small>注数</small>
+                          <strong>{filteredDetailBetCount}</strong>
+                        </span>
+                        <span className="history-record-card__metric-cell">
+                          <small>成本</small>
+                          <strong>{formatCurrency(filteredDetailCostAmount)}</strong>
+                        </span>
+                        <span className="history-record-card__metric-cell">
+                          <small>奖金</small>
+                          <strong>{formatCurrency(filteredDetailPrizeAmount)}</strong>
+                        </span>
                       </div>
                       <div className="detail-group-list">
                         {filteredDetailPredictions.map((group) => (
