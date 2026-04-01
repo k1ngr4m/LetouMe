@@ -84,7 +84,7 @@ export function HomeRulesPage() {
         <div className="panel-card__header">
           <div>
             <p className="modal-card__eyebrow">Game Rules</p>
-            <h2 className="panel-card__title">{isPl3 ? '排列3规则与奖金' : isPl5 ? '排列5规则与奖金' : '大乐透规则与奖金'}</h2>
+            <h2 className="panel-card__title">{isPl3 ? '排列3规则' : isPl5 ? '排列5规则' : '大乐透规则'}</h2>
           </div>
           <button className="ghost-button" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
             返回预测总览

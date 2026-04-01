@@ -1190,7 +1190,7 @@ describe('HomePage dashboard sidebar', () => {
   it('navigates to rules page from tab strip', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '规则与奖金' }))
+    await userEvent.click(screen.getByRole('button', { name: '规则' }))
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/rules')
   })

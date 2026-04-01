@@ -942,8 +942,11 @@ export function HomePage() {
           </div>
           <h2 className="hero-panel__title">{lotteryLabel}</h2>
           <p className="hero-panel__description">
-            当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>，下期开奖日{' '}
-            <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>。
+            当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>
+          </p>
+          <p className="hero-panel__description">
+            下期开奖日{' '}
+            <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
           </p>
         </div>
         <div className="hero-panel__summary" aria-label="当前预测摘要">
@@ -958,12 +961,10 @@ export function HomePage() {
           <article className="hero-panel__summary-card hero-panel__summary-card--status">
             <span>开奖状态</span>
             <strong>{actualResult ? '已开奖' : '待开奖'}</strong>
-            <small>{actualResult ? '已可查看命中结果' : '等待官方开奖结果'}</small>
           </article>
           <article className="hero-panel__summary-card hero-panel__summary-card--key">
             <span>模型覆盖</span>
             <strong>{models.length}</strong>
-            <small>当前参与预测的活跃模型</small>
           </article>
         </div>
       </section>

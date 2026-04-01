@@ -45,9 +45,9 @@ describe('HomeRulesPage', () => {
   it('renders dlt rules and prize references', () => {
     renderPage()
 
-    expect(screen.getByRole('heading', { name: '大乐透规则与奖金' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '大乐透规则' })).toBeInTheDocument()
     expect(document.querySelector('.tab-strip.dashboard-tab-strip')).not.toBeNull()
-    expect(screen.getByRole('button', { name: '规则与奖金' })).toHaveClass('is-active')
+    expect(screen.getByRole('button', { name: '规则' })).toHaveClass('is-active')
     expect(screen.getByTitle('中国体育彩票超级大乐透游戏规则')).toBeInTheDocument()
     expect(screen.getByAltText('大乐透奖金对照表')).toBeInTheDocument()
     expect(screen.getByText('规则切换说明')).toBeInTheDocument()

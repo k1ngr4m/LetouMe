@@ -6138,6 +6138,40 @@ a {
   gap: 1rem;
 }
 
+.my-bets-page .panel-card__header {
+  flex-direction: row;
+  align-items: center;
+}
+
+.my-bets-page .panel-card__actions {
+  margin-left: auto;
+}
+
+.my-bets-page__toolbar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.my-bets-page__toolbar-button {
+  width: 2.18rem;
+  height: 2.18rem;
+  min-height: 2.18rem;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.my-bets-page__toolbar-button--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #e46c40, #f1b24c);
+  box-shadow: 0 10px 22px rgba(241, 178, 76, 0.26);
+}
+
+.my-bets-page__toolbar-button--primary:hover {
+  transform: translateY(-1px);
+}
+
 .my-bets-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -6850,6 +6884,65 @@ a {
     padding: 1rem;
   }
 
+  .app-header {
+    margin-bottom: 0.8rem;
+    padding: 0.72rem 0.82rem;
+    border-radius: 1.08rem;
+    gap: 0.62rem;
+    align-items: flex-start;
+  }
+
+  .app-header__brand {
+    gap: 0.58rem;
+  }
+
+  .app-header__mark {
+    width: 2.36rem;
+    height: 2.36rem;
+    border-radius: 0.76rem;
+    font-size: 1.06rem;
+  }
+
+  .app-header__eyebrow {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+  }
+
+  .app-header__title {
+    margin: 0;
+    font-size: 0.96rem;
+    line-height: 1.16;
+  }
+
+  .app-nav {
+    width: 100%;
+    gap: 0.34rem;
+    align-items: center;
+  }
+
+  .app-nav__link,
+  .app-nav .ghost-button {
+    min-height: 2rem;
+    padding: 0.4rem 0.64rem;
+    font-size: 0.78rem;
+    border-radius: 999px;
+  }
+
+  .app-nav__theme-toggle {
+    width: 1.86rem;
+    height: 1.86rem;
+  }
+
+  .app-nav__meta {
+    max-width: 6.2rem;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding: 0.16rem 0.34rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .app-header,
   .hero-panel,
   .history-toolbar,
@@ -6960,12 +7053,13 @@ a {
   }
 
   .lottery-switch .chip-button {
-    min-height: 3.64rem;
-    padding: 0.56rem 0.58rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.68rem;
+    padding: 0.34rem 0.42rem;
     border-radius: 0.88rem;
     text-align: center;
-    justify-items: center;
-    align-content: center;
     gap: 0;
     border: 1px solid rgba(148, 178, 230, 0.26);
     background:
@@ -7002,8 +7096,8 @@ a {
   }
 
   .lottery-switch .chip-button__title {
-    font-size: 1rem;
-    line-height: 1.18;
+    font-size: 0.82rem;
+    line-height: 1.1;
     letter-spacing: 0.01em;
     text-align: center;
     width: 100%;
@@ -7117,7 +7211,29 @@ a {
 
   .hero-panel__summary {
     width: 100%;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.52rem;
+  }
+
+  .hero-panel__summary-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    min-height: 3.76rem;
+    padding: 0.66rem 0.68rem;
+    border-radius: 0.95rem;
+    gap: 0.2rem;
+  }
+
+  .hero-panel__summary-card span {
+    font-size: 0.72rem;
+  }
+
+  .hero-panel__summary-card strong,
+  .hero-panel__summary-card--key strong {
+    font-size: 0.86rem;
+    line-height: 1.16;
   }
 
   :root[data-theme='light'] .lottery-switch .chip-button {
@@ -7164,7 +7280,6 @@ a {
   .settings-grid-react,
   .form-grid,
   .settings-overview-grid,
-  .my-bets-summary-grid,
   .form-section__grid,
   .dashboard-layout,
   .settings-center-layout,
@@ -7178,6 +7293,33 @@ a {
     padding: 0.8rem;
   }
 
+  .my-bets-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .my-bets-page__toolbar {
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .my-bets-page__toolbar-button {
+    width: 1.96rem;
+    height: 1.96rem;
+    min-height: 1.96rem;
+  }
+
+  .my-bets-page .panel-card__header {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .my-bets-page .panel-card__actions {
+    width: auto;
+    margin-left: auto;
+  }
+
   .auth-hero-metrics,
   .auth-highlight-list {
     grid-template-columns: 1fr;
@@ -7189,8 +7331,23 @@ a {
   }
 
   .site-disclaimer {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.48rem;
+    padding: 0.72rem 0.82rem;
+  }
+
+  .site-disclaimer__badge {
+    padding: 0.28rem 0.56rem;
+    font-size: 0.66rem;
+  }
+
+  .site-disclaimer__text {
+    font-size: 0.86rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .simulation-ball-grid {
@@ -7279,6 +7436,22 @@ a {
   .my-bets-image-uploader__actions .ghost-button {
     width: 100%;
     justify-content: center;
+  }
+
+  .my-bets-card__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .my-bets-card__actions .ghost-button {
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.36rem 0.3rem;
+    font-size: 0.82rem;
+    gap: 0.24rem;
+    white-space: nowrap;
   }
 
   .my-bets-modal__footer .primary-button,
@@ -7514,13 +7687,95 @@ a {
     font-size: 1.5rem;
   }
 
+  .app-header {
+    padding: 0.62rem 0.68rem;
+    border-radius: 0.96rem;
+    gap: 0.52rem;
+  }
+
+  .app-header__mark {
+    width: 2.02rem;
+    height: 2.02rem;
+    border-radius: 0.66rem;
+    font-size: 0.94rem;
+  }
+
+  .app-header__eyebrow {
+    display: none;
+  }
+
+  .app-header__title {
+    font-size: 0.9rem;
+  }
+
+  .app-nav {
+    gap: 0.28rem;
+  }
+
+  .app-nav__link,
+  .app-nav .ghost-button {
+    min-height: 1.86rem;
+    padding: 0.36rem 0.54rem;
+    font-size: 0.72rem;
+  }
+
+  .app-nav__theme-toggle {
+    width: 1.74rem;
+    height: 1.74rem;
+  }
+
+  .app-nav__meta {
+    max-width: 4.8rem;
+    font-size: 0.72rem;
+    padding: 0.12rem 0.28rem;
+  }
+
+  .site-disclaimer {
+    gap: 0.42rem;
+    padding: 0.62rem 0.72rem;
+  }
+
+  .site-disclaimer__badge {
+    padding: 0.24rem 0.5rem;
+    font-size: 0.62rem;
+  }
+
+  .site-disclaimer__text {
+    font-size: 0.8rem;
+  }
+
+  .hero-panel__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.42rem;
+  }
+
+  .hero-panel__summary-card {
+    min-height: 3.34rem;
+    padding: 0.58rem 0.58rem;
+    border-radius: 0.86rem;
+  }
+
+  .hero-panel__summary-card span {
+    font-size: 0.64rem;
+  }
+
+  .hero-panel__summary-card strong,
+  .hero-panel__summary-card--key strong {
+    font-size: 0.78rem;
+  }
+
   .lottery-switch .chip-button {
-    min-height: 3.24rem;
-    padding: 0.48rem 0.52rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.24rem;
+    padding: 0.28rem 0.34rem;
   }
 
   .lottery-switch .chip-button__title {
-    font-size: 0.9rem;
+    font-size: 0.74rem;
+    line-height: 1.1;
+    text-align: center;
   }
 
   .lottery-switch .chip-button__meta {
@@ -7535,6 +7790,24 @@ a {
     min-height: 2.02rem;
     padding: 0.38rem 0.44rem;
     font-size: 0.66rem;
+  }
+
+  .my-bets-page__toolbar-button {
+    width: 1.78rem;
+    height: 1.78rem;
+    min-height: 1.78rem;
+  }
+
+  .my-bets-card__actions {
+    gap: 0.3rem;
+  }
+
+  .my-bets-card__actions .ghost-button {
+    min-height: 1.82rem;
+    padding: 0.3rem 0.22rem;
+    font-size: 0.72rem;
+    gap: 0.18rem;
+    border-radius: 0.85rem;
   }
 
   .dashboard-tab-strip {
@@ -7671,4 +7944,312 @@ a {
 
 .rules-page__prize-grid span {
   color: var(--text-secondary);
+}
+
+.app-shell {
+  padding-bottom: calc(7.2rem + env(safe-area-inset-bottom, 0px));
+}
+
+.dashboard-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(0.8rem, env(safe-area-inset-bottom, 0px));
+  margin-inline: auto;
+  z-index: 90;
+  width: min(95vw, 52rem);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.42rem;
+  border-radius: 1.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(152deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(18, 24, 39, 0.76);
+  box-shadow:
+    0 24px 44px rgba(6, 10, 18, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px);
+  isolation: isolate;
+  transition:
+    width 260ms var(--motion-ease-emphasized),
+    padding 260ms var(--motion-ease-emphasized),
+    border-color 220ms var(--motion-ease-standard),
+    background 220ms var(--motion-ease-standard),
+    box-shadow 260ms var(--motion-ease-emphasized),
+    backdrop-filter 220ms var(--motion-ease-standard),
+    transform 260ms var(--motion-ease-emphasized),
+    opacity 220ms var(--motion-ease-standard);
+}
+
+.dashboard-bottom-nav::before {
+  content: '';
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(123, 188, 255, 0.12), rgba(253, 200, 114, 0.46), rgba(123, 188, 255, 0.12));
+  box-shadow: 0 0 10px rgba(123, 188, 255, 0.24);
+  opacity: 0;
+  transition: opacity 220ms var(--motion-ease-standard);
+}
+
+.dashboard-bottom-nav__item {
+  position: relative;
+  min-height: 4rem;
+  padding: 0.5rem 0.36rem 0.72rem;
+  border-radius: 1.2rem;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.28rem;
+  color: color-mix(in srgb, var(--text-2) 92%, #d4deef 8%);
+  transition:
+    min-height 240ms var(--motion-ease-emphasized),
+    padding 240ms var(--motion-ease-emphasized),
+    background-color 220ms var(--motion-ease-standard),
+    color 220ms var(--motion-ease-standard),
+    box-shadow 220ms var(--motion-ease-standard),
+    opacity 180ms var(--motion-ease-standard),
+    transform 240ms var(--motion-ease-emphasized);
+}
+
+.dashboard-bottom-nav__item svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.dashboard-bottom-nav__item:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-bottom-nav__item.is-active {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dashboard-bottom-nav__item.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0.34rem;
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-1) 80%, #f6f9ff 20%);
+  transform: translateX(-50%);
+}
+
+.dashboard-bottom-nav__label {
+  font-size: 0.9rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  transition:
+    opacity 180ms var(--motion-ease-standard),
+    transform 220ms var(--motion-ease-emphasized),
+    max-height 220ms var(--motion-ease-emphasized),
+    margin 220ms var(--motion-ease-emphasized);
+}
+
+.dashboard-bottom-nav.is-compact {
+  width: min(84vw, 44rem);
+  padding: 0.28rem;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(152deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(15, 20, 34, 0.56);
+  box-shadow:
+    0 12px 24px rgba(6, 10, 18, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.dashboard-bottom-nav.is-compact .dashboard-bottom-nav__item {
+  min-height: 2.86rem;
+  padding: 0.24rem 0.16rem 0.2rem;
+}
+
+.dashboard-bottom-nav.is-compact .dashboard-bottom-nav__label {
+  opacity: 0;
+  transform: translateY(5px);
+  max-height: 0;
+  margin-top: -0.2rem;
+  overflow: hidden;
+}
+
+.dashboard-bottom-nav.is-reveal {
+  animation: dashboard-bottom-nav-rebound 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboard-bottom-nav.is-hidden-edge {
+  transform: translateY(calc(100% - 0.3rem));
+  border-color: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(152deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.006)),
+    rgba(11, 16, 28, 0.24);
+  box-shadow:
+    0 8px 16px rgba(6, 10, 18, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.dashboard-bottom-nav.is-hidden-edge::before {
+  opacity: 1;
+}
+
+.dashboard-bottom-nav.is-hidden-edge .dashboard-bottom-nav__item {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+@keyframes dashboard-bottom-nav-rebound {
+  0% {
+    transform: translateY(22px) scale(0.96);
+    opacity: 0.7;
+  }
+
+  64% {
+    transform: translateY(-4px) scale(1.01);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav {
+  border-color: rgba(135, 151, 176, 0.24);
+  background:
+    linear-gradient(154deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 255, 0.86)),
+    rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 18px 36px rgba(116, 132, 160, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav__item {
+  color: rgba(86, 95, 112, 0.84);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav__item:hover {
+  color: #1f2735;
+  background: rgba(110, 127, 163, 0.12);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav__item.is-active {
+  color: #11151f;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 8px 16px rgba(121, 138, 166, 0.18);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav__item.is-active::after {
+  background: rgba(48, 56, 74, 0.85);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav.is-compact {
+  border-color: rgba(135, 151, 176, 0.16);
+  background:
+    linear-gradient(154deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 255, 0.7)),
+    rgba(255, 255, 255, 0.64);
+  box-shadow:
+    0 10px 22px rgba(116, 132, 160, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+:root[data-theme='light'] .dashboard-bottom-nav.is-hidden-edge {
+  border-color: rgba(135, 151, 176, 0.14);
+  background:
+    linear-gradient(154deg, rgba(255, 255, 255, 0.58), rgba(248, 250, 255, 0.46)),
+    rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 7px 14px rgba(116, 132, 160, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dashboard-bottom-nav {
+    width: min(96vw, 44rem);
+  }
+
+  .dashboard-bottom-nav__item {
+    min-height: 3.66rem;
+    padding: 0.42rem 0.24rem 0.62rem;
+  }
+
+  .dashboard-bottom-nav__label {
+    font-size: 0.78rem;
+  }
+
+  .dashboard-bottom-nav.is-compact {
+    width: min(90vw, 36rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dashboard-bottom-nav {
+    width: min(98vw, 27rem);
+    gap: 0.1rem;
+    padding: 0.3rem;
+    border-radius: 1.25rem;
+  }
+
+  .dashboard-bottom-nav__item {
+    min-height: 3.32rem;
+    padding: 0.34rem 0.12rem 0.54rem;
+    border-radius: 0.96rem;
+    gap: 0.2rem;
+  }
+
+  .dashboard-bottom-nav__item svg {
+    width: 1.02rem;
+    height: 1.02rem;
+  }
+
+  .dashboard-bottom-nav__label {
+    font-size: 0.66rem;
+  }
+
+  .dashboard-bottom-nav.is-compact {
+    width: min(94vw, 24rem);
+    padding: 0.24rem;
+  }
+
+  .dashboard-bottom-nav.is-compact .dashboard-bottom-nav__item {
+    min-height: 2.72rem;
+    padding: 0.2rem 0.1rem 0.14rem;
+  }
+
+  .dashboard-bottom-nav.is-hidden-edge {
+    transform: translateY(calc(100% - 0.26rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-bottom-nav,
+  .dashboard-bottom-nav__item,
+  .dashboard-bottom-nav__label {
+    transition: none;
+  }
+
+  .dashboard-bottom-nav.is-reveal {
+    animation: none;
+  }
 }

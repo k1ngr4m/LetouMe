@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, ChevronDown, ChevronUp, Coins, Gift, ImageIcon, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronUp, ChevronsUpDown, Coins, Gift, ImageIcon, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -889,17 +889,27 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     <div className="page-section my-bets-page">
       <StatusCard
         title="我的投注"
-        subtitle="按当前账号和彩种隔离，支持手动录入、OCR识别、多注编辑和盈亏自动结算。"
         actions={
-          <div className="toolbar-inline">
+          <div className="toolbar-inline my-bets-page__toolbar">
             {hasRecords ? (
-              <button className="ghost-button" type="button" onClick={toggleAllRecordsExpanded}>
-                {allRecordsExpanded ? '全部收起' : '全部展开'}
+              <button
+                className={clsx('icon-button my-bets-page__toolbar-button', allRecordsExpanded && 'is-active')}
+                type="button"
+                onClick={toggleAllRecordsExpanded}
+                aria-label={allRecordsExpanded ? '全部收起' : '全部展开'}
+                title={allRecordsExpanded ? '全部收起' : '全部展开'}
+              >
+                <ChevronsUpDown size={16} aria-hidden="true" />
               </button>
             ) : null}
-            <button className="primary-button" type="button" onClick={() => openCreateModal()}>
+            <button
+              className="icon-button my-bets-page__toolbar-button my-bets-page__toolbar-button--primary"
+              type="button"
+              onClick={() => openCreateModal()}
+              aria-label="添加投注"
+              title="添加投注"
+            >
               <Plus size={16} aria-hidden="true" />
-              添加投注
             </button>
           </div>
         }
