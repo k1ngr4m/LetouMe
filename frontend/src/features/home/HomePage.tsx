@@ -922,50 +922,54 @@ export function HomePage() {
           <div className="export-toast__message">{exportToast.message}</div>
         </div>
       ) : null}
-      <section className="hero-panel">
-        <div className="hero-panel__copy">
-          <p className="hero-panel__eyebrow">Prediction Command Center</p>
-          <div className="lottery-switch" role="tablist" aria-label="彩种切换">
-            {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={clsx('chip-button', selectedLottery === code && 'is-active')}
-                onClick={() => setSelectedLottery(code)}
-                aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
-                aria-pressed={selectedLottery === code}
-              >
-                <span className="chip-button__title">{code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}</span>
-                <span className="chip-button__meta">{code === 'dlt' ? '支持普通、复式与胆拖预测' : code === 'pl3' ? '支持直选与和值预测' : '仅直选定位玩法'}</span>
-              </button>
-            ))}
+      <section className="hero-panel hero-panel--command">
+        <div className="hero-panel__grid">
+          <div className="hero-panel__main">
+            <p className="hero-panel__eyebrow">Prediction Command Center</p>
+            <div className="hero-switch" role="tablist" aria-label="彩种切换">
+              {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={clsx('hero-switch__item', selectedLottery === code && 'is-active')}
+                  onClick={() => setSelectedLottery(code)}
+                  aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                  aria-pressed={selectedLottery === code}
+                >
+                  {code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                </button>
+              ))}
+            </div>
+            <h2 className="hero-panel__title">{lotteryLabel}</h2>
+            <div className="hero-panel__lead">
+              <p>
+                <span>当前目标期</span>
+                <strong>{currentPredictions.data?.target_period || '-'}</strong>
+              </p>
+              <p>
+                <span>下期开奖日</span>
+                <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
+              </p>
+            </div>
           </div>
-          <h2 className="hero-panel__title">{lotteryLabel}</h2>
-          <p className="hero-panel__description">
-            当前目标期为 <strong>{currentPredictions.data?.target_period || '-'}</strong>
-          </p>
-          <p className="hero-panel__description">
-            下期开奖日{' '}
-            <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
-          </p>
-        </div>
-        <div className="hero-panel__summary" aria-label="当前预测摘要">
-          <article className="hero-panel__summary-card hero-panel__summary-card--key">
-            <span>目标期号</span>
-            <strong>{currentPredictions.data?.target_period || '-'}</strong>
-          </article>
-          <article className="hero-panel__summary-card">
-            <span>预测日期</span>
-            <strong>{currentPredictions.data?.prediction_date || '-'}</strong>
-          </article>
-          <article className="hero-panel__summary-card hero-panel__summary-card--status">
-            <span>开奖状态</span>
-            <strong>{actualResult ? '已开奖' : '待开奖'}</strong>
-          </article>
-          <article className="hero-panel__summary-card hero-panel__summary-card--key">
-            <span>模型覆盖</span>
-            <strong>{models.length}</strong>
-          </article>
+          <div className="hero-metrics" aria-label="当前预测摘要">
+            <article className="hero-metric-card hero-metric-card--primary">
+              <span>目标期号</span>
+              <strong>{currentPredictions.data?.target_period || '-'}</strong>
+            </article>
+            <article className="hero-metric-card hero-metric-card--primary">
+              <span>下期开奖日</span>
+              <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
+            </article>
+            <article className="hero-metric-card">
+              <span>预测日期</span>
+              <em>{currentPredictions.data?.prediction_date || '-'}</em>
+            </article>
+            <article className="hero-metric-card">
+              <span>开奖状态</span>
+              <em>{actualResult ? '已开奖' : '待开奖'}</em>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -992,7 +996,7 @@ export function HomePage() {
             <section ref={modelSectionRef} data-section="models" className="prediction-overview-section prediction-overview-section--models">
               <StatusCard
                 title="模型列表"
-                subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
+                // subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
                   <div className="toolbar-inline prediction-overview-toolbar">
                     {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
