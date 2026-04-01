@@ -17,10 +17,8 @@ export function HomeDashboardTabStrip({
   const navigate = useNavigate()
   const [isCompact, setIsCompact] = useState(false)
   const [isReveal, setIsReveal] = useState(false)
-  const [isEdgeHidden, setIsEdgeHidden] = useState(false)
   const compactRef = useRef(false)
   const revealRef = useRef(false)
-  const edgeHiddenRef = useRef(false)
   const revealTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -37,12 +35,6 @@ export function HomeDashboardTabStrip({
       if (revealRef.current === next) return
       revealRef.current = next
       setIsReveal(next)
-    }
-
-    const setEdgeHiddenState = (next: boolean) => {
-      if (edgeHiddenRef.current === next) return
-      edgeHiddenRef.current = next
-      setIsEdgeHidden(next)
     }
 
     const triggerReveal = () => {
@@ -62,22 +54,12 @@ export function HomeDashboardTabStrip({
       const isNearTop = currentScrollY < 56
 
       if (isNearTop) {
-        setEdgeHiddenState(false)
         setCompactState(false)
         setRevealState(false)
-      } else if (delta > 24 && currentScrollY > 180) {
-        setEdgeHiddenState(true)
-        setCompactState(true)
-        setRevealState(false)
-      } else if (delta > 8 && currentScrollY > 120 && !edgeHiddenRef.current) {
+      } else if (delta > 8 && currentScrollY > 120) {
         setCompactState(true)
         setRevealState(false)
       } else if (delta < -4) {
-        if (edgeHiddenRef.current) {
-          setEdgeHiddenState(false)
-          setCompactState(false)
-          triggerReveal()
-        } else
         if (compactRef.current) {
           setCompactState(false)
           triggerReveal()
@@ -153,7 +135,6 @@ export function HomeDashboardTabStrip({
         'tab-strip dashboard-tab-strip dashboard-bottom-nav',
         isCompact && 'is-compact',
         isReveal && 'is-reveal',
-        isEdgeHidden && 'is-hidden-edge',
       )}
       aria-label="主导航"
     >

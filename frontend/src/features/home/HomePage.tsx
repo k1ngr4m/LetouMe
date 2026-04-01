@@ -941,16 +941,16 @@ export function HomePage() {
               ))}
             </div>
             <h2 className="hero-panel__title">{lotteryLabel}</h2>
-            <div className="hero-panel__lead">
-              <p>
-                <span>当前目标期</span>
-                <strong>{currentPredictions.data?.target_period || '-'}</strong>
-              </p>
-              <p>
-                <span>下期开奖日</span>
-                <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
-              </p>
-            </div>
+            {/*<div className="hero-panel__lead">*/}
+            {/*  <p>*/}
+            {/*    <span>当前目标期</span>*/}
+            {/*    <strong>{currentPredictions.data?.target_period || '-'}</strong>*/}
+            {/*  </p>*/}
+            {/*  <p>*/}
+            {/*    <span>下期开奖日</span>*/}
+            {/*    <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>*/}
+            {/*  </p>*/}
+            {/*</div>*/}
           </div>
           <div className="hero-metrics" aria-label="当前预测摘要">
             <article className="hero-metric-card hero-metric-card--primary">
@@ -999,36 +999,41 @@ export function HomePage() {
                 // subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
                   <div className="toolbar-inline prediction-overview-toolbar">
-                    {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
-                    {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
-                    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
-                      <HomeIconButton
-                        label="列表视图"
-                        icon={<HomeListIcon />}
-                        active={modelListView === 'list'}
-                        onClick={() => setModelListView('list')}
-                      />
-                      <HomeIconButton
-                        label="卡片视图"
-                        icon={<HomeGridIcon />}
-                        active={modelListView === 'card'}
-                        onClick={() => setModelListView('card')}
-                      />
-                      <HomeIconButton
-                        label="评分视图"
-                        icon={<HomeScoreIcon />}
-                        active={modelListView === 'score'}
-                        onClick={() => setModelListView('score')}
-                      />
+                    <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--play">
+                      {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
+                      {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
+                    </div>
+                    <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--view">
+                      <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
+                        <HomeIconButton
+                          label="列表视图"
+                          icon={<HomeListIcon />}
+                          active={modelListView === 'list'}
+                          onClick={() => setModelListView('list')}
+                        />
+                        <HomeIconButton
+                          label="卡片视图"
+                          icon={<HomeGridIcon />}
+                          active={modelListView === 'card'}
+                          onClick={() => setModelListView('card')}
+                        />
+                        <HomeIconButton
+                          label="评分视图"
+                          icon={<HomeScoreIcon />}
+                          active={modelListView === 'score'}
+                          onClick={() => setModelListView('score')}
+                        />
+                      </div>
                     </div>
                     <button
-                      className={clsx('icon-button', isModelFilterOpen && 'is-active')}
+                      className={clsx('icon-button prediction-overview-toolbar__filter', isModelFilterOpen && 'is-active')}
                       onClick={() => setIsModelFilterOpen((value) => !value)}
                       aria-label="筛选"
                       title="筛选"
                       type="button"
                     >
                       <HomeFilterIcon />
+                      <span>筛选</span>
                     </button>
                   </div>
                 }
@@ -1120,12 +1125,14 @@ export function HomePage() {
                 subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
                   <div className="toolbar-inline prediction-summary-toolbar">
-                    <label className="toggle-chip">
-                      <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
-                      <span>仅共同号码</span>
-                    </label>
+                    <div className="prediction-summary-toolbar__group prediction-summary-toolbar__group--toggle">
+                      <label className="toggle-chip">
+                        <input type="checkbox" checked={commonOnly} onChange={(event) => setCommonOnly(event.target.checked)} />
+                        <span>仅共同号码</span>
+                      </label>
+                    </div>
                     <button
-                      className="icon-button prediction-summary__export-button"
+                      className="icon-button prediction-summary__export-button prediction-summary-toolbar__export"
                       onClick={exportPredictionSummary}
                       aria-label="导出统计"
                       title={isExportingSummary ? '导出中...' : '导出统计'}
@@ -1133,6 +1140,7 @@ export function HomePage() {
                       disabled={isExportingSummary || exportingModelId !== null || !canExportSummary}
                     >
                       <ExportIcon />
+                      <span>{isExportingSummary ? '导出中' : '导出'}</span>
                     </button>
                   </div>
                 }
