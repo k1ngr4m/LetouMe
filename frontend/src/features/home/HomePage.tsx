@@ -68,6 +68,22 @@ const HistoryHitTrendCard = lazy(() =>
 )
 const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ default: module.MyBetsPanel })))
 
+const MODEL_DETAIL_NAV_EXEMPT_SELECTOR = [
+  'button',
+  'a',
+  'input',
+  'select',
+  'textarea',
+  'label',
+  '[role="button"]',
+  '[data-detail-nav-exempt="true"]',
+].join(',')
+
+function canTriggerModelDetailNavigation(event: { target: EventTarget | null }) {
+  if (!(event.target instanceof Element)) return true
+  return !event.target.closest(MODEL_DETAIL_NAV_EXEMPT_SELECTOR)
+}
+
 function HomeSvgIcon({ children }: { children: ReactNode }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2603,13 +2619,19 @@ function ModelListCard({
   hideExport: boolean
 }) {
   return (
-    <article className="model-list-card">
+    <article
+      className="model-list-card model-list-card--clickable"
+      onClick={(event) => {
+        if (!canTriggerModelDetailNavigation(event)) return
+        onDetail()
+      }}
+    >
       <div className="model-list-card__header">
         <div>
           <p className="model-list-card__provider">{model.model_provider}</p>
           <h3>{model.model_name}</h3>
         </div>
-        <div className="model-list-card__actions">
+        <div className="model-list-card__actions" data-detail-nav-exempt="true">
           {isPinned ? (
             <span className="model-list-card__pin-indicator" aria-label="已置顶" title="已置顶">
               <PinIndicatorIcon />
@@ -2717,7 +2739,13 @@ function ModelListTable({
             const isActionMenuOpen = activeActionMenuId === model.model_id
             return (
               <tr key={model.model_id} className={clsx(isActionMenuOpen && 'is-menu-open')}>
-                <td>
+                <td
+                  className="home-model-list-table__cell--clickable"
+                  onClick={(event) => {
+                    if (!canTriggerModelDetailNavigation(event)) return
+                    onDetail(model.model_id)
+                  }}
+                >
                   <div className="home-model-list-table__title">
                     <button
                       className="home-model-list-table__model-link"
@@ -2732,7 +2760,13 @@ function ModelListTable({
                     <ModelScoreInlineCompact score={resolveModelScore(modelScores, model)} />
                   </div>
                 </td>
-                <td>
+                <td
+                  className="home-model-list-table__cell--clickable"
+                  onClick={(event) => {
+                    if (!canTriggerModelDetailNavigation(event)) return
+                    onDetail(model.model_id)
+                  }}
+                >
                   <div className="home-model-list-table__groups">
                     {model.predictions.map((group) => (
                       <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact showBetCostSummary />
@@ -3399,7 +3433,15 @@ function ModelScoreComparisonTable({
             const score = resolveModelScore(modelScores, model)
             const isPinned = validPinnedModelIds.includes(model.model_id)
             return (
-              <tr key={model.model_id}>
+              <tr
+                key={model.model_id}
+                className="score-view-table__row--clickable"
+                onClick={(event) => {
+                  if (event.target instanceof Element && event.target.closest('.score-view-table__col--actions')) return
+                  if (!canTriggerModelDetailNavigation(event)) return
+                  onDetail(model.model_id)
+                }}
+              >
                 <td>
                   <div className="score-view-table__model">
                     <button

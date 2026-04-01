@@ -1960,6 +1960,10 @@ a {
   box-shadow: 0 20px 44px rgba(8, 13, 24, 0.26);
 }
 
+.model-list-card--clickable {
+  cursor: pointer;
+}
+
 .model-list-card__header,
 .model-list-card__footer,
 .model-list-card__actions {
@@ -2432,6 +2436,10 @@ a {
   transform: translateY(-1px);
 }
 
+.home-model-list-table__cell--clickable {
+  cursor: pointer;
+}
+
 @media (min-width: 1480px) {
   .home-model-list-table__groups {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2567,6 +2575,10 @@ a {
 
 .score-view-table__detail-button {
   flex: 0 0 auto;
+}
+
+.score-view-table__row--clickable td:not(.score-view-table__col--actions) {
+  cursor: pointer;
 }
 
 .score-info-tooltip {

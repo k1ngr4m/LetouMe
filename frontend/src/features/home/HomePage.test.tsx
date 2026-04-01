@@ -1149,10 +1149,34 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(rowsAfterHover[0]).getByText('模型A')).toBeInTheDocument()
   })
 
-  it('navigates to model detail page when opening model detail', async () => {
+  it('navigates to model detail page when clicking list row data', async () => {
     renderPage()
 
-    await userEvent.click(screen.getAllByRole('button', { name: /查看详情：/ })[0])
+    const modelARow = screen.getByRole('button', { name: '查看详情：模型A' }).closest('tr')
+    expect(modelARow).not.toBeNull()
+    await userEvent.click(within(modelARow as HTMLElement).getByText('openai_compatible'))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('navigates to model detail page when clicking card data', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
+    await userEvent.click(screen.getByRole('heading', { name: '模型A' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('navigates to model detail page when clicking score row data', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '评分视图' }))
+    const modelARow = screen.getByText('openai_compatible').closest('tr')
+    expect(modelARow).not.toBeNull()
+    await userEvent.click(within(modelARow as HTMLElement).getByText('openai_compatible'))
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
