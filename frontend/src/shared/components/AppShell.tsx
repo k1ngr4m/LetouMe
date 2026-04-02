@@ -7,10 +7,8 @@ import {
   BookOpen,
   ChartColumnIncreasing,
   ChevronDown,
-  CheckSquare,
   CircleDollarSign,
   Gauge,
-  Grid2x2,
   History,
   LayoutGrid,
   LogOut,
@@ -47,7 +45,7 @@ const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
   { code: 'pl5', label: '排列5' },
 ]
 
-type PlaceholderPanelKey = 'messages' | 'todos' | 'apps' | null
+type PlaceholderPanelKey = 'messages' | null
 type SidebarPanelMode = 'workspace' | 'settings'
 
 function SidebarCollapseIcon() {
@@ -143,8 +141,6 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const placeholderPanelTitle = useMemo(() => {
     if (activePlaceholderPanel === 'messages') return '消息中心即将上线'
-    if (activePlaceholderPanel === 'todos') return '待办中心即将上线'
-    if (activePlaceholderPanel === 'apps') return '应用菜单即将上线'
     return ''
   }, [activePlaceholderPanel])
 
@@ -474,24 +470,6 @@ export function AppShell({ children }: PropsWithChildren) {
               onClick={() => openPlaceholderPanel('messages')}
             >
               <Bell size={16} aria-hidden="true" />
-            </button>
-            <button
-              className={clsx('crm-topbar__icon-btn', activePlaceholderPanel === 'todos' && 'is-active')}
-              type="button"
-              aria-label="待办中心"
-              title="待办中心"
-              onClick={() => openPlaceholderPanel('todos')}
-            >
-              <CheckSquare size={16} aria-hidden="true" />
-            </button>
-            <button
-              className={clsx('crm-topbar__icon-btn', activePlaceholderPanel === 'apps' && 'is-active')}
-              type="button"
-              aria-label="应用菜单"
-              title="应用菜单"
-              onClick={() => openPlaceholderPanel('apps')}
-            >
-              <Grid2x2 size={16} aria-hidden="true" />
             </button>
             {canOpenSettings ? (
               <div className="crm-topbar__settings-entry">
