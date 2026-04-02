@@ -10031,6 +10031,8 @@ a {
   --crm-card-bg: #ffffff;
   --crm-card-border: rgba(174, 189, 210, 0.42);
   --crm-card-shadow: 0 10px 30px rgba(46, 66, 98, 0.08);
+  --crm-sidebar-width-expanded: 160px;
+  --crm-sidebar-width-collapsed: 64px;
 }
 
 :root[data-theme='dark'] {
@@ -10047,8 +10049,9 @@ a {
   min-height: 100vh;
   padding: 0;
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
+  grid-template-columns: var(--crm-sidebar-width-expanded) minmax(0, 1fr);
   background: var(--crm-workspace-bg);
+  transition: grid-template-columns 220ms var(--motion-ease-standard);
 }
 
 .crm-sidebar {
@@ -10061,6 +10064,11 @@ a {
   border-right: 1px solid var(--crm-sidebar-border);
   color: var(--crm-sidebar-text);
   z-index: 55;
+  width: 100%;
+  transition:
+    width 220ms var(--motion-ease-standard),
+    padding 220ms var(--motion-ease-standard),
+    box-shadow 220ms var(--motion-ease-standard);
 }
 
 .crm-sidebar__brand {
@@ -10300,6 +10308,8 @@ a {
   margin-top: 0.84rem;
   padding-top: 0.7rem;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 0.42rem;
 }
 
 .crm-logout-btn {
@@ -10320,6 +10330,35 @@ a {
 }
 
 .crm-logout-btn span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crm-sidebar__collapse-btn {
+  width: 100%;
+  min-height: 2.14rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.62rem;
+  color: #deebfb;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+}
+
+.crm-sidebar__collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.crm-sidebar__collapse-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.crm-sidebar__collapse-btn span {
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -10516,6 +10555,57 @@ a {
   display: none;
 }
 
+@media (min-width: 1024px) {
+  .crm-shell.is-sidebar-collapsed {
+    grid-template-columns: var(--crm-sidebar-width-collapsed) minmax(0, 1fr);
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar {
+    position: sticky;
+    overflow-x: visible;
+    padding-inline: 0.3rem;
+    width: var(--crm-sidebar-width-collapsed);
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:hover {
+    width: var(--crm-sidebar-width-expanded);
+    padding-inline: 0.48rem;
+    box-shadow: 16px 0 32px rgba(6, 12, 22, 0.3);
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar__brand {
+    justify-content: center;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__brand-copy,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__group-title,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-lottery-picker__label,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item span,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-submenu,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back span,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn span,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn span {
+    opacity: 0;
+    width: 0;
+    pointer-events: none;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn {
+    justify-content: center;
+    padding-inline: 0.34rem;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item svg,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back svg,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn svg,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn svg {
+    margin: 0;
+  }
+}
+
 @media (max-width: 1023px) {
   .crm-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -10543,6 +10633,10 @@ a {
 
   .crm-topbar__menu-btn {
     display: grid;
+  }
+
+  .crm-sidebar__collapse-btn {
+    display: none;
   }
 }
 

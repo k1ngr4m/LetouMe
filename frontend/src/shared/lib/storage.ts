@@ -5,6 +5,7 @@ const SELECTED_LOTTERY_KEY = 'letoumeSelectedLottery'
 const THEME_PREFERENCE_KEY = 'letoumeThemePreference'
 const MOTION_PREFERENCE_KEY = 'letoumeMotionPreference'
 const SETTINGS_TABLE_WIDTHS_KEY_PREFIX = 'letoumeSettingsTableWidths'
+const SIDEBAR_COLLAPSE_PREFERENCE_KEY = 'letoumeSidebarCollapsed'
 
 export function loadPinnedModels(lotteryCode: LotteryCode = 'dlt') {
   try {
@@ -96,6 +97,22 @@ export function loadSettingsTableColumnWidths(tableKey: string): Record<string, 
 export function saveSettingsTableColumnWidths(tableKey: string, widths: Record<string, number>) {
   try {
     window.localStorage.setItem(`${SETTINGS_TABLE_WIDTHS_KEY_PREFIX}:${tableKey}`, JSON.stringify(widths))
+  } catch {
+    // Ignore persistence failures in unsupported environments.
+  }
+}
+
+export function loadSidebarCollapsePreference() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSE_PREFERENCE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveSidebarCollapsePreference(isCollapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSE_PREFERENCE_KEY, isCollapsed ? '1' : '0')
   } catch {
     // Ignore persistence failures in unsupported environments.
   }

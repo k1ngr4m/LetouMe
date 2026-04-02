@@ -13,7 +13,6 @@ import {
   Grid2x2,
   History,
   LayoutGrid,
-  LogOut,
   Menu,
   Settings2,
   Sparkles,
@@ -28,6 +27,7 @@ import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
+import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import type { LotteryCode } from '../types/api'
 
 const SETTINGS_PATHS = {
@@ -47,15 +47,27 @@ const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
 type PlaceholderPanelKey = 'messages' | 'todos' | 'apps' | null
 type SidebarPanelMode = 'workspace' | 'settings'
 
+function SidebarCollapseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6h12" />
+      <path d="M4 12h12" />
+      <path d="M4 18h12" />
+      <path d="m18 12 3-2.5v5L18 12Z" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
   const { selectedLottery, setSelectedLottery } = useLotterySelection()
-  const { user, logout, hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [activePlaceholderPanel, setActivePlaceholderPanel] = useState<PlaceholderPanelKey>(null)
   const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
   const lotteryMenuRef = useRef<HTMLDivElement | null>(null)
 
   const canOpenSettings = hasPermission('basic_profile')
@@ -103,6 +115,10 @@ export function AppShell({ children }: PropsWithChildren) {
   const onNavigate = () => {
     setIsSidebarOpen(false)
   }
+
+  useEffect(() => {
+    saveSidebarCollapsePreference(isSidebarCollapsed)
+  }, [isSidebarCollapsed])
 
   useEffect(() => {
     if (!canOpenSettings) {
@@ -175,8 +191,12 @@ export function AppShell({ children }: PropsWithChildren) {
     setActivePlaceholderPanel((current) => (current === panel ? null : panel))
   }
 
+  function toggleSidebarCollapsed() {
+    setIsSidebarCollapsed((current) => !current)
+  }
+
   return (
-    <div className="app-shell crm-shell">
+    <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed')}>
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
         <div className="crm-sidebar__brand">
           <span className="crm-sidebar__brand-mark">L</span>
@@ -314,9 +334,15 @@ export function AppShell({ children }: PropsWithChildren) {
         </nav>
 
         <div className="crm-sidebar__footer">
-          <button className="crm-logout-btn" type="button" title="退出登录" onClick={() => void logout().then(() => navigate('/login', { replace: true }))}>
-            <LogOut size={16} aria-hidden="true" />
-            <span>退出登录</span>
+          <button
+            className="crm-sidebar__collapse-btn"
+            type="button"
+            title={isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            aria-label={isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            aria-pressed={isSidebarCollapsed}
+            onClick={toggleSidebarCollapsed}
+          >
+            <SidebarCollapseIcon />
           </button>
         </div>
       </aside>
