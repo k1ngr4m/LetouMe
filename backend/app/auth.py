@@ -223,8 +223,13 @@ class AuthService:
             purpose=PASSWORD_RESET_EMAIL_PURPOSE,
         )
         if latest_code:
-            created_at = _to_datetime(latest_code.get("created_at"))
-            if created_at and created_at + timedelta(seconds=self.settings.auth_email_code_cooldown_seconds) > datetime.utcnow():
+            expires_at = _to_datetime(latest_code.get("expires_at"))
+            sent_at = (
+                expires_at - timedelta(minutes=self.settings.auth_email_code_expire_minutes)
+                if expires_at
+                else None
+            )
+            if sent_at and sent_at + timedelta(seconds=self.settings.auth_email_code_cooldown_seconds) > datetime.utcnow():
                 raise ValueError("验证码发送过于频繁，请稍后再试")
 
         code = "".join(secrets.choice(string.digits) for _ in range(6))
