@@ -1928,6 +1928,15 @@ export function SettingsPage() {
     navigate('/login', { replace: true })
   }
 
+  function submitProfileName() {
+    if (!profileNickname.trim()) {
+      setMessage('昵称不能为空')
+      setMessageType('error')
+      return
+    }
+    profileMutation.mutate()
+  }
+
   return (
     <div className="page-stack">
       {message ? <div className={clsx('banner-message', messageType === 'error' && 'is-error')}>{message}</div> : null}
@@ -1968,12 +1977,8 @@ export function SettingsPage() {
                     </button>
                   </div>
 
-                  <form
+                  <div
                     className="settings-split-row"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      profileMutation.mutate()
-                    }}
                   >
                     <div className="settings-split-row__main">
                       <h3>姓名</h3>
@@ -1985,10 +1990,16 @@ export function SettingsPage() {
                           className="settings-split-input"
                           value={profileNickname}
                           onChange={(event) => setProfileNickname(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              submitProfileName()
+                            }
+                          }}
                           aria-label="昵称"
                           required
                         />
-                        <button className="primary-button settings-split-row__action" type="submit" disabled={profileMutation.isPending}>
+                        <button className="primary-button settings-split-row__action" type="button" disabled={profileMutation.isPending} onClick={submitProfileName}>
                           保存
                         </button>
                         <button
@@ -2015,7 +2026,7 @@ export function SettingsPage() {
                         </button>
                       </div>
                     )}
-                  </form>
+                  </div>
 
                   <div className="settings-split-row">
                     <div className="settings-split-row__main">
