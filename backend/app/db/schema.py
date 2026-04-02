@@ -280,6 +280,7 @@ SCHEMA_STATEMENTS = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(128) NOT NULL UNIQUE,
         nickname VARCHAR(128) NULL,
+        avatar_url VARCHAR(1024) NULL,
         password_hash VARCHAR(255) NOT NULL,
         role_id BIGINT NOT NULL,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -847,6 +848,7 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "app_user": {
         "nickname": "ALTER TABLE app_user ADD COLUMN nickname VARCHAR(128) NULL AFTER username",
+        "avatar_url": "ALTER TABLE app_user ADD COLUMN avatar_url VARCHAR(1024) NULL AFTER nickname",
         "role_id": (
             "ALTER TABLE app_user "
             "ADD COLUMN role_id BIGINT NULL AFTER role, "

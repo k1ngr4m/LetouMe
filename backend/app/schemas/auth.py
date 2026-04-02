@@ -17,6 +17,7 @@ class AuthUserResponse(BaseModel):
     id: int
     username: str
     nickname: str
+    avatar_url: str | None = None
     role: str
     role_name: str
     is_active: bool

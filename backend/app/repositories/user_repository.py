@@ -57,6 +57,7 @@ class UserRepository:
                         au.id,
                         au.username,
                         au.nickname,
+                        au.avatar_url,
                         ar.role_code AS role,
                         ar.role_name AS role_name,
                         au.is_active,
@@ -101,6 +102,21 @@ class UserRepository:
                     WHERE id = ?
                     """,
                     (nickname, user_id),
+                )
+                if cursor.rowcount == 0:
+                    raise KeyError(user_id)
+        return self.get_user_by_id(user_id) or {}
+
+    def update_avatar_url(self, user_id: int, *, avatar_url: str) -> dict[str, Any]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE app_user
+                    SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (avatar_url, user_id),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(user_id)
@@ -172,6 +188,7 @@ class UserRepository:
                         au.id,
                         au.username,
                         au.nickname,
+                        au.avatar_url,
                         au.password_hash,
                         ar.role_code AS role,
                         ar.role_name AS role_name,
@@ -219,6 +236,7 @@ class UserRepository:
                         au.id,
                         au.username,
                         au.nickname,
+                        au.avatar_url,
                         au.password_hash,
                         ar.role_code AS role,
                         ar.role_name AS role_name,

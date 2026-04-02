@@ -710,6 +710,7 @@ export type AuthUser = {
   id: number
   username: string
   nickname: string
+  avatar_url?: string | null
   role: string
   role_name: string
   is_active: boolean

@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
+import { UserAvatar } from './UserAvatar'
 import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
@@ -518,6 +519,7 @@ export function AppShell({ children }: PropsWithChildren) {
                 aria-haspopup="menu"
                 onClick={() => setIsUserMenuOpen((current) => !current)}
               >
+                <UserAvatar avatarUrl={user?.avatar_url} displayName={displayName} className="crm-topbar__user-avatar" />
                 <span>{displayName}</span>
                 <ChevronDown size={14} aria-hidden="true" />
               </button>

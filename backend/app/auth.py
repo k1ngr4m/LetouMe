@@ -198,6 +198,13 @@ class AuthService:
         updated = self.repository.update_profile(user_id, nickname=normalized_nickname)
         return self._serialize_user(updated)
 
+    def update_profile_avatar(self, user_id: int, avatar_url: str) -> dict[str, Any]:
+        normalized_avatar_url = avatar_url.strip()
+        if not normalized_avatar_url:
+            raise ValueError("头像地址不能为空")
+        updated = self.repository.update_avatar_url(user_id, avatar_url=normalized_avatar_url)
+        return self._serialize_user(updated)
+
     def change_password(self, user_id: int, current_password: str, new_password: str) -> None:
         user = self.repository.get_user_by_id(user_id)
         if not user:
@@ -245,6 +252,7 @@ class AuthService:
             "id": int(user["id"]),
             "username": str(user["username"]),
             "nickname": str(user.get("nickname") or user["username"]),
+            "avatar_url": str(user["avatar_url"]) if user.get("avatar_url") else None,
             "role": str(user["role"]),
             "role_name": str(user.get("role_name") or user["role"]),
             "is_active": bool(user["is_active"]),

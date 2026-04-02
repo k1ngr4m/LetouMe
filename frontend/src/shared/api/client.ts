@@ -168,6 +168,11 @@ export const apiClient = {
       body: JSON.stringify(payload),
     })
   },
+  uploadProfileAvatar(image: File) {
+    const formData = new FormData()
+    formData.set('image', image)
+    return requestFormData<CurrentUserResponse>('/api/settings/profile/avatar/upload', formData)
+  },
   changePassword(payload: PasswordChangePayload) {
     return requestJson<CurrentUserResponse>('/api/settings/profile/password', {
       method: 'POST',

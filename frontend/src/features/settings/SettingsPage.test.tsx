@@ -15,6 +15,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     listRoles: vi.fn(),
     listPermissions: vi.fn(),
     updateProfile: vi.fn(),
+    uploadProfileAvatar: vi.fn(),
     changePassword: vi.fn(),
     createSettingsModel: vi.fn(),
     updateSettingsModel: vi.fn(),
@@ -317,6 +318,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByLabelText('昵称')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
+    expect(screen.getByText('支持 JPG、PNG 格式，最大 4.5MB')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '更换' })).toBeEnabled()
   })
 
   it('renders account management sections and can expand password form', async () => {

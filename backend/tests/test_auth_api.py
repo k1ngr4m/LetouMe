@@ -138,6 +138,45 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(updated["permission_name"], "基础资料")
         self.assertEqual(updated["permission_description"], "允许用户查看账号信息并修改昵称与密码。")
 
+    def test_upload_profile_avatar_updates_current_user(self) -> None:
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+
+        with patch("backend.app.api.routes.profile_avatar_service.upload_profile_avatar", return_value="https://img.example/avatar.jpg"):
+            response = self.client.post(
+                "/api/settings/profile/avatar/upload",
+                files={"image": ("avatar.png", b"mock-image-content", "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["avatar_url"], "https://img.example/avatar.jpg")
+
+        me_response = self.client.post("/api/auth/me", json={})
+        self.assertEqual(me_response.status_code, 200)
+        self.assertEqual(me_response.json()["user"]["avatar_url"], "https://img.example/avatar.jpg")
+
+    def test_upload_profile_avatar_rejects_invalid_format(self) -> None:
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+
+        response = self.client.post(
+            "/api/settings/profile/avatar/upload",
+            files={"image": ("avatar.gif", b"gif89a", "image/gif")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("JPG、PNG", response.json()["detail"])
+
+    def test_upload_profile_avatar_rejects_oversized_file(self) -> None:
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+
+        oversized_payload = b"a" * (4 * 1024 * 1024 + 512 * 1024 + 1)
+        response = self.client.post(
+            "/api/settings/profile/avatar/upload",
+            files={"image": ("avatar.jpg", oversized_payload, "image/jpeg")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("4.5MB", response.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

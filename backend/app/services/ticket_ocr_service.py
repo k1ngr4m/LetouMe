@@ -65,6 +65,10 @@ class TicketOCRService:
         image_url = self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code=normalized_code)
         return {"lottery_code": normalized_code, "ticket_image_url": image_url}
 
+    def upload_profile_avatar(self, *, image_bytes: bytes, filename: str) -> str:
+        self._validate_imgloc_settings()
+        return self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code="profile")
+
     def _validate_baidu_settings(self) -> None:
         if not self.settings.baidu_ocr_api_key or not self.settings.baidu_ocr_secret_key:
             raise ValueError("未配置百度 OCR 密钥")

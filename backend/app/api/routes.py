@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 
 from backend.app.auth import (
@@ -107,6 +109,7 @@ from backend.app.services.prediction_service import PredictionService
 from backend.app.services.schedule_service import schedule_service
 from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.simulation_ticket_service import SimulationTicketService
+from backend.app.services.ticket_ocr_service import TicketOCRService
 
 
 router = APIRouter(prefix="/api")
@@ -116,6 +119,26 @@ model_service = ModelService()
 prediction_generation_service = PredictionGenerationService()
 simulation_ticket_service = SimulationTicketService()
 my_bet_service = MyBetService()
+profile_avatar_service = TicketOCRService()
+
+PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
+PROFILE_AVATAR_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+PROFILE_AVATAR_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
+
+
+def _validate_profile_avatar_upload(*, image: UploadFile, image_bytes: bytes) -> str:
+    if not image_bytes:
+        raise ValueError("图片不能为空")
+    if len(image_bytes) > PROFILE_AVATAR_MAX_SIZE_BYTES:
+        raise ValueError("头像图片大小不能超过 4.5MB")
+    filename = str(image.filename or "avatar.jpg")
+    extension = Path(filename).suffix.lower()
+    if extension not in PROFILE_AVATAR_ALLOWED_EXTENSIONS:
+        raise ValueError("头像仅支持 JPG、PNG 格式")
+    content_type = (image.content_type or "").split(";", 1)[0].strip().lower()
+    if content_type and content_type not in PROFILE_AVATAR_ALLOWED_CONTENT_TYPES:
+        raise ValueError("头像仅支持 JPG、PNG 格式")
+    return filename
 
 
 @router.post("/auth/login", response_model=CurrentUserResponse)
@@ -324,6 +347,21 @@ def update_profile(
 ) -> dict:
     try:
         return {"user": auth_service.update_profile(int(current_user["id"]), payload.nickname)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/profile/avatar/upload", response_model=CurrentUserResponse)
+async def upload_profile_avatar(
+    image: UploadFile = File(...),
+    current_user: dict = Depends(require_basic_profile_permission),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        image_bytes = await image.read()
+        filename = _validate_profile_avatar_upload(image=image, image_bytes=image_bytes)
+        avatar_url = profile_avatar_service.upload_profile_avatar(image_bytes=image_bytes, filename=filename)
+        return {"user": auth_service.update_profile_avatar(int(current_user["id"]), avatar_url)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
