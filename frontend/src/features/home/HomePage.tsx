@@ -223,11 +223,11 @@ function Pl3PredictionModeSwitch({
   onChange: (value: 'direct' | 'direct_sum') => void
 }) {
   return (
-    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="排列3玩法切换">
-      <button className={clsx('tab-strip__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
+    <div className="view-switch settings-model-toolbar__view-switch play-mode-switch play-mode-switch--prediction" role="tablist" aria-label="排列3玩法切换">
+      <button className={clsx('tab-strip__item', 'play-mode-switch__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
         直选
       </button>
-      <button className={clsx('tab-strip__item', value === 'direct_sum' && 'is-active')} type="button" onClick={() => onChange('direct_sum')}>
+      <button className={clsx('tab-strip__item', 'play-mode-switch__item', value === 'direct_sum' && 'is-active')} type="button" onClick={() => onChange('direct_sum')}>
         和值
       </button>
     </div>
@@ -242,14 +242,14 @@ function DltPredictionModeSwitch({
   onChange: (value: 'direct' | 'compound' | 'dantuo') => void
 }) {
   return (
-    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="大乐透玩法切换">
-      <button className={clsx('tab-strip__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
+    <div className="view-switch settings-model-toolbar__view-switch play-mode-switch play-mode-switch--prediction" role="tablist" aria-label="大乐透玩法切换">
+      <button className={clsx('tab-strip__item', 'play-mode-switch__item', value === 'direct' && 'is-active')} type="button" onClick={() => onChange('direct')}>
         普通
       </button>
-      <button className={clsx('tab-strip__item', value === 'compound' && 'is-active')} type="button" onClick={() => onChange('compound')}>
+      <button className={clsx('tab-strip__item', 'play-mode-switch__item', value === 'compound' && 'is-active')} type="button" onClick={() => onChange('compound')}>
         复式
       </button>
-      <button className={clsx('tab-strip__item', value === 'dantuo' && 'is-active')} type="button" onClick={() => onChange('dantuo')}>
+      <button className={clsx('tab-strip__item', 'play-mode-switch__item', value === 'dantuo' && 'is-active')} type="button" onClick={() => onChange('dantuo')}>
         胆拖
       </button>
     </div>
@@ -1793,22 +1793,28 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
           </div>
         }
       >
-        <div className="simulation-layout">
+        <div className="simulation-shell">
+          <div className="simulation-shell__header">
+            <p className="hero-panel__eyebrow">Interactive Playground</p>
+            <h3>{lotteryLabel}选号面板</h3>
+            <span>切换玩法后，系统会实时更新可选规则与注数计算。</span>
+          </div>
+          <div className="simulation-layout">
           {lotteryCode === 'dlt' ? (
             <>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--mode">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Play Type</p>
                     <h3>玩法切换</h3>
                   </div>
-                  <span>{isDltDantuo ? '胆拖' : '普通复式'}</span>
+                  <span className="simulation-section__badge">{isDltDantuo ? '胆拖' : '普通复式'}</span>
                 </div>
-                <div className="tab-strip" role="tablist" aria-label="大乐透玩法切换">
-                  <button className={clsx('tab-strip__item', dltPlayType === 'dlt' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt')}>
+                <div className="tab-strip play-mode-switch play-mode-switch--simulation" role="tablist" aria-label="大乐透玩法切换">
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', dltPlayType === 'dlt' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt')}>
                     普通
                   </button>
-                  <button className={clsx('tab-strip__item', dltPlayType === 'dlt_dantuo' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt_dantuo')}>
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', dltPlayType === 'dlt_dantuo' && 'is-active')} type="button" onClick={() => setDltPlayType('dlt_dantuo')}>
                     胆拖
                   </button>
                 </div>
@@ -1816,7 +1822,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
               {isDltDantuo ? (
                 <>
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Front Dan</p>
@@ -1839,7 +1845,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     </div>
                   </section>
 
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Front Tuo</p>
@@ -1862,7 +1868,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     </div>
                   </section>
 
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Back Dan</p>
@@ -1885,7 +1891,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     </div>
                   </section>
 
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Back Tuo</p>
@@ -1910,7 +1916,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 </>
               ) : (
                 <>
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Front Zone</p>
@@ -1933,7 +1939,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     </div>
                   </section>
 
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Back Zone</p>
@@ -1960,25 +1966,25 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
             </>
           ) : isPl3 ? (
             <>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--mode">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Play Type</p>
                     <h3>玩法切换</h3>
                   </div>
-                  <span>{playTypeLabel}</span>
+                  <span className="simulation-section__badge">{playTypeLabel}</span>
                 </div>
-                <div className="tab-strip" role="tablist" aria-label="排列3玩法切换">
-                  <button className={clsx('tab-strip__item', pl3PlayType === 'direct' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct')}>
+                <div className="tab-strip play-mode-switch play-mode-switch--simulation" role="tablist" aria-label="排列3玩法切换">
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', pl3PlayType === 'direct' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct')}>
                     直选
                   </button>
-                  <button className={clsx('tab-strip__item', pl3PlayType === 'direct_sum' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct_sum')}>
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', pl3PlayType === 'direct_sum' && 'is-active')} type="button" onClick={() => setPl3PlayType('direct_sum')}>
                     和值
                   </button>
-                  <button className={clsx('tab-strip__item', pl3PlayType === 'group3' && 'is-active')} type="button" onClick={() => setPl3PlayType('group3')}>
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', pl3PlayType === 'group3' && 'is-active')} type="button" onClick={() => setPl3PlayType('group3')}>
                     组选3
                   </button>
-                  <button className={clsx('tab-strip__item', pl3PlayType === 'group6' && 'is-active')} type="button" onClick={() => setPl3PlayType('group6')}>
+                  <button className={clsx('tab-strip__item', 'play-mode-switch__item', pl3PlayType === 'group6' && 'is-active')} type="button" onClick={() => setPl3PlayType('group6')}>
                     组选6
                   </button>
                 </div>
@@ -1986,7 +1992,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
               {pl3PlayType === 'direct' ? (
                 <>
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Hundreds</p>
@@ -2008,7 +2014,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                       ))}
                     </div>
                   </section>
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Tens</p>
@@ -2030,7 +2036,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                       ))}
                     </div>
                   </section>
-                  <section className="simulation-section">
+                  <section className="simulation-section simulation-section--picker">
                     <div className="simulation-section__header">
                       <div>
                         <p className="hero-panel__eyebrow">Units</p>
@@ -2054,7 +2060,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   </section>
                 </>
               ) : pl3PlayType === 'direct_sum' ? (
-                <section className="simulation-section">
+                <section className="simulation-section simulation-section--picker">
                   <div className="simulation-section__header">
                     <div>
                       <p className="hero-panel__eyebrow">Sum Value</p>
@@ -2077,7 +2083,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   </div>
                 </section>
               ) : (
-                <section className="simulation-section">
+                <section className="simulation-section simulation-section--picker">
                   <div className="simulation-section__header">
                     <div>
                       <p className="hero-panel__eyebrow">Digits</p>
@@ -2103,7 +2109,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
             </>
           ) : (
             <>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--picker">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Ten Thousands</p>
@@ -2125,7 +2131,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   ))}
                 </div>
               </section>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--picker">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Thousands</p>
@@ -2147,7 +2153,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   ))}
                 </div>
               </section>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--picker">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Hundreds</p>
@@ -2169,7 +2175,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   ))}
                 </div>
               </section>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--picker">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Tens</p>
@@ -2191,7 +2197,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   ))}
                 </div>
               </section>
-              <section className="simulation-section">
+              <section className="simulation-section simulation-section--picker">
                 <div className="simulation-section__header">
                   <div>
                     <p className="hero-panel__eyebrow">Units</p>
@@ -2215,6 +2221,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               </section>
             </>
           )}
+          </div>
         </div>
 
         <div className="simulation-summary-bar">
