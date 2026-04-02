@@ -2022,7 +2022,9 @@ export function SettingsPage() {
                       <h3>邮箱</h3>
                       <p>邮箱地址暂不支持修改</p>
                     </div>
-                    <span className="settings-split-row__value">{displayEmail}</span>
+                    <div className="settings-split-row__editor settings-split-row__editor--readonly">
+                      <span className="settings-split-row__value">{displayEmail}</span>
+                    </div>
                   </div>
 
                   <div className="settings-split-row">
