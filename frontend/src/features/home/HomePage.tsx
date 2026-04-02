@@ -1015,46 +1015,46 @@ export function HomePage() {
                 title="模型列表"
                 // subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
-                  <div className="toolbar-inline prediction-overview-toolbar">
-                    <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--play">
-                      {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
-                      {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
-                    </div>
-                    <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--view">
-                      <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
-                        <HomeIconButton
-                          label="列表视图"
-                          icon={<HomeListIcon />}
-                          active={modelListView === 'list'}
-                          onClick={() => setModelListView('list')}
-                        />
-                        <HomeIconButton
-                          label="卡片视图"
-                          icon={<HomeGridIcon />}
-                          active={modelListView === 'card'}
-                          onClick={() => setModelListView('card')}
-                        />
-                        <HomeIconButton
-                          label="评分视图"
-                          icon={<HomeScoreIcon />}
-                          active={modelListView === 'score'}
-                          onClick={() => setModelListView('score')}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      className={clsx('icon-button prediction-overview-toolbar__filter', isModelFilterOpen && 'is-active')}
-                      onClick={() => setIsModelFilterOpen((value) => !value)}
-                      aria-label="筛选"
-                      title="筛选"
-                      type="button"
-                    >
-                      <HomeFilterIcon />
-                      <span>筛选</span>
-                    </button>
-                  </div>
+                  <button
+                    className={clsx('icon-button prediction-overview-toolbar__filter', isModelFilterOpen && 'is-active')}
+                    onClick={() => setIsModelFilterOpen((value) => !value)}
+                    aria-label="筛选"
+                    title="筛选"
+                    type="button"
+                  >
+                    <HomeFilterIcon />
+                    <span>筛选</span>
+                  </button>
                 }
               >
+                <div className="toolbar-inline prediction-overview-toolbar prediction-overview-toolbar--body">
+                  <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--play">
+                    {selectedLottery === 'pl3' ? <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} /> : null}
+                    {selectedLottery === 'dlt' ? <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} /> : null}
+                  </div>
+                  <div className="prediction-overview-toolbar__group prediction-overview-toolbar__group--view">
+                    <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="预测总览模型视图切换">
+                      <HomeIconButton
+                        label="列表视图"
+                        icon={<HomeListIcon />}
+                        active={modelListView === 'list'}
+                        onClick={() => setModelListView('list')}
+                      />
+                      <HomeIconButton
+                        label="卡片视图"
+                        icon={<HomeGridIcon />}
+                        active={modelListView === 'card'}
+                        onClick={() => setModelListView('card')}
+                      />
+                      <HomeIconButton
+                        label="评分视图"
+                        icon={<HomeScoreIcon />}
+                        active={modelListView === 'score'}
+                        onClick={() => setModelListView('score')}
+                      />
+                    </div>
+                  </div>
+                </div>
                 {isModelFilterOpen ? (
                   <ModelFilterPanel
                     modelNameQuery={modelNameQuery}

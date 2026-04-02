@@ -1489,6 +1489,10 @@ a {
   gap: 0.56rem;
 }
 
+.prediction-overview-toolbar--body {
+  margin-top: 0.72rem;
+}
+
 .prediction-overview-toolbar__group {
   min-width: 0;
   display: flex;
@@ -10570,7 +10574,7 @@ a {
   }
 
   .hero-metrics {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.42rem;
   }
 
@@ -11421,6 +11425,20 @@ a {
 
   .prediction-overview-toolbar__group--view {
     display: none;
+  }
+
+  .prediction-overview-section--models .panel-card__header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .prediction-overview-section--models .panel-card__actions {
+    width: auto;
+    min-width: fit-content;
+  }
+
+  .prediction-overview-toolbar {
+    grid-template-areas: 'play play play play';
   }
 
   .model-list-card__pin-indicator,
