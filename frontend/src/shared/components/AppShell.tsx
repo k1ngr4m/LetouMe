@@ -7,6 +7,7 @@ import {
   BookOpen,
   ChartColumnIncreasing,
   ChevronDown,
+  CheckSquare,
   CircleDollarSign,
   Gauge,
   History,
