@@ -139,7 +139,7 @@ export function HomeDashboardTabStrip({
   return (
     <section
       className={clsx(
-        'tab-strip dashboard-tab-strip dashboard-bottom-nav',
+        'tab-strip dashboard-tab-strip dashboard-bottom-nav dashboard-bottom-nav--mobile',
         isCompact && 'is-compact',
         isReveal && 'is-reveal',
       )}
