@@ -2572,7 +2572,18 @@ function ModelListCard({
       <div className="model-list-card__header">
         <div>
           <p className="model-list-card__provider">{model.model_provider}</p>
-          <h3>{model.model_name}</h3>
+          <div className="model-list-card__title-row" data-detail-nav-exempt="true">
+            <h3>{model.model_name}</h3>
+            <button
+              className="icon-button model-list-card__detail-button"
+              onClick={onDetail}
+              aria-label={`查看详情：${model.model_name}`}
+              title="查看详情"
+              type="button"
+            >
+              <DetailIcon />
+            </button>
+          </div>
         </div>
         <div className="model-list-card__actions" data-detail-nav-exempt="true">
           {isPinned ? (
@@ -2580,15 +2591,6 @@ function ModelListCard({
               <PinIndicatorIcon />
             </span>
           ) : null}
-          <button
-            className="icon-button model-list-card__detail-button"
-            onClick={onDetail}
-            aria-label={`查看详情：${model.model_name}`}
-            title="查看详情"
-            type="button"
-          >
-            <DetailIcon />
-          </button>
           {!hideExport ? (
             <button
               className="icon-button model-list-card__export-button"

@@ -1993,6 +1993,17 @@ a {
   overflow-wrap: anywhere;
 }
 
+.model-list-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.model-list-card__title-row h3 {
+  min-width: 0;
+}
+
 .model-list-card__meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -11406,5 +11417,15 @@ a {
 
   .crm-main .dashboard-sidebar {
     grid-template-columns: 1fr;
+  }
+
+  .prediction-overview-toolbar__group--view {
+    display: none;
+  }
+
+  .model-list-card__pin-indicator,
+  .model-list-card .action-menu,
+  .home-model-list-table__menu-button {
+    display: none;
   }
 }
