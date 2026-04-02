@@ -10816,8 +10816,7 @@ a {
 }
 
 .crm-topbar__settings-entry:hover .crm-topbar__settings-tooltip,
-.crm-topbar__settings-entry:focus-within .crm-topbar__settings-tooltip,
-.crm-topbar__settings-entry.is-open .crm-topbar__settings-tooltip {
+.crm-topbar__settings-entry:focus-within .crm-topbar__settings-tooltip {
   opacity: 1;
   transform: translate3d(0, 0, 0);
 }

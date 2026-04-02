@@ -493,7 +493,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <Grid2x2 size={16} aria-hidden="true" />
             </button>
             {canOpenSettings ? (
-              <div className={clsx('crm-topbar__settings-entry', sidebarMode === 'settings' && 'is-open')}>
+              <div className="crm-topbar__settings-entry">
                 <button
                   className={clsx('crm-topbar__icon-btn', sidebarMode === 'settings' && 'is-active')}
                   type="button"
