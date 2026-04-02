@@ -39,6 +39,19 @@ class AuthApiTests(unittest.TestCase):
         self.env.stop()
         self.temp_dir.cleanup()
 
+    def _issue_register_code(self, email: str) -> str:
+        captured: dict[str, str] = {}
+
+        def _capture_code(target_email: str, code: str) -> None:
+            captured["email"] = target_email
+            captured["code"] = code
+
+        with patch("backend.app.auth.EmailService.send_password_reset_code", side_effect=_capture_code):
+            response = self.client.post("/api/auth/register/send-code", json={"email": email})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured.get("email"), email)
+        return captured.get("code", "")
+
     def test_login_me_logout_flow(self) -> None:
         login_response = self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
         self.assertEqual(login_response.status_code, 200)
@@ -85,9 +98,10 @@ class AuthApiTests(unittest.TestCase):
         self.assertTrue(all(user["last_login_at"] is None or isinstance(user["last_login_at"], str) for user in payload))
 
     def test_register_creates_normal_user_and_logs_in(self) -> None:
+        register_code = self._issue_register_code("signup-user@example.com")
         register_response = self.client.post(
             "/api/auth/register",
-            json={"username": "signup-user", "email": "signup-user@example.com", "password": "signup123"},
+            json={"username": "signup-user", "email": "signup-user@example.com", "password": "signup123", "code": register_code},
         )
         self.assertEqual(register_response.status_code, 200)
         self.assertEqual(register_response.json()["user"]["role"], "normal_user")
@@ -103,17 +117,48 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(lottery_fetch_forbidden.status_code, 403)
 
     def test_register_rejects_duplicate_username(self) -> None:
-        self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123"})
-        response = self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123"})
+        first_code = self._issue_register_code("dup-user@example.com")
+        self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123", "code": first_code})
+        second_code = self._issue_register_code("dup-user-2@example.com")
+        response = self.client.post(
+            "/api/auth/register",
+            json={"username": "dup-user", "email": "dup-user-2@example.com", "password": "signup123", "code": second_code},
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_register_cannot_escalate_to_admin_role(self) -> None:
+        register_code = self._issue_register_code("escalate-user@example.com")
         response = self.client.post(
             "/api/auth/register",
-            json={"username": "escalate-user", "email": "escalate-user@example.com", "password": "signup123", "role": "admin"},
+            json={"username": "escalate-user", "email": "escalate-user@example.com", "password": "signup123", "code": register_code, "role": "admin"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["role"], "normal_user")
+
+    def test_register_rejects_invalid_or_missing_code(self) -> None:
+        self._issue_register_code("invalid-code@example.com")
+        missing_code_response = self.client.post(
+            "/api/auth/register",
+            json={"username": "missing-code", "email": "invalid-code@example.com", "password": "signup123", "code": ""},
+        )
+        self.assertEqual(missing_code_response.status_code, 400)
+
+        wrong_code_response = self.client.post(
+            "/api/auth/register",
+            json={"username": "wrong-code", "email": "invalid-code@example.com", "password": "signup123", "code": "000000"},
+        )
+        self.assertEqual(wrong_code_response.status_code, 400)
+
+    def test_register_send_code_rejects_existing_email(self) -> None:
+        register_code = self._issue_register_code("already-used@example.com")
+        response = self.client.post(
+            "/api/auth/register",
+            json={"username": "already-used", "email": "already-used@example.com", "password": "signup123", "code": register_code},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        second_send = self.client.post("/api/auth/register/send-code", json={"email": "already-used@example.com"})
+        self.assertEqual(second_send.status_code, 400)
 
     def test_role_permissions_include_description_and_can_be_updated(self) -> None:
         self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})

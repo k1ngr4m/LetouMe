@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { apiClient } from '../../shared/api/client'
@@ -37,11 +37,41 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [code, setCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
+  const [countdown, setCountdown] = useState(0)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
+  const canSendCode = useMemo(() => countdown <= 0 && email.trim().length > 0 && !isSendingCode, [countdown, email, isSendingCode])
+
+  async function handleSendCode() {
+    if (!canSendCode) return
+    try {
+      setIsSendingCode(true)
+      setError(null)
+      setMessage(null)
+      await apiClient.sendRegisterCode({ email })
+      setMessage('注册验证码已发送，请检查邮箱。')
+      setCountdown(60)
+      const timer = window.setInterval(() => {
+        setCountdown((value) => {
+          if (value <= 1) {
+            window.clearInterval(timer)
+            return 0
+          }
+          return value - 1
+        })
+      }, 1000)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '验证码发送失败')
+    } finally {
+      setIsSendingCode(false)
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -56,7 +86,8 @@ export function RegisterPage() {
     try {
       setIsSubmitting(true)
       setError(null)
-      await register({ username, email, password })
+      setMessage(null)
+      await register({ username, email, password, code })
       navigate('/dashboard/prediction', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '注册失败')
@@ -107,6 +138,15 @@ export function RegisterPage() {
               />
             </label>
             <label className="authx-field">
+              <span>验证码</span>
+              <div className="authx-inline-action">
+                <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="6 位验证码" required />
+                <button type="button" className="authx-inline-btn" onClick={() => void handleSendCode()} disabled={!canSendCode}>
+                  {countdown > 0 ? `${countdown}s` : isSendingCode ? '发送中' : '发送验证码'}
+                </button>
+              </div>
+            </label>
+            <label className="authx-field">
               <span>密码</span>
               <div className="authx-password-wrap">
                 <input
@@ -142,6 +182,7 @@ export function RegisterPage() {
                 </button>
               </div>
             </label>
+            {message ? <p className="authx-success">{message}</p> : null}
             {error ? <p className="authx-error">注册失败：{error}</p> : null}
             <button className="authx-primary" type="submit" disabled={isSubmitting}>
               {isSubmitting ? '注册中...' : '注册'}

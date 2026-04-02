@@ -31,6 +31,7 @@ from backend.app.services.email_service import EmailService
 
 logger = get_logger("auth")
 PASSWORD_RESET_EMAIL_PURPOSE = "password_reset"
+REGISTER_EMAIL_PURPOSE = "register"
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
@@ -102,13 +103,17 @@ class AuthService:
         logger.info("User logged in", extra={"context": {"username": user["username"], "role": user["role"]}})
         return self._serialize_user(user), token
 
-    def register(self, username: str, email: str, password: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
+    def register(self, username: str, email: str, password: str, code: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
         normalized_username = username.strip()
         normalized_email = email.strip().lower()
+        normalized_code = code.strip()
         if not normalized_email:
             raise ValueError("邮箱不能为空")
         if not _is_valid_email(normalized_email):
             raise ValueError("邮箱格式不正确")
+        if not normalized_code:
+            raise ValueError("验证码不能为空")
+        code_id = self._validate_email_code(normalized_email, normalized_code, purpose=REGISTER_EMAIL_PURPOSE)
         created = self.create_user(
             {
                 "username": normalized_username,
@@ -119,6 +124,7 @@ class AuthService:
                 "is_active": True,
             }
         )
+        self.repository.consume_email_verification_code(code_id)
         token = secrets.token_urlsafe(32)
         self.repository.create_session(
             user_id=int(created["id"]),
@@ -218,9 +224,21 @@ class AuthService:
         user = self.repository.get_user_by_email(normalized_email)
         if not user or not user.get("is_active"):
             raise ValueError("该邮箱未绑定可用账号")
+        self._send_email_code(normalized_email, purpose=PASSWORD_RESET_EMAIL_PURPOSE)
+
+    def send_registration_code(self, email: str) -> None:
+        normalized_email = email.strip().lower()
+        if not _is_valid_email(normalized_email):
+            raise ValueError("邮箱格式不正确")
+        existing_user = self.repository.get_user_by_email(normalized_email)
+        if existing_user:
+            raise ValueError("该邮箱已注册")
+        self._send_email_code(normalized_email, purpose=REGISTER_EMAIL_PURPOSE)
+
+    def _send_email_code(self, email: str, *, purpose: str) -> None:
         latest_code = self.repository.get_latest_active_email_verification_code(
-            email=normalized_email,
-            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
+            email=email,
+            purpose=purpose,
         )
         if latest_code:
             expires_at = _to_datetime(latest_code.get("expires_at"))
@@ -233,14 +251,14 @@ class AuthService:
                 raise ValueError("验证码发送过于频繁，请稍后再试")
 
         code = "".join(secrets.choice(string.digits) for _ in range(6))
-        code_hash = _hash_email_code(code, normalized_email)
+        code_hash = _hash_email_code(code, email)
+        self.email_service.send_password_reset_code(email, code)
         self.repository.create_email_verification_code(
-            email=normalized_email,
-            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
+            email=email,
+            purpose=purpose,
             code_hash=code_hash,
             expires_at=datetime.utcnow() + timedelta(minutes=self.settings.auth_email_code_expire_minutes),
         )
-        self.email_service.send_password_reset_code(normalized_email, code)
 
     def reset_password_by_email_code(self, email: str, code: str, new_password: str) -> None:
         normalized_email = email.strip().lower()
@@ -249,30 +267,35 @@ class AuthService:
             raise ValueError("邮箱格式不正确")
         if len(new_password) < 8:
             raise ValueError("密码长度至少为 8 位")
-        latest_code = self.repository.get_latest_active_email_verification_code(
-            email=normalized_email,
-            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
-        )
-        if not latest_code:
-            raise ValueError("验证码不存在或已失效")
-        if int(latest_code.get("attempt_count") or 0) >= 5:
-            self.repository.consume_email_verification_code(int(latest_code["id"]))
-            raise ValueError("验证码错误次数过多，请重新获取")
-        expires_at = _to_datetime(latest_code.get("expires_at"))
-        if not expires_at or expires_at <= datetime.utcnow():
-            self.repository.consume_email_verification_code(int(latest_code["id"]))
-            raise ValueError("验证码已过期")
-        expected_hash = str(latest_code.get("code_hash") or "")
-        candidate_hash = _hash_email_code(normalized_code, normalized_email)
-        if not expected_hash or not hmac.compare_digest(candidate_hash, expected_hash):
-            self.repository.increment_email_verification_code_attempt(int(latest_code["id"]))
-            raise ValueError("验证码错误")
+        code_id = self._validate_email_code(normalized_email, normalized_code, purpose=PASSWORD_RESET_EMAIL_PURPOSE)
         user = self.repository.get_user_by_email(normalized_email)
         if not user or not user.get("is_active"):
             raise ValueError("该邮箱未绑定可用账号")
-        self.repository.consume_email_verification_code(int(latest_code["id"]))
+        self.repository.consume_email_verification_code(code_id)
         self.repository.update_password(int(user["id"]), hash_password(new_password))
         self.repository.delete_sessions_for_user(int(user["id"]))
+
+    def _validate_email_code(self, email: str, code: str, *, purpose: str) -> int:
+        latest_code = self.repository.get_latest_active_email_verification_code(
+            email=email,
+            purpose=purpose,
+        )
+        if not latest_code:
+            raise ValueError("验证码不存在或已失效")
+        code_id = int(latest_code["id"])
+        if int(latest_code.get("attempt_count") or 0) >= 5:
+            self.repository.consume_email_verification_code(code_id)
+            raise ValueError("验证码错误次数过多，请重新获取")
+        expires_at = _to_datetime(latest_code.get("expires_at"))
+        if not expires_at or expires_at <= datetime.utcnow():
+            self.repository.consume_email_verification_code(code_id)
+            raise ValueError("验证码已过期")
+        expected_hash = str(latest_code.get("code_hash") or "")
+        candidate_hash = _hash_email_code(code, email)
+        if not expected_hash or not hmac.compare_digest(candidate_hash, expected_hash):
+            self.repository.increment_email_verification_code_attempt(code_id)
+            raise ValueError("验证码错误")
+        return code_id
 
     def get_oauth_provider_start(self, provider: str) -> dict[str, Any]:
         normalized_provider = provider.strip().lower()

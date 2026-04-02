@@ -19,6 +19,7 @@ import type {
   MyBetRecordUpdatePayload,
   MyBetRecordUpdateResponse,
   OAuthStartResponse,
+  RegisterSendCodePayload,
   LotteryHistoryResponse,
   LotteryFetchTask,
   MaintenanceRunLogListResponse,
@@ -149,6 +150,12 @@ export const apiClient = {
   },
   register(payload: RegisterPayload) {
     return requestJson<CurrentUserResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  sendRegisterCode(payload: RegisterSendCodePayload) {
+    return requestJson<SuccessResponse>('/api/auth/register/send-code', {
       method: 'POST',
       body: JSON.stringify(payload),
     })

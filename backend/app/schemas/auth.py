@@ -12,6 +12,11 @@ class RegisterPayload(BaseModel):
     username: str
     email: str
     password: str
+    code: str
+
+
+class RegisterSendCodePayload(BaseModel):
+    email: str
 
 
 class ForgotPasswordSendCodePayload(BaseModel):

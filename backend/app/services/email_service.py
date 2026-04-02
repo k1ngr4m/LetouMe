@@ -39,9 +39,34 @@ class EmailService:
         message["From"] = f"{self.settings.smtp_from_name} <{self.settings.smtp_from_email}>"
         message["To"] = to_email
 
-        with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=20) as server:
-            if self.settings.smtp_use_tls:
-                server.starttls()
-            server.login(self.settings.smtp_user, self.settings.smtp_password)
-            server.sendmail(self.settings.smtp_from_email, [to_email], message.as_string())
-            logger.info("Password reset email sent", extra={"context": {"to_email": to_email}})
+        security = str(self.settings.smtp_security or "starttls").strip().lower()
+        if security not in {"ssl", "starttls", "plain"}:
+            security = "starttls"
+        try:
+            if security == "ssl":
+                with smtplib.SMTP_SSL(self.settings.smtp_host, self.settings.smtp_port, timeout=20) as server:
+                    server.ehlo()
+                    server.login(self.settings.smtp_user, self.settings.smtp_password)
+                    server.sendmail(self.settings.smtp_from_email, [to_email], message.as_string())
+            else:
+                with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=20) as server:
+                    server.ehlo()
+                    if security == "starttls":
+                        server.starttls()
+                        server.ehlo()
+                    server.login(self.settings.smtp_user, self.settings.smtp_password)
+                    server.sendmail(self.settings.smtp_from_email, [to_email], message.as_string())
+        except (smtplib.SMTPException, TimeoutError, OSError) as exc:
+            logger.exception(
+                "Failed to send email via SMTP",
+                extra={
+                    "context": {
+                        "smtp_host": self.settings.smtp_host,
+                        "smtp_port": self.settings.smtp_port,
+                        "smtp_security": security,
+                        "error_type": type(exc).__name__,
+                    }
+                },
+            )
+            raise RuntimeError("邮件服务暂不可用，请稍后再试") from exc
+        logger.info("Password reset email sent", extra={"context": {"to_email": to_email}})

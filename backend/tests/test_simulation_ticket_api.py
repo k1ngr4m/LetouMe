@@ -35,11 +35,29 @@ class SimulationTicketApiTests(unittest.TestCase):
                 cursor.execute("DELETE FROM user_session")
                 cursor.execute("DELETE FROM app_user WHERE username != ?", ("admin",))
         self.client = TestClient(create_app())
-        self.client.post("/api/auth/register", json={"username": "player-a", "email": "player-a@example.com", "password": "player12345"})
+        register_code = self._issue_register_code("player-a@example.com")
+        self.client.post(
+            "/api/auth/register",
+            json={"username": "player-a", "email": "player-a@example.com", "password": "player12345", "code": register_code},
+        )
 
     def tearDown(self) -> None:
         self.env.stop()
         self.temp_dir.cleanup()
+
+    def _issue_register_code(self, email: str, client: TestClient | None = None) -> str:
+        active_client = client or self.client
+        captured: dict[str, str] = {}
+
+        def _capture_code(target_email: str, code: str) -> None:
+            captured["email"] = target_email
+            captured["code"] = code
+
+        with patch("backend.app.auth.EmailService.send_password_reset_code", side_effect=_capture_code):
+            response = active_client.post("/api/auth/register/send-code", json={"email": email})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured.get("email"), email)
+        return captured.get("code", "")
 
     def test_create_list_and_delete_ticket(self) -> None:
         create_response = self.client.post(
@@ -72,7 +90,11 @@ class SimulationTicketApiTests(unittest.TestCase):
             json={"front_numbers": ["01", "02", "03", "04", "05"], "back_numbers": ["01", "02"]},
         )
         other_client = TestClient(create_app())
-        other_client.post("/api/auth/register", json={"username": "player-b", "email": "player-b@example.com", "password": "player12345"})
+        other_code = self._issue_register_code("player-b@example.com", client=other_client)
+        other_client.post(
+            "/api/auth/register",
+            json={"username": "player-b", "email": "player-b@example.com", "password": "player12345", "code": other_code},
+        )
         other_client.post(
             "/api/simulation/tickets/create",
             json={"front_numbers": ["06", "07", "08", "09", "10"], "back_numbers": ["03", "04"]},

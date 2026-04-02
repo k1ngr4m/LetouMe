@@ -49,10 +49,11 @@ class Settings:
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_use_tls: bool = True
+    smtp_security: str = "starttls"
     smtp_from_email: str = ""
     smtp_from_name: str = "LetouMe"
     auth_email_code_expire_minutes: int = 10
-    auth_email_code_cooldown_seconds: int = 1
+    auth_email_code_cooldown_seconds: int = 60
     auth_oauth_base_url: str = ""
     auth_oauth_google_client_id: str = ""
     auth_oauth_google_client_secret: str = ""
@@ -112,6 +113,18 @@ def load_settings() -> Settings:
     )
     mysql_host, mysql_port, mysql_user, mysql_password, mysql_database = _split_mysql_config(database_url)
 
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
+    smtp_security_raw = os.getenv("SMTP_SECURITY", "").strip().lower()
+    if smtp_security_raw in {"ssl", "starttls", "plain"}:
+        smtp_security = smtp_security_raw
+    elif smtp_security_raw:
+        smtp_security = "starttls"
+    elif smtp_port == 465:
+        smtp_security = "ssl"
+    else:
+        smtp_security = "starttls" if smtp_use_tls else "plain"
+
     return Settings(
         database_url=database_url,
         mysql_host=mysql_host,
@@ -141,10 +154,11 @@ def load_settings() -> Settings:
         imgloc_api_key=os.getenv("IMGLOC_API_KEY", ""),
         imgloc_api_url=os.getenv("IMGLOC_API_URL", "https://imgloc.com/api/1/upload"),
         smtp_host=os.getenv("SMTP_HOST", ""),
-        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+        smtp_port=smtp_port,
         smtp_user=os.getenv("SMTP_USER", ""),
         smtp_password=os.getenv("SMTP_PASSWORD", ""),
-        smtp_use_tls=os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"},
+        smtp_use_tls=smtp_use_tls,
+        smtp_security=smtp_security,
         smtp_from_email=os.getenv("SMTP_FROM_EMAIL", ""),
         smtp_from_name=os.getenv("SMTP_FROM_NAME", "LetouMe"),
         auth_email_code_expire_minutes=int(os.getenv("AUTH_EMAIL_CODE_EXPIRE_MINUTES", "10")),

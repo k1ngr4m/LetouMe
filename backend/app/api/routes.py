@@ -28,6 +28,7 @@ from backend.app.schemas.auth import (
     PermissionListResponse,
     RoleListResponse,
     RegisterPayload,
+    RegisterSendCodePayload,
     ResetPasswordPayload,
     RoleResponse,
     UserCreatePayload,
@@ -192,6 +193,7 @@ def register(
             payload.username,
             payload.email,
             payload.password,
+            payload.code,
             user_agent=request.headers.get("user-agent", ""),
             ip_address=request.client.host if request.client else "",
         )
@@ -217,6 +219,20 @@ def get_current_auth_user(current_user: dict = Depends(require_current_user)) ->
     return {"user": current_user}
 
 
+@router.post("/auth/register/send-code", response_model=SuccessResponse)
+def send_register_code(
+    payload: RegisterSendCodePayload,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        auth_service.send_registration_code(payload.email)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"success": True}
+
+
 @router.post("/auth/forgot-password/send-code", response_model=SuccessResponse)
 def send_forgot_password_code(
     payload: ForgotPasswordSendCodePayload,
@@ -227,7 +243,7 @@ def send_forgot_password_code(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"success": True}
 
 

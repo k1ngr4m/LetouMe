@@ -733,9 +733,14 @@ export type RegisterPayload = {
   username: string
   email: string
   password: string
+  code: string
 }
 
 export type ForgotPasswordSendCodePayload = {
+  email: string
+}
+
+export type RegisterSendCodePayload = {
   email: string
 }
 

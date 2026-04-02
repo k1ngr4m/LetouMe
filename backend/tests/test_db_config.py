@@ -39,6 +39,18 @@ class DatabaseConfigTests(unittest.TestCase):
 
         self.assertFalse(settings.lottery_split_tables_enabled)
 
+    def test_smtp_security_defaults_to_ssl_on_port_465(self) -> None:
+        with patch.dict(os.environ, {"SMTP_PORT": "465"}, clear=True):
+            settings = load_settings()
+
+        self.assertEqual(settings.smtp_security, "ssl")
+
+    def test_smtp_security_prefers_explicit_env_value(self) -> None:
+        with patch.dict(os.environ, {"SMTP_PORT": "465", "SMTP_SECURITY": "starttls"}, clear=True):
+            settings = load_settings()
+
+        self.assertEqual(settings.smtp_security, "starttls")
+
 
 if __name__ == "__main__":
     unittest.main()
