@@ -48,6 +48,8 @@ type BetFormState = {
   lines: EditableLine[]
 }
 
+type MyBetsViewMode = 'list' | 'form'
+
 type LineQuote = {
   betCount: number
   amount: number
@@ -281,6 +283,20 @@ function revokeObjectUrlIfNeeded(value: string) {
   if (value.startsWith('blob:')) {
     URL.revokeObjectURL(value)
   }
+}
+
+function buildFormSnapshot(form: BetFormState) {
+  return JSON.stringify({
+    ...form,
+    ticketImageFile: form.ticketImageFile
+      ? {
+          name: form.ticketImageFile.name,
+          size: form.ticketImageFile.size,
+          type: form.ticketImageFile.type,
+          lastModified: form.ticketImageFile.lastModified,
+        }
+      : null,
+  })
 }
 
 function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
@@ -623,15 +639,26 @@ function BallPicker({
   )
 }
 
-export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: LotteryCode; targetPeriod: string }) {
+export function MyBetsPanel({
+  lotteryCode,
+  targetPeriod,
+  onDirtyStateChange,
+}: {
+  lotteryCode: LotteryCode
+  targetPeriod: string
+  onDirtyStateChange?: (isDirty: boolean) => void
+}) {
   const { motionLevel } = useMotion()
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [expandedRecordMap, setExpandedRecordMap] = useState<Record<number, boolean>>({})
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState(() =>
+    buildFormSnapshot(createDefaultFormState(targetPeriod, lotteryCode)),
+  )
 
   useEffect(() => {
     return () => {
@@ -685,9 +712,11 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
       const successMessage = editingRecord ? '投注已更新。' : '投注已添加。'
       setMessage(result.imageUploadWarning ? `${successMessage}${result.imageUploadWarning}` : successMessage)
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-      setFormOpen(false)
+      setViewMode('list')
       setEditingRecord(null)
-      setForm(createDefaultFormState(targetPeriod, lotteryCode))
+      const nextForm = createDefaultFormState(targetPeriod, lotteryCode)
+      setForm(nextForm)
+      setInitialFormSnapshot(buildFormSnapshot(nextForm))
       await queryClient.invalidateQueries({ queryKey: ['my-bets', lotteryCode] })
     },
     onError: (error) => {
@@ -726,6 +755,8 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const lineQuotes = useMemo(() => form.lines.map((line) => quoteLine(lotteryCode, line)), [form.lines, lotteryCode])
   const totalBetCount = lineQuotes.reduce((sum, item) => sum + item.betCount, 0)
   const totalAmount = lineQuotes.reduce((sum, item) => sum + item.amount, 0)
+  const currentFormSnapshot = useMemo(() => buildFormSnapshot(form), [form])
+  const isFormDirty = viewMode === 'form' && currentFormSnapshot !== initialFormSnapshot
   const discountAmount = parseDiscountAmount(form.discountAmountInput)
   const netTotalAmount = Math.max(0, totalAmount - discountAmount)
   const discountValidationError = discountAmount > totalAmount ? '优惠金额不能超过预计下注金额。' : null
@@ -750,8 +781,6 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
   const summaryEnterY = 10 * motionScale
   const cardEnterY = 12 * motionScale
   const lineEnterY = 6 * motionScale
-  const modalEnterY = 24 * motionScale
-  const modalExitY = 18 * motionScale
   const summaryCards = useMemo(
     () => [
       {
@@ -776,6 +805,25 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     ],
     [summary],
   )
+  const shouldWarnUnsaved = isFormDirty && !saveMutation.isPending && !ocrMutation.isPending
+
+  useEffect(() => {
+    onDirtyStateChange?.(shouldWarnUnsaved)
+  }, [onDirtyStateChange, shouldWarnUnsaved])
+
+  useEffect(() => {
+    return () => onDirtyStateChange?.(false)
+  }, [onDirtyStateChange])
+
+  useEffect(() => {
+    if (!shouldWarnUnsaved) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [shouldWarnUnsaved])
 
   useEffect(() => {
     setExpandedRecordMap((previous) => {
@@ -791,12 +839,14 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     })
   }, [records])
 
-  function openCreateModal(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
+  function openCreateForm(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
     setEditingRecord(null)
     revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-    setForm({ ...createDefaultFormState(targetPeriod, lotteryCode), sourceType })
-    setFormOpen(true)
+    const nextForm = { ...createDefaultFormState(targetPeriod, lotteryCode), sourceType }
+    setForm(nextForm)
+    setInitialFormSnapshot(buildFormSnapshot(nextForm))
+    setViewMode('form')
     if (focusImageInput) {
       requestAnimationFrame(() => {
         editImageInputRef.current?.focus()
@@ -804,18 +854,24 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
     }
   }
 
-  function openEditModal(record: MyBetRecord) {
+  function openEditForm(record: MyBetRecord) {
     setMessage(null)
     setEditingRecord(record)
     revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-    setForm(buildFormFromRecord(record))
-    setFormOpen(true)
+    const nextForm = buildFormFromRecord(record)
+    setForm(nextForm)
+    setInitialFormSnapshot(buildFormSnapshot(nextForm))
+    setViewMode('form')
   }
 
-  function closeFormModal() {
+  function backToListView() {
     if (saveMutation.isPending) return
+    if (shouldWarnUnsaved && !window.confirm('有未保存内容，确定返回列表吗？')) return
     revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
-    setFormOpen(false)
+    const nextForm = createDefaultFormState(targetPeriod, lotteryCode)
+    setForm(nextForm)
+    setInitialFormSnapshot(buildFormSnapshot(nextForm))
+    setViewMode('list')
     setEditingRecord(null)
   }
 
@@ -891,7 +947,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
         title="我的投注"
         actions={
           <div className="toolbar-inline my-bets-page__toolbar">
-            {hasRecords ? (
+            {viewMode === 'list' && hasRecords ? (
               <button
                 className={clsx('icon-button my-bets-page__toolbar-button', allRecordsExpanded && 'is-active')}
                 type="button"
@@ -902,19 +958,31 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 <ChevronsUpDown size={16} aria-hidden="true" />
               </button>
             ) : null}
-            <button
-              className="icon-button my-bets-page__toolbar-button my-bets-page__toolbar-button--primary"
-              type="button"
-              onClick={() => openCreateModal()}
-              aria-label="添加投注"
-              title="添加投注"
-            >
-              <Plus size={16} aria-hidden="true" />
-            </button>
+            {viewMode === 'list' ? (
+              <button
+                className="icon-button my-bets-page__toolbar-button my-bets-page__toolbar-button--primary"
+                type="button"
+                onClick={() => openCreateForm()}
+                aria-label="添加投注"
+                title="添加投注"
+              >
+                <Plus size={16} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                className="ghost-button ghost-button--compact my-bets-page__toolbar-back"
+                type="button"
+                onClick={backToListView}
+              >
+                返回列表
+              </button>
+            )}
           </div>
         }
       >
-        <div className="my-bets-summary-grid">
+        {viewMode === 'list' ? (
+          <>
+            <div className="my-bets-summary-grid">
           {summaryCards.map((item, index) => {
             const Icon = item.icon
             return (
@@ -934,27 +1002,27 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
               </motion.article>
             )
           })}
-        </div>
+            </div>
 
-        {message ? <div className="simulation-inline-message">{message}</div> : null}
+            {message ? <div className="simulation-inline-message">{message}</div> : null}
 
-        {betsQuery.isLoading ? (
-          <div className="state-shell">正在加载投注记录...</div>
-        ) : betsQuery.error instanceof Error ? (
-          <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
-        ) : records.length ? (
-          <div className="my-bets-list">
-            {records.map((record, index) => {
-              const isExpanded = Boolean(expandedRecordMap[record.id])
-              return (
-              <motion.article
-                layout={animationsEnabled}
-                key={record.id}
-                className="my-bets-card"
-                initial={animationsEnabled ? { opacity: 0, y: cardEnterY } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, delay: animationsEnabled ? Math.min(index * 0.025, 0.22) : 0 }}
-              >
+            {betsQuery.isLoading ? (
+              <div className="state-shell">正在加载投注记录...</div>
+            ) : betsQuery.error instanceof Error ? (
+              <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
+            ) : records.length ? (
+              <div className="my-bets-list">
+                {records.map((record, index) => {
+                  const isExpanded = Boolean(expandedRecordMap[record.id])
+                  return (
+                  <motion.article
+                    layout={animationsEnabled}
+                    key={record.id}
+                    className="my-bets-card"
+                    initial={animationsEnabled ? { opacity: 0, y: cardEnterY } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, delay: animationsEnabled ? Math.min(index * 0.025, 0.22) : 0 }}
+                  >
                 <div className="my-bets-card__header">
                   <div>
                     <p className="hero-panel__eyebrow">{`第 ${record.target_period} 期`}</p>
@@ -979,7 +1047,7 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                       {isExpanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
                       {isExpanded ? '收起详情' : '展开详情'}
                     </button>
-                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditModal(record)}>
+                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEditForm(record)}>
                       <PencilLine size={14} aria-hidden="true" />
                       编辑
                     </button>
@@ -1024,43 +1092,31 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                     查看票据图片
                   </a>
                 ) : null}
-              </motion.article>
-            )})}
-          </div>
+                  </motion.article>
+                )})}
+              </div>
+            ) : (
+              <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
+            )}
+          </>
         ) : (
-          <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
+          <>
+            {message ? <div className="simulation-inline-message">{message}</div> : null}
+          </>
         )}
       </StatusCard>
 
-      <AnimatePresence>
-        {formOpen ? (
-          <motion.div
-            className="modal-shell"
-            role="presentation"
-            onClick={closeFormModal}
-            initial={animationsEnabled ? { opacity: 0 } : false}
-            animate={{ opacity: 1 }}
-            exit={animationsEnabled ? { opacity: 0 } : undefined}
-            transition={{ duration: animationsEnabled ? 0.18 * motionScale : 0 }}
-          >
-            <motion.div
-              className="modal-card modal-card--form my-bets-modal-card"
-              role="dialog"
-              aria-modal="true"
-              onClick={(event) => event.stopPropagation()}
-              initial={animationsEnabled ? { opacity: 0, y: modalEnterY, scale: 0.98 } : false}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={animationsEnabled ? { opacity: 0, y: modalExitY, scale: 0.98 } : undefined}
-              transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, ease: 'easeOut' }}
-            >
-            <form className="settings-model-form my-bets-modal my-bets-modal__form" onSubmit={submitForm}>
+      {viewMode === 'form' ? (
+        <section className="my-bets-form-view" data-testid="my-bets-form-view">
+          <div className="my-bets-form-view__card">
+            <form className="settings-model-form my-bets-modal my-bets-modal__form my-bets-form-view__form" onSubmit={submitForm}>
               <div className="modal-card__header my-bets-modal__header">
                 <div>
                   <p className="modal-card__eyebrow">My Bets</p>
                   <h2>{editingRecord ? '编辑投注' : '添加投注'}</h2>
                 </div>
-                <button className="ghost-button ghost-button--compact" type="button" onClick={closeFormModal}>
-                  关闭
+                <button className="ghost-button ghost-button--compact" type="button" onClick={backToListView}>
+                  返回列表
                 </button>
               </div>
 
@@ -1491,10 +1547,9 @@ export function MyBetsPanel({ lotteryCode, targetPeriod }: { lotteryCode: Lotter
                 </div>
               </div>
             </form>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

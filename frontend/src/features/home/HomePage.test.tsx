@@ -23,6 +23,7 @@ const {
   updateMyBet,
   simulateHistoryFilterLoading,
   toPng,
+  setMotionPreference,
 } = vi.hoisted(() => ({
   createMyBet: vi.fn(),
   createSimulationTicket: vi.fn(),
@@ -40,6 +41,7 @@ const {
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
   toPng: vi.fn(),
+  setMotionPreference: vi.fn(),
 }))
 
 function buildHistoryRecord(period: string, date: string, primaryModelId: 'model-a' | 'model-b' = 'model-b') {
@@ -780,6 +782,14 @@ vi.mock('html-to-image', () => ({
   toPng,
 }))
 
+vi.mock('../../shared/theme/MotionProvider', () => ({
+  useMotion: () => ({
+    motionLevel: 'normal',
+    motionPreference: 'system',
+    setMotionPreference,
+  }),
+}))
+
 function renderPage(initialEntry = '/dashboard/prediction') {
   const client = new QueryClient({
     defaultOptions: {
@@ -825,6 +835,7 @@ beforeEach(() => {
   simulatePl3SumHistoryMislabel.current = false
   toPng.mockReset()
   toPng.mockResolvedValue('data:image/png;base64,mock-image')
+  setMotionPreference.mockReset()
   getMyBets.mockReset()
   getMyBets.mockResolvedValue({
     records: [
@@ -2700,12 +2711,13 @@ describe('HomePage dashboard sidebar', () => {
     await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
 
     await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
-    const dialog = await screen.findByRole('dialog')
-    await userEvent.clear(within(dialog).getByLabelText('前区号码（逗号分隔）'))
-    await userEvent.type(within(dialog).getByLabelText('前区号码（逗号分隔）', { exact: true }), '01,02,03,04,05')
-    await userEvent.clear(within(dialog).getByLabelText('后区号码（逗号分隔）'))
-    await userEvent.type(within(dialog).getByLabelText('后区号码（逗号分隔）', { exact: true }), '06,07')
-    await userEvent.click(within(dialog).getByRole('button', { name: '添加投注' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const formView = await screen.findByTestId('my-bets-form-view')
+    await userEvent.clear(within(formView).getByLabelText('前区号码（逗号分隔）'))
+    await userEvent.type(within(formView).getByLabelText('前区号码（逗号分隔）', { exact: true }), '01,02,03,04,05')
+    await userEvent.clear(within(formView).getByLabelText('后区号码（逗号分隔）'))
+    await userEvent.type(within(formView).getByLabelText('后区号码（逗号分隔）', { exact: true }), '06,07')
+    await userEvent.click(within(formView).getByRole('button', { name: '添加投注' }))
 
     await waitFor(() =>
       expect(createMyBet).toHaveBeenCalledWith(
@@ -2815,13 +2827,13 @@ describe('HomePage dashboard sidebar', () => {
     await screen.findByRole('heading', { name: '我的投注' })
 
     await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
-    const dialog = await screen.findByRole('dialog')
-    await userEvent.selectOptions(within(dialog).getByLabelText('玩法'), 'dlt_dantuo')
-    await userEvent.type(within(dialog).getByLabelText('前区胆码（逗号分隔）'), '01')
-    await userEvent.type(within(dialog).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
-    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01')
-    await userEvent.type(within(dialog).getByLabelText('后区拖码（逗号分隔）'), '07,08')
-    await userEvent.click(within(dialog).getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+    await userEvent.selectOptions(within(formView).getByLabelText('玩法'), 'dlt_dantuo')
+    await userEvent.type(within(formView).getByLabelText('前区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(formView).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
+    await userEvent.type(within(formView).getByLabelText('后区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(formView).getByLabelText('后区拖码（逗号分隔）'), '07,08')
+    await userEvent.click(within(formView).getByRole('button', { name: '添加投注' }))
 
     await waitFor(() =>
       expect(createMyBet).toHaveBeenCalledWith(
@@ -2846,22 +2858,64 @@ describe('HomePage dashboard sidebar', () => {
     await screen.findByRole('heading', { name: '我的投注' })
 
     await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
-    const dialog = await screen.findByRole('dialog')
-    await userEvent.selectOptions(within(dialog).getByLabelText('玩法'), 'dlt_dantuo')
-    await userEvent.type(within(dialog).getByLabelText('前区胆码（逗号分隔）'), '01')
-    await userEvent.type(within(dialog).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
-    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01,02')
-    await userEvent.type(within(dialog).getByLabelText('后区拖码（逗号分隔）'), '07,08')
+    const formView = await screen.findByTestId('my-bets-form-view')
+    await userEvent.selectOptions(within(formView).getByLabelText('玩法'), 'dlt_dantuo')
+    await userEvent.type(within(formView).getByLabelText('前区胆码（逗号分隔）'), '01')
+    await userEvent.type(within(formView).getByLabelText('前区拖码（逗号分隔）'), '02,03,04,05,06')
+    await userEvent.type(within(formView).getByLabelText('后区胆码（逗号分隔）'), '01,02')
+    await userEvent.type(within(formView).getByLabelText('后区拖码（逗号分隔）'), '07,08')
 
-    expect(within(dialog).getByText('子注单 #1：后区胆码最多 1 个。')).toBeInTheDocument()
-    const submitButton = within(dialog).getByRole('button', { name: '添加投注' })
+    expect(within(formView).getByText('子注单 #1：后区胆码最多 1 个。')).toBeInTheDocument()
+    const submitButton = within(formView).getByRole('button', { name: '添加投注' })
     expect(submitButton).toBeDisabled()
     expect(createMyBet).not.toHaveBeenCalled()
 
-    await userEvent.clear(within(dialog).getByLabelText('后区胆码（逗号分隔）'))
-    await userEvent.type(within(dialog).getByLabelText('后区胆码（逗号分隔）'), '01')
+    await userEvent.clear(within(formView).getByLabelText('后区胆码（逗号分隔）'))
+    await userEvent.type(within(formView).getByLabelText('后区胆码（逗号分隔）'), '01')
 
-    await waitFor(() => expect(within(dialog).getByText('可提交保存。')).toBeInTheDocument())
+    await waitFor(() => expect(within(formView).getByText('可提交保存。')).toBeInTheDocument())
     expect(submitButton).toBeEnabled()
+  })
+
+  it('confirms before returning to list when my-bets form has unsaved changes', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+    await userEvent.type(within(formView).getByLabelText('前区号码（逗号分隔）'), '01,02,03,04,05')
+
+    await userEvent.click(within(formView).getByRole('button', { name: '返回列表' }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(screen.getByTestId('my-bets-form-view')).toBeInTheDocument()
+
+    await userEvent.click(within(formView).getByRole('button', { name: '返回列表' }))
+    await waitFor(() => expect(screen.queryByTestId('my-bets-form-view')).not.toBeInTheDocument())
+
+    confirmSpy.mockRestore()
+  })
+
+  it('prompts before switching tab when my-bets form has unsaved changes', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+    await userEvent.type(within(formView).getByLabelText('前区号码（逗号分隔）'), '01,02,03,04,05')
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/my-bets')
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history'))
+
+    confirmSpy.mockRestore()
   })
 })

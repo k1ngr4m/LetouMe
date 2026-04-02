@@ -465,6 +465,7 @@ export function HomePage() {
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const [isSummaryModelChipsExpanded, setIsSummaryModelChipsExpanded] = useState(false)
+  const [myBetsFormDirty, setMyBetsFormDirty] = useState(false)
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
     () =>
       selectedLottery === 'pl3'
@@ -491,6 +492,9 @@ export function HomePage() {
   const exportToastTimerRef = useRef<number | null>(null)
   const hasRestoredScrollRef = useRef(false)
   const hasInitializedLotteryRef = useRef(false)
+
+  const canNavigateDashboardTab = () =>
+    activeTab !== 'my-bets' || !myBetsFormDirty || window.confirm('有未保存内容，确定离开当前页面吗？')
 
   const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
     selectedLottery,
@@ -1068,7 +1072,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <HomeDashboardTabStrip activeTab={activeTab} selectedLottery={selectedLottery} />
+      <HomeDashboardTabStrip activeTab={activeTab} selectedLottery={selectedLottery} beforeNavigate={canNavigateDashboardTab} />
 
       {activeTab === 'prediction' ? (
         <div className="dashboard-layout">
@@ -1596,7 +1600,11 @@ export function HomePage() {
 
       {activeTab === 'my-bets' ? (
         <Suspense fallback={<div className="state-shell">正在加载投注面板...</div>}>
-          <MyBetsPanel lotteryCode={selectedLottery} targetPeriod={currentPredictions.data?.target_period || ''} />
+          <MyBetsPanel
+            lotteryCode={selectedLottery}
+            targetPeriod={currentPredictions.data?.target_period || ''}
+            onDirtyStateChange={setMyBetsFormDirty}
+          />
         </Suspense>
       ) : null}
       {exportModel ? (

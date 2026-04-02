@@ -6982,6 +6982,26 @@ a {
   gap: 1.08rem;
 }
 
+.my-bets-form-view {
+  margin-top: 0.9rem;
+}
+
+.my-bets-form-view__card {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(74, 144, 226, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(18, 24, 37, 0.9), rgba(13, 19, 30, 0.94));
+  box-shadow: 0 10px 24px rgba(4, 10, 20, 0.2);
+  overflow: hidden;
+}
+
+.my-bets-form-view__form {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
 .my-bets-modal-card {
   width: min(1060px, calc(100vw - 2rem));
   max-height: calc(100vh - 2.5rem);
@@ -7262,6 +7282,14 @@ a {
     radial-gradient(circle at top left, rgba(139, 92, 246, 0.11), transparent 32%),
     linear-gradient(180deg, rgba(252, 253, 255, 0.98), rgba(245, 249, 255, 0.97));
   box-shadow: 0 24px 56px rgba(85, 106, 138, 0.22);
+}
+
+:root[data-theme='light'] .my-bets-form-view__card {
+  border-color: rgba(133, 150, 178, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(74, 144, 226, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(253, 254, 255, 0.98), rgba(247, 251, 255, 0.97));
+  box-shadow: 0 8px 18px rgba(85, 106, 138, 0.14);
 }
 
 :root[data-theme='light'] .my-bets-modal__header {

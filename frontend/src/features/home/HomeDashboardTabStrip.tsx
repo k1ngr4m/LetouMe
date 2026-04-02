@@ -10,9 +10,11 @@ type DashboardActiveTab = 'prediction' | 'simulation' | 'analysis' | 'history' |
 export function HomeDashboardTabStrip({
   activeTab,
   selectedLottery,
+  beforeNavigate,
 }: {
   activeTab: DashboardActiveTab
   selectedLottery: LotteryCode
+  beforeNavigate?: () => boolean
 }) {
   const navigate = useNavigate()
   const [isCompact, setIsCompact] = useState(false)
@@ -85,6 +87,11 @@ export function HomeDashboardTabStrip({
     }
   }, [])
 
+  function guardedNavigate(action: () => void) {
+    if (beforeNavigate && !beforeNavigate()) return
+    action()
+  }
+
   const items: Array<{
     key: DashboardActiveTab
     label: string
@@ -95,37 +102,37 @@ export function HomeDashboardTabStrip({
       key: 'prediction',
       label: '预测总览',
       icon: Sparkles,
-      onClick: () => navigate(getDashboardPath('prediction')),
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('prediction'))),
     },
     {
       key: 'simulation',
       label: '模拟试玩',
       icon: CircleDollarSign,
-      onClick: () => navigate(getDashboardPath('simulation')),
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('simulation'))),
     },
     {
       key: 'analysis',
       label: '图表分析',
       icon: ChartColumnIncreasing,
-      onClick: () => navigate(getDashboardPath('analysis')),
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('analysis'))),
     },
     {
       key: 'history',
       label: '历史回溯',
       icon: History,
-      onClick: () => navigate(getDashboardPath('history')),
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('history'))),
     },
     {
       key: 'rules',
       label: '规则',
       icon: BookOpen,
-      onClick: () => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState }),
+      onClick: () => guardedNavigate(() => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState })),
     },
     {
       key: 'my-bets',
       label: '我的投注',
       icon: WalletCards,
-      onClick: () => navigate(getDashboardPath('my-bets')),
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('my-bets'))),
     },
   ]
 
