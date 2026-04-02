@@ -100,6 +100,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isPredictionSubmenuOpen, setIsPredictionSubmenuOpen] = useState(true)
   const lotteryMenuRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -309,12 +310,37 @@ export function AppShell({ children }: PropsWithChildren) {
                   ) : null}
                 </div>
               ) : null}
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate} title="预测总览">
-                <Sparkles size={16} aria-hidden="true" />
-                <span>预测总览</span>
-              </NavLink>
               {isPredictionRoute ? (
-                <div className="crm-nav-submenu" aria-label="预测总览二级菜单">
+                <div className="crm-nav-item crm-nav-item--with-toggle is-active" title="预测总览">
+                  <button className="crm-nav-item__main" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
+                    <Sparkles size={16} aria-hidden="true" />
+                    <span>预测总览</span>
+                  </button>
+                  <button
+                    className={clsx('crm-nav-submenu__toggle', isPredictionSubmenuOpen && 'is-open')}
+                    type="button"
+                    aria-label={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
+                    title={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
+                    aria-controls="prediction-submenu"
+                    aria-expanded={isPredictionSubmenuOpen}
+                    onClick={() => setIsPredictionSubmenuOpen((current) => !current)}
+                  >
+                    <ChevronDown size={14} aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate} title="预测总览">
+                  <Sparkles size={16} aria-hidden="true" />
+                  <span>预测总览</span>
+                </NavLink>
+              )}
+              {isPredictionRoute ? (
+                <div
+                  className={clsx('crm-nav-submenu', !isPredictionSubmenuOpen && 'is-collapsed')}
+                  id="prediction-submenu"
+                  aria-label="预测总览二级菜单"
+                  aria-hidden={!isPredictionSubmenuOpen}
+                >
                   <NavLink
                     className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'models' && 'is-active')}
                     to={`${HOME_TAB_PATHS.prediction}#models`}

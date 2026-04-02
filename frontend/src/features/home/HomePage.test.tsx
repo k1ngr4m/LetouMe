@@ -1028,11 +1028,25 @@ beforeEach(() => {
 })
 
 describe('HomePage dashboard sidebar', () => {
+  it('shows standalone summary cards between disclaimer and model list on prediction tab', () => {
+    renderPage()
+
+    expect(screen.queryByText('Prediction Command Center')).not.toBeInTheDocument()
+
+    const summary = screen.getByLabelText('当前预测摘要')
+    expect(within(summary).getByText('目标期号')).toBeInTheDocument()
+    expect(within(summary).getByText('下期开奖日')).toBeInTheDocument()
+    expect(within(summary).getByText('预测日期')).toBeInTheDocument()
+    expect(within(summary).getByText('开奖状态')).toBeInTheDocument()
+
+    const modelSectionTitle = screen.getByRole('heading', { name: '模型列表' })
+    expect(summary.compareDocumentPosition(modelSectionTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('shows local sidebar navigation on prediction tab', () => {
     renderPage()
 
-    expect(screen.getByRole('button', { name: '模型列表' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '预测统计' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '模型列表' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '预测统计' })).toBeInTheDocument()
     expect(screen.queryByText('评分加权')).not.toBeInTheDocument()
   })
