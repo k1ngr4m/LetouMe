@@ -11,7 +11,6 @@ import {
   CircleDollarSign,
   Gauge,
   History,
-  LayoutGrid,
   LogOut,
   Menu,
   Settings2,
@@ -46,7 +45,6 @@ const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
   { code: 'pl5', label: '排列5' },
 ]
 
-type PlaceholderPanelKey = 'messages' | null
 type SidebarPanelMode = 'workspace' | 'settings'
 
 function SidebarCollapseIcon() {
@@ -97,7 +95,6 @@ export function AppShell({ children }: PropsWithChildren) {
   const { user, hasPermission, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [activePlaceholderPanel, setActivePlaceholderPanel] = useState<PlaceholderPanelKey>(null)
   const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -139,11 +136,6 @@ export function AppShell({ children }: PropsWithChildren) {
     if (location.pathname.startsWith('/settings')) return '模型、用户与任务管理'
     return '预测工作台'
   }, [location.pathname])
-
-  const placeholderPanelTitle = useMemo(() => {
-    if (activePlaceholderPanel === 'messages') return '消息中心即将上线'
-    return ''
-  }, [activePlaceholderPanel])
 
   const onNavigate = () => {
     setIsSidebarOpen(false)
@@ -243,10 +235,6 @@ export function AppShell({ children }: PropsWithChildren) {
   function onSettingsNavigate() {
     setSidebarMode('settings')
     onNavigate()
-  }
-
-  function openPlaceholderPanel(panel: Exclude<PlaceholderPanelKey, null>) {
-    setActivePlaceholderPanel((current) => (current === panel ? null : panel))
   }
 
   function toggleSidebarCollapsed() {
@@ -464,11 +452,10 @@ export function AppShell({ children }: PropsWithChildren) {
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button
-              className={clsx('crm-topbar__icon-btn', activePlaceholderPanel === 'messages' && 'is-active')}
+              className="crm-topbar__icon-btn"
               type="button"
               aria-label="消息中心"
               title="消息中心"
-              onClick={() => openPlaceholderPanel('messages')}
             >
               <Bell size={16} aria-hidden="true" />
             </button>
@@ -513,13 +500,6 @@ export function AppShell({ children }: PropsWithChildren) {
             </div>
           </nav>
         </header>
-
-        {activePlaceholderPanel ? (
-          <section className="crm-placeholder-panel" role="status" aria-live="polite">
-            <LayoutGrid size={16} aria-hidden="true" />
-            <span>{placeholderPanelTitle}</span>
-          </section>
-        ) : null}
 
         <main className="app-main crm-main">
           <SiteDisclaimer compact />

@@ -11423,10 +11423,6 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .prediction-overview-toolbar__group--view {
-    display: none;
-  }
-
   .prediction-overview-section--models .panel-card__header {
     flex-direction: row;
     align-items: center;
@@ -11438,7 +11434,17 @@ a {
   }
 
   .prediction-overview-toolbar {
-    grid-template-areas: 'play play play play';
+    grid-template-areas:
+      'play play play play'
+      'view view view view';
+  }
+
+  .prediction-overview-toolbar__group--view {
+    grid-area: view;
+  }
+
+  .prediction-overview-toolbar__group--view .settings-model-toolbar__view-switch {
+    width: 100%;
   }
 
   .model-list-card__pin-indicator,

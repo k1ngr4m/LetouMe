@@ -441,7 +441,12 @@ export function HomePage() {
   const { showToast } = useToast()
   const activeTab = getHomeTabFromPath(location.pathname)
   const navigationState = location.state as HomeDetailRouteState | null
-  const [modelListView, setModelListView] = useState<HomeModelView>('list')
+  const [modelListView, setModelListView] = useState<HomeModelView>(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      return 'card'
+    }
+    return 'list'
+  })
   const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>('overallScore')
   const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
   const [historyPage, setHistoryPage] = useState(1)
