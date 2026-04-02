@@ -10059,6 +10059,8 @@ a {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding: 0.82rem 0.48rem;
   background: var(--crm-sidebar-bg);
   border-right: 1px solid var(--crm-sidebar-border);
@@ -10118,6 +10120,8 @@ a {
 
 .crm-sidebar__nav {
   display: grid;
+  align-content: start;
+  flex: 1;
   gap: 0.24rem;
 }
 
@@ -10305,42 +10309,19 @@ a {
 }
 
 .crm-sidebar__footer {
-  margin-top: 0.84rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  display: grid;
-  gap: 0.42rem;
-}
-
-.crm-logout-btn {
-  width: 100%;
-  min-height: 2.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 0.62rem;
-  color: #f7fbff;
-  background: rgba(255, 255, 255, 0.08);
+  margin-top: auto;
+  padding-top: 0.52rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-}
-
-.crm-logout-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.crm-logout-btn span {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .crm-sidebar__collapse-btn {
-  width: 100%;
-  min-height: 2.14rem;
+  width: 2.24rem;
+  min-width: 2.24rem;
+  min-height: 2.24rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.62rem;
+  border-radius: 0.68rem;
   color: #deebfb;
   background: rgba(255, 255, 255, 0.05);
   display: flex;
@@ -10354,15 +10335,8 @@ a {
 }
 
 .crm-sidebar__collapse-btn svg {
-  width: 1.05rem;
-  height: 1.05rem;
-}
-
-.crm-sidebar__collapse-btn span {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 1.12rem;
+  height: 1.12rem;
 }
 
 .crm-workspace {
@@ -10583,7 +10557,6 @@ a {
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item span,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-submenu,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back span,
-  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn span,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn span {
     opacity: 0;
     width: 0;
@@ -10592,7 +10565,6 @@ a {
 
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back,
-  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn {
     justify-content: center;
     padding-inline: 0.34rem;
@@ -10600,7 +10572,6 @@ a {
 
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item svg,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back svg,
-  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-logout-btn svg,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn svg {
     margin: 0;
   }
