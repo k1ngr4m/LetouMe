@@ -7,6 +7,8 @@ import type {
   BulkSettingsModelActionPayload,
   CurrentUserResponse,
   CurrentPredictionsResponse,
+  ForgotPasswordResetPayload,
+  ForgotPasswordSendCodePayload,
   GenerateSettingsModelPredictionsPayload,
   LoginPayload,
   MyBetRecordCreateResponse,
@@ -16,6 +18,7 @@ import type {
   MyBetRecordPayload,
   MyBetRecordUpdatePayload,
   MyBetRecordUpdateResponse,
+  OAuthStartResponse,
   LotteryHistoryResponse,
   LotteryFetchTask,
   MaintenanceRunLogListResponse,
@@ -148,6 +151,23 @@ export const apiClient = {
     return requestJson<CurrentUserResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload),
+    })
+  },
+  sendForgotPasswordCode(payload: ForgotPasswordSendCodePayload) {
+    return requestJson<SuccessResponse>('/api/auth/forgot-password/send-code', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  resetForgotPassword(payload: ForgotPasswordResetPayload) {
+    return requestJson<SuccessResponse>('/api/auth/forgot-password/reset', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  getOAuthStart(provider: 'google' | 'github') {
+    return requestJson<OAuthStartResponse>(`/api/auth/oauth/${provider}/start`, {
+      method: 'GET',
     })
   },
   logout() {

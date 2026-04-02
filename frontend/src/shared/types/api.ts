@@ -709,6 +709,7 @@ export type SettingsPredictionRecordDetail = {
 export type AuthUser = {
   id: number
   username: string
+  email?: string | null
   nickname: string
   avatar_url?: string | null
   role: string
@@ -724,17 +725,36 @@ export type CurrentUserResponse = {
 }
 
 export type LoginPayload = {
-  username: string
+  identifier: string
   password: string
 }
 
 export type RegisterPayload = {
   username: string
+  email: string
   password: string
+}
+
+export type ForgotPasswordSendCodePayload = {
+  email: string
+}
+
+export type ForgotPasswordResetPayload = {
+  email: string
+  code: string
+  new_password: string
+}
+
+export type OAuthStartResponse = {
+  provider: string
+  enabled: boolean
+  auth_url?: string | null
+  message?: string | null
 }
 
 export type AdminUserCreatePayload = {
   username: string
+  email?: string
   nickname?: string
   password: string
   role: string

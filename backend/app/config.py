@@ -44,6 +44,22 @@ class Settings:
     baidu_ocr_url: str = "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic"
     imgloc_api_key: str = ""
     imgloc_api_url: str = "https://imgloc.com/api/1/upload"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_from_email: str = ""
+    smtp_from_name: str = "LetouMe"
+    auth_email_code_expire_minutes: int = 10
+    auth_email_code_cooldown_seconds: int = 60
+    auth_oauth_base_url: str = ""
+    auth_oauth_google_client_id: str = ""
+    auth_oauth_google_authorize_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    auth_oauth_google_redirect_uri: str = ""
+    auth_oauth_github_client_id: str = ""
+    auth_oauth_github_authorize_url: str = "https://github.com/login/oauth/authorize"
+    auth_oauth_github_redirect_uri: str = ""
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -116,4 +132,20 @@ def load_settings() -> Settings:
         baidu_ocr_url=os.getenv("BAIDU_OCR_URL", "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic"),
         imgloc_api_key=os.getenv("IMGLOC_API_KEY", ""),
         imgloc_api_url=os.getenv("IMGLOC_API_URL", "https://imgloc.com/api/1/upload"),
+        smtp_host=os.getenv("SMTP_HOST", ""),
+        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+        smtp_user=os.getenv("SMTP_USER", ""),
+        smtp_password=os.getenv("SMTP_PASSWORD", ""),
+        smtp_use_tls=os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"},
+        smtp_from_email=os.getenv("SMTP_FROM_EMAIL", ""),
+        smtp_from_name=os.getenv("SMTP_FROM_NAME", "LetouMe"),
+        auth_email_code_expire_minutes=int(os.getenv("AUTH_EMAIL_CODE_EXPIRE_MINUTES", "10")),
+        auth_email_code_cooldown_seconds=int(os.getenv("AUTH_EMAIL_CODE_COOLDOWN_SECONDS", "60")),
+        auth_oauth_base_url=os.getenv("AUTH_OAUTH_BASE_URL", ""),
+        auth_oauth_google_client_id=os.getenv("AUTH_OAUTH_GOOGLE_CLIENT_ID", ""),
+        auth_oauth_google_authorize_url=os.getenv("AUTH_OAUTH_GOOGLE_AUTHORIZE_URL", "https://accounts.google.com/o/oauth2/v2/auth"),
+        auth_oauth_google_redirect_uri=os.getenv("AUTH_OAUTH_GOOGLE_REDIRECT_URI", ""),
+        auth_oauth_github_client_id=os.getenv("AUTH_OAUTH_GITHUB_CLIENT_ID", ""),
+        auth_oauth_github_authorize_url=os.getenv("AUTH_OAUTH_GITHUB_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),
+        auth_oauth_github_redirect_uri=os.getenv("AUTH_OAUTH_GITHUB_REDIRECT_URI", ""),
     )

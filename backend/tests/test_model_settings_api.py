@@ -30,7 +30,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.env.start()
         ensure_schema()
         self.client = TestClient(app)
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
     def tearDown(self) -> None:
         self.env.stop()

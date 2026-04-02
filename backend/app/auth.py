@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import string
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urlencode
 
 from backend.app.cache import runtime_cache
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -23,9 +25,11 @@ from backend.app.rbac import (
 )
 from backend.app.repositories.role_repository import RoleRepository
 from backend.app.repositories.user_repository import UserRepository
+from backend.app.services.email_service import EmailService
 
 
 logger = get_logger("auth")
+PASSWORD_RESET_EMAIL_PURPOSE = "password_reset"
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
@@ -53,6 +57,7 @@ class AuthService:
         self.repository = repository or UserRepository()
         self.settings = settings or load_settings()
         self.role_repository = role_repository or RoleRepository()
+        self.email_service = EmailService(settings=self.settings)
 
     def ensure_bootstrap_admin(self) -> None:
         ensure_rbac_setup()
@@ -74,8 +79,12 @@ class AuthService:
         )
         logger.info("Bootstrap admin created", extra={"context": {"username": username}})
 
-    def login(self, username: str, password: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
-        user = self.repository.get_user_by_username(username.strip())
+    def login(self, identifier: str, password: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
+        normalized_identifier = identifier.strip()
+        if "@" in normalized_identifier:
+            user = self.repository.get_user_by_email(normalized_identifier.lower())
+        else:
+            user = self.repository.get_user_by_username(normalized_identifier)
         if not user or not user.get("is_active"):
             raise ValueError("用户名或密码错误")
         if not verify_password(password, str(user["password_hash"])):
@@ -92,11 +101,17 @@ class AuthService:
         logger.info("User logged in", extra={"context": {"username": user["username"], "role": user["role"]}})
         return self._serialize_user(user), token
 
-    def register(self, username: str, password: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
+    def register(self, username: str, email: str, password: str, *, user_agent: str = "", ip_address: str = "") -> tuple[dict[str, Any], str]:
         normalized_username = username.strip()
+        normalized_email = email.strip().lower()
+        if not normalized_email:
+            raise ValueError("邮箱不能为空")
+        if not _is_valid_email(normalized_email):
+            raise ValueError("邮箱格式不正确")
         created = self.create_user(
             {
                 "username": normalized_username,
+                "email": normalized_email,
                 "nickname": normalized_username,
                 "password": password,
                 "role": NORMAL_USER_ROLE,
@@ -146,11 +161,14 @@ class AuthService:
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
         username = str(payload.get("username") or "").strip()
+        email = str(payload.get("email") or "").strip().lower()
         nickname = str(payload.get("nickname") or username).strip() or username
         password = str(payload.get("password") or "")
         role_code = self._normalize_role_code(payload.get("role"))
         if not username:
             raise ValueError("用户名不能为空")
+        if email and not _is_valid_email(email):
+            raise ValueError("邮箱格式不正确")
         if len(password) < 8:
             raise ValueError("密码长度至少为 8 位")
         if not self.role_repository.get_role(role_code):
@@ -158,6 +176,7 @@ class AuthService:
         created = self.repository.create_user(
             {
                 "username": username,
+                "email": email or None,
                 "nickname": nickname,
                 "password_hash": hash_password(password),
                 "role": role_code,
@@ -190,6 +209,102 @@ class AuthService:
         updated = self.repository.update_password(user_id, hash_password(new_password))
         self.repository.delete_sessions_for_user(user_id)
         return self._serialize_user(updated)
+
+    def send_password_reset_code(self, email: str) -> None:
+        normalized_email = email.strip().lower()
+        if not _is_valid_email(normalized_email):
+            raise ValueError("邮箱格式不正确")
+        user = self.repository.get_user_by_email(normalized_email)
+        if not user or not user.get("is_active"):
+            raise ValueError("该邮箱未绑定可用账号")
+        latest_code = self.repository.get_latest_active_email_verification_code(
+            email=normalized_email,
+            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
+        )
+        if latest_code:
+            created_at = _to_datetime(latest_code.get("created_at"))
+            if created_at and created_at + timedelta(seconds=self.settings.auth_email_code_cooldown_seconds) > datetime.utcnow():
+                raise ValueError("验证码发送过于频繁，请稍后再试")
+
+        code = "".join(secrets.choice(string.digits) for _ in range(6))
+        code_hash = _hash_email_code(code, normalized_email)
+        self.repository.create_email_verification_code(
+            email=normalized_email,
+            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
+            code_hash=code_hash,
+            expires_at=datetime.utcnow() + timedelta(minutes=self.settings.auth_email_code_expire_minutes),
+        )
+        self.email_service.send_password_reset_code(normalized_email, code)
+
+    def reset_password_by_email_code(self, email: str, code: str, new_password: str) -> None:
+        normalized_email = email.strip().lower()
+        normalized_code = code.strip()
+        if not _is_valid_email(normalized_email):
+            raise ValueError("邮箱格式不正确")
+        if len(new_password) < 8:
+            raise ValueError("密码长度至少为 8 位")
+        latest_code = self.repository.get_latest_active_email_verification_code(
+            email=normalized_email,
+            purpose=PASSWORD_RESET_EMAIL_PURPOSE,
+        )
+        if not latest_code:
+            raise ValueError("验证码不存在或已失效")
+        if int(latest_code.get("attempt_count") or 0) >= 5:
+            self.repository.consume_email_verification_code(int(latest_code["id"]))
+            raise ValueError("验证码错误次数过多，请重新获取")
+        expires_at = _to_datetime(latest_code.get("expires_at"))
+        if not expires_at or expires_at <= datetime.utcnow():
+            self.repository.consume_email_verification_code(int(latest_code["id"]))
+            raise ValueError("验证码已过期")
+        expected_hash = str(latest_code.get("code_hash") or "")
+        candidate_hash = _hash_email_code(normalized_code, normalized_email)
+        if not expected_hash or not hmac.compare_digest(candidate_hash, expected_hash):
+            self.repository.increment_email_verification_code_attempt(int(latest_code["id"]))
+            raise ValueError("验证码错误")
+        user = self.repository.get_user_by_email(normalized_email)
+        if not user or not user.get("is_active"):
+            raise ValueError("该邮箱未绑定可用账号")
+        self.repository.consume_email_verification_code(int(latest_code["id"]))
+        self.repository.update_password(int(user["id"]), hash_password(new_password))
+        self.repository.delete_sessions_for_user(int(user["id"]))
+
+    def get_oauth_provider_start(self, provider: str) -> dict[str, Any]:
+        normalized_provider = provider.strip().lower()
+        if normalized_provider not in {"google", "github"}:
+            raise ValueError("不支持的 OAuth Provider")
+        if normalized_provider == "google":
+            client_id = self.settings.auth_oauth_google_client_id.strip()
+            authorize_url = self.settings.auth_oauth_google_authorize_url.strip()
+            redirect_uri = self.settings.auth_oauth_google_redirect_uri.strip()
+            scope = "openid email profile"
+        else:
+            client_id = self.settings.auth_oauth_github_client_id.strip()
+            authorize_url = self.settings.auth_oauth_github_authorize_url.strip()
+            redirect_uri = self.settings.auth_oauth_github_redirect_uri.strip()
+            scope = "read:user user:email"
+        if not client_id or not authorize_url or not redirect_uri:
+            return {
+                "provider": normalized_provider,
+                "enabled": False,
+                "auth_url": None,
+                "message": "OAuth 未配置，请联系管理员",
+            }
+        state = secrets.token_urlsafe(24)
+        query = urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": scope,
+                "state": state,
+            }
+        )
+        return {
+            "provider": normalized_provider,
+            "enabled": True,
+            "auth_url": f"{authorize_url}?{query}",
+            "message": None,
+        }
 
     def update_profile(self, user_id: int, nickname: str) -> dict[str, Any]:
         normalized_nickname = nickname.strip()
@@ -251,6 +366,7 @@ class AuthService:
         return {
             "id": int(user["id"]),
             "username": str(user["username"]),
+            "email": str(user["email"]) if user.get("email") else None,
             "nickname": str(user.get("nickname") or user["username"]),
             "avatar_url": str(user["avatar_url"]) if user.get("avatar_url") else None,
             "role": str(user["role"]),
@@ -277,6 +393,27 @@ def _format_datetime(value: Any) -> str | None:
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%dT%H:%M:%SZ")
     return str(value)
+
+
+def _to_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def _is_valid_email(email: str) -> bool:
+    return bool(email) and ("@" in email) and ("." in email.rsplit("@", 1)[-1])
+
+
+def _hash_email_code(code: str, email: str) -> str:
+    material = f"{email}:{code}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
 def set_session_cookie(response: Response, session_token: str, settings: Settings | None = None) -> None:

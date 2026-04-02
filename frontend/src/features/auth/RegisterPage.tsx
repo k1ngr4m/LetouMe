@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
+import './auth-redesign.css'
 
 function PasswordToggleIcon({ visible }: { visible: boolean }) {
   return visible ? (
@@ -32,12 +34,14 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const { register } = useAuth()
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,7 +56,7 @@ export function RegisterPage() {
     try {
       setIsSubmitting(true)
       setError(null)
-      await register({ username, password })
+      await register({ username, email, password })
       navigate('/dashboard/prediction', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '注册失败')
@@ -61,109 +65,101 @@ export function RegisterPage() {
     }
   }
 
+  async function handleOAuth(provider: 'google' | 'github') {
+    try {
+      setOauthLoading(provider)
+      setError(null)
+      const response = await apiClient.getOAuthStart(provider)
+      if (!response.enabled || !response.auth_url) {
+        throw new Error(response.message || '第三方登录暂未开通')
+      }
+      window.location.href = response.auth_url
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '暂时无法使用第三方登录')
+    } finally {
+      setOauthLoading(null)
+    }
+  }
+
   return (
-    <div className="landing-shell">
-      <div className="landing-page-stack">
-        <SiteDisclaimer />
-        <section className="landing-panel landing-panel--auth">
-          <div className="landing-panel__copy landing-panel__copy--auth">
-            <p className="landing-panel__eyebrow">Registration</p>
-            <h1 className="landing-panel__title landing-panel__title--auth">创建 LetouMe 账号</h1>
-            <p className="landing-panel__description auth-hero-description">注册完成后即可进入预测工作台，账号配置后续可随时调整。</p>
-            <div className="auth-hero-metrics" aria-label="注册后能力概览">
-              <article className="auth-hero-metric">
-                <span>默认权限</span>
-                <strong>普通用户可用</strong>
-              </article>
-              <article className="auth-hero-metric">
-                <span>体验入口</span>
-                <strong>立即进入预测页</strong>
-              </article>
-              <article className="auth-hero-metric">
-                <span>安全管理</span>
-                <strong>支持后续改密</strong>
-              </article>
-            </div>
-            <div className="auth-highlight-list" aria-label="注册账号说明">
-              <div className="auth-highlight-card">
-                <strong>开通即用</strong>
-                <span>注册成功后直接进入控制台，无需额外激活。</span>
+    <div className="authx-page">
+      <div className="authx-wrap">
+        <SiteDisclaimer compact />
+        <section className="authx-panel">
+          <header className="authx-head">
+            <h1>创建账户</h1>
+            <p>填写以下信息创建您的 LetouMe 账户</p>
+          </header>
+          <form className="authx-form" onSubmit={handleSubmit}>
+            <label className="authx-field">
+              <span>用户名</span>
+              <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="输入您的用户名" required />
+            </label>
+            <label className="authx-field">
+              <span>邮箱</span>
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+            <label className="authx-field">
+              <span>密码</span>
+              <div className="authx-password-wrap">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="不少于 8 位"
+                  required
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? '隐藏密码' : '显示密码'}>
+                  <PasswordToggleIcon visible={showPassword} />
+                </button>
               </div>
-              <div className="auth-highlight-card">
-                <strong>安全规范</strong>
-                <span>密码至少 8 位，建议同时包含数字与字母。</span>
+            </label>
+            <label className="authx-field">
+              <span>确认密码</span>
+              <div className="authx-password-wrap">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="再次输入密码"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
+                >
+                  <PasswordToggleIcon visible={showConfirmPassword} />
+                </button>
               </div>
-              <div className="auth-highlight-card">
-                <strong>资料可修改</strong>
-                <span>后续可在设置页更新昵称和密码信息。</span>
-              </div>
-            </div>
+            </label>
+            {error ? <p className="authx-error">注册失败：{error}</p> : null}
+            <button className="authx-primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? '注册中...' : '注册'}
+            </button>
+          </form>
+          <div className="authx-divider">或者使用</div>
+          <div className="authx-social">
+            <button type="button" onClick={() => void handleOAuth('google')} disabled={oauthLoading !== null}>
+              <span aria-hidden="true">G</span> Google
+            </button>
+            <button type="button" onClick={() => void handleOAuth('github')} disabled={oauthLoading !== null}>
+              <span aria-hidden="true">⌘</span> GitHub
+            </button>
           </div>
-          <div className="auth-panel">
-            <div className="auth-panel__header">
-              <p className="auth-panel__eyebrow">Create Account</p>
-              <h2 className="auth-panel__title">新用户注册</h2>
-              <p className="auth-panel__subtitle">填写账号信息后即可创建新账户并进入平台。</p>
-            </div>
-            <form className="auth-form auth-form--card" onSubmit={handleSubmit}>
-              <label className="auth-field">
-                <span className="auth-field__label">用户名</span>
-                <input className="auth-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="设置登录用户名" />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field__label">密码</span>
-                <div className="auth-input-wrap">
-                  <input
-                    className="auth-input auth-input--password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="不少于 8 位密码"
-                  />
-                  <button
-                    className="auth-input-toggle"
-                    type="button"
-                    onClick={() => setShowPassword((value) => !value)}
-                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                    title={showPassword ? '隐藏密码' : '显示密码'}
-                  >
-                    <PasswordToggleIcon visible={showPassword} />
-                  </button>
-                </div>
-              </label>
-              <label className="auth-field">
-                <span className="auth-field__label">确认密码</span>
-                <div className="auth-input-wrap">
-                  <input
-                    className="auth-input auth-input--password"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    placeholder="再次输入密码"
-                  />
-                  <button
-                    className="auth-input-toggle"
-                    type="button"
-                    onClick={() => setShowConfirmPassword((value) => !value)}
-                    aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
-                    title={showConfirmPassword ? '隐藏密码' : '显示密码'}
-                  >
-                    <PasswordToggleIcon visible={showConfirmPassword} />
-                  </button>
-                </div>
-              </label>
-              {error ? <p className="landing-panel__error landing-panel__error--auth">注册失败：{error}</p> : null}
-              <button className="landing-panel__button landing-panel__button--auth" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? '注册中...' : '注册'}
-              </button>
-            </form>
-            <div className="auth-panel__footer">
-              <span>已经有账号了？</span>
-              <Link className="ghost-button auth-panel__link" to="/login">
-                去登录
-              </Link>
-            </div>
-          </div>
+          <p className="authx-switch">
+            已有账户？
+            <Link to="/login">立即登录</Link>
+          </p>
         </section>
       </div>
     </div>

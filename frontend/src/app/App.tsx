@@ -18,6 +18,8 @@ const ROLE_MANAGEMENT_PERMISSION = 'role_management'
 const LandingPage = lazy(() => import('../features/landing/LandingPage').then((module) => ({ default: module.LandingPage })))
 const LoginPage = lazy(() => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage })))
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage').then((module) => ({ default: module.RegisterPage })))
+const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })))
+const OAuthCallbackPage = lazy(() => import('../features/auth/OAuthCallbackPage').then((module) => ({ default: module.OAuthCallbackPage })))
 const HomePage = lazy(() => import('../features/home/HomePage').then((module) => ({ default: module.HomePage })))
 const HomeModelDetailPage = lazy(() =>
   import('../features/home/HomeModelDetailPage').then((module) => ({ default: module.HomeModelDetailPage })),
@@ -41,6 +43,8 @@ export function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
             <Route path="/dashboard" element={<Navigate to={HOME_TAB_PATHS.prediction} replace />} />
             <Route
               path={HOME_TAB_PATHS.prediction}

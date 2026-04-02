@@ -19,7 +19,10 @@ from backend.app.auth import (
 )
 from backend.app.schemas.auth import (
     CurrentUserResponse,
+    ForgotPasswordResetPayload,
+    ForgotPasswordSendCodePayload,
     LoginPayload,
+    OAuthStartResponse,
     PermissionListResponse,
     RoleListResponse,
     RegisterPayload,
@@ -150,7 +153,7 @@ def login(
 ) -> dict:
     try:
         user, session_token = auth_service.login(
-            payload.username,
+            payload.identifier,
             payload.password,
             user_agent=request.headers.get("user-agent", ""),
             ip_address=request.client.host if request.client else "",
@@ -171,6 +174,7 @@ def register(
     try:
         user, session_token = auth_service.register(
             payload.username,
+            payload.email,
             payload.password,
             user_agent=request.headers.get("user-agent", ""),
             ip_address=request.client.host if request.client else "",
@@ -195,6 +199,47 @@ def logout(
 @router.post("/auth/me", response_model=CurrentUserResponse)
 def get_current_auth_user(current_user: dict = Depends(require_current_user)) -> dict:
     return {"user": current_user}
+
+
+@router.post("/auth/forgot-password/send-code", response_model=SuccessResponse)
+def send_forgot_password_code(
+    payload: ForgotPasswordSendCodePayload,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        auth_service.send_password_reset_code(payload.email)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"success": True}
+
+
+@router.post("/auth/forgot-password/reset", response_model=SuccessResponse)
+def reset_password_by_email_code(
+    payload: ForgotPasswordResetPayload,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> dict:
+    try:
+        auth_service.reset_password_by_email_code(payload.email, payload.code, payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True}
+
+
+@router.get("/auth/oauth/{provider}/start", response_model=OAuthStartResponse)
+def oauth_provider_start(provider: str, auth_service: AuthService = Depends(get_auth_service)) -> dict:
+    try:
+        return auth_service.get_oauth_provider_start(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/auth/oauth/{provider}/callback", response_model=SuccessResponse)
+def oauth_provider_callback(provider: str) -> dict:
+    if provider.strip().lower() not in {"google", "github"}:
+        raise HTTPException(status_code=400, detail="不支持的 OAuth Provider")
+    raise HTTPException(status_code=501, detail="OAuth 回调尚未启用")
 
 
 @router.post("/lottery/history", response_model=LotteryHistoryResponse)

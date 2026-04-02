@@ -35,7 +35,7 @@ class SimulationTicketApiTests(unittest.TestCase):
                 cursor.execute("DELETE FROM user_session")
                 cursor.execute("DELETE FROM app_user WHERE username != ?", ("admin",))
         self.client = TestClient(create_app())
-        self.client.post("/api/auth/register", json={"username": "player-a", "password": "player12345"})
+        self.client.post("/api/auth/register", json={"username": "player-a", "email": "player-a@example.com", "password": "player12345"})
 
     def tearDown(self) -> None:
         self.env.stop()
@@ -72,7 +72,7 @@ class SimulationTicketApiTests(unittest.TestCase):
             json={"front_numbers": ["01", "02", "03", "04", "05"], "back_numbers": ["01", "02"]},
         )
         other_client = TestClient(create_app())
-        other_client.post("/api/auth/register", json={"username": "player-b", "password": "player12345"})
+        other_client.post("/api/auth/register", json={"username": "player-b", "email": "player-b@example.com", "password": "player12345"})
         other_client.post(
             "/api/simulation/tickets/create",
             json={"front_numbers": ["06", "07", "08", "09", "10"], "back_numbers": ["03", "04"]},

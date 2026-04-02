@@ -816,9 +816,9 @@ export function SettingsPage() {
   }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers, isSuperAdmin])
 
   const displayEmail = useMemo(() => {
-    const candidate = [user?.username].find((item) => typeof item === 'string' && item.includes('@'))
+    const candidate = [user?.email, user?.username].find((item) => typeof item === 'string' && item.includes('@'))
     return candidate || '暂未设置邮箱'
-  }, [user?.username])
+  }, [user?.email, user?.username])
 
   const displayCreatedAt = user?.created_at ? formatDateTimeBeijing(user.created_at) : '-'
 

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
+import './auth-redesign.css'
 
 function PasswordToggleIcon({ visible }: { visible: boolean }) {
   return visible ? (
@@ -32,18 +34,19 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-  const [username, setUsername] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     try {
       setIsSubmitting(true)
       setError(null)
-      await login({ username, password })
+      await login({ identifier, password })
       navigate((location.state as { from?: string } | null)?.from || '/dashboard/prediction', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '登录失败')
@@ -52,87 +55,82 @@ export function LoginPage() {
     }
   }
 
+  async function handleOAuth(provider: 'google' | 'github') {
+    try {
+      setOauthLoading(provider)
+      setError(null)
+      const response = await apiClient.getOAuthStart(provider)
+      if (!response.enabled || !response.auth_url) {
+        throw new Error(response.message || '第三方登录暂未开通')
+      }
+      window.location.href = response.auth_url
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '暂时无法使用第三方登录')
+    } finally {
+      setOauthLoading(null)
+    }
+  }
+
   return (
-    <div className="landing-shell">
-      <div className="landing-page-stack">
-        <SiteDisclaimer />
-        <section className="landing-panel landing-panel--auth">
-          <div className="landing-panel__copy landing-panel__copy--auth">
-            <p className="landing-panel__eyebrow">Authentication</p>
-            <h1 className="landing-panel__title landing-panel__title--auth">欢迎回到 LetouMe</h1>
-            <p className="landing-panel__description auth-hero-description">进入统一控制台，查看预测、历史表现与策略结果。</p>
-            <div className="auth-hero-metrics" aria-label="平台能力概览">
-              <article className="auth-hero-metric">
-                <span>模型编排</span>
-                <strong>多 Provider 并行</strong>
-              </article>
-              <article className="auth-hero-metric">
-                <span>预测输出</span>
-                <strong>普通 / 复式 / 胆拖</strong>
-              </article>
-              <article className="auth-hero-metric">
-                <span>数据链路</span>
-                <strong>抓取 · 归档 · 分析</strong>
-              </article>
-            </div>
-            <div className="auth-highlight-list" aria-label="登录后可用功能">
-              <div className="auth-highlight-card">
-                <strong>实时预测</strong>
-                <span>快速进入大乐透预测与历史数据视图。</span>
+    <div className="authx-page">
+      <div className="authx-wrap">
+        <SiteDisclaimer compact />
+        <section className="authx-panel">
+          <header className="authx-head">
+            <h1>登录</h1>
+            <p>输入用户名或邮箱与密码登录您的账户</p>
+          </header>
+          <form className="authx-form" onSubmit={handleSubmit}>
+            <label className="authx-field">
+              <span>用户名或邮箱</span>
+              <input
+                type="text"
+                autoComplete="username"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                placeholder="username / name@example.com"
+                required
+              />
+            </label>
+            <label className="authx-field">
+              <div className="authx-field-row">
+                <span>密码</span>
+                <Link to="/forgot-password">忘记密码?</Link>
               </div>
-              <div className="auth-highlight-card">
-                <strong>模型管理</strong>
-                <span>统一查看模型状态、参数和策略配置。</span>
+              <div className="authx-password-wrap">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="请输入密码"
+                  required
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? '隐藏密码' : '显示密码'}>
+                  <PasswordToggleIcon visible={showPassword} />
+                </button>
               </div>
-              <div className="auth-highlight-card">
-                <strong>账号安全</strong>
-                <span>在个人设置中维护资料与密码信息。</span>
-              </div>
-            </div>
-          </div>
-          <div className="auth-panel">
-            <div className="auth-panel__header">
-              <p className="auth-panel__eyebrow">Sign In</p>
-              <h2 className="auth-panel__title">账号登录</h2>
-              <p className="auth-panel__subtitle">请输入你的系统账号和密码继续使用平台。</p>
-            </div>
-            <form className="auth-form auth-form--card" onSubmit={handleSubmit}>
-              <label className="auth-field">
-                <span className="auth-field__label">用户名</span>
-                <input className="auth-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="请输入用户名" />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field__label">密码</span>
-                <div className="auth-input-wrap">
-                  <input
-                    className="auth-input auth-input--password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="请输入密码"
-                  />
-                  <button
-                    className="auth-input-toggle"
-                    type="button"
-                    onClick={() => setShowPassword((value) => !value)}
-                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                    title={showPassword ? '隐藏密码' : '显示密码'}
-                  >
-                    <PasswordToggleIcon visible={showPassword} />
-                  </button>
-                </div>
-              </label>
-              {error ? <p className="landing-panel__error landing-panel__error--auth">登录失败：{error}</p> : null}
-              <button className="landing-panel__button landing-panel__button--auth" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? '登录中...' : '登录'}
-              </button>
-            </form>
-            <div className="auth-panel__footer">
-              <span>还没有账号？</span>
-              <Link className="ghost-button auth-panel__link" to="/register">
-                立即注册
-              </Link>
-            </div>
+            </label>
+            {error ? <p className="authx-error">登录失败：{error}</p> : null}
+            <button className="authx-primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? '登录中...' : '登录'}
+            </button>
+          </form>
+          <button className="authx-secondary" type="button" onClick={() => setError('魔法链接功能即将上线')}>
+            使用魔法链接登录
+          </button>
+          <p className="authx-switch">
+            还没有账号？
+            <Link to="/register">立即注册</Link>
+          </p>
+          <div className="authx-divider">或者使用</div>
+          <div className="authx-social">
+            <button type="button" onClick={() => void handleOAuth('google')} disabled={oauthLoading !== null}>
+              <span aria-hidden="true">G</span> Google
+            </button>
+            <button type="button" onClick={() => void handleOAuth('github')} disabled={oauthLoading !== null}>
+              <span aria-hidden="true">⌘</span> GitHub
+            </button>
           </div>
         </section>
       </div>

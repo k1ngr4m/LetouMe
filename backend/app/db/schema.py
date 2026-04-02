@@ -279,6 +279,7 @@ SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS app_user (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(128) NOT NULL UNIQUE,
+        email VARCHAR(255) NULL,
         nickname VARCHAR(128) NULL,
         avatar_url VARCHAR(1024) NULL,
         password_hash VARCHAR(255) NOT NULL,
@@ -289,6 +290,20 @@ SCHEMA_STATEMENTS = [
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_app_user_role_active (role_id, is_active),
         CONSTRAINT fk_app_user_role FOREIGN KEY (role_id) REFERENCES app_role(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS auth_email_code (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        purpose VARCHAR(32) NOT NULL,
+        code_hash VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        consumed_at DATETIME NULL,
+        attempt_count INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_auth_email_code_lookup (email, purpose, consumed_at),
+        INDEX idx_auth_email_code_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -769,6 +784,11 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
 
 
 SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
+    "app_user": {
+        "add": {
+            "uq_app_user_email": "ALTER TABLE app_user ADD UNIQUE KEY uq_app_user_email (email)",
+        },
+    },
     "draw_result_number": {
         "drop": {
             "uq_draw_result_number_value": "ALTER TABLE draw_result_number DROP INDEX uq_draw_result_number_value",
@@ -847,6 +867,7 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         "provider_model_id": "ALTER TABLE ai_model ADD COLUMN provider_model_id BIGINT NULL AFTER provider_id",
     },
     "app_user": {
+        "email": "ALTER TABLE app_user ADD COLUMN email VARCHAR(255) NULL AFTER username",
         "nickname": "ALTER TABLE app_user ADD COLUMN nickname VARCHAR(128) NULL AFTER username",
         "avatar_url": "ALTER TABLE app_user ADD COLUMN avatar_url VARCHAR(1024) NULL AFTER nickname",
         "role_id": (
@@ -937,6 +958,9 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
             "ALTER TABLE scheduled_task "
             "ADD COLUMN prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct' AFTER generation_mode"
         ),
+    },
+    "auth_email_code": {
+        "attempt_count": "ALTER TABLE auth_email_code ADD COLUMN attempt_count INT NOT NULL DEFAULT 0 AFTER consumed_at",
     },
 }
 

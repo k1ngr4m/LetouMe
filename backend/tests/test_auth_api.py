@@ -40,7 +40,7 @@ class AuthApiTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_login_me_logout_flow(self) -> None:
-        login_response = self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        login_response = self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
         self.assertEqual(login_response.status_code, 200)
         self.assertEqual(login_response.json()["user"]["username"], "admin")
 
@@ -55,7 +55,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(unauth_response.status_code, 401)
 
     def test_admin_can_create_user_and_user_cannot_access_settings(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
         create_response = self.client.post(
             "/api/admin/users/create",
@@ -64,14 +64,14 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(create_response.status_code, 200)
 
         user_client = TestClient(create_app())
-        login_response = user_client.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
+        login_response = user_client.post("/api/auth/login", json={"identifier": "viewer", "password": "viewer123"})
         self.assertEqual(login_response.status_code, 200)
 
         settings_response = user_client.post("/api/settings/models/list", json={"include_deleted": False})
         self.assertEqual(settings_response.status_code, 403)
 
     def test_admin_user_list_serializes_datetime_fields(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
         self.client.post(
             "/api/admin/users/create",
             json={"username": "viewer", "password": "viewer123", "role": "user", "is_active": True},
@@ -87,7 +87,7 @@ class AuthApiTests(unittest.TestCase):
     def test_register_creates_normal_user_and_logs_in(self) -> None:
         register_response = self.client.post(
             "/api/auth/register",
-            json={"username": "signup-user", "password": "signup123"},
+            json={"username": "signup-user", "email": "signup-user@example.com", "password": "signup123"},
         )
         self.assertEqual(register_response.status_code, 200)
         self.assertEqual(register_response.json()["user"]["role"], "normal_user")
@@ -103,20 +103,20 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(lottery_fetch_forbidden.status_code, 403)
 
     def test_register_rejects_duplicate_username(self) -> None:
-        self.client.post("/api/auth/register", json={"username": "dup-user", "password": "signup123"})
-        response = self.client.post("/api/auth/register", json={"username": "dup-user", "password": "signup123"})
+        self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123"})
+        response = self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123"})
         self.assertEqual(response.status_code, 400)
 
     def test_register_cannot_escalate_to_admin_role(self) -> None:
         response = self.client.post(
             "/api/auth/register",
-            json={"username": "escalate-user", "password": "signup123", "role": "admin"},
+            json={"username": "escalate-user", "email": "escalate-user@example.com", "password": "signup123", "role": "admin"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["role"], "normal_user")
 
     def test_role_permissions_include_description_and_can_be_updated(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
         list_response = self.client.post("/api/admin/roles/permissions", json={})
 
@@ -139,7 +139,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(updated["permission_description"], "允许用户查看账号信息并修改昵称与密码。")
 
     def test_upload_profile_avatar_updates_current_user(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
         with patch("backend.app.api.routes.profile_avatar_service.upload_profile_avatar", return_value="https://img.example/avatar.jpg"):
             response = self.client.post(
@@ -155,7 +155,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(me_response.json()["user"]["avatar_url"], "https://img.example/avatar.jpg")
 
     def test_upload_profile_avatar_rejects_invalid_format(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
         response = self.client.post(
             "/api/settings/profile/avatar/upload",
@@ -166,7 +166,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertIn("JPG、PNG", response.json()["detail"])
 
     def test_upload_profile_avatar_rejects_oversized_file(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123456"})
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
 
         oversized_payload = b"a" * (4 * 1024 * 1024 + 512 * 1024 + 1)
         response = self.client.post(

@@ -4,18 +4,37 @@ from pydantic import BaseModel, Field
 
 
 class LoginPayload(BaseModel):
-    username: str
+    identifier: str
     password: str
 
 
 class RegisterPayload(BaseModel):
     username: str
+    email: str
     password: str
+
+
+class ForgotPasswordSendCodePayload(BaseModel):
+    email: str
+
+
+class ForgotPasswordResetPayload(BaseModel):
+    email: str
+    code: str
+    new_password: str
+
+
+class OAuthStartResponse(BaseModel):
+    provider: str
+    enabled: bool
+    auth_url: str | None = None
+    message: str | None = None
 
 
 class AuthUserResponse(BaseModel):
     id: int
     username: str
+    email: str | None = None
     nickname: str
     avatar_url: str | None = None
     role: str
@@ -58,6 +77,7 @@ class PermissionListResponse(BaseModel):
 
 class UserCreatePayload(BaseModel):
     username: str
+    email: str | None = None
     nickname: str | None = None
     password: str
     role: str = "normal_user"

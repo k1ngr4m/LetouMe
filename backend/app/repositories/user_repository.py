@@ -30,15 +30,21 @@ class UserRepository:
                 cursor.execute("SELECT 1 FROM app_user WHERE username = ?", (payload["username"],))
                 if cursor.fetchone():
                     raise ValueError(f"用户名已存在: {payload['username']}")
+                email = str(payload.get("email") or "").strip().lower()
+                if email:
+                    cursor.execute("SELECT 1 FROM app_user WHERE email = ?", (email,))
+                    if cursor.fetchone():
+                        raise ValueError(f"邮箱已存在: {email}")
                 role_code = str(payload.get("role") or NORMAL_USER_ROLE)
                 role_id = self._resolve_role_id(cursor, role_code)
                 cursor.execute(
                     """
-                    INSERT INTO app_user (username, nickname, password_hash, role_id, is_active)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO app_user (username, email, nickname, password_hash, role_id, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         payload["username"],
+                        email or None,
                         payload.get("nickname") or payload["username"],
                         payload["password_hash"],
                         role_id,
@@ -56,6 +62,7 @@ class UserRepository:
                     SELECT
                         au.id,
                         au.username,
+                        au.email,
                         au.nickname,
                         au.avatar_url,
                         ar.role_code AS role,
@@ -72,6 +79,9 @@ class UserRepository:
 
     def get_user_by_username(self, username: str) -> dict[str, Any] | None:
         return self._get_user("au.username = ?", (username,))
+
+    def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+        return self._get_user("au.email = ?", (email,))
 
     def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
         return self._get_user("au.id = ?", (user_id,))
@@ -187,6 +197,7 @@ class UserRepository:
                         us.expires_at,
                         au.id,
                         au.username,
+                        au.email,
                         au.nickname,
                         au.avatar_url,
                         au.password_hash,
@@ -227,6 +238,71 @@ class UserRepository:
             with connection.cursor() as cursor:
                 cursor.execute("DELETE FROM user_session WHERE user_id = ?", (user_id,))
 
+    def create_email_verification_code(
+        self,
+        *,
+        email: str,
+        purpose: str,
+        code_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE auth_email_code
+                    SET consumed_at = CURRENT_TIMESTAMP
+                    WHERE email = ? AND purpose = ? AND consumed_at IS NULL
+                    """,
+                    (email, purpose),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO auth_email_code (email, purpose, code_hash, expires_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (email, purpose, code_hash, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+                )
+
+    def get_latest_active_email_verification_code(self, *, email: str, purpose: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, email, purpose, code_hash, expires_at, consumed_at, attempt_count, created_at
+                    FROM auth_email_code
+                    WHERE email = ? AND purpose = ? AND consumed_at IS NULL
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (email, purpose),
+                )
+                return cursor.fetchone()
+
+    def increment_email_verification_code_attempt(self, code_id: int) -> None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE auth_email_code
+                    SET attempt_count = attempt_count + 1
+                    WHERE id = ?
+                    """,
+                    (code_id,),
+                )
+
+    def consume_email_verification_code(self, code_id: int) -> None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE auth_email_code
+                    SET consumed_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (code_id,),
+                )
+
     def _get_user(self, where_clause: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -235,6 +311,7 @@ class UserRepository:
                     SELECT
                         au.id,
                         au.username,
+                        au.email,
                         au.nickname,
                         au.avatar_url,
                         au.password_hash,
