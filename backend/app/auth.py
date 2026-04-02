@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 
 from backend.app.cache import runtime_cache
 from fastapi import Depends, HTTPException, Request, Response, status
+import requests
 
 from backend.app.config import Settings, load_settings
 from backend.app.logging_utils import get_logger
@@ -272,17 +273,12 @@ class AuthService:
         normalized_provider = provider.strip().lower()
         if normalized_provider not in {"google", "github"}:
             raise ValueError("不支持的 OAuth Provider")
-        if normalized_provider == "google":
-            client_id = self.settings.auth_oauth_google_client_id.strip()
-            authorize_url = self.settings.auth_oauth_google_authorize_url.strip()
-            redirect_uri = self.settings.auth_oauth_google_redirect_uri.strip()
-            scope = "openid email profile"
-        else:
-            client_id = self.settings.auth_oauth_github_client_id.strip()
-            authorize_url = self.settings.auth_oauth_github_authorize_url.strip()
-            redirect_uri = self.settings.auth_oauth_github_redirect_uri.strip()
-            scope = "read:user user:email"
-        if not client_id or not authorize_url or not redirect_uri:
+        oauth_config = self._get_oauth_config(normalized_provider)
+        client_id = str(oauth_config["client_id"])
+        authorize_url = str(oauth_config["authorize_url"])
+        redirect_uri = str(oauth_config["redirect_uri"])
+        scope = str(oauth_config["scope"])
+        if not client_id or not authorize_url or not redirect_uri or not str(oauth_config["client_secret"]):
             return {
                 "provider": normalized_provider,
                 "enabled": False,
@@ -290,6 +286,11 @@ class AuthService:
                 "message": "OAuth 未配置，请联系管理员",
             }
         state = secrets.token_urlsafe(24)
+        runtime_cache.set(
+            f"auth:oauth:state:{normalized_provider}:{state}",
+            True,
+            ttl_seconds=max(60, self.settings.auth_oauth_state_ttl_seconds),
+        )
         query = urlencode(
             {
                 "client_id": client_id,
@@ -305,6 +306,178 @@ class AuthService:
             "auth_url": f"{authorize_url}?{query}",
             "message": None,
         }
+
+    def complete_oauth_login(
+        self,
+        provider: str,
+        code: str,
+        state: str,
+        *,
+        user_agent: str = "",
+        ip_address: str = "",
+    ) -> tuple[dict[str, Any], str]:
+        normalized_provider = provider.strip().lower()
+        oauth_config = self._get_oauth_config(normalized_provider)
+        if not str(oauth_config["client_id"]) or not str(oauth_config["client_secret"]):
+            raise ValueError("OAuth 未配置，请联系管理员")
+        state_key = f"auth:oauth:state:{normalized_provider}:{state.strip()}"
+        if runtime_cache.get(state_key) is None:
+            raise ValueError("OAuth 状态已失效，请重新发起登录")
+        runtime_cache.delete(state_key)
+
+        access_token = self._exchange_oauth_access_token(normalized_provider, oauth_config, code.strip())
+        oauth_user = self._fetch_oauth_user_profile(normalized_provider, oauth_config, access_token)
+        email = str(oauth_user.get("email") or "").strip().lower()
+        if not _is_valid_email(email):
+            raise ValueError("第三方账号未返回可用邮箱")
+        user = self.repository.get_user_by_email(email)
+        if not user:
+            username = self._build_unique_oauth_username(
+                preferred_username=str(oauth_user.get("username") or ""),
+                email=email,
+                provider=normalized_provider,
+            )
+            display_name = str(oauth_user.get("display_name") or username).strip() or username
+            user = self.create_user(
+                {
+                    "username": username,
+                    "email": email,
+                    "nickname": display_name[:128],
+                    "password": secrets.token_urlsafe(24),
+                    "role": NORMAL_USER_ROLE,
+                    "is_active": True,
+                }
+            )
+        if not user.get("is_active"):
+            raise ValueError("该账号已被禁用")
+        session_token = secrets.token_urlsafe(32)
+        self.repository.create_session(
+            user_id=int(user["id"]),
+            session_token=session_token,
+            expires_at=datetime.utcnow() + timedelta(days=self.settings.auth_session_days),
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+        self.repository.touch_last_login(int(user["id"]))
+        logger.info("OAuth login succeeded", extra={"context": {"provider": normalized_provider, "email": email}})
+        return self._serialize_user(user), session_token
+
+    def _get_oauth_config(self, provider: str) -> dict[str, str]:
+        normalized_provider = provider.strip().lower()
+        if normalized_provider == "google":
+            redirect_uri = self.settings.auth_oauth_google_redirect_uri.strip() or self._build_default_oauth_redirect_uri("google")
+            return {
+                "provider": "google",
+                "client_id": self.settings.auth_oauth_google_client_id.strip(),
+                "client_secret": self.settings.auth_oauth_google_client_secret.strip(),
+                "authorize_url": self.settings.auth_oauth_google_authorize_url.strip(),
+                "token_url": self.settings.auth_oauth_google_token_url.strip(),
+                "userinfo_url": self.settings.auth_oauth_google_userinfo_url.strip(),
+                "emails_url": "",
+                "redirect_uri": redirect_uri,
+                "scope": "openid email profile",
+            }
+        if normalized_provider == "github":
+            redirect_uri = self.settings.auth_oauth_github_redirect_uri.strip() or self._build_default_oauth_redirect_uri("github")
+            return {
+                "provider": "github",
+                "client_id": self.settings.auth_oauth_github_client_id.strip(),
+                "client_secret": self.settings.auth_oauth_github_client_secret.strip(),
+                "authorize_url": self.settings.auth_oauth_github_authorize_url.strip(),
+                "token_url": self.settings.auth_oauth_github_token_url.strip(),
+                "userinfo_url": self.settings.auth_oauth_github_userinfo_url.strip(),
+                "emails_url": self.settings.auth_oauth_github_emails_url.strip(),
+                "redirect_uri": redirect_uri,
+                "scope": "read:user user:email",
+            }
+        raise ValueError("不支持的 OAuth Provider")
+
+    def _build_default_oauth_redirect_uri(self, provider: str) -> str:
+        base_url = self.settings.auth_oauth_base_url.strip()
+        if not base_url:
+            return ""
+        return f"{base_url.rstrip('/')}/api/auth/oauth/{provider}/callback"
+
+    def _exchange_oauth_access_token(self, provider: str, oauth_config: dict[str, str], code: str) -> str:
+        payload = {
+            "client_id": oauth_config["client_id"],
+            "client_secret": oauth_config["client_secret"],
+            "code": code,
+            "redirect_uri": oauth_config["redirect_uri"],
+            "grant_type": "authorization_code",
+        }
+        headers = {"Accept": "application/json"}
+        try:
+            response = requests.post(
+                oauth_config["token_url"],
+                data=payload,
+                headers=headers,
+                timeout=15,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"OAuth 令牌请求失败: {exc}") from exc
+        access_token = str(data.get("access_token") or "").strip()
+        if not access_token:
+            message = str(data.get("error_description") or data.get("error") or "未知错误")
+            raise ValueError(f"OAuth 授权失败: {message}")
+        return access_token
+
+    def _fetch_oauth_user_profile(self, provider: str, oauth_config: dict[str, str], access_token: str) -> dict[str, str]:
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        try:
+            profile_response = requests.get(oauth_config["userinfo_url"], headers=headers, timeout=15)
+            profile_response.raise_for_status()
+            profile = profile_response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"OAuth 用户信息获取失败: {exc}") from exc
+        if provider == "google":
+            return {
+                "email": str(profile.get("email") or "").strip().lower(),
+                "username": str(profile.get("name") or profile.get("given_name") or "").strip(),
+                "display_name": str(profile.get("name") or "").strip(),
+            }
+        email = str(profile.get("email") or "").strip().lower()
+        if not email and oauth_config.get("emails_url"):
+            try:
+                emails_response = requests.get(str(oauth_config["emails_url"]), headers=headers, timeout=15)
+                emails_response.raise_for_status()
+                email_list = emails_response.json() if isinstance(emails_response.json(), list) else []
+                primary_verified = next(
+                    (
+                        item
+                        for item in email_list
+                        if isinstance(item, dict) and item.get("primary") and item.get("verified") and item.get("email")
+                    ),
+                    None,
+                )
+                any_verified = next(
+                    (item for item in email_list if isinstance(item, dict) and item.get("verified") and item.get("email")),
+                    None,
+                )
+                selected = primary_verified or any_verified
+                email = str((selected or {}).get("email") or "").strip().lower()
+            except requests.RequestException as exc:
+                raise RuntimeError(f"GitHub 邮箱信息获取失败: {exc}") from exc
+        return {
+            "email": email,
+            "username": str(profile.get("login") or "").strip(),
+            "display_name": str(profile.get("name") or profile.get("login") or "").strip(),
+        }
+
+    def _build_unique_oauth_username(self, *, preferred_username: str, email: str, provider: str) -> str:
+        base_candidates = [
+            _sanitize_username(preferred_username),
+            _sanitize_username(email.split("@", 1)[0]),
+            f"{provider}_user",
+        ]
+        base = next((item for item in base_candidates if item), f"{provider}_user")
+        for index in range(0, 100):
+            candidate = base if index == 0 else f"{base}_{index}"
+            if not self.repository.get_user_by_username(candidate):
+                return candidate
+        return f"{base}_{secrets.token_hex(3)}"
 
     def update_profile(self, user_id: int, nickname: str) -> dict[str, Any]:
         normalized_nickname = nickname.strip()
@@ -414,6 +587,11 @@ def _is_valid_email(email: str) -> bool:
 def _hash_email_code(code: str, email: str) -> str:
     material = f"{email}:{code}".encode("utf-8")
     return hashlib.sha256(material).hexdigest()
+
+
+def _sanitize_username(value: str) -> str:
+    normalized = "".join(character for character in value.strip().lower() if character.isalnum() or character in {"_", "-", "."})
+    return normalized[:40]
 
 
 def set_session_cookie(response: Response, session_token: str, settings: Settings | None = None) -> None:

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi.responses import RedirectResponse
 
 from backend.app.auth import (
     AuthService,
@@ -144,6 +146,20 @@ def _validate_profile_avatar_upload(*, image: UploadFile, image_bytes: bytes) ->
     return filename
 
 
+def _build_oauth_callback_frontend_url(
+    *,
+    frontend_origin: str,
+    provider: str,
+    status: str,
+    message: str | None = None,
+) -> str:
+    normalized_origin = frontend_origin.rstrip("/")
+    params: dict[str, str] = {"status": status}
+    if message:
+        params["message"] = message
+    return f"{normalized_origin}/auth/callback/{provider}?{urlencode(params)}"
+
+
 @router.post("/auth/login", response_model=CurrentUserResponse)
 def login(
     payload: LoginPayload,
@@ -235,11 +251,59 @@ def oauth_provider_start(provider: str, auth_service: AuthService = Depends(get_
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/auth/oauth/{provider}/callback", response_model=SuccessResponse)
-def oauth_provider_callback(provider: str) -> dict:
-    if provider.strip().lower() not in {"google", "github"}:
+@router.get("/auth/oauth/{provider}/callback")
+def oauth_provider_callback(
+    provider: str,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    code: str | None = None,
+    state: str | None = None,
+):
+    normalized_provider = provider.strip().lower()
+    if normalized_provider not in {"google", "github"}:
         raise HTTPException(status_code=400, detail="不支持的 OAuth Provider")
-    raise HTTPException(status_code=501, detail="OAuth 回调尚未启用")
+
+    if not code or not state:
+        return RedirectResponse(
+            _build_oauth_callback_frontend_url(
+                frontend_origin=auth_service.settings.frontend_origin,
+                provider=normalized_provider,
+                status="error",
+                message="缺少 OAuth 参数",
+            ),
+            status_code=302,
+        )
+
+    try:
+        _, session_token = auth_service.complete_oauth_login(
+            normalized_provider,
+            code=code,
+            state=state,
+            user_agent=request.headers.get("user-agent", ""),
+            ip_address=request.client.host if request.client else "",
+        )
+    except (ValueError, RuntimeError) as exc:
+        return RedirectResponse(
+            _build_oauth_callback_frontend_url(
+                frontend_origin=auth_service.settings.frontend_origin,
+                provider=normalized_provider,
+                status="error",
+                message=str(exc),
+            ),
+            status_code=302,
+        )
+
+    redirect = RedirectResponse(
+        _build_oauth_callback_frontend_url(
+            frontend_origin=auth_service.settings.frontend_origin,
+            provider=normalized_provider,
+            status="success",
+            message="登录成功",
+        ),
+        status_code=302,
+    )
+    set_session_cookie(redirect, session_token, auth_service.settings)
+    return redirect
 
 
 @router.post("/lottery/history", response_model=LotteryHistoryResponse)

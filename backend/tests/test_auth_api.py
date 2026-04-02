@@ -177,6 +177,28 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("4.5MB", response.json()["detail"])
 
+    def test_oauth_start_returns_disabled_when_not_configured(self) -> None:
+        response = self.client.get("/api/auth/oauth/google/start")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["enabled"])
+        self.assertIsNone(payload["auth_url"])
+
+    def test_oauth_callback_redirects_to_frontend_with_error_when_missing_params(self) -> None:
+        response = self.client.get("/api/auth/oauth/google/callback", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/auth/callback/google?status=error", response.headers.get("location", ""))
+
+    def test_oauth_callback_sets_session_cookie_on_success(self) -> None:
+        with patch("backend.app.api.routes.AuthService.complete_oauth_login", return_value=({"id": 1, "username": "oauth-user"}, "oauth-session-token")):
+            response = self.client.get(
+                "/api/auth/oauth/google/callback?code=sample-code&state=sample-state",
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/auth/callback/google?status=success", response.headers.get("location", ""))
+        self.assertIn("letoume_session=oauth-session-token", response.headers.get("set-cookie", ""))
+
 
 if __name__ == "__main__":
     unittest.main()

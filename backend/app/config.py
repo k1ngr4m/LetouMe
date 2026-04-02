@@ -52,14 +52,22 @@ class Settings:
     smtp_from_email: str = ""
     smtp_from_name: str = "LetouMe"
     auth_email_code_expire_minutes: int = 10
-    auth_email_code_cooldown_seconds: int = 60
+    auth_email_code_cooldown_seconds: int = 1
     auth_oauth_base_url: str = ""
     auth_oauth_google_client_id: str = ""
+    auth_oauth_google_client_secret: str = ""
     auth_oauth_google_authorize_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    auth_oauth_google_token_url: str = "https://oauth2.googleapis.com/token"
+    auth_oauth_google_userinfo_url: str = "https://openidconnect.googleapis.com/v1/userinfo"
     auth_oauth_google_redirect_uri: str = ""
     auth_oauth_github_client_id: str = ""
+    auth_oauth_github_client_secret: str = ""
     auth_oauth_github_authorize_url: str = "https://github.com/login/oauth/authorize"
+    auth_oauth_github_token_url: str = "https://github.com/login/oauth/access_token"
+    auth_oauth_github_userinfo_url: str = "https://api.github.com/user"
+    auth_oauth_github_emails_url: str = "https://api.github.com/user/emails"
     auth_oauth_github_redirect_uri: str = ""
+    auth_oauth_state_ttl_seconds: int = 600
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -143,9 +151,17 @@ def load_settings() -> Settings:
         auth_email_code_cooldown_seconds=int(os.getenv("AUTH_EMAIL_CODE_COOLDOWN_SECONDS", "60")),
         auth_oauth_base_url=os.getenv("AUTH_OAUTH_BASE_URL", ""),
         auth_oauth_google_client_id=os.getenv("AUTH_OAUTH_GOOGLE_CLIENT_ID", ""),
+        auth_oauth_google_client_secret=os.getenv("AUTH_OAUTH_GOOGLE_CLIENT_SECRET", ""),
         auth_oauth_google_authorize_url=os.getenv("AUTH_OAUTH_GOOGLE_AUTHORIZE_URL", "https://accounts.google.com/o/oauth2/v2/auth"),
+        auth_oauth_google_token_url=os.getenv("AUTH_OAUTH_GOOGLE_TOKEN_URL", "https://oauth2.googleapis.com/token"),
+        auth_oauth_google_userinfo_url=os.getenv("AUTH_OAUTH_GOOGLE_USERINFO_URL", "https://openidconnect.googleapis.com/v1/userinfo"),
         auth_oauth_google_redirect_uri=os.getenv("AUTH_OAUTH_GOOGLE_REDIRECT_URI", ""),
         auth_oauth_github_client_id=os.getenv("AUTH_OAUTH_GITHUB_CLIENT_ID", ""),
+        auth_oauth_github_client_secret=os.getenv("AUTH_OAUTH_GITHUB_CLIENT_SECRET", ""),
         auth_oauth_github_authorize_url=os.getenv("AUTH_OAUTH_GITHUB_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),
+        auth_oauth_github_token_url=os.getenv("AUTH_OAUTH_GITHUB_TOKEN_URL", "https://github.com/login/oauth/access_token"),
+        auth_oauth_github_userinfo_url=os.getenv("AUTH_OAUTH_GITHUB_USERINFO_URL", "https://api.github.com/user"),
+        auth_oauth_github_emails_url=os.getenv("AUTH_OAUTH_GITHUB_EMAILS_URL", "https://api.github.com/user/emails"),
         auth_oauth_github_redirect_uri=os.getenv("AUTH_OAUTH_GITHUB_REDIRECT_URI", ""),
+        auth_oauth_state_ttl_seconds=int(os.getenv("AUTH_OAUTH_STATE_TTL_SECONDS", "600")),
     )
