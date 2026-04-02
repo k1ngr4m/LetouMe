@@ -10156,6 +10156,12 @@ a {
   gap: 0.4rem;
 }
 
+.crm-lottery-picker__trigger svg {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: none;
+}
+
 .crm-lottery-picker__trigger:hover,
 .crm-lottery-picker.is-open .crm-lottery-picker__trigger {
   background: rgba(255, 255, 255, 0.14);
@@ -10192,6 +10198,15 @@ a {
   color: #1f2d47;
   background: transparent;
   text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.46rem;
+}
+
+.crm-lottery-picker__option svg {
+  width: 0.94rem;
+  height: 0.94rem;
+  flex: none;
 }
 
 .crm-lottery-picker__option:hover {
@@ -10448,12 +10463,52 @@ a {
 
 .crm-topbar__user {
   margin-left: 0.18rem;
+  min-height: 2.05rem;
   padding: 0.42rem 0.68rem;
   border-radius: 0.6rem;
   background: color-mix(in srgb, var(--crm-topbar-bg) 75%, #2f466a 25%);
   border: 1px solid var(--crm-topbar-border);
   color: var(--text-1);
   font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.crm-topbar__user-entry {
+  position: relative;
+}
+
+.crm-topbar__user-menu {
+  position: absolute;
+  top: calc(100% + 0.42rem);
+  right: 0;
+  min-width: 7.6rem;
+  padding: 0.34rem;
+  border-radius: 0.64rem;
+  border: 1px solid var(--crm-topbar-border);
+  background: color-mix(in srgb, var(--crm-topbar-bg) 90%, #0f1b2d 10%);
+  box-shadow: 0 12px 26px rgba(7, 12, 20, 0.22);
+  z-index: 6;
+}
+
+.crm-topbar__user-menu-item {
+  width: 100%;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: var(--text-1);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  padding: 0.34rem 0.5rem;
+}
+
+.crm-topbar__user-menu-item:hover {
+  border-color: var(--crm-topbar-border);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .crm-placeholder-panel {

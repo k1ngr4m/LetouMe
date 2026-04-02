@@ -13,6 +13,7 @@ import {
   Grid2x2,
   History,
   LayoutGrid,
+  LogOut,
   Menu,
   Settings2,
   Sparkles,
@@ -58,17 +59,49 @@ function SidebarCollapseIcon() {
   )
 }
 
+function LotterySwitchIcon({ code }: { code: LotteryCode }) {
+  if (code === 'pl3') {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2.8" y="8.2" width="3.2" height="3.2" rx="0.7" />
+        <rect x="8.4" y="8.2" width="3.2" height="3.2" rx="0.7" />
+        <rect x="14" y="8.2" width="3.2" height="3.2" rx="0.7" />
+      </svg>
+    )
+  }
+  if (code === 'pl5') {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="3.6" cy="10" r="1.2" />
+        <circle cx="7.8" cy="10" r="1.2" />
+        <circle cx="10" cy="10" r="1.2" />
+        <circle cx="12.2" cy="10" r="1.2" />
+        <circle cx="16.4" cy="10" r="1.2" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="6.4" cy="10" r="2.4" />
+      <circle cx="13.6" cy="10" r="2.4" />
+      <path d="M8.8 10h2.4" />
+    </svg>
+  )
+}
+
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
   const { selectedLottery, setSelectedLottery } = useLotterySelection()
-  const { user, hasPermission } = useAuth()
+  const { user, hasPermission, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [activePlaceholderPanel, setActivePlaceholderPanel] = useState<PlaceholderPanelKey>(null)
   const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const lotteryMenuRef = useRef<HTMLDivElement | null>(null)
+  const userMenuRef = useRef<HTMLDivElement | null>(null)
 
   const canOpenSettings = hasPermission('basic_profile')
   const canManageModels = hasPermission('model_management')
@@ -132,6 +165,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     setIsLotteryMenuOpen(false)
+    setIsUserMenuOpen(false)
   }, [location.pathname])
 
   useEffect(() => {
@@ -158,6 +192,30 @@ export function AppShell({ children }: PropsWithChildren) {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [isLotteryMenuOpen])
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return
+
+    function handleDocumentClick(event: MouseEvent) {
+      if (!(event.target instanceof Node)) return
+      if (!userMenuRef.current?.contains(event.target)) {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isUserMenuOpen])
 
   function openWorkspaceCenter() {
     setSidebarMode('workspace')
@@ -195,6 +253,12 @@ export function AppShell({ children }: PropsWithChildren) {
     setIsSidebarCollapsed((current) => !current)
   }
 
+  async function handleLogout() {
+    setIsUserMenuOpen(false)
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed')}>
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
@@ -221,6 +285,7 @@ export function AppShell({ children }: PropsWithChildren) {
                     aria-haspopup="menu"
                     onClick={() => setIsLotteryMenuOpen((current) => !current)}
                   >
+                    <LotterySwitchIcon code={selectedLottery} />
                     <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
                     <ChevronDown size={14} aria-hidden="true" />
                   </button>
@@ -236,6 +301,7 @@ export function AppShell({ children }: PropsWithChildren) {
                           title={item.label}
                           onClick={() => handleLotterySelect(item.code)}
                         >
+                          <LotterySwitchIcon code={item.code} />
                           {item.label}
                         </button>
                       ))}
@@ -412,7 +478,27 @@ export function AppShell({ children }: PropsWithChildren) {
             <button className="crm-topbar__icon-btn" type="button" onClick={toggleTheme} aria-label={nextThemeLabel} title={nextThemeLabel}>
               <SunMoon size={16} aria-hidden="true" />
             </button>
-            <span className="crm-topbar__user">{displayName}</span>
+            <div className={clsx('crm-topbar__user-entry', isUserMenuOpen && 'is-open')} ref={userMenuRef}>
+              <button
+                className="crm-topbar__user"
+                type="button"
+                aria-label="用户菜单"
+                aria-expanded={isUserMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setIsUserMenuOpen((current) => !current)}
+              >
+                <span>{displayName}</span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+              {isUserMenuOpen ? (
+                <div className="crm-topbar__user-menu" role="menu" aria-label="用户菜单">
+                  <button className="crm-topbar__user-menu-item" type="button" role="menuitem" onClick={() => void handleLogout()}>
+                    <LogOut size={14} aria-hidden="true" />
+                    <span>退出登录</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </nav>
         </header>
 
