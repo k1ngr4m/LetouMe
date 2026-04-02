@@ -122,6 +122,16 @@ export function App() {
               }
             />
             <Route
+              path="/settings/account"
+              element={
+                <ProtectedRoute requiredPermission={BASIC_PROFILE_PERMISSION}>
+                  <AppShell>
+                    <SettingsPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/settings/models"
               element={
                 <ProtectedRoute requiredPermission={MODEL_MANAGEMENT_PERMISSION}>

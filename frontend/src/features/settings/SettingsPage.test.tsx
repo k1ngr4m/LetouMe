@@ -294,7 +294,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage()
 
-    await screen.findByRole('button', { name: '基础信息' })
+    await screen.findByRole('button', { name: '个人资料' })
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/profile')
   })
 
@@ -308,13 +308,30 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/profile')
 
-    await screen.findByText('账号概览')
-    expect(screen.getByRole('heading', { name: '修改昵称' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: '个人资料' })
+    expect(screen.getByRole('heading', { name: '姓名' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '动效分级' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '修改密码' })).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: '全站动效分级' })).toBeInTheDocument()
+    expect(screen.getByLabelText('昵称')).toBeInTheDocument()
+  })
+
+  it('renders account management sections and can expand password form', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage('/settings/account')
+
+    await screen.findByRole('heading', { name: '账户管理' })
+    expect(screen.getByRole('heading', { name: '绑定的登录方式' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '修改密码' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '修改密码' }))
     expect(screen.getByLabelText('当前密码')).toBeInTheDocument()
     expect(screen.getByLabelText('确认新密码')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '退出登录' })).toBeInTheDocument()
   })
 
   it('opens generate prediction modal from list view', async () => {

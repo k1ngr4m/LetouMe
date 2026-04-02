@@ -6200,6 +6200,164 @@ a {
   grid-template-columns: 1fr;
 }
 
+.settings-split-page {
+  display: grid;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-split-row {
+  min-height: 5.4rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 0.12rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-split-row--avatar {
+  min-height: 7.1rem;
+}
+
+.settings-split-row__icon-wrap {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.72rem;
+  color: rgba(198, 220, 246, 0.9);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-split-row__icon-wrap svg {
+  width: 1.12rem;
+  height: 1.12rem;
+}
+
+.settings-split-row__main {
+  min-width: 0;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.settings-split-row__main h3 {
+  margin: 0;
+  font-size: 1.18rem;
+}
+
+.settings-split-row__main p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.settings-split-row__value {
+  color: var(--text-2);
+  font-size: 1rem;
+}
+
+.settings-split-row__extra {
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-avatar-fallback {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.settings-split-row__editor {
+  min-width: 12rem;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.settings-split-row__editor--chips {
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.settings-split-row__editor--chips .chip-button {
+  min-height: 2.52rem;
+  padding: 0.48rem 0.9rem;
+  border-radius: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.settings-split-row__editor--chips .chip-button__title {
+  font-size: 0.94rem;
+  line-height: 1.1;
+}
+
+.settings-split-input,
+.settings-split-select {
+  width: clamp(11rem, 26vw, 18rem);
+  min-height: 2.5rem;
+  border-radius: 0.84rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+  padding: 0.5rem 0.72rem;
+}
+
+.settings-split-select:disabled,
+.settings-split-input:disabled {
+  opacity: 0.78;
+}
+
+.settings-split-row__action {
+  min-width: 6.1rem;
+}
+
+.settings-linked-providers {
+  margin-top: 0.28rem;
+  display: grid;
+  gap: 0.52rem;
+}
+
+.settings-linked-providers__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.68rem;
+  padding: 0.36rem 0;
+}
+
+.settings-linked-providers__item span {
+  color: var(--text-1);
+}
+
+.settings-split-password-form {
+  margin: 0 0 0.86rem;
+  padding: 0.92rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.72rem;
+}
+
+.settings-split-password-form .primary-button {
+  grid-column: 1 / -1;
+  justify-self: flex-end;
+}
+
 .settings-profile-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.34fr) minmax(0, 1fr);
@@ -6383,6 +6541,37 @@ a {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(242, 249, 255, 0.9)),
     rgba(255, 255, 255, 0.88);
+}
+
+:root[data-theme='light'] .settings-split-page {
+  border-top-color: rgba(133, 150, 178, 0.2);
+}
+
+:root[data-theme='light'] .settings-split-row {
+  border-bottom-color: rgba(133, 150, 178, 0.2);
+}
+
+:root[data-theme='light'] .settings-split-row__icon-wrap {
+  border-color: rgba(133, 150, 178, 0.26);
+  color: rgba(73, 87, 112, 0.86);
+  background: rgba(245, 249, 255, 0.86);
+}
+
+:root[data-theme='light'] .settings-avatar-fallback {
+  border-color: rgba(133, 150, 178, 0.24);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(241, 247, 255, 0.9));
+}
+
+:root[data-theme='light'] .settings-split-input,
+:root[data-theme='light'] .settings-split-select {
+  border-color: rgba(133, 150, 178, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  color: #243148;
+}
+
+:root[data-theme='light'] .settings-split-password-form {
+  border-color: rgba(133, 150, 178, 0.24);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 :root[data-theme='light'] .settings-profile-form-card--motion .chip-button {
@@ -8130,6 +8319,34 @@ a {
   }
 
   .settings-profile-form-card--security {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-split-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.6rem;
+  }
+
+  .settings-split-row__extra,
+  .settings-split-row__value,
+  .settings-split-row__editor,
+  .settings-split-row__action {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .settings-split-row__editor {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .settings-split-input,
+  .settings-split-select {
+    width: 100%;
+  }
+
+  .settings-split-password-form {
     grid-template-columns: 1fr;
   }
 

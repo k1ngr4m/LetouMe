@@ -32,7 +32,7 @@ import type {
   LotteryCode,
 } from '../../shared/types/api'
 
-type SettingsTab = 'profile' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
+type SettingsTab = 'profile' | 'account' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
@@ -56,6 +56,7 @@ type ScheduleForm = ScheduleTaskPayload
 
 const SETTINGS_TAB_PATHS: Record<SettingsTab, string> = {
   profile: '/settings/profile',
+  account: '/settings/account',
   models: '/settings/models',
   maintenance: '/settings/maintenance',
   schedules: '/settings/schedules',
@@ -349,6 +350,63 @@ function EyeIcon({ open }: { open: boolean }) {
   )
 }
 
+function UserAvatarIcon() {
+  return (
+    <SvgIcon>
+      <circle cx="10" cy="7.1" r="2.3" />
+      <path d="M4.5 15.4a5.8 5.8 0 0 1 11 0" />
+    </SvgIcon>
+  )
+}
+
+function AccountLinkIcon() {
+  return (
+    <SvgIcon>
+      <path d="M7 8.2h-1a3 3 0 1 0 0 6h1" />
+      <path d="M13 8.2h1a3 3 0 0 1 0 6h-1" />
+      <path d="M7.8 11.2h4.4" />
+    </SvgIcon>
+  )
+}
+
+function KeySettingIcon() {
+  return (
+    <SvgIcon>
+      <circle cx="7.2" cy="10.2" r="2.4" />
+      <path d="M9.3 10.2h6.2" />
+      <path d="M13.2 10.2v1.8" />
+      <path d="M15.5 10.2v1.3" />
+    </SvgIcon>
+  )
+}
+
+function MailSettingIcon() {
+  return (
+    <SvgIcon>
+      <rect x="2.8" y="4.8" width="14.4" height="10.4" rx="1.6" />
+      <path d="m3.4 6 6.6 4.8L16.6 6" />
+    </SvgIcon>
+  )
+}
+
+function ShieldSettingIcon() {
+  return (
+    <SvgIcon>
+      <path d="M10 3.8 15.4 6v4.3c0 2.7-2 4.8-5.4 5.9-3.4-1.1-5.4-3.2-5.4-5.9V6z" />
+    </SvgIcon>
+  )
+}
+
+function LogoutSettingIcon() {
+  return (
+    <SvgIcon>
+      <path d="M8.2 4.8H4.6a1.1 1.1 0 0 0-1.1 1.1v8.2a1.1 1.1 0 0 0 1.1 1.1h3.6" />
+      <path d="M10 10h6.4" />
+      <path d="m13.8 7.4 2.8 2.6-2.8 2.6" />
+    </SvgIcon>
+  )
+}
+
 function IconButton({
   label,
   onClick,
@@ -581,7 +639,7 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, hasPermission, logout } = useAuth()
-  const { motionPreference, motionLevel, setMotionPreference } = useMotion()
+  const { motionPreference, setMotionPreference } = useMotion()
   const activeTab = getSettingsTabFromPath(location.pathname)
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
   const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
@@ -590,6 +648,7 @@ export function SettingsPage() {
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
+  const [isPasswordEditorOpen, setIsPasswordEditorOpen] = useState(false)
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
   const [lmStudioDiscoveredModels, setLmStudioDiscoveredModels] = useState<SettingsProviderDiscoveredModel[]>([])
@@ -679,7 +738,10 @@ export function SettingsPage() {
   })
 
   const availableTabs = useMemo(() => {
-    const tabs: Array<{ id: SettingsTab; label: string }> = [{ id: 'profile', label: '基础信息' }]
+    const tabs: Array<{ id: SettingsTab; label: string }> = [
+      { id: 'profile', label: '个人资料' },
+      { id: 'account', label: '账户管理' },
+    ]
     if (canManageModels) tabs.push({ id: 'models', label: '模型管理' })
     if (isSuperAdmin) tabs.push({ id: 'maintenance', label: '数据维护' })
     if (canManageSchedules) tabs.push({ id: 'schedules', label: '定时任务' })
@@ -687,6 +749,13 @@ export function SettingsPage() {
     if (canManageRoles) tabs.push({ id: 'roles', label: '角色管理' })
     return tabs
   }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers, isSuperAdmin])
+
+  const displayEmail = useMemo(() => {
+    const candidate = [user?.username].find((item) => typeof item === 'string' && item.includes('@'))
+    return candidate || '暂未设置邮箱'
+  }, [user?.username])
+
+  const displayCreatedAt = user?.created_at ? formatDateTimeBeijing(user.created_at) : '-'
 
   useEffect(() => {
     if (!availableTabs.some((item) => item.id === activeTab)) {
@@ -1851,21 +1920,13 @@ export function SettingsPage() {
     window.addEventListener('mouseup', handleMouseUp)
   }
 
+  async function handlePageLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="page-stack">
-      <section className="hero-panel hero-panel--settings">
-        <div className="hero-panel__copy">
-          <p className="hero-panel__eyebrow">Settings Center</p>
-          <h2 className="hero-panel__title">设置中心</h2>
-          <p className="hero-panel__description">综合管理用户</p>
-          <div className="hero-panel__meta">
-            {/*<span>当前角色 {user?.role_name || '-'}</span>*/}
-            {/*<span>权限数 {user?.permissions?.length || 0}</span>*/}
-            {/*<span>账号 {user?.username || '-'}</span>*/}
-          </div>
-        </div>
-      </section>
-
       {message ? <div className={clsx('banner-message', messageType === 'error' && 'is-error')}>{message}</div> : null}
 
       <section className="settings-center-layout settings-center-layout--shell">
@@ -1884,85 +1945,145 @@ export function SettingsPage() {
         <div className="settings-center-content settings-center-content--shell">
           {activeTab === 'profile' ? (
             <div className="page-section">
-              <StatusCard title="基础信息" subtitle="修改昵称和密码，登录账号仅用于身份识别。">
-                <div className="settings-profile-grid">
-                  <div className="settings-profile-layout">
-                    <section className="settings-profile-hero settings-profile-layout__main">
-                      <div className="settings-profile-hero__main">
-                        <p className="settings-profile-hero__eyebrow">账号概览</p>
-                        <h2>{user?.nickname || user?.username || '未命名用户'}</h2>
-                        <p className="settings-profile-hero__description">当前账号用于登录和身份识别，昵称会展示在系统内的个人信息区域。</p>
-                      </div>
-                      <div className="settings-profile-hero__badges">
-                        <span className="status-pill">{user?.role_name || '未分配角色'}</span>
-                        <span className={clsx('status-pill', user?.is_active ? 'is-active' : 'is-muted')}>
-                          {user?.is_active ? '状态正常' : '已停用'}
-                        </span>
-                      </div>
-                      <div className="settings-profile-summary">
-                        <article className="settings-profile-summary__item">
-                          <span>账号</span>
-                          <strong>{user?.username || '-'}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>昵称</span>
-                          <strong>{user?.nickname || '-'}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>角色</span>
-                          <strong>{user?.role_name || '-'}</strong>
-                        </article>
-                        <article className="settings-profile-summary__item">
-                          <span>权限数</span>
-                          <strong>{user?.permissions?.length || 0}</strong>
-                        </article>
-                      </div>
-                    </section>
-                    <div className="settings-profile-layout__actions">
-                      <form className="panel-card settings-form-card settings-profile-form-card" onSubmit={(event) => { event.preventDefault(); profileMutation.mutate() }}>
-                        <div className="panel-card__header">
-                          <div>
-                            <h2 className="panel-card__title">修改昵称</h2>
-                            <p className="settings-profile-form-card__hint">更新系统内展示名称，不影响登录账号。</p>
-                          </div>
-                        </div>
-                        <label className="field">
-                          <span>昵称</span>
-                          <input value={profileNickname} onChange={(event) => setProfileNickname(event.target.value)} required />
-                        </label>
-                        <button className="primary-button" type="submit" disabled={profileMutation.isPending}>
-                          保存基础信息
-                        </button>
-                      </form>
-                      <section className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--motion">
-                        <div className="panel-card__header">
-                          <div>
-                            <h2 className="panel-card__title">动效分级</h2>
-                            <p className="settings-profile-form-card__hint">当前生效：{motionLevel === 'enhanced' ? '增强' : motionLevel === 'minimal' ? '极简' : '标准'}</p>
-                          </div>
-                        </div>
-                        <div className="settings-motion-switch" role="radiogroup" aria-label="全站动效分级">
-                          {MOTION_PREFERENCE_OPTIONS.map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              role="radio"
-                              aria-checked={motionPreference === option.value}
-                              className={clsx('chip-button', motionPreference === option.value && 'is-active')}
-                              onClick={() => setMotionPreference(option.value)}
-                            >
-                              <span className="chip-button__title">{option.label}</span>
-                              <span className="chip-button__meta">{option.description}</span>
-                            </button>
-                          ))}
-                        </div>
-                        <div className="settings-inline-hint settings-profile-security-note">
-                          “跟随系统”会读取你设备的“减少动态效果”设置；“极简”适合低性能设备或偏静态体验。
-                        </div>
-                      </section>
+              <StatusCard title="个人资料" subtitle="管理你的头像、姓名等基本信息。">
+                <div className="settings-split-page">
+                  <div className="settings-split-row settings-split-row--avatar">
+                    <div className="settings-split-row__icon-wrap">
+                      <UserAvatarIcon />
                     </div>
+                    <div className="settings-split-row__main">
+                      <h3>头像</h3>
+                      <p>支持 JPG、PNG、WebP、GIF 格式，最大 4.5MB</p>
+                    </div>
+                    <div className="settings-split-row__extra">
+                      <span className="settings-avatar-fallback" aria-hidden="true">
+                        {(user?.nickname || user?.username || 'U').slice(0, 1).toUpperCase()}
+                      </span>
+                    </div>
+                    <button type="button" className="ghost-button settings-split-row__action" disabled title="即将开放">
+                      更换
+                    </button>
+                  </div>
+
+                  <form
+                    className="settings-split-row"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      profileMutation.mutate()
+                    }}
+                  >
+                    <div className="settings-split-row__main">
+                      <h3>姓名</h3>
+                      <p>你在平台上显示的名称</p>
+                    </div>
+                    <div className="settings-split-row__editor">
+                      <input
+                        className="settings-split-input"
+                        value={profileNickname}
+                        onChange={(event) => setProfileNickname(event.target.value)}
+                        aria-label="昵称"
+                        required
+                      />
+                    </div>
+                    <button className="ghost-button settings-split-row__action" type="submit" disabled={profileMutation.isPending}>
+                      保存
+                    </button>
+                  </form>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__main">
+                      <h3>邮箱</h3>
+                      <p>邮箱地址暂不支持修改</p>
+                    </div>
+                    <span className="settings-split-row__value">{displayEmail}</span>
+                  </div>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__main">
+                      <h3>语言</h3>
+                      <p>选择你的首选语言</p>
+                    </div>
+                    <div className="settings-split-row__editor">
+                      <select className="settings-split-select" defaultValue="zh-CN" disabled aria-label="首选语言">
+                        <option value="zh-CN">简体中文</option>
+                        <option value="en-US">English</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__main">
+                      <h3>动效分级</h3>
+                    </div>
+                    <div className="settings-split-row__editor settings-split-row__editor--chips" role="radiogroup" aria-label="全站动效分级">
+                      {MOTION_PREFERENCE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={motionPreference === option.value}
+                          className={clsx('chip-button', motionPreference === option.value && 'is-active')}
+                          onClick={() => setMotionPreference(option.value)}
+                          title={option.description}
+                        >
+                          <span className="chip-button__title">{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </StatusCard>
+            </div>
+          ) : null}
+
+          {activeTab === 'account' ? (
+            <div className="page-section">
+              <StatusCard title="账户管理" subtitle="邮箱验证和账户操作。">
+                <div className="settings-split-page">
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__icon-wrap">
+                      <AccountLinkIcon />
+                    </div>
+                    <div className="settings-split-row__main">
+                      <h3>绑定的登录方式</h3>
+                      <p>绑定多种登录方式后，可用任意方式登录同一账号</p>
+                      <div className="settings-linked-providers">
+                        <div className="settings-linked-providers__item">
+                          <span>邮箱密码</span>
+                          <span className="status-pill is-active">已绑定</span>
+                        </div>
+                        <div className="settings-linked-providers__item">
+                          <span>Google</span>
+                          <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>
+                        </div>
+                        <div className="settings-linked-providers__item">
+                          <span>GitHub</span>
+                          <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__icon-wrap">
+                      <KeySettingIcon />
+                    </div>
+                    <div className="settings-split-row__main">
+                      <h3>登录密码</h3>
+                      <p>定期更换密码以保护账户安全</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="ghost-button settings-split-row__action"
+                      onClick={() => setIsPasswordEditorOpen((current) => !current)}
+                    >
+                      {isPasswordEditorOpen ? '收起' : '修改密码'}
+                    </button>
+                  </div>
+
+                  {isPasswordEditorOpen ? (
                     <form
-                      className="panel-card settings-form-card settings-profile-form-card settings-profile-form-card--security settings-profile-layout__security"
+                      className="settings-split-password-form"
                       onSubmit={(event) => {
                         event.preventDefault()
                         if (passwordForm.new_password !== passwordForm.confirm_password) {
@@ -1973,15 +2094,6 @@ export function SettingsPage() {
                         passwordMutation.mutate()
                       }}
                     >
-                      <div className="panel-card__header">
-                        <div>
-                          <h2 className="panel-card__title">修改密码</h2>
-                          <p className="settings-profile-form-card__hint">为确保账号安全，修改密码后需要重新登录。</p>
-                        </div>
-                      </div>
-                      <div className="settings-inline-hint settings-profile-security-note">
-                        建议使用更长且不重复的密码，并定期更新账号凭证。
-                      </div>
                       <label className="field">
                         <span>当前密码</span>
                         <input type="password" value={passwordForm.current_password} onChange={(event) => setPasswordForm((previous) => ({ ...previous, current_password: event.target.value }))} required />
@@ -1998,6 +2110,41 @@ export function SettingsPage() {
                         更新密码
                       </button>
                     </form>
+                  ) : null}
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__icon-wrap">
+                      <MailSettingIcon />
+                    </div>
+                    <div className="settings-split-row__main">
+                      <h3>邮箱验证</h3>
+                      <p>{displayEmail}</p>
+                    </div>
+                    <span className="status-pill is-active">已验证</span>
+                  </div>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__icon-wrap">
+                      <ShieldSettingIcon />
+                    </div>
+                    <div className="settings-split-row__main">
+                      <h3>账户创建时间</h3>
+                      <p>你的账户注册时间</p>
+                    </div>
+                    <span className="settings-split-row__value">{displayCreatedAt}</span>
+                  </div>
+
+                  <div className="settings-split-row">
+                    <div className="settings-split-row__icon-wrap">
+                      <LogoutSettingIcon />
+                    </div>
+                    <div className="settings-split-row__main">
+                      <h3>退出登录</h3>
+                      <p>退出当前账户，可重新登录其他账户</p>
+                    </div>
+                    <button className="ghost-button settings-split-row__action" type="button" onClick={() => void handlePageLogout()}>
+                      退出登录
+                    </button>
                   </div>
                 </div>
               </StatusCard>

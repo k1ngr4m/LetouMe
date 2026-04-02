@@ -33,6 +33,7 @@ import type { LotteryCode } from '../types/api'
 
 const SETTINGS_PATHS = {
   profile: '/settings/profile',
+  account: '/settings/account',
   models: '/settings/models',
   maintenance: '/settings/maintenance',
   schedules: '/settings/schedules',
@@ -387,9 +388,13 @@ export function AppShell({ children }: PropsWithChildren) {
                 <ArrowLeft size={16} aria-hidden="true" />
                 <span>返回工作台</span>
               </button>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.profile} onClick={onSettingsNavigate} title="基本设置">
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.profile} onClick={onSettingsNavigate} title="个人资料">
                 <Settings2 size={16} aria-hidden="true" />
-                <span>基本设置</span>
+                <span>个人资料</span>
+              </NavLink>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.account} onClick={onSettingsNavigate} title="账户管理">
+                <UserCog size={16} aria-hidden="true" />
+                <span>账户管理</span>
               </NavLink>
               {canManageModels ? (
                 <>
