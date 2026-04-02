@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
+import { ToastProvider } from '../../shared/feedback/ToastProvider'
 
 const {
   createMyBet,
@@ -806,21 +807,23 @@ function renderPage(initialEntry = '/dashboard/prediction') {
 
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route
-            path="/dashboard/:tab"
-            element={
-              <>
-                <HomePage />
-                <LocationDisplay />
-              </>
-            }
-          />
-          <Route path="/dashboard/models/:modelId" element={<LocationDisplay />} />
-          <Route path="/dashboard/rules" element={<LocationDisplay />} />
-        </Routes>
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route
+              path="/dashboard/:tab"
+              element={
+                <>
+                  <HomePage />
+                  <LocationDisplay />
+                </>
+              }
+            />
+            <Route path="/dashboard/models/:modelId" element={<LocationDisplay />} />
+            <Route path="/dashboard/rules" element={<LocationDisplay />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }

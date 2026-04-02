@@ -6,6 +6,7 @@ import { CalendarClock, ChevronDown, ChevronUp, ChevronsUpDown, Coins, Gift, Ima
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
+import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import { useMotion } from '../../shared/theme/MotionProvider'
 import { IMGLOC_CONTENT_BLOCKED_MESSAGE, isImglocContentBlockedError } from './lib/myBetUploadFallback'
@@ -649,16 +650,24 @@ export function MyBetsPanel({
   onDirtyStateChange?: (isDirty: boolean) => void
 }) {
   const { motionLevel } = useMotion()
+  const { showToast } = useToast()
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [messageTone, setMessageTone] = useState<'success' | 'error'>('success')
   const [expandedRecordMap, setExpandedRecordMap] = useState<Record<number, boolean>>({})
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
   const [initialFormSnapshot, setInitialFormSnapshot] = useState(() =>
     buildFormSnapshot(createDefaultFormState(targetPeriod, lotteryCode)),
   )
+
+  useEffect(() => {
+    if (!message) return
+    showToast(message, messageTone)
+    setMessage(null)
+  }, [message, messageTone, showToast])
 
   useEffect(() => {
     return () => {
@@ -710,6 +719,7 @@ export function MyBetsPanel({
     },
     onSuccess: async (result) => {
       const successMessage = editingRecord ? '投注已更新。' : '投注已添加。'
+      setMessageTone('success')
       setMessage(result.imageUploadWarning ? `${successMessage}${result.imageUploadWarning}` : successMessage)
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
       setViewMode('list')
@@ -720,6 +730,7 @@ export function MyBetsPanel({
       await queryClient.invalidateQueries({ queryKey: ['my-bets', lotteryCode] })
     },
     onError: (error) => {
+      setMessageTone('error')
       setMessage(error instanceof Error ? error.message : '保存失败')
     },
   })
@@ -727,10 +738,12 @@ export function MyBetsPanel({
   const deleteMutation = useMutation({
     mutationFn: async (recordId: number) => apiClient.deleteMyBet(recordId, lotteryCode),
     onSuccess: async () => {
+      setMessageTone('success')
       setMessage('投注记录已删除。')
       await queryClient.invalidateQueries({ queryKey: ['my-bets', lotteryCode] })
     },
     onError: (error) => {
+      setMessageTone('error')
       setMessage(error instanceof Error ? error.message : '删除失败')
     },
   })
@@ -744,10 +757,12 @@ export function MyBetsPanel({
     },
     onSuccess: (draft) => {
       setEditingRecord(null)
+      setMessageTone('success')
       setMessage(draft.warnings.length ? draft.warnings.join('；') : 'OCR识别完成，请确认后保存。')
       setForm((previous) => buildFormFromOCRDraft(lotteryCode, draft, previous.ticketImageFile, previous.ticketImagePreviewUrl))
     },
     onError: (error) => {
+      setMessageTone('error')
       setMessage(error instanceof Error ? error.message : 'OCR识别失败')
     },
   })
@@ -899,6 +914,7 @@ export function MyBetsPanel({
   function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) {
+      setMessageTone('error')
       setMessage(submitHint)
       return
     }
@@ -1100,9 +1116,7 @@ export function MyBetsPanel({
             )}
           </>
         ) : (
-          <>
-            {message ? <div className="simulation-inline-message">{message}</div> : null}
-          </>
+          null
         )}
       </StatusCard>
 

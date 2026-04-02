@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from './SettingsPage'
 import { MotionProvider } from '../../shared/theme/MotionProvider'
+import { ToastProvider } from '../../shared/feedback/ToastProvider'
 
 const { apiClientMock } = vi.hoisted(() => ({
   apiClientMock: {
@@ -83,12 +84,14 @@ function renderPage(initialEntry = '/settings/profile') {
 
   render(
     <QueryClientProvider client={client}>
-      <MotionProvider>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <SettingsPage />
-          <LocationDisplay />
-        </MemoryRouter>
-      </MotionProvider>
+      <ToastProvider>
+        <MotionProvider>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <SettingsPage />
+            <LocationDisplay />
+          </MemoryRouter>
+        </MotionProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }

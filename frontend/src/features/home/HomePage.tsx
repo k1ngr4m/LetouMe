@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
+import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
 import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
@@ -51,7 +52,6 @@ import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const LOTTERY_DEFAULT_PAGE_SIZE = 10
-const EXPORT_TOAST_DURATION_MS = 2000
 const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
 const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
@@ -317,11 +317,6 @@ function isMobileExportDisabled() {
   return window.innerWidth <= MOBILE_EXPORT_MAX_WIDTH
 }
 
-type ExportToastState = {
-  message: string
-  tone: 'success' | 'error'
-} | null
-
 const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
   0: 2,
   1: 6,
@@ -443,6 +438,7 @@ export function HomePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { selectedLottery, setSelectedLottery, isGlobalSelection } = useLotterySelection()
+  const { showToast } = useToast()
   const activeTab = getHomeTabFromPath(location.pathname)
   const navigationState = location.state as HomeDetailRouteState | null
   const [modelListView, setModelListView] = useState<HomeModelView>('list')
@@ -457,7 +453,6 @@ export function HomePage() {
   const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
   const [isExportingSummary, setIsExportingSummary] = useState(false)
-  const [exportToast, setExportToast] = useState<ExportToastState>(null)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
@@ -489,7 +484,6 @@ export function HomePage() {
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
   const exportSheetRef = useRef<HTMLDivElement | null>(null)
-  const exportToastTimerRef = useRef<number | null>(null)
   const hasRestoredScrollRef = useRef(false)
   const hasInitializedLotteryRef = useRef(false)
 
@@ -626,14 +620,6 @@ export function HomePage() {
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
     return () => cancelAnimationFrame(frameId)
   }, [navigationState?.scrollY])
-
-  useEffect(() => {
-    return () => {
-      if (exportToastTimerRef.current !== null) {
-        window.clearTimeout(exportToastTimerRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (!activeHistoryStatMenuId) return
@@ -888,14 +874,7 @@ export function HomePage() {
   }
 
   function showExportToast(message: string, tone: 'success' | 'error') {
-    if (exportToastTimerRef.current !== null) {
-      window.clearTimeout(exportToastTimerRef.current)
-    }
-    setExportToast({ message, tone })
-    exportToastTimerRef.current = window.setTimeout(() => {
-      setExportToast(null)
-      exportToastTimerRef.current = null
-    }, EXPORT_TOAST_DURATION_MS)
+    showToast(message, tone)
   }
 
   async function exportModelDetail(modelId: string) {
@@ -991,13 +970,6 @@ export function HomePage() {
 
   return (
     <div className="page-stack">
-      {exportToast ? (
-        <div className={clsx('export-toast', exportToast.tone === 'error' && 'is-error')} role="status" aria-live="polite">
-          <div className="export-toast__badge">{exportToast.tone === 'error' ? '导出失败' : '导出完成'}</div>
-          <div className="export-toast__message">{exportToast.message}</div>
-        </div>
-      ) : null}
-
       <HomeDashboardTabStrip activeTab={activeTab} beforeNavigate={canNavigateDashboardTab} />
 
       {activeTab === 'prediction' ? (

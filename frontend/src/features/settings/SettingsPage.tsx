@@ -7,6 +7,7 @@ import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { UserAvatar } from '../../shared/components/UserAvatar'
 import { useAuth } from '../../shared/auth/AuthProvider'
+import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
 import { useMotion } from '../../shared/theme/MotionProvider'
 import { loadSettingsTableColumnWidths, saveSettingsTableColumnWidths } from '../../shared/lib/storage'
@@ -694,6 +695,7 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, hasPermission, logout } = useAuth()
+  const { showToast } = useToast()
   const { motionPreference, setMotionPreference } = useMotion()
   const activeTab = getSettingsTabFromPath(location.pathname)
   const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
@@ -830,6 +832,12 @@ export function SettingsPage() {
     setProfileNickname(user?.nickname || '')
     setIsProfileNameEditing(false)
   }, [user?.nickname])
+
+  useEffect(() => {
+    if (!message) return
+    showToast(message, messageType)
+    setMessage(null)
+  }, [message, messageType, showToast])
 
   useEffect(
     () => () => {
@@ -2079,8 +2087,6 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      {message ? <div className={clsx('banner-message', messageType === 'error' && 'is-error')}>{message}</div> : null}
-
       <section className="settings-center-layout settings-center-layout--shell">
         <aside className="settings-center-sidebar" aria-label="设置导航">
           {availableTabs.map((tab) => (
