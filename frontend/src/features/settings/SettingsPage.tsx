@@ -647,6 +647,7 @@ export function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
+  const [isProfileNameEditing, setIsProfileNameEditing] = useState(false)
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM)
   const [isPasswordEditorOpen, setIsPasswordEditorOpen] = useState(false)
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
@@ -765,6 +766,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     setProfileNickname(user?.nickname || '')
+    setIsProfileNameEditing(false)
   }, [user?.nickname])
 
   useEffect(() => {
@@ -1041,6 +1043,7 @@ export function SettingsPage() {
       queryClient.setQueryData(['auth', 'me'], response.user)
       setMessage('基础信息已更新。')
       setMessageType('success')
+      setIsProfileNameEditing(false)
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '保存失败')
@@ -1976,18 +1979,42 @@ export function SettingsPage() {
                       <h3>姓名</h3>
                       <p>你在平台上显示的名称</p>
                     </div>
-                    <div className="settings-split-row__editor">
-                      <input
-                        className="settings-split-input"
-                        value={profileNickname}
-                        onChange={(event) => setProfileNickname(event.target.value)}
-                        aria-label="昵称"
-                        required
-                      />
-                    </div>
-                    <button className="ghost-button settings-split-row__action" type="submit" disabled={profileMutation.isPending}>
-                      保存
-                    </button>
+                    {isProfileNameEditing ? (
+                      <div className="settings-split-row__editor settings-split-row__editor--name">
+                        <input
+                          className="settings-split-input"
+                          value={profileNickname}
+                          onChange={(event) => setProfileNickname(event.target.value)}
+                          aria-label="昵称"
+                          required
+                        />
+                        <button className="primary-button settings-split-row__action" type="submit" disabled={profileMutation.isPending}>
+                          保存
+                        </button>
+                        <button
+                          className="ghost-button settings-split-row__action settings-split-row__action--cancel"
+                          type="button"
+                          onClick={() => {
+                            setProfileNickname(user?.nickname || '')
+                            setIsProfileNameEditing(false)
+                          }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="settings-split-row__editor settings-split-row__editor--readonly">
+                        <span className="settings-split-row__value settings-split-row__name-value">{profileNickname || '-'}</span>
+                        <button
+                          className="ghost-button settings-split-row__action settings-split-row__action--edit"
+                          type="button"
+                          aria-label="编辑姓名"
+                          onClick={() => setIsProfileNameEditing(true)}
+                        >
+                          <EditIcon />
+                        </button>
+                      </div>
+                    )}
                   </form>
 
                   <div className="settings-split-row">

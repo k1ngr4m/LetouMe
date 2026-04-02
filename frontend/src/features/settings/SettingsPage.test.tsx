@@ -312,7 +312,11 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByRole('heading', { name: '姓名' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '动效分级' })).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: '全站动效分级' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('昵称')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '编辑姓名' }))
     expect(screen.getByLabelText('昵称')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
   })
 
   it('renders account management sections and can expand password form', async () => {
