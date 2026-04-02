@@ -445,7 +445,6 @@ export function HomePage() {
   const { selectedLottery, setSelectedLottery, isGlobalSelection } = useLotterySelection()
   const activeTab = getHomeTabFromPath(location.pathname)
   const navigationState = location.state as HomeDetailRouteState | null
-  const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
   const [modelListView, setModelListView] = useState<HomeModelView>('list')
   const [scoreViewSortKey, setScoreViewSortKey] = useState<ScoreViewSortKey>('overallScore')
   const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
@@ -661,33 +660,11 @@ export function HomePage() {
 
   useEffect(() => {
     if (activeTab !== 'prediction') return
-
-    function syncActiveSection() {
-      const sections = [
-        { id: 'models' as const, element: modelSectionRef.current },
-        { id: 'weights' as const, element: weightsSectionRef.current },
-      ]
-      const visibleSections = sections
-        .map((section) => {
-          const top = section.element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY
-          return { id: section.id, top }
-        })
-        .filter((section) => Number.isFinite(section.top))
-        .sort((left, right) => Math.abs(left.top - 120) - Math.abs(right.top - 120))
-
-      if (visibleSections[0]) {
-        setActiveSection(visibleSections[0].id)
-      }
-    }
-
-    syncActiveSection()
-    window.addEventListener('scroll', syncActiveSection, { passive: true })
-    window.addEventListener('resize', syncActiveSection)
-    return () => {
-      window.removeEventListener('scroll', syncActiveSection)
-      window.removeEventListener('resize', syncActiveSection)
-    }
-  }, [activeTab])
+    const section = location.hash === '#weights' ? 'weights' : location.hash === '#models' ? 'models' : null
+    if (!section) return
+    const frameId = requestAnimationFrame(() => scrollToSection(section))
+    return () => cancelAnimationFrame(frameId)
+  }, [activeTab, location.hash])
 
   const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
     const references = new Map<string, HistoryModelRef>()
@@ -890,7 +867,6 @@ export function HomePage() {
 
   function scrollToSection(section: 'models' | 'weights') {
     const target = section === 'models' ? modelSectionRef.current : weightsSectionRef.current
-    setActiveSection(section)
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -1078,21 +1054,6 @@ export function HomePage() {
 
       {activeTab === 'prediction' ? (
         <div className="dashboard-layout">
-          <aside className="dashboard-sidebar" aria-label="预测总览导航">
-            <button
-              className={clsx('dashboard-sidebar__link', activeSection === 'models' && 'is-active')}
-              onClick={() => scrollToSection('models')}
-            >
-              模型列表
-            </button>
-            <button
-              className={clsx('dashboard-sidebar__link', activeSection === 'weights' && 'is-active')}
-              onClick={() => scrollToSection('weights')}
-            >
-              预测统计
-            </button>
-          </aside>
-
           <div className="page-section dashboard-content">
             <section ref={modelSectionRef} data-section="models" className="prediction-overview-section prediction-overview-section--models">
               <StatusCard

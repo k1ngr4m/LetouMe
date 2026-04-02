@@ -65,6 +65,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const canManageRoles = hasPermission('role_management')
   const isSettingsRoute = location.pathname.startsWith('/settings')
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
+  const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
+  const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
     canOpenSettings && isSettingsRoute ? 'settings' : 'workspace',
   )
@@ -178,9 +180,9 @@ export function AppShell({ children }: PropsWithChildren) {
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
         <div className="crm-sidebar__brand">
           <span className="crm-sidebar__brand-mark">L</span>
-          <div>
-            <p className="crm-sidebar__brand-eyebrow">LetouMe</p>
-            <h1 className="crm-sidebar__brand-title">乐透么</h1>
+          <div className="crm-sidebar__brand-copy">
+            <p className="crm-sidebar__brand-eyebrow" title="LetouMe">LetouMe</p>
+            <h1 className="crm-sidebar__brand-title" title="乐透么">乐透么</h1>
           </div>
         </div>
 
@@ -194,6 +196,7 @@ export function AppShell({ children }: PropsWithChildren) {
                     className="crm-lottery-picker__trigger"
                     type="button"
                     aria-label="彩种切换"
+                    title={`彩种切换：${selectedLotteryLabel}`}
                     aria-expanded={isLotteryMenuOpen}
                     aria-haspopup="menu"
                     onClick={() => setIsLotteryMenuOpen((current) => !current)}
@@ -210,6 +213,7 @@ export function AppShell({ children }: PropsWithChildren) {
                           type="button"
                           role="menuitemradio"
                           aria-checked={selectedLottery === item.code}
+                          title={item.label}
                           onClick={() => handleLotterySelect(item.code)}
                         >
                           {item.label}
@@ -219,27 +223,47 @@ export function AppShell({ children }: PropsWithChildren) {
                   ) : null}
                 </div>
               ) : null}
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate} title="预测总览">
                 <Sparkles size={16} aria-hidden="true" />
                 <span>预测总览</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate}>
+              {isPredictionRoute ? (
+                <div className="crm-nav-submenu" aria-label="预测总览二级菜单">
+                  <NavLink
+                    className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'models' && 'is-active')}
+                    to={`${HOME_TAB_PATHS.prediction}#models`}
+                    onClick={onWorkspaceNavigate}
+                    title="模型列表"
+                  >
+                    模型列表
+                  </NavLink>
+                  <NavLink
+                    className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'weights' && 'is-active')}
+                    to={`${HOME_TAB_PATHS.prediction}#weights`}
+                    onClick={onWorkspaceNavigate}
+                    title="预测统计"
+                  >
+                    预测统计
+                  </NavLink>
+                </div>
+              ) : null}
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
                 <CircleDollarSign size={16} aria-hidden="true" />
                 <span>模拟试玩</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.analysis} onClick={onWorkspaceNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.analysis} onClick={onWorkspaceNavigate} title="图表分析">
                 <ChartColumnIncreasing size={16} aria-hidden="true" />
                 <span>图表分析</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="历史回溯">
                 <History size={16} aria-hidden="true" />
                 <span>历史回溯</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS['my-bets']} onClick={onWorkspaceNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS['my-bets']} onClick={onWorkspaceNavigate} title="我的投注">
                 <WalletCards size={16} aria-hidden="true" />
                 <span>我的投注</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_RULES_PATH} onClick={onWorkspaceNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_RULES_PATH} onClick={onWorkspaceNavigate} title="规则说明">
                 <BookOpen size={16} aria-hidden="true" />
                 <span>规则说明</span>
               </NavLink>
@@ -247,40 +271,40 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : canOpenSettings ? (
             <>
               <p className="crm-sidebar__group-title">设置中心</p>
-              <button className="crm-sidebar__back" type="button" onClick={openWorkspaceCenter}>
+              <button className="crm-sidebar__back" type="button" title="返回工作台" onClick={openWorkspaceCenter}>
                 <ArrowLeft size={16} aria-hidden="true" />
                 <span>返回工作台</span>
               </button>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.profile} onClick={onSettingsNavigate}>
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.profile} onClick={onSettingsNavigate} title="基本设置">
                 <Settings2 size={16} aria-hidden="true" />
                 <span>基本设置</span>
               </NavLink>
               {canManageModels ? (
                 <>
-                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.models} onClick={onSettingsNavigate}>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.models} onClick={onSettingsNavigate} title="模型管理">
                     <Gauge size={16} aria-hidden="true" />
                     <span>模型管理</span>
                   </NavLink>
-                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.maintenance} onClick={onSettingsNavigate}>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.maintenance} onClick={onSettingsNavigate} title="维护记录">
                     <Wrench size={16} aria-hidden="true" />
                     <span>维护记录</span>
                   </NavLink>
                 </>
               ) : null}
               {canManageSchedules ? (
-                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.schedules} onClick={onSettingsNavigate}>
+                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.schedules} onClick={onSettingsNavigate} title="任务调度">
                   <CheckSquare size={16} aria-hidden="true" />
                   <span>任务调度</span>
                 </NavLink>
               ) : null}
               {canManageUsers ? (
-                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.users} onClick={onSettingsNavigate}>
+                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.users} onClick={onSettingsNavigate} title="用户管理">
                   <UsersRound size={16} aria-hidden="true" />
                   <span>用户管理</span>
                 </NavLink>
               ) : null}
               {canManageRoles ? (
-                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.roles} onClick={onSettingsNavigate}>
+                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.roles} onClick={onSettingsNavigate} title="角色权限">
                   <UserCog size={16} aria-hidden="true" />
                   <span>角色权限</span>
                 </NavLink>
@@ -290,7 +314,7 @@ export function AppShell({ children }: PropsWithChildren) {
         </nav>
 
         <div className="crm-sidebar__footer">
-          <button className="crm-logout-btn" type="button" onClick={() => void logout().then(() => navigate('/login', { replace: true }))}>
+          <button className="crm-logout-btn" type="button" title="退出登录" onClick={() => void logout().then(() => navigate('/login', { replace: true }))}>
             <LogOut size={16} aria-hidden="true" />
             <span>退出登录</span>
           </button>
