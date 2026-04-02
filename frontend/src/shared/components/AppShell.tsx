@@ -266,7 +266,7 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed')}>
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
         <div className="crm-sidebar__brand">
-          <span className="crm-sidebar__brand-mark">L</span>
+          <img className="crm-sidebar__brand-mark" src="/LetouMe_ico.png" alt="LetouMe 图标" />
           <div className="crm-sidebar__brand-copy">
             <p className="crm-sidebar__brand-eyebrow" title="LetouMe">LetouMe</p>
             <h1 className="crm-sidebar__brand-title" title="乐透么">乐透么</h1>

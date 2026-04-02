@@ -10445,12 +10445,9 @@ a {
   width: 1.82rem;
   height: 1.82rem;
   border-radius: 0.65rem;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 700;
-  background: linear-gradient(130deg, #f57e2f, #ffad60);
+  display: block;
+  object-fit: cover;
+  box-shadow: 0 8px 20px rgba(6, 12, 22, 0.24);
 }
 
 .crm-sidebar__brand-copy {
