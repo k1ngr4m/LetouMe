@@ -9785,6 +9785,7 @@ a {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.52rem;
+  align-items: stretch;
 }
 
 .prediction-summary-stack {
@@ -9802,10 +9803,12 @@ a {
 
 .hero-metric-card {
   position: relative;
-  display: grid;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 0.2rem;
-  min-height: 4.5rem;
+  min-height: 5.1rem;
+  height: 100%;
   padding: 0.72rem 0.74rem;
   border-radius: 0.92rem;
   border: 1px solid rgba(130, 165, 222, 0.2);
@@ -9841,6 +9844,9 @@ a {
 .hero-metric-card strong {
   font-size: clamp(1.14rem, 1.4vw, 1.46rem);
   line-height: 1.08;
+  display: flex;
+  align-items: flex-end;
+  min-height: 2.05rem;
 }
 
 .hero-metric-card em {
@@ -9848,6 +9854,9 @@ a {
   font-size: 0.96rem;
   font-weight: 700;
   color: var(--text-1);
+  display: flex;
+  align-items: flex-end;
+  min-height: 2.05rem;
 }
 
 .hero-metric-card--primary {
