@@ -11073,9 +11073,7 @@ a {
 }
 
 .crm-topbar__eyebrow {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--text-2);
+  display: none;
 }
 
 .crm-topbar__title {
@@ -11340,7 +11338,7 @@ a {
     left: 0;
     top: 0;
     bottom: 0;
-    width: min(84vw, 18rem);
+    width: min(78vw, 16.5rem);
     height: auto;
     transform: translateX(-102%);
     transition: transform 240ms var(--motion-ease-standard);
@@ -11348,6 +11346,7 @@ a {
 
   .crm-sidebar.is-open {
     transform: translateX(0);
+    width: min(42vw, 9rem);
   }
 
   .crm-sidebar-overlay.is-open {
@@ -11378,6 +11377,14 @@ a {
   }
 
   .crm-topbar__user {
+    display: inline-flex;
+    min-width: 2.05rem;
+    padding: 0.32rem;
+    justify-content: center;
+  }
+
+  .crm-topbar__user > span:not(.crm-topbar__user-avatar),
+  .crm-topbar__user > svg {
     display: none;
   }
 
@@ -11390,7 +11397,11 @@ a {
   }
 
   .dashboard-bottom-nav--mobile {
-    display: grid;
+    display: none;
+  }
+
+  .crm-sidebar.is-open ~ .crm-workspace .dashboard-bottom-nav--mobile {
+    display: none;
   }
 
   .crm-main .dashboard-sidebar {
