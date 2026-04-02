@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import clsx from 'clsx'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpen,
   ChartColumnIncreasing,
+  ChevronDown,
   CheckSquare,
   CircleDollarSign,
   Gauge,
@@ -26,6 +27,8 @@ import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../../features/home/navigation'
+import { useLotterySelection } from '../lottery/LotterySelectionProvider'
+import type { LotteryCode } from '../types/api'
 
 const SETTINGS_PATHS = {
   profile: '/settings/profile',
@@ -35,6 +38,11 @@ const SETTINGS_PATHS = {
   users: '/settings/users',
   roles: '/settings/roles',
 }
+const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
+  { code: 'dlt', label: '大乐透' },
+  { code: 'pl3', label: '排列3' },
+  { code: 'pl5', label: '排列5' },
+]
 
 type PlaceholderPanelKey = 'messages' | 'todos' | 'apps' | null
 type SidebarPanelMode = 'workspace' | 'settings'
@@ -42,10 +50,13 @@ type SidebarPanelMode = 'workspace' | 'settings'
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { selectedLottery, setSelectedLottery } = useLotterySelection()
   const { user, logout, hasPermission } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [activePlaceholderPanel, setActivePlaceholderPanel] = useState<PlaceholderPanelKey>(null)
+  const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
+  const lotteryMenuRef = useRef<HTMLDivElement | null>(null)
 
   const canOpenSettings = hasPermission('basic_profile')
   const canManageModels = hasPermission('model_management')
@@ -53,12 +64,17 @@ export function AppShell({ children }: PropsWithChildren) {
   const canManageUsers = hasPermission('user_management')
   const canManageRoles = hasPermission('role_management')
   const isSettingsRoute = location.pathname.startsWith('/settings')
+  const isDashboardRoute = location.pathname.startsWith('/dashboard')
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
     canOpenSettings && isSettingsRoute ? 'settings' : 'workspace',
   )
 
   const nextThemeLabel = theme === 'dark' ? '切换浅色' : '切换深色'
   const displayName = user?.nickname || user?.username || '-'
+  const selectedLotteryLabel = useMemo(
+    () => LOTTERY_OPTIONS.find((item) => item.code === selectedLottery)?.label || '大乐透',
+    [selectedLottery],
+  )
 
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '设置中心'
@@ -96,6 +112,35 @@ export function AppShell({ children }: PropsWithChildren) {
     }
   }, [canOpenSettings, isSettingsRoute])
 
+  useEffect(() => {
+    setIsLotteryMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!isLotteryMenuOpen) return
+
+    function handleDocumentClick(event: MouseEvent) {
+      if (!(event.target instanceof Node)) return
+      if (!lotteryMenuRef.current?.contains(event.target)) {
+        setIsLotteryMenuOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsLotteryMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isLotteryMenuOpen])
+
   function openWorkspaceCenter() {
     setSidebarMode('workspace')
     setIsSidebarOpen(false)
@@ -107,6 +152,11 @@ export function AppShell({ children }: PropsWithChildren) {
     setSidebarMode('settings')
     setIsSidebarOpen(true)
     navigate(SETTINGS_PATHS.profile)
+  }
+
+  function handleLotterySelect(lotteryCode: LotteryCode) {
+    setSelectedLottery(lotteryCode)
+    setIsLotteryMenuOpen(false)
   }
 
   function onWorkspaceNavigate() {
@@ -138,6 +188,37 @@ export function AppShell({ children }: PropsWithChildren) {
           {sidebarMode === 'workspace' ? (
             <>
               <p className="crm-sidebar__group-title">工作台</p>
+              {isDashboardRoute ? (
+                <div className={clsx('crm-lottery-picker', isLotteryMenuOpen && 'is-open')} ref={lotteryMenuRef}>
+                  <button
+                    className="crm-lottery-picker__trigger"
+                    type="button"
+                    aria-label="彩种切换"
+                    aria-expanded={isLotteryMenuOpen}
+                    aria-haspopup="menu"
+                    onClick={() => setIsLotteryMenuOpen((current) => !current)}
+                  >
+                    <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
+                    <ChevronDown size={14} aria-hidden="true" />
+                  </button>
+                  {isLotteryMenuOpen ? (
+                    <div className="crm-lottery-picker__menu" role="menu" aria-label="彩种菜单">
+                      {LOTTERY_OPTIONS.map((item) => (
+                        <button
+                          key={item.code}
+                          className={clsx('crm-lottery-picker__option', selectedLottery === item.code && 'is-active')}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={selectedLottery === item.code}
+                          onClick={() => handleLotterySelect(item.code)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate}>
                 <Sparkles size={16} aria-hidden="true" />
                 <span>预测总览</span>

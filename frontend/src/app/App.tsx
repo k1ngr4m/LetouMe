@@ -5,6 +5,7 @@ import { AuthProvider } from '../shared/auth/AuthProvider'
 import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { MotionProvider } from '../shared/theme/MotionProvider'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
+import { LotterySelectionProvider } from '../shared/lottery/LotterySelectionProvider'
 import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
@@ -32,8 +33,9 @@ export function App() {
     <ThemeProvider>
       <MotionProvider>
         <AuthProvider>
-          <Suspense fallback={<RouteLoadingFallback />}>
-            <Routes>
+          <LotterySelectionProvider>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -170,8 +172,9 @@ export function App() {
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </LotterySelectionProvider>
         </AuthProvider>
       </MotionProvider>
     </ThemeProvider>

@@ -7,7 +7,8 @@ import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import { loadPinnedModels, loadSelectedLottery, savePinnedModels, saveSelectedLottery } from '../../shared/lib/storage'
+import { loadPinnedModels, savePinnedModels } from '../../shared/lib/storage'
+import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
 import { useHomeData } from './hooks/useHomeData'
 import { useHomeModelFilters } from './hooks/useHomeModelFilters'
 import {
@@ -441,6 +442,7 @@ function buildHistoryModelStats(records: PredictionsHistoryListRecord[], models:
 export function HomePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { selectedLottery, setSelectedLottery, isGlobalSelection } = useLotterySelection()
   const activeTab = getHomeTabFromPath(location.pathname)
   const navigationState = location.state as HomeDetailRouteState | null
   const [activeSection, setActiveSection] = useState<'models' | 'weights'>('models')
@@ -451,8 +453,7 @@ export function HomePage() {
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
   const [lotteryPage, setLotteryPage] = useState(1)
   const [lotteryPageSize, setLotteryPageSize] = useState(LOTTERY_DEFAULT_PAGE_SIZE)
-  const [selectedLottery, setSelectedLottery] = useState<LotteryCode>(() => loadSelectedLottery())
-  const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(loadSelectedLottery()))
+  const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
@@ -578,7 +579,6 @@ export function HomePage() {
   }, [selectedLottery, validPinnedModelIds])
 
   useEffect(() => {
-    saveSelectedLottery(selectedLottery)
     setPinnedModelIds(loadPinnedModels(selectedLottery))
   }, [selectedLottery])
 
@@ -1026,20 +1026,22 @@ export function HomePage() {
           <div className="hero-panel__main">
             <p className="hero-panel__eyebrow">Prediction Command Center</p>
             <h2 className="hero-panel__title">{lotteryLabel}</h2>
-            <div className="hero-switch" role="tablist" aria-label="彩种切换">
-              {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  className={clsx('hero-switch__item', selectedLottery === code && 'is-active')}
-                  onClick={() => setSelectedLottery(code)}
-                  aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
-                  aria-pressed={selectedLottery === code}
-                >
-                  {code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
-                </button>
-              ))}
-            </div>
+            {!isGlobalSelection ? (
+              <div className="hero-switch" role="tablist" aria-label="彩种切换">
+                {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    className={clsx('hero-switch__item', selectedLottery === code && 'is-active')}
+                    onClick={() => setSelectedLottery(code)}
+                    aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                    aria-pressed={selectedLottery === code}
+                  >
+                    {code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {/*<div className="hero-panel__lead">*/}
             {/*  <p>*/}
             {/*    <span>当前目标期</span>*/}
@@ -1072,7 +1074,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <HomeDashboardTabStrip activeTab={activeTab} selectedLottery={selectedLottery} beforeNavigate={canNavigateDashboardTab} />
+      <HomeDashboardTabStrip activeTab={activeTab} beforeNavigate={canNavigateDashboardTab} />
 
       {activeTab === 'prediction' ? (
         <div className="dashboard-layout">

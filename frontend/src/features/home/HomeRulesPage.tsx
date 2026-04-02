@@ -1,8 +1,7 @@
-import { useMemo } from 'react'
+import { useLayoutEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
-import { loadSelectedLottery } from '../../shared/lib/storage'
-import type { LotteryCode } from '../../shared/types/api'
+import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
 import { HOME_TAB_PATHS, type HomeRulesRouteState } from './navigation'
 import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
@@ -73,8 +72,15 @@ const PL3_RULE_CHAPTERS = [
 export function HomeRulesPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { selectedLottery, setSelectedLottery } = useLotterySelection()
   const navigationState = location.state as HomeRulesRouteState | null
-  const selectedLottery = useMemo<LotteryCode>(() => navigationState?.lotteryCode || loadSelectedLottery(), [navigationState?.lotteryCode])
+
+  useLayoutEffect(() => {
+    const lotteryCode = navigationState?.lotteryCode
+    if (!lotteryCode || lotteryCode === selectedLottery) return
+    setSelectedLottery(lotteryCode)
+  }, [navigationState?.lotteryCode, selectedLottery, setSelectedLottery])
+
   const isPl3 = selectedLottery === 'pl3'
   const isPl5 = selectedLottery === 'pl5'
 
@@ -92,7 +98,7 @@ export function HomeRulesPage() {
         </div>
         <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : '大乐透'}</div>
       </section>
-      <HomeDashboardTabStrip activeTab="rules" selectedLottery={selectedLottery} />
+      <HomeDashboardTabStrip activeTab="rules" />
 
       {!isPl3 && !isPl5 ? (
         <>

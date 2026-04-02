@@ -2,18 +2,15 @@ import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookOpen, ChartColumnIncreasing, CircleDollarSign, History, Sparkles, WalletCards } from 'lucide-react'
-import type { LotteryCode } from '../../shared/types/api'
-import { HOME_RULES_PATH, getDashboardPath, type HomeRulesRouteState } from './navigation'
+import { HOME_RULES_PATH, getDashboardPath } from './navigation'
 
 type DashboardActiveTab = 'prediction' | 'simulation' | 'analysis' | 'history' | 'my-bets' | 'rules'
 
 export function HomeDashboardTabStrip({
   activeTab,
-  selectedLottery,
   beforeNavigate,
 }: {
   activeTab: DashboardActiveTab
-  selectedLottery: LotteryCode
   beforeNavigate?: () => boolean
 }) {
   const navigate = useNavigate()
@@ -126,7 +123,7 @@ export function HomeDashboardTabStrip({
       key: 'rules',
       label: '规则',
       icon: BookOpen,
-      onClick: () => guardedNavigate(() => navigate(HOME_RULES_PATH, { state: { lotteryCode: selectedLottery } satisfies HomeRulesRouteState })),
+      onClick: () => guardedNavigate(() => navigate(HOME_RULES_PATH)),
     },
     {
       key: 'my-bets',

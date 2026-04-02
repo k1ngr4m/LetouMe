@@ -7,6 +7,7 @@ import { HomeRulesPage } from './HomeRulesPage'
 
 vi.mock('../../shared/lib/storage', () => ({
   loadSelectedLottery: () => 'dlt',
+  saveSelectedLottery: () => undefined,
 }))
 
 function renderPage(initialEntry: string | { pathname: string; state?: unknown } = '/dashboard/rules') {

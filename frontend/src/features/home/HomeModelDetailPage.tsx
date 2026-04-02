@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusCard } from '../../shared/components/StatusCard'
-import { loadSelectedLottery } from '../../shared/lib/storage'
+import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
 import { useHomeData } from './hooks/useHomeData'
 import { buildModelScores, getActualResult, normalizePredictionModelPlayMode, resolveModelScore } from './lib/home'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
@@ -14,8 +14,8 @@ export function HomeModelDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { modelId = '' } = useParams()
+  const { selectedLottery } = useLotterySelection()
   const navigationState = location.state as HomeDetailRouteState | null
-  const selectedLottery = loadSelectedLottery()
   const [isScoreExpanded, setIsScoreExpanded] = useState(false)
   const expectedPlayMode = selectedLottery === 'pl3' || selectedLottery === 'dlt' ? navigationState?.predictionPlayMode : undefined
 
