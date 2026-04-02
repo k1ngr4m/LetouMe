@@ -11083,7 +11083,31 @@ a {
   gap: 0.65rem;
 }
 
-.crm-topbar__menu-btn {
+.crm-topbar__workspace-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 5.2rem;
+  min-height: 2.1rem;
+  padding: 0.4rem 0.86rem;
+  border-radius: 999px;
+  border: 1px solid var(--crm-topbar-border);
+  background: color-mix(in srgb, var(--crm-topbar-bg) 80%, #2f466a 20%);
+  color: var(--text-1);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crm-topbar__workspace-btn:hover,
+.crm-topbar__workspace-btn.is-active {
+  background: color-mix(in srgb, var(--crm-topbar-bg) 66%, #f27f36 34%);
+}
+
+.crm-topbar__icon-btn.crm-topbar__menu-btn {
   display: none;
 }
 
@@ -11336,6 +11360,36 @@ a {
     padding-inline: 0.34rem;
   }
 
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item--with-toggle {
+    gap: 0;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item--with-toggle .crm-nav-item__main {
+    flex: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-lottery-picker {
+    pointer-events: none;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-lottery-picker__trigger {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0.34rem;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-lottery-picker__trigger svg:last-child,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-lottery-picker__menu {
+    display: none;
+  }
+
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-submenu__toggle,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-submenu {
+    display: none;
+  }
+
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item svg,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back svg,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn svg {
@@ -11369,10 +11423,6 @@ a {
     pointer-events: auto;
   }
 
-  .crm-topbar__menu-btn {
-    display: grid;
-  }
-
   .crm-sidebar__collapse-btn {
     display: none;
   }
@@ -11381,6 +11431,17 @@ a {
 @media (max-width: 767px) {
   .crm-topbar {
     padding: 0.75rem 0.78rem;
+  }
+
+  .crm-topbar__workspace-btn {
+    min-width: 4.2rem;
+    min-height: 1.9rem;
+    padding: 0.32rem 0.68rem;
+    font-size: 0.76rem;
+  }
+
+  .crm-topbar__icon-btn.crm-topbar__menu-btn {
+    display: grid;
   }
 
   .crm-topbar__title {

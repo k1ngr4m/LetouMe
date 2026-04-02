@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 're
 import clsx from 'clsx'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   Bell,
   BookOpen,
   ChartColumnIncreasing,
@@ -370,10 +369,6 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : canOpenSettings ? (
             <>
               <p className="crm-sidebar__group-title">设置中心</p>
-              <button className="crm-sidebar__back" type="button" title="返回工作台" onClick={openWorkspaceCenter}>
-                <ArrowLeft size={16} aria-hidden="true" />
-                <span>返回工作台</span>
-              </button>
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.profile} onClick={onSettingsNavigate} title="个人资料">
                 <Settings2 size={16} aria-hidden="true" />
                 <span>个人资料</span>
@@ -449,6 +444,15 @@ export function AppShell({ children }: PropsWithChildren) {
               <h2 className="crm-topbar__title">{pageTitle}</h2>
             </div>
           </div>
+          <button
+            className={clsx('crm-topbar__workspace-btn', isDashboardRoute && 'is-active')}
+            type="button"
+            onClick={openWorkspaceCenter}
+            aria-label="工作台"
+            title="工作台"
+          >
+            工作台
+          </button>
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button
