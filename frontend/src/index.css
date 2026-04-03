@@ -4002,7 +4002,9 @@ a {
 .history-record-card__models {
   margin-top: 0.7rem;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
+  align-items: start;
 }
 
 .history-stats-grid {
@@ -8834,6 +8836,7 @@ a {
   }
 
   .history-card-list__records,
+  .history-record-card__models,
   .history-record-card__detail-rate-grid {
     grid-template-columns: 1fr;
   }
