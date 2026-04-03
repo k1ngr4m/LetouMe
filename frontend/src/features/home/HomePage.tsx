@@ -498,6 +498,7 @@ export function HomePage() {
   )
   const [historyFallbackSignature, setHistoryFallbackSignature] = useState<string | null>(null)
   const [weightedSummary] = useState(true)
+  const [pendingFocusedBet, setPendingFocusedBet] = useState<{ recordId: number; token: string } | null>(null)
   const modelSectionRef = useRef<HTMLElement | null>(null)
   const weightsSectionRef = useRef<HTMLElement | null>(null)
   const exportSheetRef = useRef<HTMLDivElement | null>(null)
@@ -644,6 +645,21 @@ export function HomePage() {
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
     return () => cancelAnimationFrame(frameId)
   }, [navigationState?.scrollY])
+
+  useEffect(() => {
+    if (activeTab !== 'my-bets') return
+    const focusBetRecordId = Number(navigationState?.focusBetRecordId || 0)
+    if (focusBetRecordId <= 0) return
+    const focusToken = String(navigationState?.focusNonce || `focus-${focusBetRecordId}`)
+    setPendingFocusedBet({ recordId: focusBetRecordId, token: focusToken })
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        scrollY: navigationState?.scrollY,
+        predictionPlayMode: navigationState?.predictionPlayMode,
+      } satisfies HomeDetailRouteState,
+    })
+  }, [activeTab, location.pathname, navigate, navigationState])
 
   useEffect(() => {
     if (!activeHistoryStatMenuId) return
@@ -1582,6 +1598,9 @@ export function HomePage() {
             lotteryCode={selectedLottery}
             targetPeriod={currentPredictions.data?.target_period || ''}
             onDirtyStateChange={setMyBetsFormDirty}
+            focusRecordId={pendingFocusedBet?.recordId}
+            focusToken={pendingFocusedBet?.token}
+            onFocusHandled={() => setPendingFocusedBet(null)}
           />
         </Suspense>
       ) : null}

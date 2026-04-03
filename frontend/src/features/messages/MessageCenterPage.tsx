@@ -7,7 +7,7 @@ import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeBeijing } from '../../shared/lib/format'
 import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
 import type { LotteryCode, MessageStatusFilter, SiteMessage } from '../../shared/types/api'
-import { HOME_TAB_PATHS } from '../home/navigation'
+import { HOME_TAB_PATHS, type HomeDetailRouteState } from '../home/navigation'
 
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
@@ -124,7 +124,11 @@ export function MessageCenterPage() {
     if (message.lottery_code) {
       setSelectedLottery(message.lottery_code)
     }
-    navigate(HOME_TAB_PATHS['my-bets'])
+    const routeState: HomeDetailRouteState = {
+      focusBetRecordId: message.my_bet_record_id,
+      focusNonce: `msg-${message.id}-${Date.now()}`,
+    }
+    navigate(HOME_TAB_PATHS['my-bets'], { state: routeState })
   }
 
   return (

@@ -644,10 +644,16 @@ export function MyBetsPanel({
   lotteryCode,
   targetPeriod,
   onDirtyStateChange,
+  focusRecordId,
+  focusToken,
+  onFocusHandled,
 }: {
   lotteryCode: LotteryCode
   targetPeriod: string
   onDirtyStateChange?: (isDirty: boolean) => void
+  focusRecordId?: number
+  focusToken?: string
+  onFocusHandled?: () => void
 }) {
   const { motionLevel } = useMotion()
   const { showToast } = useToast()
@@ -658,10 +664,14 @@ export function MyBetsPanel({
   const [message, setMessage] = useState<string | null>(null)
   const [messageTone, setMessageTone] = useState<'success' | 'error'>('success')
   const [expandedRecordMap, setExpandedRecordMap] = useState<Record<number, boolean>>({})
+  const [highlightedRecordId, setHighlightedRecordId] = useState<number | null>(null)
   const [form, setForm] = useState<BetFormState>(() => createDefaultFormState(targetPeriod, lotteryCode))
   const [initialFormSnapshot, setInitialFormSnapshot] = useState(() =>
     buildFormSnapshot(createDefaultFormState(targetPeriod, lotteryCode)),
   )
+  const recordRefMap = useRef<Record<number, HTMLElement | null>>({})
+  const highlightTimeoutRef = useRef<number | null>(null)
+  const consumedFocusTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!message) return
@@ -672,6 +682,9 @@ export function MyBetsPanel({
   useEffect(() => {
     return () => {
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
+      if (highlightTimeoutRef.current !== null) {
+        window.clearTimeout(highlightTimeoutRef.current)
+      }
     }
   }, [form.ticketImagePreviewUrl])
 
@@ -854,6 +867,39 @@ export function MyBetsPanel({
     })
   }, [records])
 
+  useEffect(() => {
+    if (viewMode !== 'list') return
+    const targetRecordId = Number(focusRecordId || 0)
+    const token = String(focusToken || '')
+    if (!targetRecordId || !token) return
+    if (consumedFocusTokenRef.current === token) return
+
+    consumedFocusTokenRef.current = token
+    const targetExists = records.some((item) => item.id === targetRecordId)
+    if (!targetExists) {
+      onFocusHandled?.()
+      return
+    }
+
+    setExpandedRecordMap((previous) => ({ ...previous, [targetRecordId]: true }))
+    const frameId = window.requestAnimationFrame(() => {
+      const targetNode = recordRefMap.current[targetRecordId]
+      if (targetNode) {
+        targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      setHighlightedRecordId(targetRecordId)
+      if (highlightTimeoutRef.current !== null) {
+        window.clearTimeout(highlightTimeoutRef.current)
+      }
+      highlightTimeoutRef.current = window.setTimeout(() => {
+        setHighlightedRecordId((current) => (current === targetRecordId ? null : current))
+        highlightTimeoutRef.current = null
+      }, 2400)
+    })
+    onFocusHandled?.()
+    return () => window.cancelAnimationFrame(frameId)
+  }, [focusRecordId, focusToken, onFocusHandled, records, viewMode])
+
   function openCreateForm(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
     setEditingRecord(null)
@@ -1034,7 +1080,10 @@ export function MyBetsPanel({
                   <motion.article
                     layout={animationsEnabled}
                     key={record.id}
-                    className="my-bets-card"
+                    className={clsx('my-bets-card', highlightedRecordId === record.id && 'is-focus-highlight')}
+                    ref={(node) => {
+                      recordRefMap.current[record.id] = node
+                    }}
                     initial={animationsEnabled ? { opacity: 0, y: cardEnterY } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, delay: animationsEnabled ? Math.min(index * 0.025, 0.22) : 0 }}

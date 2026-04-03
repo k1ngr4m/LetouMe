@@ -18,6 +18,8 @@ export type ScoreViewSortDirection = 'desc' | 'asc'
 export type HomeDetailRouteState = {
   scrollY?: number
   predictionPlayMode?: PredictionPlayMode
+  focusBetRecordId?: number
+  focusNonce?: string
 }
 
 export type HomeRulesRouteState = {
