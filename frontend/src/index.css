@@ -11723,6 +11723,126 @@ a {
   font-size: 0.76rem;
 }
 
+:root[data-theme='light'] .message-center {
+  border-color: rgba(156, 179, 210, 0.38);
+  background:
+    radial-gradient(120% 120% at 8% -8%, rgba(96, 165, 250, 0.13), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 251, 255, 0.94));
+  box-shadow: 0 16px 34px rgba(56, 82, 121, 0.12);
+}
+
+:root[data-theme='light'] .message-center__title-wrap h2 {
+  color: #0f172a;
+}
+
+:root[data-theme='light'] .message-center__title-wrap p {
+  color: #475569;
+}
+
+:root[data-theme='light'] .message-center__title-icon {
+  border-color: rgba(96, 165, 250, 0.42);
+  color: #1d4ed8;
+  background: linear-gradient(135deg, rgba(219, 234, 254, 0.94), rgba(239, 246, 255, 0.94));
+}
+
+:root[data-theme='light'] .message-center__mark-all {
+  border-color: rgba(96, 165, 250, 0.52);
+  background: rgba(219, 234, 254, 0.9);
+  color: #1e3a8a;
+}
+
+:root[data-theme='light'] .message-center__status-tab {
+  border-color: rgba(148, 163, 184, 0.46);
+  background: rgba(248, 250, 252, 0.95);
+  color: #475569;
+}
+
+:root[data-theme='light'] .message-center__status-tab.is-active {
+  border-color: rgba(37, 99, 235, 0.5);
+  background: rgba(219, 234, 254, 0.95);
+  color: #1e3a8a;
+}
+
+:root[data-theme='light'] .message-center__lottery-select {
+  color: #475569;
+}
+
+:root[data-theme='light'] .message-center__lottery-select select {
+  border-color: rgba(148, 163, 184, 0.46);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+}
+
+:root[data-theme='light'] .message-center__empty {
+  border-color: rgba(148, 163, 184, 0.42);
+  color: #3b82f6;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+:root[data-theme='light'] .message-card {
+  border-color: rgba(156, 179, 210, 0.38);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 255, 0.93));
+  box-shadow: 0 8px 18px rgba(90, 121, 166, 0.1);
+}
+
+:root[data-theme='light'] .message-card.is-read {
+  border-color: rgba(156, 179, 210, 0.28);
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(245, 249, 255, 0.92));
+  opacity: 1;
+}
+
+:root[data-theme='light'] .message-card__meta time {
+  color: #64748b;
+}
+
+:root[data-theme='light'] .message-card__status.is-win {
+  color: #166534;
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(220, 252, 231, 0.9);
+}
+
+:root[data-theme='light'] .message-card__status.is-lose {
+  color: #991b1b;
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(254, 226, 226, 0.92);
+}
+
+:root[data-theme='light'] .message-card h3 {
+  color: #0f172a;
+}
+
+:root[data-theme='light'] .message-card p {
+  color: #334155;
+}
+
+:root[data-theme='light'] .message-card__metrics span {
+  border-color: rgba(156, 179, 210, 0.34);
+  background: rgba(241, 245, 249, 0.88);
+  color: #1e3a8a;
+}
+
+:root[data-theme='light'] .message-card__actions button {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(248, 250, 252, 0.95);
+  color: #334155;
+}
+
+:root[data-theme='light'] .message-card__actions button.is-danger {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.95);
+}
+
+:root[data-theme='light'] .message-center__pager button {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(248, 250, 252, 0.95);
+  color: #334155;
+}
+
+:root[data-theme='light'] .message-center__pager span {
+  color: #475569;
+}
+
 .crm-sidebar-overlay {
   position: fixed;
   inset: 0;
