@@ -3142,6 +3142,27 @@ function SummaryHitTooltipBadge({
   models: PredictionModel[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const tooltipModels = models.reduce<Array<{ key: string; name: string; isMatched: boolean }>>((accumulator, model) => {
+    const modelName = (model.model_name || model.model_id || '').trim()
+    const displayName = modelName || model.model_id
+    const dedupeKey = displayName.toLowerCase()
+    const isMatched = item.matchedModelIds.includes(model.model_id)
+    const existing = accumulator.find((entry) => entry.key === dedupeKey)
+
+    if (!existing) {
+      accumulator.push({
+        key: dedupeKey,
+        name: displayName,
+        isMatched,
+      })
+      return accumulator
+    }
+
+    if (isMatched) {
+      existing.isMatched = true
+    }
+    return accumulator
+  }, [])
 
   return (
     <div
@@ -3158,14 +3179,13 @@ function SummaryHitTooltipBadge({
         <div className="ball-stat-card__tooltip" role="tooltip">
           <p className="ball-stat-card__tooltip-title">命中模型</p>
           <div className="ball-stat-card__tooltip-models">
-            {models.map((model) => {
-              const isMatched = item.matchedModelIds.includes(model.model_id)
+            {tooltipModels.map((model) => {
               return (
                 <span
-                  key={`${title}-${item.ball}-${model.model_id}`}
-                  className={clsx('ball-stat-card__tooltip-model', isMatched && 'is-hit')}
+                  key={`${title}-${item.ball}-${model.key}`}
+                  className={clsx('ball-stat-card__tooltip-model', model.isMatched && 'is-hit')}
                 >
-                  {model.model_name}
+                  {model.name}
                 </span>
               )
             })}
