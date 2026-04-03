@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/history/presentation/pages/history_page.dart';
+import '../features/history/presentation/pages/history_detail_page.dart';
 import '../features/messages/presentation/pages/messages_page.dart';
 import '../features/model_detail/presentation/pages/model_detail_page.dart';
 import '../features/my_bets/presentation/pages/my_bets_page.dart';
@@ -66,6 +67,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: AppRoute.history.path,
                 name: AppRoute.history.name,
                 builder: (context, state) => const HistoryPage(),
+                routes: [
+                  GoRoute(
+                    path: ':targetPeriod',
+                    name: AppRoute.historyDetail.name,
+                    builder: (context, state) => HistoryDetailPage(
+                      targetPeriod: state.pathParameters['targetPeriod'] ?? '',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -119,6 +129,7 @@ enum AppRoute {
   login('/login'),
   prediction('/prediction'),
   history('/history'),
+  historyDetail('/history/detail'),
   myBets('/my-bets'),
   messages('/messages'),
   profile('/profile'),
@@ -129,11 +140,12 @@ enum AppRoute {
 
   final String path;
 
-      String get name => switch (this) {
+  String get name => switch (this) {
         bootstrap => 'bootstrap',
         login => 'login',
         prediction => 'prediction',
         history => 'history',
+        historyDetail => 'history-detail',
         myBets => 'my-bets',
         messages => 'messages',
         profile => 'profile',

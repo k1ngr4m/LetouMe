@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/network/api_client_provider.dart';
 import '../../../../shared/widgets/feature_page_scaffold.dart';
@@ -51,26 +53,30 @@ class HistoryPage extends ConsumerWidget {
                 (record) => Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: PanelCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('第 ${record.targetPeriod} 期', style: theme.textTheme.titleMedium),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          record.actualResult == null
-                              ? '尚未开奖'
-                              : '开奖：${record.actualResult!.redBalls.join(' ')}'
-                                  '${record.actualResult!.blueBalls.isEmpty ? '' : ' + ${record.actualResult!.blueBalls.join(' ')}'}',
-                          style: theme.textTheme.bodyLarge,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () => context.push('${AppRoute.history.path}/${record.targetPeriod}'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('第 ${record.targetPeriod} 期', style: theme.textTheme.titleMedium),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            record.actualResult == null
+                                ? '尚未开奖'
+                                : '开奖：${record.actualResult!.redBalls.join(' ')}'
+                                    '${record.actualResult!.blueBalls.isEmpty ? '' : ' + ${record.actualResult!.blueBalls.join(' ')}'}',
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            record.models.isEmpty
+                                ? '暂无模型摘要'
+                                : '${record.models.first.modelName} · 命中 ${record.models.first.bestHitCount ?? 0} · 胜率 ${(record.models.first.winRateByPeriod ?? 0).toStringAsFixed(2)}',
+                            style: theme.textTheme.bodyMedium,
+                          ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          record.models.isEmpty
-                              ? '暂无模型摘要'
-                              : '${record.models.first.modelName} · 命中 ${record.models.first.bestHitCount ?? 0} · 胜率 ${(record.models.first.winRateByPeriod ?? 0).toStringAsFixed(2)}',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import 'models/predictions_history_detail_response.dart';
 import 'models/predictions_history_response.dart';
 
 class HistoryRepository {
@@ -20,5 +21,19 @@ class HistoryRepository {
       },
     );
     return PredictionsHistoryListResponse.fromMap(data);
+  }
+
+  Future<PredictionsHistoryDetailResponse> fetchHistoryDetail({
+    required String targetPeriod,
+    String lotteryCode = 'dlt',
+  }) async {
+    final data = await _apiClient.post(
+      '/predictions/history/detail',
+      data: {
+        'lottery_code': lotteryCode,
+        'target_period': targetPeriod,
+      },
+    );
+    return PredictionsHistoryDetailResponse.fromMap(data);
   }
 }
