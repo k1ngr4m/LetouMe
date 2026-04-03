@@ -48,6 +48,11 @@
   --action-menu-item-active-color: #ffffff;
   --action-menu-item-danger-bg: rgba(199, 55, 82, 0.16);
   --action-menu-item-danger-color: #ffb8c1;
+  --chart-tooltip-bg: rgba(9, 16, 28, 0.9);
+  --chart-tooltip-border: rgba(144, 172, 214, 0.28);
+  --chart-tooltip-shadow: 0 18px 34px rgba(5, 11, 22, 0.34);
+  --chart-tooltip-label: #b7c8e3;
+  --chart-tooltip-text: #e8f0fc;
   --theme-toggle-bg: rgba(12, 19, 31, 0.78);
   --theme-toggle-shadow: 0 16px 32px rgba(7, 12, 20, 0.24);
   --ball-stat-bg: rgba(255, 255, 255, 0.88);
@@ -155,6 +160,11 @@
   --action-menu-item-active-color: #213047;
   --action-menu-item-danger-bg: rgba(253, 226, 231, 0.96);
   --action-menu-item-danger-color: #be123c;
+  --chart-tooltip-bg: rgba(22, 33, 51, 0.9);
+  --chart-tooltip-border: rgba(141, 164, 199, 0.34);
+  --chart-tooltip-shadow: 0 18px 34px rgba(71, 91, 122, 0.24);
+  --chart-tooltip-label: #c8d7ee;
+  --chart-tooltip-text: #eef5ff;
   --theme-toggle-bg: rgba(255, 251, 246, 0.92);
   --theme-toggle-shadow: 0 16px 32px rgba(113, 130, 153, 0.18);
   --ball-stat-bg: rgba(255, 255, 255, 0.92);
@@ -11113,11 +11123,20 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background-color 140ms var(--motion-ease-standard),
+    border-color 140ms var(--motion-ease-standard),
+    color 140ms var(--motion-ease-standard),
+    transform 140ms var(--motion-ease-standard);
 }
 
 .crm-topbar__workspace-btn:hover,
 .crm-topbar__workspace-btn.is-active {
   background: color-mix(in srgb, var(--crm-topbar-bg) 66%, #f27f36 34%);
+}
+
+.crm-topbar__workspace-btn:active {
+  transform: translateX(-50%) translateY(0.3px) scale(0.998);
 }
 
 .crm-topbar__icon-btn.crm-topbar__menu-btn {

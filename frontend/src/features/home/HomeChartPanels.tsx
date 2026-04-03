@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   Area,
   AreaChart,
@@ -70,6 +70,35 @@ function getModelTrendColor(index: number) {
   return palette[index % palette.length]
 }
 
+const chartTooltipContentStyle: CSSProperties = {
+  background: 'var(--chart-tooltip-bg)',
+  border: '1px solid var(--chart-tooltip-border)',
+  borderRadius: '14px',
+  boxShadow: 'var(--chart-tooltip-shadow)',
+  backdropFilter: 'blur(10px)',
+  padding: '10px 12px',
+}
+
+const chartTooltipLabelStyle: CSSProperties = {
+  color: 'var(--chart-tooltip-label)',
+  fontWeight: 600,
+  marginBottom: '6px',
+}
+
+const chartTooltipItemStyle: CSSProperties = {
+  color: 'var(--chart-tooltip-text)',
+  fontWeight: 600,
+}
+
+const chartTooltipCursor = { stroke: 'rgba(173, 191, 220, 0.42)', strokeWidth: 1.2 }
+
+const commonChartTooltipProps = {
+  contentStyle: chartTooltipContentStyle,
+  labelStyle: chartTooltipLabelStyle,
+  itemStyle: chartTooltipItemStyle,
+  cursor: chartTooltipCursor,
+}
+
 export function AnalysisChartsPanel({
   lotteryCode,
   redChart,
@@ -97,7 +126,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -108,7 +137,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--amber-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -119,7 +148,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -130,7 +159,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="period" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -141,7 +170,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="period" />
               <YAxis allowDecimals={false} ticks={[0, 1, 2, 3]} tickFormatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
-              <Tooltip formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
               <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -160,7 +189,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -171,7 +200,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--amber-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -182,7 +211,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -193,7 +222,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="#8b5cf6" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -204,7 +233,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="ball" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Bar dataKey="count" fill="#22c55e" radius={[12, 12, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -215,7 +244,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="period" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...commonChartTooltipProps} />
               <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -226,7 +255,7 @@ export function AnalysisChartsPanel({
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="period" />
               <YAxis allowDecimals={false} ticks={[0, 1, 2, 3, 4, 5]} tickFormatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
-              <Tooltip formatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
               <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -244,7 +273,7 @@ export function AnalysisChartsPanel({
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="ball" />
             <YAxis allowDecimals={false} />
-            <Tooltip />
+            <Tooltip {...commonChartTooltipProps} />
             <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -255,7 +284,7 @@ export function AnalysisChartsPanel({
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="ball" />
             <YAxis allowDecimals={false} />
-            <Tooltip />
+            <Tooltip {...commonChartTooltipProps} />
             <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -266,7 +295,7 @@ export function AnalysisChartsPanel({
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="period" />
             <YAxis allowDecimals={false} />
-            <Tooltip />
+            <Tooltip {...commonChartTooltipProps} />
             <Legend />
             <Area type="monotone" dataKey="odd" stackId="1" stroke="var(--red-500)" fill="rgba(215, 64, 90, 0.6)" />
             <Area type="monotone" dataKey="even" stackId="1" stroke="var(--amber-500)" fill="rgba(242, 165, 79, 0.6)" />
@@ -279,7 +308,7 @@ export function AnalysisChartsPanel({
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="period" />
             <YAxis />
-            <Tooltip />
+            <Tooltip {...commonChartTooltipProps} />
             <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
           </LineChart>
         </ResponsiveContainer>
@@ -325,7 +354,7 @@ export function HistoryHitTrendCard({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis allowDecimals={false} />
-                <Tooltip />
+                <Tooltip {...commonChartTooltipProps} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
                   <Line
@@ -349,7 +378,7 @@ export function HistoryHitTrendCard({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis allowDecimals={false} />
-                <Tooltip />
+                <Tooltip {...commonChartTooltipProps} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
                   <Bar
@@ -371,7 +400,7 @@ export function HistoryHitTrendCard({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis />
-                <Tooltip formatter={(value) => formatPrizeValue(Number(value || 0))} />
+                <Tooltip {...commonChartTooltipProps} formatter={(value) => formatPrizeValue(Number(value || 0))} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
                   <Line
