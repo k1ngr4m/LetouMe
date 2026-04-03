@@ -26,8 +26,6 @@ export function useHomeData(
     enablePagedLotteryHistory?: boolean
   },
 ) {
-  const effectiveHistoryStrategyFilters = lotteryCode === 'pl3' || lotteryCode === 'pl5' ? [] : historyStrategyFilters
-
   const currentPredictions = useQuery({
     ...currentPredictionsQueryOptions(lotteryCode),
     enabled: options?.enableCurrentPredictions ?? true,
@@ -51,7 +49,7 @@ export function useHomeData(
       lotteryCode,
       historyPage,
       historyPageSize,
-      [...effectiveHistoryStrategyFilters].sort().join('|'),
+      [...historyStrategyFilters].sort().join('|'),
       [...historyPlayTypeFilters].sort().join('|'),
     ],
     placeholderData: keepPreviousData,
@@ -61,7 +59,7 @@ export function useHomeData(
           lottery_code: lotteryCode,
           limit: historyPageSize,
           offset: (historyPage - 1) * historyPageSize,
-          strategy_filters: effectiveHistoryStrategyFilters,
+          strategy_filters: historyStrategyFilters,
           play_type_filters: historyPlayTypeFilters,
           strategy_match_mode: 'all',
         }),

@@ -1257,7 +1257,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
-    expect(screen.getByText('开奖方案筛选')).toBeInTheDocument()
+    expect(screen.getAllByText('方案筛选').length).toBeGreaterThan(0)
   })
 
   it('hides strategy filters in dlt dantuo mode', async () => {
@@ -1267,8 +1267,8 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
-    expect(screen.queryByText('正在更新开奖方案筛选结果...')).not.toBeInTheDocument()
+    expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
+    expect(screen.queryByText('正在更新方案筛选结果...')).not.toBeInTheDocument()
   })
 
   it('shows four dlt dantuo summary sections in prediction overview', async () => {
@@ -1624,7 +1624,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(strategyButton).toHaveClass('is-active')
     await waitFor(() => {
       expect(screen.queryByText('正在加载大乐透预测控制台...')).not.toBeInTheDocument()
-      expect(within(historySection as HTMLElement).getByText('正在更新开奖方案筛选结果...')).toBeInTheDocument()
+      expect(within(historySection as HTMLElement).getByText('正在更新方案筛选结果...')).toBeInTheDocument()
       expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
     })
 
@@ -2374,10 +2374,11 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
+    expect(screen.getByText('方案筛选')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    expect(screen.queryByText('开奖方案筛选')).not.toBeInTheDocument()
-    expect(screen.queryByText('正在更新开奖方案筛选结果...')).not.toBeInTheDocument()
+    expect(screen.getByText('方案筛选')).toBeInTheDocument()
+    expect(screen.queryByText('当前暂无可选方案')).not.toBeInTheDocument()
+    expect(screen.queryByText('正在更新方案筛选结果...')).not.toBeInTheDocument()
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))

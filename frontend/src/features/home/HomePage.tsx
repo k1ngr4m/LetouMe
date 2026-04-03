@@ -745,10 +745,19 @@ export function HomePage() {
     [effectiveSelectedModels],
   )
   const historyStrategyOptions = useMemo(
-    () => [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) => left.localeCompare(right)),
-    [history?.strategy_options],
+    () => {
+      const apiOptions = [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) =>
+        left.localeCompare(right),
+      )
+      if (apiOptions.length || selectedLottery !== 'pl3') {
+        return apiOptions
+      }
+      return summaryStrategyOptions
+    },
+    [history?.strategy_options, selectedLottery, summaryStrategyOptions],
   )
-  const showDltStrategyFilters = selectedLottery === 'dlt' && dltPredictionMode === 'direct'
+  const showSummaryStrategyFilters = selectedLottery === 'pl3' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
+  const showHistoryStrategyFilters = selectedLottery === 'pl3' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
 
   useEffect(() => {
     setSummaryStrategyFilters((previous) => {
@@ -1242,7 +1251,7 @@ export function HomePage() {
                     </button>
                   ) : null}
                 </div>
-                {showDltStrategyFilters ? (
+                {showSummaryStrategyFilters ? (
                   <div className="history-strategy-filter prediction-summary-strategy-filter">
                     <div className="prediction-summary-strategy-filter__header">
                       <span className="history-strategy-filter__label">方案筛选</span>
@@ -1380,9 +1389,9 @@ export function HomePage() {
                 placeholder="输入期号过滤"
               />
             </div>
-                {showDltStrategyFilters ? (
+                {showHistoryStrategyFilters ? (
               <div className="history-strategy-filter">
-                <span className="history-strategy-filter__label">开奖方案筛选</span>
+                <span className="history-strategy-filter__label">方案筛选</span>
                 {historyStrategyOptions.length ? (
                   <div className="filter-chip-group">
                     {historyStrategyOptions.map((strategy) => (
@@ -1406,7 +1415,7 @@ export function HomePage() {
                 )}
               </div>
             ) : null}
-            {showDltStrategyFilters && predictionsHistory.isFetching ? <div className="state-shell">正在更新开奖方案筛选结果...</div> : null}
+            {showHistoryStrategyFilters && predictionsHistory.isFetching ? <div className="state-shell">正在更新方案筛选结果...</div> : null}
             {needsHistoryFallbackPrompt ? (
               <div className="state-shell">
                 当前筛选模型在历史回溯中暂无匹配记录。
@@ -3769,13 +3778,38 @@ function HistoryRecordCard({
     () => new Set(normalizedStrategyFilters),
     [normalizedStrategyFilters],
   )
-  const periodSummary = listModels.reduce(
-    (accumulator, model) => ({
-      total_bet_count: accumulator.total_bet_count + (model.bet_count || 0),
-      total_cost_amount: accumulator.total_cost_amount + (model.cost_amount || 0),
-      total_prize_amount: accumulator.total_prize_amount + (model.prize_amount || 0),
-    }),
-    { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
+  const hasScopedFilters = normalizedStrategyFilters.length > 0 || normalizedPlayTypeFilters.length > 0
+  const filteredListModelMetrics = useMemo(() => {
+    const metrics = new Map<string, { bet_count: number; cost_amount: number; prize_amount: number }>()
+    for (const detailModel of detailRecord?.models || []) {
+      const modeKey = resolveHistoryModelModeKey(detailModel)
+      let filteredPredictions = filterPredictionGroupsByPlayType(detailModel.predictions || [], normalizedPlayTypeFilters)
+      if (normalizedStrategyFilters.length) {
+        filteredPredictions = filteredPredictions.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
+      }
+      metrics.set(modeKey, {
+        bet_count: filteredPredictions.length,
+        cost_amount: filteredPredictions.reduce((sum, group) => sum + resolveHistoryPredictionGroupCost(group, lotteryCode), 0),
+        prize_amount: filteredPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0),
+      })
+    }
+    return metrics
+  }, [detailRecord, lotteryCode, normalizedPlayTypeFilters, normalizedStrategyFilters.length, strategyFilterSet])
+  const periodSummary = useMemo(
+    () =>
+      listModels.reduce(
+        (accumulator, model) => {
+          const modeKey = resolveHistoryModelModeKey(model)
+          const scoped = hasScopedFilters ? filteredListModelMetrics.get(modeKey) : null
+          return {
+            total_bet_count: accumulator.total_bet_count + (scoped?.bet_count ?? model.bet_count ?? 0),
+            total_cost_amount: accumulator.total_cost_amount + (scoped?.cost_amount ?? model.cost_amount ?? 0),
+            total_prize_amount: accumulator.total_prize_amount + (scoped?.prize_amount ?? model.prize_amount ?? 0),
+          }
+        },
+        { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
+      ),
+    [filteredListModelMetrics, hasScopedFilters, listModels],
   )
   const actualLotteryCode = record.actual_result?.lottery_code || 'dlt'
   const actualMainBalls = actualLotteryCode === 'dlt'
@@ -3931,6 +3965,7 @@ function HistoryRecordCard({
       <div className="history-record-card__models">
         {listModels.map((model) => {
           const modelModeKey = resolveHistoryModelModeKey(model)
+          const scopedMetrics = hasScopedFilters ? filteredListModelMetrics.get(modelModeKey) : null
           const isExpanded = expandedModelIds.includes(modelModeKey)
           const listModelMode = normalizePredictionModelPlayMode(model)
           const currentPl3Mode: 'direct' | 'direct_sum' | null = lotteryCode === 'pl3' ? (isPl3SumMode ? 'direct_sum' : 'direct') : null
@@ -3999,15 +4034,15 @@ function HistoryRecordCard({
                 <div className="history-record-card__model-grid">
                   <span className="history-record-card__metric-cell">
                     <small>注数</small>
-                    <strong>{model.bet_count || 0}</strong>
+                    <strong>{scopedMetrics?.bet_count ?? model.bet_count ?? 0}</strong>
                   </span>
                   <span className="history-record-card__metric-cell">
                     <small>成本</small>
-                    <strong>{formatCurrency(model.cost_amount)}</strong>
+                    <strong>{formatCurrency(scopedMetrics?.cost_amount ?? model.cost_amount)}</strong>
                   </span>
                   <span className="history-record-card__metric-cell">
                     <small>奖金</small>
-                    <strong>{formatCurrency(model.prize_amount)}</strong>
+                    <strong>{formatCurrency(scopedMetrics?.prize_amount ?? model.prize_amount)}</strong>
                   </span>
                 </div>
                 <span className={clsx('history-record-card__model-expand-indicator', isExpanded && 'is-expanded')} aria-hidden="true">
