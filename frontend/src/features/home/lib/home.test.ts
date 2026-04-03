@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistoryHitTrend, buildHistoryPrizeTrend, buildModelScores, buildSummary, compareNumbers, filterModels, getPredictionPlayTypeLabel, normalizePredictionModelPlayMode, resolveHistoryFallbackState, resolveModelScore } from './home'
+import {
+  buildHistoryHitTrend,
+  buildHistoryPrizeTrend,
+  buildModelScores,
+  buildPl3OddEvenStructureChart,
+  buildPl3PositionHotChart,
+  buildPl3SumTrendChart,
+  buildSummary,
+  compareNumbers,
+  filterModels,
+  getPredictionPlayTypeLabel,
+  normalizePredictionModelPlayMode,
+  resolveHistoryFallbackState,
+  resolveModelScore,
+} from './home'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -91,6 +105,99 @@ describe('buildHistoryPrizeTrend', () => {
     expect(result).toEqual([
       { period: '26021', m1: 305, m2: 15 },
       { period: '26022', m1: 120, m2: 0 },
+    ])
+  })
+})
+
+describe('pl3 analysis chart builders', () => {
+  it('builds top10 hot numbers by position from recent draws', () => {
+    const chart = buildPl3PositionHotChart(
+      [
+        {
+          period: '2026033',
+          date: '2026-03-12',
+          lottery_code: 'pl3',
+          red_balls: ['01', '02', '03'],
+          blue_balls: [],
+          digits: ['01', '02', '03'],
+        },
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl3',
+          red_balls: ['01', '04', '05'],
+          blue_balls: [],
+          digits: ['01', '04', '05'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl3',
+          red_balls: ['01', '06', '07'],
+          blue_balls: [],
+        },
+      ],
+      0,
+    )
+
+    expect(chart).toHaveLength(10)
+    expect(chart[0]).toMatchObject({ ball: '01', count: 3 })
+    expect(chart.find((item) => item.ball === '00')).toMatchObject({ count: 0 })
+  })
+
+  it('builds sum trend from last 20 draws in ascending period order', () => {
+    const chart = buildPl3SumTrendChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl3',
+          red_balls: ['01', '02', '03'],
+          blue_balls: [],
+          digits: ['01', '02', '03'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl3',
+          red_balls: ['04', '05', '06'],
+          blue_balls: [],
+          digits: ['04', '05', '06'],
+        },
+      ],
+    )
+
+    expect(chart).toEqual([
+      { period: '2026031', sum: 15 },
+      { period: '2026032', sum: 6 },
+    ])
+  })
+
+  it('builds odd-even structure trend by 3-digit structure', () => {
+    const chart = buildPl3OddEvenStructureChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl3',
+          red_balls: ['01', '03', '05'],
+          blue_balls: [],
+          digits: ['01', '03', '05'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl3',
+          red_balls: ['02', '04', '05'],
+          blue_balls: [],
+          digits: ['02', '04', '05'],
+        },
+      ],
+    )
+
+    expect(chart).toEqual([
+      { period: '2026031', oddCount: 1, structure: '1:2' },
+      { period: '2026032', oddCount: 3, structure: '3:0' },
     ])
   })
 })

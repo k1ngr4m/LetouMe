@@ -756,6 +756,45 @@ export function buildBlueFrequencyChart(draws: LotteryDraw[]) {
   return byFrequencyDescending(Object.entries(counter).map(([ball, count]) => ({ ball, count }))).slice(0, 12)
 }
 
+const PL3_DIGITS = Array.from({ length: 10 }, (_, index) => padBall(String(index)))
+
+function resolvePl3Digits(draw: LotteryDraw) {
+  const sourceDigits = draw.digits?.length ? draw.digits : draw.red_balls
+  return sourceDigits.map(padBall).slice(0, 3)
+}
+
+export function buildPl3PositionHotChart(draws: LotteryDraw[], positionIndex: 0 | 1 | 2) {
+  const counter: Record<string, number> = Object.fromEntries(PL3_DIGITS.map((digit) => [digit, 0]))
+  for (const draw of draws.slice(0, 120)) {
+    const digits = resolvePl3Digits(draw)
+    const digit = digits[positionIndex]
+    if (!digit) continue
+    counter[digit] = (counter[digit] || 0) + 1
+  }
+  return byFrequencyDescending(Object.entries(counter).map(([ball, count]) => ({ ball, count }))).slice(0, 10)
+}
+
+export function buildPl3SumTrendChart(draws: LotteryDraw[]) {
+  return draws.slice(0, 20).reverse().map((draw) => {
+    const sum = resolvePl3Digits(draw).reduce((total, digit) => total + Number(digit), 0)
+    return {
+      period: draw.period,
+      sum,
+    }
+  })
+}
+
+export function buildPl3OddEvenStructureChart(draws: LotteryDraw[]) {
+  return draws.slice(0, 20).reverse().map((draw) => {
+    const oddCount = resolvePl3Digits(draw).filter((digit) => Number(digit) % 2 === 1).length
+    return {
+      period: draw.period,
+      oddCount,
+      structure: `${oddCount}:${3 - oddCount}`,
+    }
+  })
+}
+
 export function buildOddEvenChart(draws: LotteryDraw[]) {
   return draws.slice(0, 20).reverse().map((draw) => ({
     period: draw.period,

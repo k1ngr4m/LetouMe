@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { LotteryCode } from '../../shared/types/api'
 
 type FrequencyChartItem = {
   ball: string
@@ -23,6 +24,12 @@ type OddEvenChartItem = {
   period: string
   odd: number
   even: number
+}
+
+type Pl3OddEvenStructureChartItem = {
+  period: string
+  oddCount: number
+  structure: string
 }
 
 type SumTrendChartItem = {
@@ -58,16 +65,84 @@ function getModelTrendColor(index: number) {
 }
 
 export function AnalysisChartsPanel({
+  lotteryCode,
   redChart,
   blueChart,
+  pl3UnitChart,
   oddEvenChart,
   sumTrendChart,
 }: {
+  lotteryCode: LotteryCode
   redChart: FrequencyChartItem[]
   blueChart: FrequencyChartItem[]
-  oddEvenChart: OddEvenChartItem[]
+  pl3UnitChart: FrequencyChartItem[]
+  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem>
   sumTrendChart: SumTrendChartItem[]
 }) {
+  if (lotteryCode === 'pl3') {
+    const structureTrend = oddEvenChart as Pl3OddEvenStructureChartItem[]
+    return (
+      <div className="page-section chart-grid">
+        <ChartCard title="百位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={redChart}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="十位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={blueChart}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--amber-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="个位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={pl3UnitChart}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="和值趋势">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={sumTrendChart}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="奇偶结构走势">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={structureTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3]} tickFormatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Tooltip formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+  const oddEvenTrend = oddEvenChart as OddEvenChartItem[]
+
   return (
     <div className="page-section chart-grid">
       <ChartCard title="前区热号 Top 12">
@@ -94,7 +169,7 @@ export function AnalysisChartsPanel({
       </ChartCard>
       <ChartCard title="奇偶结构走势">
         <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={oddEvenChart}>
+          <AreaChart data={oddEvenTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="period" />
             <YAxis allowDecimals={false} />
