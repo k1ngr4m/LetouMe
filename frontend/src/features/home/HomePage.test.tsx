@@ -1192,7 +1192,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
-    await userEvent.click(screen.getByRole('heading', { name: '模型A' }))
+    await userEvent.click(screen.getByText('openai_compatible'))
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/models/model-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -2595,10 +2595,12 @@ describe('HomePage dashboard sidebar', () => {
     await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
     const detailSection = within(firstHistoryCard as HTMLElement).getByText('openai_compatible').closest('.history-record-card__detail-model')
     expect(detailSection).not.toBeNull()
-    expect(within(detailSection as HTMLElement).getByText('成本 264 元')).toBeInTheDocument()
+    expect(within(detailSection as HTMLElement).getByText('264 元')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('成本 126 元')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('成本 138 元')).toBeInTheDocument()
-    expect(within(detailSection as HTMLElement).getByText('奖金 1,040 元')).toBeInTheDocument()
+    const prizeSummaryCell = within(detailSection as HTMLElement).getByText('奖金').closest('.history-record-card__metric-cell')
+    expect(prizeSummaryCell).not.toBeNull()
+    expect(within(prizeSummaryCell as HTMLElement).getByText('1,040 元')).toBeInTheDocument()
   })
 
   it('shows pl3 sum history records even when model mode is mislabeled', async () => {

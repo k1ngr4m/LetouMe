@@ -2941,7 +2941,7 @@ export function SettingsPage() {
                               ].join('\n')
                               return (
                                 <Fragment key={task.task_code}>
-                                  <tr>
+                                  <tr className={clsx(scheduleActionMenu === scheduleMenuId && 'is-menu-open')}>
                                     <td className="settings-schedule-table__col-name" style={{ width: scheduleColumnWidths.name, minWidth: scheduleColumnWidths.name }}>
                                       <div className="settings-model-table__title settings-schedule-table__title">
                                         <strong>{task.task_name}</strong>

@@ -5822,6 +5822,19 @@ a {
   background: var(--panel-card-bg);
 }
 
+.settings-schedule-table--task-list tbody tr {
+  position: relative;
+}
+
+.settings-schedule-table--task-list tbody tr.is-menu-open {
+  z-index: 320;
+}
+
+.settings-schedule-table--task-list tbody tr.is-menu-open td {
+  position: relative;
+  z-index: 320;
+}
+
 .settings-schedule-table--task-list .settings-schedule-table__col-name {
   left: 0;
   z-index: 4;
