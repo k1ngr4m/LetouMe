@@ -105,6 +105,52 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[1]["digits"], ["00", "04", "05"])
         self.assertEqual(data[1]["jackpot_pool_balance"], 56000000)
 
+    def test_parse_pl3_data_prefers_row_jackpot_column(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr>
+              <td>26082</td>
+              <td>2026-04-02</td>
+              <td><span class="ball">0</span><span class="ball">4</span><span class="ball">8</span></td>
+              <td>5139.19万</td>
+              <td>1761.05万</td>
+            </tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl3"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_pl3_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["jackpot_pool_balance"], 17610500)
+
+    def test_parse_pl5_data_falls_back_to_detail_jackpot(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26082</td><td>0 4 8 3 8</td><td>23</td><td>25,007,612</td><td>2026-04-02</td></tr>
+            <tr><td>26081</td><td>6 9 0 1 6</td><td>22</td><td>24,609,218</td><td>2026-04-01</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        service.fetch_draw_detail = Mock(side_effect=[{"jackpot_pool_balance": 25461180}, {"jackpot_pool_balance": 25000200}])
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_pl5_data(soup)
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["jackpot_pool_balance"], 25461180)
+        self.assertEqual(data[1]["jackpot_pool_balance"], 25000200)
+        self.assertEqual(service.fetch_draw_detail.call_count, 2)
+
     def test_fetch_page_sets_pl5_encoding_from_apparent_encoding(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
         service.lottery_code = "pl5"
