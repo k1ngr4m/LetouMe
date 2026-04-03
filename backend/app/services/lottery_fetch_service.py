@@ -154,6 +154,7 @@ class LotteryFetchService:
 
     def parse_pl3_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         data_list: list[dict[str, Any]] = []
+        jackpot_pool_balance = self.parse_jackpot_pool_balance(soup)
         for row in soup.find_all("tr"):
             cols = row.find_all("td")
             if len(cols) < 3:
@@ -169,6 +170,7 @@ class LotteryFetchService:
                     "period": period,
                     "digits": normalize_digit_balls(digits[:3]),
                     "date": date,
+                    "jackpot_pool_balance": jackpot_pool_balance,
                     "prize_breakdown": build_pl3_prize_breakdown(),
                 }
             )
@@ -177,6 +179,7 @@ class LotteryFetchService:
 
     def parse_pl5_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         data_list: list[dict[str, Any]] = []
+        jackpot_pool_balance = self.parse_jackpot_pool_balance(soup)
         for row in soup.find_all("tr"):
             cols = row.find_all("td")
             if len(cols) < 2:
@@ -192,6 +195,7 @@ class LotteryFetchService:
                     "period": period,
                     "digits": normalize_digit_balls(digits[:5]),
                     "date": date,
+                    "jackpot_pool_balance": jackpot_pool_balance,
                     "prize_breakdown": build_pl5_prize_breakdown(),
                 }
             )

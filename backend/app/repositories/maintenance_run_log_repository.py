@@ -111,7 +111,9 @@ class MaintenanceRunLogRepository:
                     params,
                 )
                 if cursor.rowcount == 0:
-                    raise KeyError(task_id)
+                    cursor.execute("SELECT 1 FROM maintenance_run_log WHERE task_id = ? LIMIT 1", (task_id,))
+                    if cursor.fetchone() is None:
+                        raise KeyError(task_id)
         return {
             "task_id": task_id,
             **fields,

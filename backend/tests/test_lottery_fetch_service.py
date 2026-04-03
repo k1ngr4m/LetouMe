@@ -57,6 +57,7 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
     def test_parse_pl5_data_from_datachart_table(self) -> None:
         html = """
+        <div>奖池滚存 1.23 亿</div>
         <table>
           <tbody id="tdata">
             <tr><td>26071</td><td>5 5 1 5 3</td><td>2026-03-22</td></tr>
@@ -76,7 +77,33 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["period"], "26071")
         self.assertEqual(data[0]["digits"], ["05", "05", "01", "05", "03"])
         self.assertEqual(data[0]["date"], "2026-03-22")
+        self.assertEqual(data[0]["jackpot_pool_balance"], 123000000)
         self.assertEqual(data[1]["digits"], ["00", "01", "02", "03", "04"])
+        self.assertEqual(data[1]["jackpot_pool_balance"], 123000000)
+
+    def test_parse_pl3_data_contains_jackpot_pool_balance(self) -> None:
+        html = """
+        <div>奖池滚存 0.56 亿</div>
+        <table>
+          <tbody>
+            <tr><td>26071</td><td>2026-03-22</td><td><span class="ball">1</span><span class="ball">2</span><span class="ball">3</span></td></tr>
+            <tr><td>26070</td><td>2026-03-21</td><td><span class="ball">0</span><span class="ball">4</span><span class="ball">5</span></td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl3"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_pl3_data(soup)
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["period"], "26071")
+        self.assertEqual(data[0]["digits"], ["01", "02", "03"])
+        self.assertEqual(data[0]["jackpot_pool_balance"], 56000000)
+        self.assertEqual(data[1]["digits"], ["00", "04", "05"])
+        self.assertEqual(data[1]["jackpot_pool_balance"], 56000000)
 
     def test_fetch_page_sets_pl5_encoding_from_apparent_encoding(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
