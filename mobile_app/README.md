@@ -54,10 +54,18 @@ mobile_app/
 1. 安装 Flutter 3.24+
 2. 进入目录：`cd mobile_app`
 3. 获取依赖：`flutter pub get`
-4. 启动应用：`flutter run`
+4. 指定后端地址后启动：
+
+```bash
+flutter run --dart-define=LETOUME_API_BASE_URL=http://127.0.0.1:8000/api
+```
+
+> 真机或模拟器不要直接依赖 `localhost`。  
+> Android 模拟器通常改为 `http://10.0.2.2:8000/api`，iOS Simulator 可继续用 `127.0.0.1`。
 
 ## 当前状态
 
 - 已提供首期页面骨架、路由、底部导航、主题与状态管理模板
-- 数据层目前为本地示例/占位实现，可逐步替换为真实接口
+- 已接通 `登录`、`当前预测`、`历史预测列表` 三类真实接口
+- 鉴权依赖后端 Session Cookie，移动端通过 `dio + cookie_jar` 维持会话
 - 后台管理页未纳入移动端范围，继续保留在 Web 端

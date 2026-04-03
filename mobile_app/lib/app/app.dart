@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/auth/presentation/providers/auth_bootstrap_provider.dart';
 import '../core/theme/app_theme.dart';
 import 'router.dart';
 
@@ -9,6 +10,7 @@ class LetouMeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(authBootstrapProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'LetouMe Mobile',

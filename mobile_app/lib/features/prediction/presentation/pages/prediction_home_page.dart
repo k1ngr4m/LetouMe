@@ -22,7 +22,7 @@ class _PredictionHomePageState extends ConsumerState<PredictionHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final summaryAsync = ref.watch(predictionSummaryProvider);
+    final predictionsAsync = ref.watch(currentPredictionsProvider);
     return FeaturePageScaffold(
       title: '今日预测',
       children: [
@@ -39,22 +39,34 @@ class _PredictionHomePageState extends ConsumerState<PredictionHomePage> {
                       (lottery) => ChoiceChip(
                         label: Text(lottery.label),
                         selected: selectedLottery == lottery,
-                        onSelected: (_) => setState(() => selectedLottery = lottery),
+                        onSelected: (_) {
+                          setState(() => selectedLottery = lottery);
+                          ref.read(selectedLotteryCodeProvider.notifier).state = lottery.code;
+                        },
                       ),
                     )
                     .toList(),
               ),
               const SizedBox(height: AppSpacing.lg),
-              summaryAsync.when(
-                data: (summary) => Row(
-                  children: [
-                    _StatBadge(label: '期号', value: summary.period),
-                    const SizedBox(width: AppSpacing.sm),
-                    _StatBadge(label: '命中率', value: '${summary.hitRate}%'),
-                    const SizedBox(width: AppSpacing.sm),
-                    _StatBadge(label: '模型数', value: '${summary.modelCount}'),
-                  ],
-                ),
+              predictionsAsync.when(
+                data: (payload) {
+                  final totalGroups = payload.models.fold<int>(0, (sum, model) => sum + model.predictions.length);
+                  final averageHit = payload.models.isEmpty
+                      ? 0
+                      : payload.models
+                              .map((model) => model.bestHitCount ?? 0)
+                              .fold<int>(0, (sum, value) => sum + value) ~/
+                          payload.models.length;
+                  return Row(
+                    children: [
+                      _StatBadge(label: '期号', value: payload.targetPeriod),
+                      const SizedBox(width: AppSpacing.sm),
+                      _StatBadge(label: '优选命中', value: '$averageHit'),
+                      const SizedBox(width: AppSpacing.sm),
+                      _StatBadge(label: '注单组数', value: '$totalGroups'),
+                    ],
+                  );
+                },
                 loading: () => const Padding(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: LinearProgressIndicator(),
@@ -103,20 +115,32 @@ class _PredictionHomePageState extends ConsumerState<PredictionHomePage> {
         const SizedBox(height: AppSpacing.lg),
         Text('推荐模型', style: theme.textTheme.titleLarge),
         const SizedBox(height: AppSpacing.sm),
-        ...List.generate(
-          3,
-          (index) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: PanelCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('模型 ${index + 1} · ${selectedLottery.label}'),
-                subtitle: Text('近期稳定、命中率高，适合在移动端做详情浏览。', style: theme.textTheme.bodyMedium),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.go('/prediction/models/model-${index + 1}'),
-              ),
-            ),
-          ),
+        ...predictionsAsync.when(
+          data: (payload) => payload.models
+              .take(6)
+              .map(
+                (model) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: PanelCard(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${model.modelName} · ${model.modelProvider}'),
+                      subtitle: Text(
+                        model.predictions.isEmpty
+                            ? '暂无预测明细'
+                            : '推荐：${model.predictions.first.redBalls.join(' ')}'
+                                '${model.predictions.first.blueBalls.isEmpty ? '' : ' + ${model.predictions.first.blueBalls.join(' ')}'}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.go('/prediction/models/${model.modelId}'),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          loading: () => const [],
+          error: (error, stack) => const [],
         ),
       ],
     );

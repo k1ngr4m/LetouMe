@@ -7,6 +7,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../shared/providers/auth_state_provider.dart';
 import '../../../../shared/widgets/feature_page_scaffold.dart';
 import '../../../../shared/widgets/panel_card.dart';
+import '../../../auth/data/auth_repository.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -40,9 +41,12 @@ class ProfilePage extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('退出登录'),
                 trailing: const Icon(Icons.logout),
-                onTap: () {
+                onTap: () async {
+                  await ref.read(authRepositoryProvider).logout();
                   ref.read(authStateProvider.notifier).signOut();
-                  context.go(AppRoute.login.path);
+                  if (context.mounted) {
+                    context.go(AppRoute.login.path);
+                  }
                 },
               ),
             ],

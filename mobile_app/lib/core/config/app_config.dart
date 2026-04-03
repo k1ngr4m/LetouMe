@@ -8,6 +8,9 @@ class AppConfig {
   final String apiBaseUrl;
 
   static const current = AppConfig(
-    apiBaseUrl: 'http://localhost:8000/api',
+    apiBaseUrl: String.fromEnvironment(
+      'LETOUME_API_BASE_URL',
+      defaultValue: 'http://localhost:8000/api',
+    ),
   );
 }

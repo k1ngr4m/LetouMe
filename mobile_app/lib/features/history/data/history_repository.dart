@@ -1,24 +1,24 @@
-class HistoryRecord {
-  const HistoryRecord({
-    required this.period,
-    required this.result,
-    required this.summary,
-  });
-
-  final String period;
-  final String result;
-  final String summary;
-}
+import '../../../core/network/api_client.dart';
+import 'models/predictions_history_response.dart';
 
 class HistoryRepository {
-  Future<List<HistoryRecord>> fetchHistory() async {
-    return List.generate(
-      8,
-      (index) => HistoryRecord(
-        period: '20260${index + 1}',
-        result: '03 09 14 21 28 + 07 11',
-        summary: '预测命中：红球 2 个 / 蓝球 1 个',
-      ),
+  HistoryRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  final ApiClient _apiClient;
+
+  Future<PredictionsHistoryListResponse> fetchHistory({
+    String lotteryCode = 'dlt',
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final data = await _apiClient.post(
+      '/predictions/history/list',
+      data: {
+        'lottery_code': lotteryCode,
+        'limit': limit,
+        'offset': offset,
+      },
     );
+    return PredictionsHistoryListResponse.fromMap(data);
   }
 }

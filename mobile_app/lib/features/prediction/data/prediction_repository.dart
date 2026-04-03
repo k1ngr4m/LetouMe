@@ -1,21 +1,18 @@
-class PredictionSummary {
-  const PredictionSummary({
-    required this.period,
-    required this.hitRate,
-    required this.modelCount,
-  });
-
-  final String period;
-  final int hitRate;
-  final int modelCount;
-}
+import '../../../core/network/api_client.dart';
+import 'models/current_predictions_response.dart';
 
 class PredictionRepository {
-  Future<PredictionSummary> fetchSummary() async {
-    return const PredictionSummary(
-      period: '2026043',
-      hitRate: 74,
-      modelCount: 12,
+  PredictionRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  final ApiClient _apiClient;
+
+  Future<CurrentPredictionsResponse> fetchCurrentPredictions({
+    String lotteryCode = 'dlt',
+  }) async {
+    final data = await _apiClient.post(
+      '/predictions/current',
+      data: {'lottery_code': lotteryCode},
     );
+    return CurrentPredictionsResponse.fromMap(data);
   }
 }

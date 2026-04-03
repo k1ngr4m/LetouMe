@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/providers/auth_state_provider.dart';
 import '../../data/auth_repository.dart';
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
-
 final loginControllerProvider = Provider<LoginController>((ref) {
   return LoginController(
     repository: ref.watch(authRepositoryProvider),
@@ -26,7 +24,7 @@ class LoginController {
     required String username,
     required String password,
   }) async {
-    await _repository.login(username: username, password: password);
-    _authNotifier.signIn(username);
+    final user = await _repository.login(username: username, password: password);
+    _authNotifier.setUser(user);
   }
 }

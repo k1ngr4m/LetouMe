@@ -22,6 +22,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: authState.isLoggedIn ? AppRoute.prediction.path : AppRoute.login.path,
     redirect: (context, state) {
+      if (authState.isInitializing) {
+        return state.uri.path == AppRoute.bootstrap.path ? null : AppRoute.bootstrap.path;
+      }
+      if (state.uri.path == AppRoute.bootstrap.path) {
+        return authState.isLoggedIn ? AppRoute.prediction.path : AppRoute.login.path;
+      }
       final isLoginRoute = state.uri.path == AppRoute.login.path;
       if (!authState.isLoggedIn && !isLoginRoute) {
         return AppRoute.login.path;
@@ -32,6 +38,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: AppRoute.bootstrap.path,
+        name: AppRoute.bootstrap.name,
+        builder: (context, state) => const _BootstrapPage(),
+      ),
       GoRoute(
         path: AppRoute.login.path,
         name: AppRoute.login.name,
@@ -104,6 +115,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 enum AppRoute {
+  bootstrap('/bootstrap'),
   login('/login'),
   prediction('/prediction'),
   history('/history'),
@@ -117,7 +129,8 @@ enum AppRoute {
 
   final String path;
 
-  String get name => switch (this) {
+      String get name => switch (this) {
+        bootstrap => 'bootstrap',
         login => 'login',
         prediction => 'prediction',
         history => 'history',
@@ -129,4 +142,17 @@ enum AppRoute {
       };
 
   String get subPath => path.split('/').last;
+}
+
+class _BootstrapPage extends StatelessWidget {
+  const _BootstrapPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
 }
