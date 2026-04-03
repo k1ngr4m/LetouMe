@@ -97,6 +97,10 @@ const commonChartTooltipProps = {
   labelStyle: chartTooltipLabelStyle,
   itemStyle: chartTooltipItemStyle,
   cursor: chartTooltipCursor,
+  wrapperStyle: {
+    zIndex: 80,
+    pointerEvents: 'none',
+  } satisfies CSSProperties,
 }
 
 export function AnalysisChartsPanel({

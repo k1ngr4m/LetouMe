@@ -3295,6 +3295,17 @@ a {
 
 .chart-card {
   min-height: 22rem;
+  position: relative;
+}
+
+.chart-card .recharts-wrapper,
+.chart-card .recharts-surface {
+  overflow: visible;
+}
+
+.chart-card .recharts-tooltip-wrapper {
+  z-index: 80 !important;
+  pointer-events: none;
 }
 
 .history-hit-trend__charts {
