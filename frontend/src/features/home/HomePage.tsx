@@ -4016,7 +4016,7 @@ function HistoryRecordCard({
                           <strong>{detailModel.model_name}</strong>
                           <p>{detailModel.model_provider}</p>
                         </div>
-                        <div className="history-record-card__detail-rate-grid">
+                        <div className="history-record-card__detail-rate-grid is-soft-hidden">
                           <span className="history-record-card__metric-cell">
                             <small>按期中奖率</small>
                             <strong>{formatPercent(filteredWinRateByPeriod)}</strong>
@@ -4027,7 +4027,7 @@ function HistoryRecordCard({
                           </span>
                         </div>
                       </div>
-                      <div className="history-record-card__model-grid history-record-card__model-grid--summary">
+                      <div className="history-record-card__model-grid history-record-card__model-grid--summary is-soft-hidden">
                         <span className="history-record-card__metric-cell">
                           <small>注数</small>
                           <strong>{filteredDetailBetCount}</strong>

@@ -4259,6 +4259,11 @@ a {
   min-width: min(100%, 260px);
 }
 
+.history-record-card__detail-rate-grid.is-soft-hidden,
+.history-record-card__model-grid--summary.is-soft-hidden {
+  display: none;
+}
+
 .history-record-card__model-detail {
   margin-top: 0;
   padding-top: 0.45rem;

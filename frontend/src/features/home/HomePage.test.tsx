@@ -2026,6 +2026,9 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(firstHistoryCard as HTMLElement).getAllByText('注数').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getAllByText('成本').length).toBeGreaterThan(0)
     expect(within(firstHistoryCard as HTMLElement).getAllByText('奖金').length).toBeGreaterThan(0)
+    const detailRateGrid = (detailSection as HTMLElement).querySelector('.history-record-card__detail-rate-grid')
+    expect(detailRateGrid).not.toBeNull()
+    expect(detailRateGrid).toHaveClass('is-soft-hidden')
     expect(within(detailSection as HTMLElement).getByText('按期中奖率')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('按注中奖率')).toBeInTheDocument()
     expect(groupCard).not.toHaveClass('is-hit-tier-4')
@@ -2380,6 +2383,9 @@ describe('HomePage dashboard sidebar', () => {
     const groupCard = within(detailSection as HTMLElement).getByText('G-1').closest('.prediction-group-card')
     expect(groupCard).not.toBeNull()
     expect(groupCard).toHaveClass('is-compact')
+    const detailRateGrid = (detailSection as HTMLElement).querySelector('.history-record-card__detail-rate-grid')
+    expect(detailRateGrid).not.toBeNull()
+    expect(detailRateGrid).toHaveClass('is-soft-hidden')
     expect(within(detailSection as HTMLElement).getByText('按期中奖率')).toBeInTheDocument()
 
     const cardScope = within(groupCard as HTMLElement)
@@ -2598,9 +2604,10 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(detailSection as HTMLElement).getByText('264 元')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('成本 126 元')).toBeInTheDocument()
     expect(within(detailSection as HTMLElement).getByText('成本 138 元')).toBeInTheDocument()
-    const prizeSummaryCell = within(detailSection as HTMLElement).getByText('奖金').closest('.history-record-card__metric-cell')
-    expect(prizeSummaryCell).not.toBeNull()
-    expect(within(prizeSummaryCell as HTMLElement).getByText('1,040 元')).toBeInTheDocument()
+    const detailSummaryGrid = (detailSection as HTMLElement).querySelector('.history-record-card__model-grid--summary')
+    expect(detailSummaryGrid).not.toBeNull()
+    expect(detailSummaryGrid).toHaveClass('is-soft-hidden')
+    expect(within(detailSummaryGrid as HTMLElement).getByText('1,040 元')).toBeInTheDocument()
   })
 
   it('shows pl3 sum history records even when model mode is mislabeled', async () => {
