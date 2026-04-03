@@ -52,7 +52,14 @@ import {
   type SimulationSelection,
 } from './lib/simulation'
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
-import { getHomeTabFromPath, type HomeDetailRouteState, type HomeModelView, type ScoreViewSortDirection, type ScoreViewSortKey } from './navigation'
+import {
+  getHomeTabFromPath,
+  type HomeDetailRouteState,
+  type HomeModelView,
+  type HomePredictionReturnState,
+  type ScoreViewSortDirection,
+  type ScoreViewSortKey,
+} from './navigation'
 import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
@@ -66,6 +73,18 @@ const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> 
   { value: '31-60', label: '31-60 分' },
   { value: '61-80', label: '61-80 分' },
   { value: '81-100', label: '81-100 分' },
+]
+const SCORE_SORT_KEY_OPTIONS: ScoreViewSortKey[] = [
+  'overallScore',
+  'perBetScore',
+  'perPeriodScore',
+  'recentScore',
+  'longTermScore',
+  'profit',
+  'hit_rate',
+  'stability',
+  'ceiling',
+  'floor',
 ]
 const AnalysisChartsPanel = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.AnalysisChartsPanel })),
@@ -545,7 +564,9 @@ export function HomePage() {
     modelNameQuery,
     setModelNameQuery,
     selectedProviders,
+    setSelectedProviders,
     selectedTags,
+    setSelectedTags,
     selectedScoreRange,
     setSelectedScoreRange,
     orderedModels,
@@ -555,6 +576,7 @@ export function HomePage() {
     filteredModels,
     filteredModelIds,
     summarySelectedModelIds,
+    setSummarySelectedModelIds,
     toggleModelProvider,
     toggleModelTag,
     clearModelFilters,
@@ -645,6 +667,71 @@ export function HomePage() {
     const frameId = requestAnimationFrame(() => window.scrollTo({ top: navigationState.scrollY }))
     return () => cancelAnimationFrame(frameId)
   }, [navigationState?.scrollY])
+
+  useEffect(() => {
+    if (activeTab !== 'prediction') return
+    const returnState = navigationState?.predictionReturnState
+    if (!returnState) return
+
+    if (returnState.pl3PredictionMode === 'direct' || returnState.pl3PredictionMode === 'direct_sum') {
+      setPl3PredictionMode(returnState.pl3PredictionMode)
+    }
+    if (returnState.dltPredictionMode === 'direct' || returnState.dltPredictionMode === 'compound' || returnState.dltPredictionMode === 'dantuo') {
+      setDltPredictionMode(returnState.dltPredictionMode)
+    }
+    if (returnState.modelListView === 'card' || returnState.modelListView === 'list' || returnState.modelListView === 'score') {
+      setModelListView(returnState.modelListView)
+    }
+    if (returnState.scoreViewSortDirection === 'asc' || returnState.scoreViewSortDirection === 'desc') {
+      setScoreViewSortDirection(returnState.scoreViewSortDirection)
+    }
+    if (returnState.scoreViewSortKey && SCORE_SORT_KEY_OPTIONS.includes(returnState.scoreViewSortKey)) {
+      setScoreViewSortKey(returnState.scoreViewSortKey)
+    }
+    if (typeof returnState.modelNameQuery === 'string') {
+      setModelNameQuery(returnState.modelNameQuery)
+    }
+    if (Array.isArray(returnState.selectedProviders)) {
+      setSelectedProviders(returnState.selectedProviders.filter((item): item is string => typeof item === 'string'))
+    }
+    if (Array.isArray(returnState.selectedTags)) {
+      setSelectedTags(returnState.selectedTags.filter((item): item is string => typeof item === 'string'))
+    }
+    if (returnState.selectedScoreRange && MODEL_SCORE_FILTERS.some((option) => option.value === returnState.selectedScoreRange)) {
+      setSelectedScoreRange(returnState.selectedScoreRange)
+    }
+    if (Array.isArray(returnState.summarySelectedModelIds)) {
+      setSummarySelectedModelIds(returnState.summarySelectedModelIds.filter((item): item is string => typeof item === 'string'))
+    } else if (returnState.summarySelectedModelIds === null) {
+      setSummarySelectedModelIds(null)
+    }
+    if (typeof returnState.commonOnly === 'boolean') {
+      setCommonOnly(returnState.commonOnly)
+    }
+    if (typeof returnState.historyPeriodQuery === 'string') {
+      setHistoryPeriodQuery(returnState.historyPeriodQuery)
+    }
+
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        scrollY: returnState.scrollY ?? navigationState?.scrollY,
+        predictionPlayMode: returnState.predictionPlayMode ?? navigationState?.predictionPlayMode,
+      } satisfies HomeDetailRouteState,
+    })
+  }, [
+    activeTab,
+    location.pathname,
+    navigate,
+    navigationState,
+    setDltPredictionMode,
+    setModelNameQuery,
+    setPl3PredictionMode,
+    setSelectedProviders,
+    setSelectedScoreRange,
+    setSelectedTags,
+    setSummarySelectedModelIds,
+  ])
 
   useEffect(() => {
     if (activeTab !== 'my-bets') return
@@ -928,10 +1015,28 @@ export function HomePage() {
   }
 
   function openModelDetail(modelId: string) {
+    const predictionPlayMode = selectedLottery === 'pl3' ? pl3PredictionMode : selectedLottery === 'dlt' ? dltPredictionMode : undefined
+    const predictionReturnState: HomePredictionReturnState = {
+      scrollY: window.scrollY,
+      predictionPlayMode,
+      modelListView,
+      scoreViewSortKey,
+      scoreViewSortDirection,
+      modelNameQuery,
+      selectedProviders,
+      selectedTags,
+      selectedScoreRange,
+      summarySelectedModelIds,
+      commonOnly,
+      historyPeriodQuery,
+      pl3PredictionMode,
+      dltPredictionMode,
+    }
     navigate(`/dashboard/models/${modelId}`, {
       state: {
         scrollY: window.scrollY,
-        predictionPlayMode: selectedLottery === 'pl3' ? pl3PredictionMode : selectedLottery === 'dlt' ? dltPredictionMode : undefined,
+        predictionPlayMode,
+        predictionReturnState,
       } satisfies HomeDetailRouteState,
     })
   }

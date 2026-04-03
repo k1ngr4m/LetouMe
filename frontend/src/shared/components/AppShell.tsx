@@ -65,34 +65,14 @@ function SidebarCollapseIcon() {
   )
 }
 
-function LotterySwitchIcon({ code }: { code: LotteryCode }) {
-  if (code === 'pl3') {
-    return (
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2.8" y="8.2" width="3.2" height="3.2" rx="0.7" />
-        <rect x="8.4" y="8.2" width="3.2" height="3.2" rx="0.7" />
-        <rect x="14" y="8.2" width="3.2" height="3.2" rx="0.7" />
-      </svg>
-    )
-  }
-  if (code === 'pl5') {
-    return (
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="3.6" cy="10" r="1.2" />
-        <circle cx="7.8" cy="10" r="1.2" />
-        <circle cx="10" cy="10" r="1.2" />
-        <circle cx="12.2" cy="10" r="1.2" />
-        <circle cx="16.4" cy="10" r="1.2" />
-      </svg>
-    )
-  }
-  return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="6.4" cy="10" r="2.4" />
-      <circle cx="13.6" cy="10" r="2.4" />
-      <path d="M8.8 10h2.4" />
-    </svg>
-  )
+function getLotteryLogoSrc(code: LotteryCode) {
+  if (code === 'pl3') return '/lottery/pl3.png'
+  if (code === 'pl5') return '/lottery/pl5.png'
+  return '/lottery/dlt.png'
+}
+
+function LotterySwitchIcon({ code, label }: { code: LotteryCode; label: string }) {
+  return <img className="crm-lottery-picker__logo" src={getLotteryLogoSrc(code)} alt={label} loading="lazy" />
 }
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -182,7 +162,9 @@ export function AppShell({ children }: PropsWithChildren) {
     }
     if (isSettingsRoute) {
       setSidebarMode('settings')
+      return
     }
+    setSidebarMode('workspace')
   }, [canOpenSettings, isSettingsRoute])
 
   useEffect(() => {
@@ -275,6 +257,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   function onMessageCenterNav(status: MessageStatusFilter) {
+    setSidebarMode('workspace')
     setIsSidebarOpen(false)
     navigate({
       pathname: MESSAGE_CENTER_PATH,
@@ -283,6 +266,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   function openMessageCenter() {
+    setSidebarMode('workspace')
     setIsSidebarOpen(false)
     navigate({
       pathname: MESSAGE_CENTER_PATH,
@@ -347,7 +331,7 @@ export function AppShell({ children }: PropsWithChildren) {
                     aria-haspopup="menu"
                     onClick={() => setIsLotteryMenuOpen((current) => !current)}
                   >
-                    <LotterySwitchIcon code={selectedLottery} />
+                    <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />
                     <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
                     <ChevronDown size={14} aria-hidden="true" />
                   </button>
@@ -363,7 +347,7 @@ export function AppShell({ children }: PropsWithChildren) {
                           title={item.label}
                           onClick={() => handleLotterySelect(item.code)}
                         >
-                          <LotterySwitchIcon code={item.code} />
+                          <LotterySwitchIcon code={item.code} label={item.label} />
                           {item.label}
                         </button>
                       ))}

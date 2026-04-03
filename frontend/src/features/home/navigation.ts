@@ -14,12 +14,31 @@ export type ScoreViewSortKey =
   | 'ceiling'
   | 'floor'
 export type ScoreViewSortDirection = 'desc' | 'asc'
+export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
+
+export type HomePredictionReturnState = {
+  scrollY?: number
+  predictionPlayMode?: PredictionPlayMode
+  modelListView?: HomeModelView
+  scoreViewSortKey?: ScoreViewSortKey
+  scoreViewSortDirection?: ScoreViewSortDirection
+  modelNameQuery?: string
+  selectedProviders?: string[]
+  selectedTags?: string[]
+  selectedScoreRange?: ModelListScoreRange
+  summarySelectedModelIds?: string[] | null
+  commonOnly?: boolean
+  historyPeriodQuery?: string
+  pl3PredictionMode?: 'direct' | 'direct_sum'
+  dltPredictionMode?: 'direct' | 'compound' | 'dantuo'
+}
 
 export type HomeDetailRouteState = {
   scrollY?: number
   predictionPlayMode?: PredictionPlayMode
   focusBetRecordId?: number
   focusNonce?: string
+  predictionReturnState?: HomePredictionReturnState
 }
 
 export type HomeRulesRouteState = {

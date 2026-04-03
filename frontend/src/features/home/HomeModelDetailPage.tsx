@@ -5,7 +5,7 @@ import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvid
 import { useHomeData } from './hooks/useHomeData'
 import { buildModelScores, getActualResult, normalizePredictionModelPlayMode, resolveModelScore } from './lib/home'
 import { ModelScoreShowcase, PredictionGroupCard } from './HomePage'
-import type { HomeDetailRouteState } from './navigation'
+import { HOME_TAB_PATHS, type HomeDetailRouteState } from './navigation'
 
 const HISTORY_PAGE_SIZE = 10
 const LOTTERY_PAGE_SIZE = 10
@@ -66,7 +66,19 @@ export function HomeModelDetailPage() {
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
 
   function handleBack() {
-    navigate('/dashboard/prediction')
+    const returnState = navigationState?.predictionReturnState
+    navigate(HOME_TAB_PATHS.prediction, {
+      state: returnState
+        ? ({
+            scrollY: returnState.scrollY ?? navigationState?.scrollY,
+            predictionPlayMode: returnState.predictionPlayMode ?? navigationState?.predictionPlayMode,
+            predictionReturnState: returnState,
+          } satisfies HomeDetailRouteState)
+        : ({
+            scrollY: navigationState?.scrollY,
+            predictionPlayMode: navigationState?.predictionPlayMode,
+          } satisfies HomeDetailRouteState),
+    })
   }
 
   if (currentPredictions.isLoading || lotteryCharts.isLoading || predictionsHistory.isLoading) {
