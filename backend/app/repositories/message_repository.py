@@ -43,6 +43,7 @@ class MessageRepository:
         user_id: int,
         lottery_code: str | None = None,
         status_filter: str = "all",
+        result_filter: str = "all",
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -55,6 +56,14 @@ class MessageRepository:
             where_clauses.append("read_at IS NULL")
         elif status_filter == "read":
             where_clauses.append("read_at IS NOT NULL")
+        if result_filter == "won":
+            where_clauses.append(
+                "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json, '$.winning_bet_count')) AS SIGNED), 0) > 0"
+            )
+        elif result_filter == "lost":
+            where_clauses.append(
+                "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json, '$.winning_bet_count')) AS SIGNED), 0) <= 0"
+            )
         where_sql = " AND ".join(where_clauses)
 
         with get_connection() as connection:

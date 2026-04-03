@@ -6,7 +6,7 @@ import { apiClient } from '../../shared/api/client'
 import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeBeijing } from '../../shared/lib/format'
 import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
-import type { LotteryCode, MessageStatusFilter, SiteMessage } from '../../shared/types/api'
+import type { LotteryCode, MessageResultFilter, MessageStatusFilter, SiteMessage } from '../../shared/types/api'
 import { HOME_TAB_PATHS, type HomeDetailRouteState } from '../home/navigation'
 
 const PAGE_SIZE = 20
@@ -14,6 +14,11 @@ const STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
   { value: 'all', label: '全部消息' },
   { value: 'unread', label: '未读' },
   { value: 'read', label: '已读' },
+]
+const RESULT_OPTIONS: Array<{ value: MessageResultFilter; label: string }> = [
+  { value: 'all', label: '全部结果' },
+  { value: 'won', label: '中奖' },
+  { value: 'lost', label: '未中奖' },
 ]
 const LOTTERY_OPTIONS: Array<{ value: LotteryCode | 'all'; label: string }> = [
   { value: 'all', label: '全部彩种' },
@@ -54,14 +59,16 @@ export function MessageCenterPage() {
   const { showToast } = useToast()
   const { setSelectedLottery } = useLotterySelection()
   const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>('all')
+  const [resultFilter, setResultFilter] = useState<MessageResultFilter>('all')
   const [lotteryFilter, setLotteryFilter] = useState<LotteryCode | 'all'>('all')
   const [offset, setOffset] = useState(0)
 
   const listQuery = useQuery({
-    queryKey: ['messages', 'list', statusFilter, lotteryFilter, offset],
+    queryKey: ['messages', 'list', statusFilter, resultFilter, lotteryFilter, offset],
     queryFn: () =>
       apiClient.getMessages({
         status_filter: statusFilter,
+        result_filter: resultFilter,
         lottery_code: lotteryFilter === 'all' ? undefined : lotteryFilter,
         limit: PAGE_SIZE,
         offset,
@@ -111,6 +118,11 @@ export function MessageCenterPage() {
 
   function handleLotteryChange(value: LotteryCode | 'all') {
     setLotteryFilter(value)
+    setOffset(0)
+  }
+
+  function handleResultFilterChange(value: MessageResultFilter) {
+    setResultFilter(value)
     setOffset(0)
   }
 
@@ -177,6 +189,20 @@ export function MessageCenterPage() {
             aria-label="彩种筛选"
           >
             {LOTTERY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="message-center__lottery-select">
+          <span>中奖结果</span>
+          <select
+            value={resultFilter}
+            onChange={(event) => handleResultFilterChange(event.target.value as MessageResultFilter)}
+            aria-label="中奖结果筛选"
+          >
+            {RESULT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

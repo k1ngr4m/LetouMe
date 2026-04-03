@@ -440,6 +440,7 @@ export type MyBetOCRImageUploadResponse = {
 }
 
 export type MessageStatusFilter = 'all' | 'unread' | 'read'
+export type MessageResultFilter = 'all' | 'won' | 'lost'
 
 export type SiteMessage = {
   id: number

@@ -23,6 +23,7 @@ import type {
   LotteryHistoryResponse,
   LotteryFetchTask,
   MaintenanceRunLogListResponse,
+  MessageResultFilter,
   MessageStatusFilter,
   PasswordChangePayload,
   PermissionListResponse,
@@ -255,6 +256,7 @@ export const apiClient = {
   getMessages(payload?: {
     lottery_code?: LotteryCode
     status_filter?: MessageStatusFilter
+    result_filter?: MessageResultFilter
     limit?: number
     offset?: number
   }) {

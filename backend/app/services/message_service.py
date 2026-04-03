@@ -43,6 +43,7 @@ class MessageService:
         user_id: int,
         lottery_code: str | None = None,
         status_filter: str = "all",
+        result_filter: str = "all",
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -51,6 +52,7 @@ class MessageService:
             user_id=user_id,
             lottery_code=normalized_code,
             status_filter=status_filter,
+            result_filter=result_filter,
             limit=limit,
             offset=offset,
         )

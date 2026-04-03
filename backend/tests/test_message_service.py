@@ -9,6 +9,7 @@ class _FakeMessageRepository:
     def __init__(self) -> None:
         self.created_keys: set[tuple[int, str, str, int, str]] = set()
         self.created_payloads: list[dict] = []
+        self.last_list_kwargs: dict | None = None
 
     def create_settlement_message(self, payload: dict) -> bool:
         key = (
@@ -25,6 +26,7 @@ class _FakeMessageRepository:
         return True
 
     def list_messages(self, **kwargs):
+        self.last_list_kwargs = dict(kwargs)
         return {
             "messages": [
                 {
@@ -134,13 +136,14 @@ class MessageServiceTests(unittest.TestCase):
         self.assertIn("玩法：混合投注", str(payload.get("content")))
 
     def test_list_messages_serializes_snapshot_and_unread_count(self) -> None:
-        list_payload = self.service.list_messages(user_id=1, lottery_code="dlt", status_filter="all", limit=20, offset=0)
+        list_payload = self.service.list_messages(user_id=1, lottery_code="dlt", status_filter="all", result_filter="won", limit=20, offset=0)
         unread_payload = self.service.get_unread_count(user_id=1, lottery_code="dlt")
 
         self.assertEqual(list_payload["total_count"], 1)
         self.assertEqual(list_payload["messages"][0]["snapshot"], {"prize_level": "五等奖"})
         self.assertFalse(list_payload["messages"][0]["is_read"])
         self.assertEqual(unread_payload["unread_count"], 7)
+        self.assertEqual((self.repository.last_list_kwargs or {}).get("result_filter"), "won")
 
 
 if __name__ == "__main__":

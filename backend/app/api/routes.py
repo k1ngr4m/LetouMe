@@ -478,6 +478,7 @@ def list_messages(payload: MessageListPayload, current_user: dict = Depends(requ
         user_id=int(current_user["id"]),
         lottery_code=payload.lottery_code,
         status_filter=payload.status_filter,
+        result_filter=payload.result_filter,
         limit=payload.limit,
         offset=payload.offset,
     )

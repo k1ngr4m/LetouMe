@@ -220,6 +220,7 @@ class MyBetRecordDeletePayload(BaseModel):
 class MessageListPayload(BaseModel):
     lottery_code: str | None = None
     status_filter: Literal["all", "unread", "read"] = "all"
+    result_filter: Literal["all", "won", "lost"] = "all"
     limit: int = Field(default=20, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
