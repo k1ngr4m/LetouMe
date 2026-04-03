@@ -211,9 +211,9 @@ export function MessageCenterPage() {
       <div className="message-center-v2__layout">
         <section className="message-center-v2__list-panel">
           <header className="message-center-v2__list-header">
-            <div>
+            <div className="message-center-v2__list-title">
               <h3>{activeStatusLabel}</h3>
-              {statusFilter === 'unread' ? <em>{unreadCountLabel}</em> : null}
+              {statusFilter === 'unread' && unreadCount > 0 ? <em>{unreadCountLabel}</em> : null}
             </div>
             <div className="message-center-v2__header-actions">
               <button

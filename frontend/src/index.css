@@ -11923,6 +11923,12 @@ a {
   gap: 0.6rem;
 }
 
+.message-center-v2__list-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.58rem;
+}
+
 .message-center-v2__list-header h3 {
   margin: 0;
   color: var(--text-1);
@@ -11931,7 +11937,6 @@ a {
 }
 
 .message-center-v2__list-header em {
-  margin-top: 0.26rem;
   display: inline-flex;
   border-radius: 999px;
   background: #ef4444;
