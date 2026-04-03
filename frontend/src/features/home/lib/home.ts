@@ -874,7 +874,7 @@ export function buildHistoryHitTrend(
   })
 }
 
-export function buildHistoryPrizeTrend(
+export function buildHistoryProfitTrend(
   records: PredictionsHistoryListResponse['predictions_history'],
   selectedModelIds: string[],
 ) {
@@ -893,7 +893,7 @@ export function buildHistoryPrizeTrend(
 
     for (const modelId of seriesModelIds) {
       const model = record.models.find((item) => item.model_id === modelId)
-      point[modelId] = Number(model?.prize_amount || 0)
+      point[modelId] = Number(model?.prize_amount || 0) - Number(model?.cost_amount || 0)
     }
 
     return point

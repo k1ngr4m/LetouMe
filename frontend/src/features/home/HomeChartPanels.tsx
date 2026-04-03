@@ -9,6 +9,7 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  ReferenceLine,
   Tooltip,
   XAxis,
   YAxis,
@@ -50,8 +51,8 @@ type HistoryModelRef = {
 
 type HistoryTrendItem = Record<string, string | number>
 
-function formatPrizeValue(value: number) {
-  return `${new Intl.NumberFormat('zh-CN').format(Number(value) || 0)} 元`
+function formatProfitValue(value: number) {
+  return `${new Intl.NumberFormat('zh-CN', { signDisplay: 'exceptZero' }).format(Number(value) || 0)} 元`
 }
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
@@ -324,11 +325,11 @@ export function AnalysisChartsPanel({
 export function HistoryHitTrendCard({
   historyVisibleModels,
   historyHitTrend,
-  historyPrizeTrend,
+  historyProfitTrend,
 }: {
   historyVisibleModels: HistoryModelRef[]
   historyHitTrend: HistoryTrendItem[]
-  historyPrizeTrend: HistoryTrendItem[]
+  historyProfitTrend: HistoryTrendItem[]
 }) {
   const sortedTrendData = [...historyHitTrend].sort((left, right) => {
     const leftPeriod = Number(left.period)
@@ -338,7 +339,7 @@ export function HistoryHitTrendCard({
     if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
     return String(left.period || '').localeCompare(String(right.period || ''))
   })
-  const sortedPrizeData = [...historyPrizeTrend].sort((left, right) => {
+  const sortedProfitData = [...historyProfitTrend].sort((left, right) => {
     const leftPeriod = Number(left.period)
     const rightPeriod = Number(right.period)
     const leftIsNumber = Number.isFinite(leftPeriod)
@@ -397,14 +398,22 @@ export function HistoryHitTrendCard({
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="history-hit-trend__chart-shell" aria-label="模型奖金趋势图">
-            <p className="history-hit-trend__chart-title">奖金趋势折线</p>
+          <div className="history-hit-trend__chart-shell" aria-label="模型盈亏趋势图">
+            <p className="history-hit-trend__chart-title">盈亏趋势折线</p>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={sortedPrizeData}>
+              <LineChart data={sortedProfitData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip {...commonChartTooltipProps} formatter={(value) => formatPrizeValue(Number(value || 0))} />
+                <YAxis
+                  domain={([dataMin, dataMax]) => {
+                    const min = Number.isFinite(Number(dataMin)) ? Number(dataMin) : 0
+                    const max = Number.isFinite(Number(dataMax)) ? Number(dataMax) : 0
+                    if (min === max) return [min - 1, max + 1]
+                    return [Math.min(min, 0), Math.max(max, 0)]
+                  }}
+                />
+                <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
+                <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
                   <Line

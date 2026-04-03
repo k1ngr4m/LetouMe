@@ -1488,7 +1488,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(historySection).not.toBeNull()
     expect(await screen.findByText('命中趋势折线')).toBeInTheDocument()
     expect(await screen.findByText('命中堆叠柱形统计')).toBeInTheDocument()
-    expect(await screen.findByText('奖金趋势折线')).toBeInTheDocument()
+    expect(await screen.findByText('盈亏趋势折线')).toBeInTheDocument()
 
     expect(within(historySection as HTMLElement).getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)

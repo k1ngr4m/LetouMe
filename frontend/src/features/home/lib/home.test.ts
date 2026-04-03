@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildHistoryHitTrend,
-  buildHistoryPrizeTrend,
+  buildHistoryProfitTrend,
   buildModelScores,
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
@@ -65,9 +65,9 @@ describe('buildHistoryHitTrend', () => {
   })
 })
 
-describe('buildHistoryPrizeTrend', () => {
-  it('builds period prize points for selected models', () => {
-    const result = buildHistoryPrizeTrend(
+describe('buildHistoryProfitTrend', () => {
+  it('builds period profit points for selected models', () => {
+    const result = buildHistoryProfitTrend(
       [
         {
           prediction_date: '2026-03-01',
@@ -78,12 +78,14 @@ describe('buildHistoryPrizeTrend', () => {
               model_id: 'm1',
               model_name: 'Model 1',
               model_provider: 'openai',
+              cost_amount: 80,
               prize_amount: 305,
             },
             {
               model_id: 'm2',
               model_name: 'Model 2',
               model_provider: 'gemini',
+              cost_amount: 20,
               prize_amount: 15,
             },
           ],
@@ -97,6 +99,7 @@ describe('buildHistoryPrizeTrend', () => {
               model_id: 'm1',
               model_name: 'Model 1',
               model_provider: 'openai',
+              cost_amount: 130,
               prize_amount: 120,
             },
           ],
@@ -106,8 +109,8 @@ describe('buildHistoryPrizeTrend', () => {
     )
 
     expect(result).toEqual([
-      { period: '26021', m1: 305, m2: 15 },
-      { period: '26022', m1: 120, m2: 0 },
+      { period: '26021', m1: 225, m2: -5 },
+      { period: '26022', m1: -10, m2: 0 },
     ])
   })
 })
