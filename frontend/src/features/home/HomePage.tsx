@@ -298,6 +298,12 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
+function formatJackpotInYiYuan(value: number | undefined) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '—'
+  return `${(numeric / 100000000).toFixed(2)} 亿元`
+}
+
 function sanitizeDownloadFileName(value: string) {
   return value
     .trim()
@@ -577,6 +583,13 @@ export function HomePage() {
     [filteredModelIds, orderedModels, summarySelectedModelIds],
   )
   const actualResult = getActualResult(chartDraws, currentPredictions.data?.target_period || '')
+  const currentJackpotDisplay = useMemo(() => {
+    const latestDrawWithJackpot = chartDraws.find((draw) => Number.isFinite(Number(draw.jackpot_pool_balance)))
+    if (!latestDrawWithJackpot || latestDrawWithJackpot.jackpot_pool_balance === undefined || latestDrawWithJackpot.jackpot_pool_balance === null) {
+      return '—'
+    }
+    return formatJackpotInYiYuan(latestDrawWithJackpot.jackpot_pool_balance)
+  }, [chartDraws])
 
   useEffect(() => {
     savePinnedModels(validPinnedModelIds, selectedLottery)
@@ -749,15 +762,15 @@ export function HomePage() {
       const apiOptions = [...new Set((history?.strategy_options || []).map((item) => normalizeStrategyLabel(item)))].sort((left, right) =>
         left.localeCompare(right),
       )
-      if (apiOptions.length || selectedLottery !== 'pl3') {
+      if (apiOptions.length || (selectedLottery !== 'pl3' && selectedLottery !== 'pl5')) {
         return apiOptions
       }
       return summaryStrategyOptions
     },
     [history?.strategy_options, selectedLottery, summaryStrategyOptions],
   )
-  const showSummaryStrategyFilters = selectedLottery === 'pl3' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
-  const showHistoryStrategyFilters = selectedLottery === 'pl3' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
+  const showSummaryStrategyFilters = selectedLottery === 'pl3' || selectedLottery === 'pl5' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
+  const showHistoryStrategyFilters = selectedLottery === 'pl3' || selectedLottery === 'pl5' || (selectedLottery === 'dlt' && dltPredictionMode === 'direct')
 
   useEffect(() => {
     setSummaryStrategyFilters((previous) => {
@@ -1040,6 +1053,10 @@ export function HomePage() {
             <article className="hero-metric-card">
               <span>开奖状态</span>
               <em>{actualResult ? '已开奖' : '待开奖'}</em>
+            </article>
+            <article className="hero-metric-card">
+              <span>本期奖池</span>
+              <strong>{currentJackpotDisplay}</strong>
             </article>
           </section>
           <div className="dashboard-layout">

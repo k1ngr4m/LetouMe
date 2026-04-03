@@ -155,6 +155,14 @@ export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
     blue_balls: (draw.blue_balls || []).map(padBall).sort(),
     digits: (draw.digits || []).map(padBall),
     blue_ball: (draw.blue_balls || [])[0] || null,
+    jackpot_pool_balance:
+      draw.jackpot_pool_balance === undefined || draw.jackpot_pool_balance === null
+        ? undefined
+        : Number(draw.jackpot_pool_balance),
+    previous_jackpot_pool:
+      draw.previous_jackpot_pool === undefined || draw.previous_jackpot_pool === null
+        ? undefined
+        : Number(draw.previous_jackpot_pool),
     prize_breakdown: (draw.prize_breakdown || []).map((item) => ({
       ...item,
       prize_amount: Number(item.prize_amount || 0),

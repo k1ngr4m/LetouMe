@@ -21,6 +21,7 @@ const {
   simulateDltDantuoCurrentPredictions,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
+  simulateJackpotPoolData,
   updateMyBet,
   simulateHistoryFilterLoading,
   toPng,
@@ -39,6 +40,7 @@ const {
   simulateDltDantuoCurrentPredictions: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
+  simulateJackpotPoolData: { current: false },
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
   toPng: vi.fn(),
@@ -717,6 +719,7 @@ vi.mock('./hooks/useHomeData', () => ({
             date: '2026-03-10',
             red_balls: ['01', '02', '03', '04', '05'],
             blue_balls: ['06', '07'],
+            jackpot_pool_balance: simulateJackpotPoolData.current ? 123456789 : undefined,
           },
           {
             period: '2026030',
@@ -836,6 +839,7 @@ beforeEach(() => {
   simulateDltDantuoCurrentPredictions.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
+  simulateJackpotPoolData.current = false
   toPng.mockReset()
   toPng.mockResolvedValue('data:image/png;base64,mock-image')
   setMotionPreference.mockReset()
@@ -1041,9 +1045,20 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(summary).getByText('下期开奖日')).toBeInTheDocument()
     expect(within(summary).getByText('预测日期')).toBeInTheDocument()
     expect(within(summary).getByText('开奖状态')).toBeInTheDocument()
+    expect(within(summary).getByText('本期奖池')).toBeInTheDocument()
+    expect(within(summary).getByText('—')).toBeInTheDocument()
 
     const modelSectionTitle = screen.getByRole('heading', { name: '模型列表' })
     expect(summary.compareDocumentPosition(modelSectionTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows jackpot amount when draw provides jackpot data', () => {
+    simulateJackpotPoolData.current = true
+    renderPage()
+
+    const summary = screen.getByLabelText('当前预测摘要')
+    expect(within(summary).getByText('本期奖池')).toBeInTheDocument()
+    expect(within(summary).getByText('1.23 亿元')).toBeInTheDocument()
   })
 
   it('shows local sidebar navigation on prediction tab', () => {
@@ -1258,6 +1273,17 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
 
     expect(screen.getAllByText('方案筛选').length).toBeGreaterThan(0)
+  })
+
+  it('shows strategy filters for pl5 views', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+    expect(screen.getByText('方案筛选')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    expect(screen.getByText('方案筛选')).toBeInTheDocument()
+    expect(screen.queryByText('当前暂无可选方案')).not.toBeInTheDocument()
   })
 
   it('hides strategy filters in dlt dantuo mode', async () => {
