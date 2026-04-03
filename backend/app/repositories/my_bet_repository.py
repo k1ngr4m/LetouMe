@@ -153,6 +153,44 @@ class MyBetRepository:
                     line_map = self._list_lines_map(cursor, [record_id])
                     return self._compose_record_payload(record, line_map.get(record_id, []), lottery_code=lottery_code)
 
+    def list_records_by_period(self, target_period: str, lottery_code: str = "dlt") -> list[dict[str, Any]]:
+        with use_lottery_table_scope(lottery_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            record.id,
+                            record.user_id,
+                            record.target_period,
+                            record.play_type,
+                            record.multiplier,
+                            record.is_append,
+                            record.bet_count,
+                            record.amount,
+                            record.discount_amount,
+                            record.created_at,
+                            record.updated_at,
+                            meta.source_type,
+                            meta.ticket_image_url,
+                            meta.ocr_text,
+                            meta.ocr_provider,
+                            meta.ocr_recognized_at,
+                            meta.ticket_purchased_at
+                        FROM my_bet_record AS record
+                        LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
+                        WHERE record.target_period = ?
+                        ORDER BY record.created_at DESC, record.id DESC
+                        """,
+                        (str(target_period or ""),),
+                    )
+                    records = cursor.fetchall()
+                    line_map = self._list_lines_map(cursor, [int(item["id"]) for item in records])
+                    return [
+                        self._compose_record_payload(item, line_map.get(int(item["id"]), []), lottery_code=lottery_code)
+                        for item in records
+                    ]
+
     def delete_record(self, record_id: int, user_id: int, lottery_code: str = "dlt") -> bool:
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:

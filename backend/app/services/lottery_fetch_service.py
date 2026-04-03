@@ -11,6 +11,7 @@ from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import build_pl3_prize_breakdown, build_pl5_prize_breakdown, normalize_digit_balls, normalize_lottery_code
 from backend.app.services.lottery_service import LotteryService
+from backend.app.services.message_service import MessageService
 
 
 class LotteryFetchService:
@@ -29,7 +30,12 @@ class LotteryFetchService:
         "九等奖": 5,
     }
 
-    def __init__(self, lottery_service: LotteryService | None = None, lottery_code: str = "dlt") -> None:
+    def __init__(
+        self,
+        lottery_service: LotteryService | None = None,
+        lottery_code: str = "dlt",
+        message_service: MessageService | None = None,
+    ) -> None:
         self.lottery_code = normalize_lottery_code(lottery_code)
         self.base_url = (
             "https://datachart.500.com/dlt/history/newinc/history.php"
@@ -58,6 +64,7 @@ class LotteryFetchService:
         self.session.headers.update(self.headers)
         ensure_schema()
         self.lottery_service = lottery_service or LotteryService()
+        self.message_service = message_service or MessageService()
         self.logger = get_logger("services.lottery_fetch")
 
     def fetch_and_save(
@@ -90,11 +97,26 @@ class LotteryFetchService:
             lottery_data = lottery_data[: max(1, int(limit))]
 
         saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
+        generated_message_count = 0
+        message_service = getattr(self, "message_service", None)
+        if message_service:
+            recent_periods = [str(item.get("period") or "").strip() for item in saved_draws if str(item.get("period") or "").strip()]
+            generated_message_count += message_service.generate_messages_for_periods(
+                lottery_code=self.lottery_code,
+                periods=recent_periods,
+            )
+            generated_message_count += message_service.generate_messages_for_recent_draws(
+                lottery_code=self.lottery_code,
+                recent_days=30,
+                limit=500,
+                excluded_periods=set(recent_periods),
+            )
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
         summary = {
             "lottery_code": self.lottery_code,
             "fetched_count": len(lottery_data),
             "saved_count": len(saved_draws),
+            "message_generated_count": generated_message_count,
             "latest_period": saved_draws[0]["period"] if saved_draws else None,
             "duration_ms": duration_ms,
         }

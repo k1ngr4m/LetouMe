@@ -48,6 +48,10 @@ from backend.app.schemas.requests import (
     BulkGenerateModelPredictionsPayload,
     BulkModelActionPayload,
     GenerateModelPredictionsPayload,
+    MessageDeletePayload,
+    MessageListPayload,
+    MessageReadAllPayload,
+    MessageReadPayload,
     ModelCodePayload,
     ModelConnectivityTestPayload,
     MyBetRecordDeletePayload,
@@ -97,6 +101,8 @@ from backend.app.schemas.responses import (
     PredictionsHistoryResponse,
     ScheduleTaskListResponse,
     ScheduleTaskResponse,
+    SiteMessageListResponse,
+    SiteMessageUnreadCountResponse,
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
     SimulationTicketCreateResponse,
@@ -113,6 +119,7 @@ from backend.app.services.prediction_generation_service import PredictionGenerat
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
 from backend.app.services.prediction_service import PredictionService
 from backend.app.services.schedule_service import schedule_service
+from backend.app.services.message_service import MessageService
 from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.simulation_ticket_service import SimulationTicketService
 from backend.app.services.ticket_ocr_service import TicketOCRService
@@ -125,6 +132,7 @@ model_service = ModelService()
 prediction_generation_service = PredictionGenerationService()
 simulation_ticket_service = SimulationTicketService()
 my_bet_service = MyBetService()
+message_service = MessageService()
 profile_avatar_service = TicketOCRService()
 
 PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
@@ -461,6 +469,46 @@ def delete_my_bet(payload: MyBetRecordDeletePayload, current_user: dict = Depend
         my_bet_service.delete_record(int(current_user["id"]), payload.record_id, lottery_code=payload.lottery_code)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="投注记录不存在") from exc
+    return {"success": True}
+
+
+@router.post("/messages/list", response_model=SiteMessageListResponse)
+def list_messages(payload: MessageListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return message_service.list_messages(
+        user_id=int(current_user["id"]),
+        lottery_code=payload.lottery_code,
+        status_filter=payload.status_filter,
+        limit=payload.limit,
+        offset=payload.offset,
+    )
+
+
+@router.post("/messages/unread-count", response_model=SiteMessageUnreadCountResponse)
+def get_message_unread_count(payload: MessageReadAllPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return message_service.get_unread_count(user_id=int(current_user["id"]), lottery_code=payload.lottery_code)
+
+
+@router.post("/messages/read", response_model=SuccessResponse)
+def mark_message_read(payload: MessageReadPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        message_service.mark_read(user_id=int(current_user["id"]), message_id=payload.message_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="消息不存在") from exc
+    return {"success": True}
+
+
+@router.post("/messages/read-all", response_model=SuccessResponse)
+def mark_all_messages_read(payload: MessageReadAllPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    message_service.mark_all_read(user_id=int(current_user["id"]), lottery_code=payload.lottery_code)
+    return {"success": True}
+
+
+@router.post("/messages/delete", response_model=SuccessResponse)
+def delete_message(payload: MessageDeletePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        message_service.delete_message(user_id=int(current_user["id"]), message_id=payload.message_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="消息不存在") from exc
     return {"success": True}
 
 

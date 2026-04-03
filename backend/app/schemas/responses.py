@@ -232,6 +232,29 @@ class MyBetOCRImageUploadResponse(BaseModel):
     ticket_image_url: str
 
 
+class SiteMessageResponse(BaseModel):
+    id: int
+    lottery_code: str = "dlt"
+    target_period: str
+    my_bet_record_id: int
+    message_type: str = "bet_settlement"
+    title: str
+    content: str
+    snapshot: dict[str, Any] | None = None
+    is_read: bool = False
+    read_at: str | None = None
+    created_at: str
+
+
+class SiteMessageListResponse(BaseModel):
+    messages: list[SiteMessageResponse] = Field(default_factory=list)
+    total_count: int = 0
+
+
+class SiteMessageUnreadCountResponse(BaseModel):
+    unread_count: int = 0
+
+
 class SuccessResponse(BaseModel):
     success: bool = True
 

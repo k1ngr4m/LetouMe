@@ -439,6 +439,31 @@ export type MyBetOCRImageUploadResponse = {
   ticket_image_url: string
 }
 
+export type MessageStatusFilter = 'all' | 'unread' | 'read'
+
+export type SiteMessage = {
+  id: number
+  lottery_code: LotteryCode
+  target_period: string
+  my_bet_record_id: number
+  message_type: 'bet_settlement'
+  title: string
+  content: string
+  snapshot?: Record<string, unknown> | null
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+}
+
+export type SiteMessageListResponse = {
+  messages: SiteMessage[]
+  total_count: number
+}
+
+export type SiteMessageUnreadCountResponse = {
+  unread_count: number
+}
+
 export type SuccessResponse = {
   success: boolean
 }

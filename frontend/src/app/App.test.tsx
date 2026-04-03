@@ -15,6 +15,9 @@ vi.mock('../features/home/HomeModelDetailPage', () => ({
 vi.mock('../features/home/HomeRulesPage', () => ({
   HomeRulesPage: () => <div>Home Rules Page Mock</div>,
 }))
+vi.mock('../features/messages/MessageCenterPage', () => ({
+  MessageCenterPage: () => <div>Message Center Page Mock</div>,
+}))
 
 vi.mock('../features/landing/LandingPage', () => ({
   LandingPage: () => <div>Landing Page Mock</div>,
@@ -83,6 +86,11 @@ describe('App routing', () => {
   it('renders dashboard rules route', async () => {
     renderApp(['/dashboard/rules'])
     expect(await screen.findByText('Home Rules Page Mock')).toBeInTheDocument()
+  })
+
+  it('renders message center route', async () => {
+    renderApp(['/dashboard/messages'])
+    expect(await screen.findByText('Message Center Page Mock')).toBeInTheDocument()
   })
 
   it('redirects settings route to profile route', async () => {

@@ -217,6 +217,25 @@ class MyBetRecordDeletePayload(BaseModel):
     record_id: int = Field(ge=1)
 
 
+class MessageListPayload(BaseModel):
+    lottery_code: str | None = None
+    status_filter: Literal["all", "unread", "read"] = "all"
+    limit: int = Field(default=20, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+
+class MessageReadPayload(BaseModel):
+    message_id: int = Field(ge=1)
+
+
+class MessageReadAllPayload(BaseModel):
+    lottery_code: str | None = None
+
+
+class MessageDeletePayload(BaseModel):
+    message_id: int = Field(ge=1)
+
+
 class ProfileUpdatePayload(BaseModel):
     nickname: str
 

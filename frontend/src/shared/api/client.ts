@@ -23,6 +23,7 @@ import type {
   LotteryHistoryResponse,
   LotteryFetchTask,
   MaintenanceRunLogListResponse,
+  MessageStatusFilter,
   PasswordChangePayload,
   PermissionListResponse,
   PermissionUpdatePayload,
@@ -52,6 +53,8 @@ import type {
   SimulationTicketQuoteResponse,
   SimulationTicketListResponse,
   SimulationTicketPayload,
+  SiteMessageListResponse,
+  SiteMessageUnreadCountResponse,
   SuccessResponse,
   UserListResponse,
   RegisterPayload,
@@ -247,6 +250,41 @@ export const apiClient = {
     return requestJson<MyBetRecordListResponse>('/api/my-bets/list', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: lotteryCode }),
+    })
+  },
+  getMessages(payload?: {
+    lottery_code?: LotteryCode
+    status_filter?: MessageStatusFilter
+    limit?: number
+    offset?: number
+  }) {
+    return requestJson<SiteMessageListResponse>('/api/messages/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getMessageUnreadCount(payload?: { lottery_code?: LotteryCode }) {
+    return requestJson<SiteMessageUnreadCountResponse>('/api/messages/unread-count', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  markMessageRead(messageId: number) {
+    return requestJson<SuccessResponse>('/api/messages/read', {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
+    })
+  },
+  markAllMessagesRead(payload?: { lottery_code?: LotteryCode }) {
+    return requestJson<SuccessResponse>('/api/messages/read-all', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  deleteMessage(messageId: number) {
+    return requestJson<SuccessResponse>('/api/messages/delete', {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
     })
   },
   createMyBet(payload: MyBetRecordPayload) {

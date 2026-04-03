@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import clsx from 'clsx'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -24,9 +25,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 import { UserAvatar } from './UserAvatar'
-import { HOME_RULES_PATH, HOME_TAB_PATHS } from '../../features/home/navigation'
+import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
+import { apiClient } from '../api/client'
 import type { LotteryCode } from '../types/api'
 
 const SETTINGS_PATHS = {
@@ -120,6 +122,20 @@ export function AppShell({ children }: PropsWithChildren) {
     () => LOTTERY_OPTIONS.find((item) => item.code === selectedLottery)?.label || '大乐透',
     [selectedLottery],
   )
+  const messageUnreadCountQuery = useQuery({
+    queryKey: ['messages', 'unread-count'],
+    queryFn: async () => {
+      try {
+        return await apiClient.getMessageUnreadCount()
+      } catch {
+        return { unread_count: 0 }
+      }
+    },
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+  })
+  const unreadCount = Math.max(0, Number(messageUnreadCountQuery.data?.unread_count || 0))
+  const unreadCountLabel = unreadCount > 99 ? '99+' : `${unreadCount}`
 
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '设置中心'
@@ -128,11 +144,13 @@ export function AppShell({ children }: PropsWithChildren) {
     if (location.pathname === HOME_TAB_PATHS.simulation) return '模拟试玩'
     if (location.pathname === HOME_TAB_PATHS['my-bets']) return '我的投注'
     if (location.pathname === HOME_RULES_PATH) return '规则说明'
+    if (location.pathname === MESSAGE_CENTER_PATH) return '消息中心'
     return '预测总览'
   }, [location.pathname])
 
   const pageSubtitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '模型、用户与任务管理'
+    if (location.pathname === MESSAGE_CENTER_PATH) return '开奖通知与站内信'
     return '预测工作台'
   }, [location.pathname])
 
@@ -234,6 +252,11 @@ export function AppShell({ children }: PropsWithChildren) {
   function onSettingsNavigate() {
     setSidebarMode('settings')
     onNavigate()
+  }
+
+  function openMessageCenter() {
+    setIsSidebarOpen(false)
+    navigate(MESSAGE_CENTER_PATH)
   }
 
   function toggleSidebarCollapsed() {
@@ -456,12 +479,14 @@ export function AppShell({ children }: PropsWithChildren) {
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button
-              className="crm-topbar__icon-btn"
+              className={clsx('crm-topbar__icon-btn crm-topbar__icon-btn--with-badge', location.pathname === MESSAGE_CENTER_PATH && 'is-active')}
               type="button"
               aria-label="消息中心"
               title="消息中心"
+              onClick={openMessageCenter}
             >
               <Bell size={16} aria-hidden="true" />
+              {unreadCount > 0 ? <span className="crm-topbar__badge">{unreadCountLabel}</span> : null}
             </button>
             {canOpenSettings ? (
               <div className="crm-topbar__settings-entry">

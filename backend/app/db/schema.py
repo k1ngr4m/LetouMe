@@ -435,6 +435,28 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS site_message (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        target_period VARCHAR(32) NOT NULL,
+        my_bet_record_id BIGINT NOT NULL,
+        message_type VARCHAR(32) NOT NULL DEFAULT 'bet_settlement',
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        snapshot_json JSON NULL,
+        read_at DATETIME NULL,
+        deleted_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_site_message_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_site_message_unique (user_id, lottery_code, target_period, my_bet_record_id, message_type),
+        INDEX idx_site_message_user_created (user_id, created_at),
+        INDEX idx_site_message_user_read (user_id, read_at),
+        INDEX idx_site_message_user_deleted_created (user_id, deleted_at, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS app_role (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         role_code VARCHAR(64) NOT NULL UNIQUE,
