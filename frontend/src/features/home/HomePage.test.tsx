@@ -1734,6 +1734,9 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '历史中奖匹配' }))
     expect(await screen.findByText('一等奖')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: '仅展示中奖期数' })).not.toBeChecked()
+    const winningCard = screen.getByText('第 2026031 期').closest('.simulation-match-card')
+    expect(winningCard).not.toBeNull()
+    expect(winningCard).toHaveClass('is-winning')
 
     await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
 
@@ -1773,6 +1776,10 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(await screen.findByText('第 2026031 期')).toBeInTheDocument()
     expect(screen.getByText('第 2026030 期')).toBeInTheDocument()
+    const winningCard = screen.getByText('第 2026031 期').closest('.simulation-match-card')
+    const nonWinningCard = screen.getByText('第 2026030 期').closest('.simulation-match-card')
+    expect(winningCard).toHaveClass('is-winning')
+    expect(nonWinningCard).not.toHaveClass('is-winning')
 
     await userEvent.click(screen.getByRole('checkbox', { name: '仅展示中奖期数' }))
 

@@ -2383,7 +2383,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
         ) : visibleMatches.length ? (
           <div className="simulation-match-list">
             {visibleMatches.map((match) => (
-              <article key={match.period} className="simulation-match-card">
+              <article key={match.period} className={clsx('simulation-match-card', match.totalWinningBets > 0 && 'is-winning')}>
                 <div className="simulation-match-card__header">
                   <div>
                     <p className="history-record-card__eyebrow">第 {match.period} 期</p>
