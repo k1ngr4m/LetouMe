@@ -44,6 +44,9 @@ class MessageService:
         lottery_code: str | None = None,
         status_filter: str = "all",
         result_filter: str = "all",
+        keyword: str | None = None,
+        date_start: str | None = None,
+        date_end: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -53,6 +56,9 @@ class MessageService:
             lottery_code=normalized_code,
             status_filter=status_filter,
             result_filter=result_filter,
+            keyword=keyword,
+            date_start=date_start,
+            date_end=date_end,
             limit=limit,
             offset=offset,
         )

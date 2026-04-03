@@ -23,6 +23,7 @@ import type {
   LotteryHistoryResponse,
   LotteryFetchTask,
   MaintenanceRunLogListResponse,
+  MessageDateFilter,
   MessageResultFilter,
   MessageStatusFilter,
   PasswordChangePayload,
@@ -257,6 +258,9 @@ export const apiClient = {
     lottery_code?: LotteryCode
     status_filter?: MessageStatusFilter
     result_filter?: MessageResultFilter
+    keyword?: string
+    date_start?: MessageDateFilter['date_start']
+    date_end?: MessageDateFilter['date_end']
     limit?: number
     offset?: number
   }) {

@@ -44,6 +44,9 @@ class MessageRepository:
         lottery_code: str | None = None,
         status_filter: str = "all",
         result_filter: str = "all",
+        keyword: str | None = None,
+        date_start: str | None = None,
+        date_end: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -64,6 +67,21 @@ class MessageRepository:
             where_clauses.append(
                 "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json, '$.winning_bet_count')) AS SIGNED), 0) <= 0"
             )
+        normalized_keyword = str(keyword or "").strip()
+        if normalized_keyword:
+            where_clauses.append("(title LIKE ? OR content LIKE ?)")
+            keyword_pattern = f"%{normalized_keyword}%"
+            params.extend([keyword_pattern, keyword_pattern])
+        start_date = self._parse_date(date_start)
+        end_date = self._parse_date(date_end)
+        if start_date and end_date and start_date > end_date:
+            start_date, end_date = end_date, start_date
+        if start_date:
+            where_clauses.append("created_at >= ?")
+            params.append(f"{start_date.strftime('%Y-%m-%d')} 00:00:00")
+        if end_date:
+            where_clauses.append("created_at <= ?")
+            params.append(f"{end_date.strftime('%Y-%m-%d')} 23:59:59")
         where_sql = " AND ".join(where_clauses)
 
         with get_connection() as connection:
@@ -100,6 +118,16 @@ class MessageRepository:
                 )
                 row = cursor.fetchone() or {}
         return {"messages": messages, "total_count": int(row.get("total") or 0)}
+
+    @staticmethod
+    def _parse_date(raw_value: str | None):
+        raw = str(raw_value or "").strip()
+        if not raw:
+            return None
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            return None
 
     def get_unread_count(self, *, user_id: int, lottery_code: str | None = None) -> int:
         where_clauses = ["user_id = ?", "deleted_at IS NULL", "read_at IS NULL"]

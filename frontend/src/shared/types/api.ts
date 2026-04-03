@@ -441,6 +441,10 @@ export type MyBetOCRImageUploadResponse = {
 
 export type MessageStatusFilter = 'all' | 'unread' | 'read'
 export type MessageResultFilter = 'all' | 'won' | 'lost'
+export type MessageDateFilter = {
+  date_start?: string
+  date_end?: string
+}
 
 export type SiteMessage = {
   id: number

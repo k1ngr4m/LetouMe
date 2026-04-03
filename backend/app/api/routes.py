@@ -479,6 +479,9 @@ def list_messages(payload: MessageListPayload, current_user: dict = Depends(requ
         lottery_code=payload.lottery_code,
         status_filter=payload.status_filter,
         result_filter=payload.result_filter,
+        keyword=payload.keyword,
+        date_start=payload.date_start,
+        date_end=payload.date_end,
         limit=payload.limit,
         offset=payload.offset,
     )

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BellRing, CheckCheck, CircleAlert, Inbox, Trash2 } from 'lucide-react'
+import { CheckCheck, CircleAlert, Filter, Inbox, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { useToast } from '../../shared/feedback/ToastProvider'
@@ -11,9 +11,9 @@ import { HOME_TAB_PATHS, type HomeDetailRouteState } from '../home/navigation'
 
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
+  { value: 'unread', label: '未读消息' },
+  { value: 'read', label: '已读消息' },
   { value: 'all', label: '全部消息' },
-  { value: 'unread', label: '未读' },
-  { value: 'read', label: '已读' },
 ]
 const RESULT_OPTIONS: Array<{ value: MessageResultFilter; label: string }> = [
   { value: 'all', label: '全部结果' },
@@ -36,11 +36,10 @@ function getSummaryTags(message: SiteMessage) {
   const winningBetCount = Number(snapshot?.winning_bet_count || 0)
   const prizeAmount = Number(snapshot?.prize_amount || 0)
   const netProfit = Number(snapshot?.net_profit || 0)
-  const prizeLevel = String(snapshot?.prize_level || '').trim()
   if (winningBetCount > 0) {
     return {
       tone: 'win' as const,
-      statusLabel: prizeLevel ? `${prizeLevel} · 中 ${winningBetCount} 注` : `中奖 ${winningBetCount} 注`,
+      statusLabel: `中奖 ${winningBetCount} 注`,
       prizeAmount: formatYuan(prizeAmount),
       netProfit: formatYuan(netProfit),
     }
@@ -58,21 +57,40 @@ export function MessageCenterPage() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const { setSelectedLottery } = useLotterySelection()
-  const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>('unread')
   const [resultFilter, setResultFilter] = useState<MessageResultFilter>('all')
   const [lotteryFilter, setLotteryFilter] = useState<LotteryCode | 'all'>('all')
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd, setDateEnd] = useState('')
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keywordFilter, setKeywordFilter] = useState('')
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [draftResultFilter, setDraftResultFilter] = useState<MessageResultFilter>('all')
+  const [draftLotteryFilter, setDraftLotteryFilter] = useState<LotteryCode | 'all'>('all')
+  const [draftDateStart, setDraftDateStart] = useState('')
+  const [draftDateEnd, setDraftDateEnd] = useState('')
   const [offset, setOffset] = useState(0)
+  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
 
   const listQuery = useQuery({
-    queryKey: ['messages', 'list', statusFilter, resultFilter, lotteryFilter, offset],
+    queryKey: ['messages', 'list', statusFilter, resultFilter, lotteryFilter, dateStart, dateEnd, keywordFilter, offset],
     queryFn: () =>
       apiClient.getMessages({
         status_filter: statusFilter,
         result_filter: resultFilter,
         lottery_code: lotteryFilter === 'all' ? undefined : lotteryFilter,
+        keyword: keywordFilter || undefined,
+        date_start: dateStart || undefined,
+        date_end: dateEnd || undefined,
         limit: PAGE_SIZE,
         offset,
       }),
+    staleTime: 10_000,
+  })
+
+  const unreadCountQuery = useQuery({
+    queryKey: ['messages', 'unread-count'],
+    queryFn: () => apiClient.getMessageUnreadCount(),
     staleTime: 10_000,
   })
 
@@ -80,8 +98,13 @@ export function MessageCenterPage() {
   const totalCount = Number(listQuery.data?.total_count || 0)
   const hasPrevPage = offset > 0
   const hasNextPage = offset + PAGE_SIZE < totalCount
-
-  const unreadCount = useMemo(() => messages.filter((item) => !item.is_read).length, [messages])
+  const unreadCount = Math.max(0, Number(unreadCountQuery.data?.unread_count || 0))
+  const unreadCountLabel = unreadCount > 99 ? '99+' : `${unreadCount}`
+  const selectedMessage = useMemo(
+    () => messages.find((item) => item.id === selectedMessageId) || messages[0] || null,
+    [messages, selectedMessageId],
+  )
+  const activeStatusLabel = STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label || '消息列表'
 
   const refreshMessageQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['messages', 'list'] })
@@ -93,40 +116,61 @@ export function MessageCenterPage() {
     onSuccess: refreshMessageQueries,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (messageId: number) => apiClient.deleteMessage(messageId),
-    onSuccess: () => {
-      refreshMessageQueries()
-      showToast('消息已删除。', 'success')
-    },
-    onError: (error: Error) => showToast(error.message || '删除消息失败', 'error'),
-  })
-
   const markAllReadMutation = useMutation({
-    mutationFn: () => apiClient.markAllMessagesRead({ lottery_code: lotteryFilter === 'all' ? undefined : lotteryFilter }),
+    mutationFn: () => apiClient.markAllMessagesRead({}),
     onSuccess: () => {
       refreshMessageQueries()
-      showToast('已将当前筛选消息标记为已读。', 'success')
+      showToast('已将当前消息标记为已读。', 'success')
     },
     onError: (error: Error) => showToast(error.message || '操作失败', 'error'),
   })
 
-  function handleFilterChange(nextStatus: MessageStatusFilter) {
+  useEffect(() => {
+    if (!messages.length) {
+      setSelectedMessageId(null)
+      return
+    }
+    if (!selectedMessageId || !messages.some((item) => item.id === selectedMessageId)) {
+      setSelectedMessageId(messages[0].id)
+    }
+  }, [messages, selectedMessageId])
+
+  function handleStatusChange(nextStatus: MessageStatusFilter) {
     setStatusFilter(nextStatus)
     setOffset(0)
   }
 
-  function handleLotteryChange(value: LotteryCode | 'all') {
-    setLotteryFilter(value)
+  function handleApplyKeyword() {
+    setKeywordFilter(keywordInput.trim())
     setOffset(0)
   }
 
-  function handleResultFilterChange(value: MessageResultFilter) {
-    setResultFilter(value)
-    setOffset(0)
+  function handleOpenFilterModal() {
+    setDraftLotteryFilter(lotteryFilter)
+    setDraftResultFilter(resultFilter)
+    setDraftDateStart(dateStart)
+    setDraftDateEnd(dateEnd)
+    setFilterModalOpen(true)
   }
 
-  function handleOpenMessage(message: SiteMessage) {
+  function handleApplyFilters() {
+    setLotteryFilter(draftLotteryFilter)
+    setResultFilter(draftResultFilter)
+    setDateStart(draftDateStart)
+    setDateEnd(draftDateEnd)
+    setOffset(0)
+    setFilterModalOpen(false)
+  }
+
+  function handleResetFilters() {
+    setDraftLotteryFilter('all')
+    setDraftResultFilter('all')
+    setDraftDateStart('')
+    setDraftDateEnd('')
+  }
+
+  function handleSelectMessage(message: SiteMessage) {
+    setSelectedMessageId(message.id)
     if (!message.is_read && !markReadMutation.isPending) {
       markReadMutation.mutate(message.id)
     }
@@ -143,147 +187,219 @@ export function MessageCenterPage() {
     navigate(HOME_TAB_PATHS['my-bets'], { state: routeState })
   }
 
-  return (
-    <section className="message-center" aria-label="消息中心">
-      <header className="message-center__header">
-        <div className="message-center__title-wrap">
-          <div className="message-center__title-icon" aria-hidden="true">
-            <BellRing size={18} />
-          </div>
-          <div>
-            <h2>消息中心</h2>
-            <p>开奖后自动推送投注结算消息，可随时回看历史通知。</p>
-          </div>
-        </div>
-        <button
-          className="message-center__mark-all"
-          type="button"
-          disabled={markAllReadMutation.isPending || unreadCount <= 0}
-          onClick={() => markAllReadMutation.mutate()}
-        >
-          <CheckCheck size={15} aria-hidden="true" />
-          <span>{markAllReadMutation.isPending ? '处理中...' : '全部标记已读'}</span>
-        </button>
-      </header>
+  const detailSnapshot = (selectedMessage?.snapshot || {}) as Record<string, unknown>
+  const detailAmount = Number(detailSnapshot.amount || 0)
+  const detailNetAmount = Number(detailSnapshot.net_amount || 0)
+  const detailTags = selectedMessage ? getSummaryTags(selectedMessage) : null
 
-      <div className="message-center__toolbar">
-        <div className="message-center__status-tabs" role="tablist" aria-label="消息状态">
-          {STATUS_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === option.value}
-              className={`message-center__status-tab${statusFilter === option.value ? ' is-active' : ''}`}
-              onClick={() => handleFilterChange(option.value)}
-            >
-              {option.label}
+  return (
+    <section className="message-center-v2" aria-label="消息中心">
+      <div className="message-center-v2__layout">
+        <aside className="message-center-v2__sidebar">
+          <h2>消息中心</h2>
+          <nav className="message-center-v2__status-nav" aria-label="消息状态">
+            {STATUS_OPTIONS.map((option) => {
+              const isActive = statusFilter === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`message-center-v2__status-item${isActive ? ' is-active' : ''}`}
+                  onClick={() => handleStatusChange(option.value)}
+                >
+                  <span>{option.label}</span>
+                  {option.value === 'unread' && unreadCount > 0 ? <em>{unreadCountLabel}</em> : null}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="message-center-v2__business-group" aria-label="业务分类">
+            <p>业务消息</p>
+            <button type="button" className="message-center-v2__business-item is-active">
+              开奖通知
             </button>
-          ))}
-        </div>
-        <label className="message-center__lottery-select">
-          <span>彩种筛选</span>
-          <select
-            value={lotteryFilter}
-            onChange={(event) => handleLotteryChange(event.target.value as LotteryCode | 'all')}
-            aria-label="彩种筛选"
-          >
-            {LOTTERY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="message-center__lottery-select">
-          <span>中奖结果</span>
-          <select
-            value={resultFilter}
-            onChange={(event) => handleResultFilterChange(event.target.value as MessageResultFilter)}
-            aria-label="中奖结果筛选"
-          >
-            {RESULT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          </div>
+        </aside>
+
+        <section className="message-center-v2__list-panel">
+          <header className="message-center-v2__list-header">
+            <div>
+              <h3>{activeStatusLabel}</h3>
+              {statusFilter === 'unread' ? <em>{unreadCountLabel}</em> : null}
+            </div>
+            <div className="message-center-v2__header-actions">
+              <button
+                type="button"
+                title="全部标记已读"
+                aria-label="全部标记已读"
+                className="message-center-v2__icon-btn"
+                disabled={markAllReadMutation.isPending || unreadCount <= 0 || statusFilter === 'read'}
+                onClick={() => markAllReadMutation.mutate()}
+              >
+                <CheckCheck size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                title="筛选"
+                aria-label="筛选"
+                className="message-center-v2__icon-btn"
+                onClick={handleOpenFilterModal}
+              >
+                <Filter size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </header>
+
+          <label className="message-center-v2__search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              value={keywordInput}
+              onChange={(event) => setKeywordInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handleApplyKeyword()
+                }
+              }}
+              placeholder="搜索消息"
+            />
+          </label>
+
+          {listQuery.isLoading ? <div className="state-shell">正在加载消息...</div> : null}
+          {listQuery.isError ? (
+            <div className="state-shell state-shell--error">
+              <CircleAlert size={16} aria-hidden="true" />
+              <span>加载失败：{(listQuery.error as Error).message}</span>
+            </div>
+          ) : null}
+          {!listQuery.isLoading && !listQuery.isError && messages.length <= 0 ? (
+            <div className="message-center-v2__empty">
+              <Inbox size={22} aria-hidden="true" />
+              <p>当前筛选下暂无消息。</p>
+            </div>
+          ) : null}
+
+          {!listQuery.isLoading && !listQuery.isError && messages.length > 0 ? (
+            <div className="message-center-v2__list">
+              {messages.map((message) => {
+                const tags = getSummaryTags(message)
+                const isActive = selectedMessage?.id === message.id
+                return (
+                  <article
+                    key={message.id}
+                    className={`message-center-v2__item${isActive ? ' is-active' : ''}${message.is_read ? ' is-read' : ''}`}
+                    onClick={() => handleSelectMessage(message)}
+                  >
+                    <div className="message-center-v2__item-meta">
+                      <span className={`message-center-v2__item-status is-${tags.tone}`}>{tags.statusLabel}</span>
+                      <time>{formatDateTimeBeijing(message.created_at)}</time>
+                    </div>
+                    <h4>{message.title}</h4>
+                    <p>{message.content}</p>
+                  </article>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {!listQuery.isLoading && !listQuery.isError && totalCount > 0 ? (
+            <footer className="message-center-v2__pager">
+              <button type="button" disabled={!hasPrevPage} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>
+                上一页
+              </button>
+              <span>
+                {Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+              </span>
+              <button type="button" disabled={!hasNextPage} onClick={() => setOffset((current) => current + PAGE_SIZE)}>
+                下一页
+              </button>
+            </footer>
+          ) : null}
+        </section>
+
+        <section className="message-center-v2__detail-panel">
+          {selectedMessage ? (
+            <>
+              <header className="message-center-v2__detail-header">
+                <h3>{selectedMessage.title}</h3>
+                <p>
+                  <span>通知时间</span>
+                  <time>{formatDateTimeBeijing(selectedMessage.created_at)}</time>
+                </p>
+              </header>
+              <div className="message-center-v2__detail-body">
+                <p>{selectedMessage.content}</p>
+              </div>
+              <div className="message-center-v2__detail-metrics">
+                <span>投注金额：{formatYuan(detailAmount)}</span>
+                <span>实付金额：{formatYuan(detailNetAmount)}</span>
+                <span>奖金：{detailTags?.prizeAmount || formatYuan(0)}</span>
+                <span>盈亏：{detailTags?.netProfit || formatYuan(0)}</span>
+              </div>
+              <footer className="message-center-v2__detail-actions">
+                <button type="button" onClick={() => jumpToBetDetail(selectedMessage)}>
+                  查看
+                </button>
+              </footer>
+            </>
+          ) : (
+            <div className="message-center-v2__detail-empty">
+              <Inbox size={24} aria-hidden="true" />
+              <p>请选择一条消息查看详情</p>
+            </div>
+          )}
+        </section>
       </div>
 
-      {listQuery.isLoading ? <div className="state-shell">正在加载消息...</div> : null}
-      {listQuery.isError ? (
-        <div className="state-shell state-shell--error">
-          <CircleAlert size={16} aria-hidden="true" />
-          <span>加载失败：{(listQuery.error as Error).message}</span>
+      {filterModalOpen ? (
+        <div className="message-center-v2__filter-layer" role="dialog" aria-modal="true" aria-label="筛选消息">
+          <button
+            type="button"
+            className="message-center-v2__filter-backdrop"
+            aria-label="关闭筛选"
+            onClick={() => setFilterModalOpen(false)}
+          />
+          <div className="message-center-v2__filter-modal">
+            <h4>筛选条件</h4>
+            <label>
+              <span>彩种</span>
+              <select value={draftLotteryFilter} onChange={(event) => setDraftLotteryFilter(event.target.value as LotteryCode | 'all')}>
+                {LOTTERY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>中奖结果</span>
+              <select value={draftResultFilter} onChange={(event) => setDraftResultFilter(event.target.value as MessageResultFilter)}>
+                {RESULT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="message-center-v2__date-range">
+              <label>
+                <span>开始日期</span>
+                <input type="date" value={draftDateStart} onChange={(event) => setDraftDateStart(event.target.value)} />
+              </label>
+              <label>
+                <span>结束日期</span>
+                <input type="date" value={draftDateEnd} onChange={(event) => setDraftDateEnd(event.target.value)} />
+              </label>
+            </div>
+            <footer>
+              <button type="button" className="is-ghost" onClick={handleResetFilters}>
+                重置
+              </button>
+              <button type="button" onClick={handleApplyFilters}>
+                搜索
+              </button>
+            </footer>
+          </div>
         </div>
-      ) : null}
-      {!listQuery.isLoading && !listQuery.isError && messages.length <= 0 ? (
-        <div className="message-center__empty">
-          <Inbox size={22} aria-hidden="true" />
-          <p>当前筛选下暂无消息。</p>
-        </div>
-      ) : null}
-
-      {!listQuery.isLoading && !listQuery.isError && messages.length > 0 ? (
-        <div className="message-center__list">
-          {messages.map((message) => {
-            const tags = getSummaryTags(message)
-            const snapshot = (message.snapshot || {}) as Record<string, unknown>
-            const amount = Number(snapshot.amount || 0)
-            const netAmount = Number(snapshot.net_amount || 0)
-            return (
-              <article
-                key={message.id}
-                className={`message-card${message.is_read ? ' is-read' : ''}`}
-                onClick={() => handleOpenMessage(message)}
-              >
-                <div className="message-card__meta">
-                  <span className={`message-card__status is-${tags.tone}`}>{tags.statusLabel}</span>
-                  {!message.is_read ? <em className="message-card__unread">未读</em> : null}
-                  <time>{formatDateTimeBeijing(message.created_at)}</time>
-                </div>
-                <h3>{message.title}</h3>
-                <p>{message.content}</p>
-                <div className="message-card__metrics">
-                  <span>投注 {formatYuan(amount)}</span>
-                  <span>实付 {formatYuan(netAmount)}</span>
-                  <span>奖金 {tags.prizeAmount}</span>
-                  <span>盈亏 {tags.netProfit}</span>
-                </div>
-                <div className="message-card__actions">
-                  <button type="button" onClick={() => jumpToBetDetail(message)}>
-                    查看投注
-                  </button>
-                  <button
-                    type="button"
-                    className="is-danger"
-                    aria-label={`删除消息：${message.title}`}
-                    onClick={() => deleteMutation.mutate(message.id)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                    <span>删除</span>
-                  </button>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {!listQuery.isLoading && !listQuery.isError && totalCount > 0 ? (
-        <footer className="message-center__pager">
-          <button type="button" disabled={!hasPrevPage} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>
-            上一页
-          </button>
-          <span>
-            {Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
-          </span>
-          <button type="button" disabled={!hasNextPage} onClick={() => setOffset((current) => current + PAGE_SIZE)}>
-            下一页
-          </button>
-        </footer>
       ) : null}
     </section>
   )
