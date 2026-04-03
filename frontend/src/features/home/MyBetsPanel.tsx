@@ -873,14 +873,16 @@ export function MyBetsPanel({
     const token = String(focusToken || '')
     if (!targetRecordId || !token) return
     if (consumedFocusTokenRef.current === token) return
+    if (betsQuery.isLoading && !records.length) return
 
-    consumedFocusTokenRef.current = token
     const targetExists = records.some((item) => item.id === targetRecordId)
     if (!targetExists) {
+      consumedFocusTokenRef.current = token
       onFocusHandled?.()
       return
     }
 
+    consumedFocusTokenRef.current = token
     setExpandedRecordMap((previous) => ({ ...previous, [targetRecordId]: true }))
     const frameId = window.requestAnimationFrame(() => {
       const targetNode = recordRefMap.current[targetRecordId]
@@ -898,7 +900,7 @@ export function MyBetsPanel({
     })
     onFocusHandled?.()
     return () => window.cancelAnimationFrame(frameId)
-  }, [focusRecordId, focusToken, onFocusHandled, records, viewMode])
+  }, [betsQuery.isLoading, focusRecordId, focusToken, onFocusHandled, records, viewMode])
 
   function openCreateForm(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
