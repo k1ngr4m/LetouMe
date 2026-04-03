@@ -29,7 +29,7 @@ import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../feat
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import { apiClient } from '../api/client'
-import type { LotteryCode } from '../types/api'
+import type { LotteryCode, MessageStatusFilter } from '../types/api'
 
 const SETTINGS_PATHS = {
   profile: '/settings/profile',
@@ -44,6 +44,12 @@ const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
   { code: 'dlt', label: '大乐透' },
   { code: 'pl3', label: '排列3' },
   { code: 'pl5', label: '排列5' },
+]
+const MESSAGE_BIZ_CODE = 'draw'
+const MESSAGE_STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
+  { value: 'unread', label: '未读消息' },
+  { value: 'read', label: '已读消息' },
+  { value: 'all', label: '全部消息' },
 ]
 
 type SidebarPanelMode = 'workspace' | 'settings'
@@ -110,6 +116,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const canManageRoles = hasPermission('role_management')
   const isSettingsRoute = location.pathname.startsWith('/settings')
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
+  const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
   const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
@@ -136,6 +143,12 @@ export function AppShell({ children }: PropsWithChildren) {
   })
   const unreadCount = Math.max(0, Number(messageUnreadCountQuery.data?.unread_count || 0))
   const unreadCountLabel = unreadCount > 99 ? '99+' : `${unreadCount}`
+  const messageSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const messageStatus = useMemo<MessageStatusFilter>(() => {
+    const status = messageSearchParams.get('status')
+    return status === 'read' || status === 'all' || status === 'unread' ? status : 'unread'
+  }, [messageSearchParams])
+  const messageBiz = MESSAGE_BIZ_CODE
 
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '设置中心'
@@ -254,9 +267,27 @@ export function AppShell({ children }: PropsWithChildren) {
     onNavigate()
   }
 
+  function buildMessageCenterSearch(status: MessageStatusFilter, biz: string = MESSAGE_BIZ_CODE) {
+    const params = new URLSearchParams()
+    params.set('status', status)
+    params.set('biz', biz)
+    return `?${params.toString()}`
+  }
+
+  function onMessageCenterNav(status: MessageStatusFilter) {
+    setIsSidebarOpen(false)
+    navigate({
+      pathname: MESSAGE_CENTER_PATH,
+      search: buildMessageCenterSearch(status, messageBiz),
+    })
+  }
+
   function openMessageCenter() {
     setIsSidebarOpen(false)
-    navigate(MESSAGE_CENTER_PATH)
+    navigate({
+      pathname: MESSAGE_CENTER_PATH,
+      search: buildMessageCenterSearch('unread', MESSAGE_BIZ_CODE),
+    })
   }
 
   function toggleSidebarCollapsed() {
@@ -281,7 +312,28 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
 
         <nav className="crm-sidebar__nav">
-          {sidebarMode === 'workspace' ? (
+          {isMessageCenterRoute ? (
+            <>
+              <p className="crm-sidebar__group-title">消息中心</p>
+              {MESSAGE_STATUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={clsx('crm-message-nav-item', messageStatus === option.value && 'is-active')}
+                  title={option.label}
+                  onClick={() => onMessageCenterNav(option.value)}
+                >
+                  <span>{option.label}</span>
+                  {option.value === 'unread' && unreadCount > 0 ? <em>{unreadCountLabel}</em> : null}
+                </button>
+              ))}
+              <div className="crm-message-nav-divider" />
+              <p className="crm-sidebar__group-title">业务消息</p>
+              <button type="button" className="crm-message-nav-item is-active" title="开奖通知" onClick={() => onMessageCenterNav(messageStatus)}>
+                <span>开奖通知</span>
+              </button>
+            </>
+          ) : sidebarMode === 'workspace' ? (
             <>
               <p className="crm-sidebar__group-title">工作台</p>
               {isDashboardRoute ? (

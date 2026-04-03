@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCheck, CircleAlert, Filter, Inbox, Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../../shared/api/client'
 import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeBeijing } from '../../shared/lib/format'
@@ -10,6 +10,7 @@ import type { LotteryCode, MessageResultFilter, MessageStatusFilter, SiteMessage
 import { HOME_TAB_PATHS, type HomeDetailRouteState } from '../home/navigation'
 
 const PAGE_SIZE = 20
+const MESSAGE_BIZ_CODE = 'draw'
 const STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
   { value: 'unread', label: '未读消息' },
   { value: 'read', label: '已读消息' },
@@ -54,10 +55,13 @@ function getSummaryTags(message: SiteMessage) {
 
 export function MessageCenterPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const { setSelectedLottery } = useLotterySelection()
-  const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>('unread')
+  const searchStatus = searchParams.get('status')
+  const statusFilter: MessageStatusFilter = searchStatus === 'read' || searchStatus === 'all' || searchStatus === 'unread' ? searchStatus : 'unread'
+  const businessCode = searchParams.get('biz') === MESSAGE_BIZ_CODE ? MESSAGE_BIZ_CODE : MESSAGE_BIZ_CODE
   const [resultFilter, setResultFilter] = useState<MessageResultFilter>('all')
   const [lotteryFilter, setLotteryFilter] = useState<LotteryCode | 'all'>('all')
   const [dateStart, setDateStart] = useState('')
@@ -73,7 +77,7 @@ export function MessageCenterPage() {
   const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
 
   const listQuery = useQuery({
-    queryKey: ['messages', 'list', statusFilter, resultFilter, lotteryFilter, dateStart, dateEnd, keywordFilter, offset],
+    queryKey: ['messages', 'list', businessCode, statusFilter, resultFilter, lotteryFilter, dateStart, dateEnd, keywordFilter, offset],
     queryFn: () =>
       apiClient.getMessages({
         status_filter: statusFilter,
@@ -126,6 +130,21 @@ export function MessageCenterPage() {
   })
 
   useEffect(() => {
+    const normalized = new URLSearchParams(searchParams)
+    const nextStatus = statusFilter
+    const nextBiz = MESSAGE_BIZ_CODE
+    if (normalized.get('status') !== nextStatus || normalized.get('biz') !== nextBiz) {
+      normalized.set('status', nextStatus)
+      normalized.set('biz', nextBiz)
+      setSearchParams(normalized, { replace: true })
+    }
+  }, [searchParams, setSearchParams, statusFilter])
+
+  useEffect(() => {
+    setOffset(0)
+  }, [statusFilter, businessCode])
+
+  useEffect(() => {
     if (!messages.length) {
       setSelectedMessageId(null)
       return
@@ -134,11 +153,6 @@ export function MessageCenterPage() {
       setSelectedMessageId(messages[0].id)
     }
   }, [messages, selectedMessageId])
-
-  function handleStatusChange(nextStatus: MessageStatusFilter) {
-    setStatusFilter(nextStatus)
-    setOffset(0)
-  }
 
   function handleApplyKeyword() {
     setKeywordFilter(keywordInput.trim())
@@ -195,32 +209,6 @@ export function MessageCenterPage() {
   return (
     <section className="message-center-v2" aria-label="消息中心">
       <div className="message-center-v2__layout">
-        <aside className="message-center-v2__sidebar">
-          <h2>消息中心</h2>
-          <nav className="message-center-v2__status-nav" aria-label="消息状态">
-            {STATUS_OPTIONS.map((option) => {
-              const isActive = statusFilter === option.value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`message-center-v2__status-item${isActive ? ' is-active' : ''}`}
-                  onClick={() => handleStatusChange(option.value)}
-                >
-                  <span>{option.label}</span>
-                  {option.value === 'unread' && unreadCount > 0 ? <em>{unreadCountLabel}</em> : null}
-                </button>
-              )
-            })}
-          </nav>
-          <div className="message-center-v2__business-group" aria-label="业务分类">
-            <p>业务消息</p>
-            <button type="button" className="message-center-v2__business-item is-active">
-              开奖通知
-            </button>
-          </div>
-        </aside>
-
         <section className="message-center-v2__list-panel">
           <header className="message-center-v2__list-header">
             <div>
