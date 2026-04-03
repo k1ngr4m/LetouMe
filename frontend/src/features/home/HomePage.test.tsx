@@ -1684,6 +1684,23 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
   })
 
+  it('shows pl5-specific analysis charts on analysis tab', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列5' }))
+    await userEvent.click(screen.getByRole('button', { name: '图表分析' }))
+
+    expect(screen.getByRole('heading', { name: '万位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '千位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '百位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '十位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '个位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '和值趋势' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '奇偶结构走势' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '前区热号 Top 12' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
+  })
+
   it('supports simulation pick, matching, save and delete flows', async () => {
     getSimulationTickets
       .mockResolvedValueOnce({ tickets: [] })

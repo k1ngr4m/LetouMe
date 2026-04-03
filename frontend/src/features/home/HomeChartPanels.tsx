@@ -32,6 +32,12 @@ type Pl3OddEvenStructureChartItem = {
   structure: string
 }
 
+type Pl5OddEvenStructureChartItem = {
+  period: string
+  oddCount: number
+  structure: string
+}
+
 type SumTrendChartItem = {
   period: string
   sum: number
@@ -69,6 +75,7 @@ export function AnalysisChartsPanel({
   redChart,
   blueChart,
   pl3UnitChart,
+  pl5PositionCharts,
   oddEvenChart,
   sumTrendChart,
 }: {
@@ -76,7 +83,8 @@ export function AnalysisChartsPanel({
   redChart: FrequencyChartItem[]
   blueChart: FrequencyChartItem[]
   pl3UnitChart: FrequencyChartItem[]
-  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem>
+  pl5PositionCharts: FrequencyChartItem[][]
+  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem | Pl5OddEvenStructureChartItem>
   sumTrendChart: SumTrendChartItem[]
 }) {
   if (lotteryCode === 'pl3') {
@@ -134,6 +142,91 @@ export function AnalysisChartsPanel({
               <XAxis dataKey="period" />
               <YAxis allowDecimals={false} ticks={[0, 1, 2, 3]} tickFormatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
               <Tooltip formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+  if (lotteryCode === 'pl5') {
+    const structureTrend = oddEvenChart as Pl5OddEvenStructureChartItem[]
+    const [tenThousands = [], thousands = [], hundreds = [], tens = [], units = []] = pl5PositionCharts
+    return (
+      <div className="page-section chart-grid">
+        <ChartCard title="万位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={tenThousands}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="千位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={thousands}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--amber-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="百位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={hundreds}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="十位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={tens}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#8b5cf6" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="个位热号 Top 10">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={units}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#22c55e" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="和值趋势">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={sumTrendChart}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="奇偶结构走势">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={structureTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3, 4, 5]} tickFormatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
+              <Tooltip formatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
               <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>

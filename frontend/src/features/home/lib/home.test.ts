@@ -6,6 +6,9 @@ import {
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
   buildPl3SumTrendChart,
+  buildPl5OddEvenStructureChart,
+  buildPl5PositionHotChart,
+  buildPl5SumTrendChart,
   buildSummary,
   compareNumbers,
   filterModels,
@@ -198,6 +201,92 @@ describe('pl3 analysis chart builders', () => {
     expect(chart).toEqual([
       { period: '2026031', oddCount: 1, structure: '1:2' },
       { period: '2026032', oddCount: 3, structure: '3:0' },
+    ])
+  })
+})
+
+describe('pl5 analysis chart builders', () => {
+  it('builds top10 hot numbers for five positions', () => {
+    const tenThousands = buildPl5PositionHotChart(
+      [
+        {
+          period: '2026033',
+          date: '2026-03-12',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['01', '02', '03', '04', '05'],
+        },
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['01', '06', '07', '08', '09'],
+        },
+      ],
+      0,
+    )
+
+    expect(tenThousands).toHaveLength(10)
+    expect(tenThousands[0]).toMatchObject({ ball: '01', count: 2 })
+    expect(tenThousands.find((item) => item.ball === '00')).toMatchObject({ count: 0 })
+  })
+
+  it('builds sum trend from five digits in ascending period order', () => {
+    const chart = buildPl5SumTrendChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['01', '02', '03', '04', '05'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['05', '06', '07', '08', '09'],
+        },
+      ],
+    )
+
+    expect(chart).toEqual([
+      { period: '2026031', sum: 35 },
+      { period: '2026032', sum: 15 },
+    ])
+  })
+
+  it('builds odd-even structure trend with 5-digit structure mapping', () => {
+    const chart = buildPl5OddEvenStructureChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['01', '03', '05', '07', '09'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl5',
+          red_balls: [],
+          blue_balls: [],
+          digits: ['02', '04', '06', '08', '09'],
+        },
+      ],
+    )
+
+    expect(chart).toEqual([
+      { period: '2026031', oddCount: 1, structure: '1:4' },
+      { period: '2026032', oddCount: 5, structure: '5:0' },
     ])
   })
 })

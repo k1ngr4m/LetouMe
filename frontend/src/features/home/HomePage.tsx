@@ -22,6 +22,9 @@ import {
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
   buildPl3SumTrendChart,
+  buildPl5OddEvenStructureChart,
+  buildPl5PositionHotChart,
+  buildPl5SumTrendChart,
   filterPredictionGroupsByPlayType,
   getPredictionPlayTypeLabel,
   buildRedFrequencyChart,
@@ -816,11 +819,24 @@ export function HomePage() {
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
-  const redChart = selectedLottery === 'pl3' ? buildPl3PositionHotChart(chartDraws, 0) : buildRedFrequencyChart(chartDraws)
-  const blueChart = selectedLottery === 'pl3' ? buildPl3PositionHotChart(chartDraws, 1) : buildBlueFrequencyChart(chartDraws)
-  const pl3UnitChart = selectedLottery === 'pl3' ? buildPl3PositionHotChart(chartDraws, 2) : []
-  const oddEvenChart = selectedLottery === 'pl3' ? buildPl3OddEvenStructureChart(chartDraws) : buildOddEvenChart(chartDraws)
-  const sumTrendChart = selectedLottery === 'pl3' ? buildPl3SumTrendChart(chartDraws) : buildSumTrendChart(chartDraws)
+  const isPl3Lottery = selectedLottery === 'pl3'
+  const isPl5Lottery = selectedLottery === 'pl5'
+  const redChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 0) : buildRedFrequencyChart(chartDraws)
+  const blueChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 1) : buildBlueFrequencyChart(chartDraws)
+  const pl3UnitChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 2) : []
+  const pl5PositionCharts = isPl5Lottery
+    ? ([0, 1, 2, 3, 4] as const).map((index) => buildPl5PositionHotChart(chartDraws, index))
+    : []
+  const oddEvenChart = isPl3Lottery
+    ? buildPl3OddEvenStructureChart(chartDraws)
+    : isPl5Lottery
+      ? buildPl5OddEvenStructureChart(chartDraws)
+      : buildOddEvenChart(chartDraws)
+  const sumTrendChart = isPl3Lottery
+    ? buildPl3SumTrendChart(chartDraws)
+    : isPl5Lottery
+      ? buildPl5SumTrendChart(chartDraws)
+      : buildSumTrendChart(chartDraws)
   const scoreViewModels = useMemo(
     () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
@@ -1309,6 +1325,7 @@ export function HomePage() {
             redChart={redChart}
             blueChart={blueChart}
             pl3UnitChart={pl3UnitChart}
+            pl5PositionCharts={pl5PositionCharts}
             oddEvenChart={oddEvenChart}
             sumTrendChart={sumTrendChart}
           />
