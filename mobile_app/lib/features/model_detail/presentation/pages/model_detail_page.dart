@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../shared/widgets/feature_page_scaffold.dart';
@@ -21,6 +22,14 @@ class ModelDetailPage extends ConsumerWidget {
     final predictionsAsync = ref.watch(currentPredictionsProvider);
     return FeaturePageScaffold(
       title: '模型详情',
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new),
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          }
+        },
+      ),
       children: [
         predictionsAsync.when(
           data: (payload) {

@@ -8,16 +8,19 @@ class FeaturePageScaffold extends StatelessWidget {
     required this.children,
     super.key,
     this.actions,
+    this.leading,
   });
 
   final String title;
   final List<Widget> children;
   final List<Widget>? actions;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: leading,
         title: Text(title),
         actions: actions,
       ),
