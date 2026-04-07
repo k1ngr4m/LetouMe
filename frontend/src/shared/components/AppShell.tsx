@@ -57,12 +57,26 @@ const CHART_CENTER_GROUPS = [
   {
     id: 'number-analysis',
     title: '号码分析',
+    items: [
+      { id: 'number-base', label: '基础分析' },
+    ],
   },
   {
     id: 'backtest-analysis',
     title: '回溯分析',
+    items: [
+      { id: 'backtest-base', label: '基础趋势' },
+      { id: 'backtest-revenue', label: '收益分析' },
+      { id: 'backtest-stability', label: '稳定性分析' },
+    ],
   },
 ] as const
+
+function hasChartSubItems(
+  group: (typeof CHART_CENTER_GROUPS)[number],
+): group is Extract<(typeof CHART_CENTER_GROUPS)[number], { items: readonly { id: string; label: string }[] }> {
+  return 'items' in group
+}
 
 function SidebarCollapseIcon() {
   return (
@@ -96,6 +110,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isPredictionSubmenuOpen, setIsPredictionSubmenuOpen] = useState(true)
+  const [isChartNumberMenuOpen, setIsChartNumberMenuOpen] = useState(true)
+  const [isChartBacktestMenuOpen, setIsChartBacktestMenuOpen] = useState(true)
   const lotteryMenuRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -184,6 +200,17 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [location.pathname])
 
   useEffect(() => {
+    const isNumberHash = ['#number-base'].includes(location.hash)
+    const isBacktestHash = ['#backtest-base', '#backtest-revenue', '#backtest-stability'].includes(location.hash)
+    if (isNumberHash) {
+      setIsChartNumberMenuOpen(true)
+    }
+    if (isBacktestHash) {
+      setIsChartBacktestMenuOpen(true)
+    }
+  }, [location.hash])
+
+  useEffect(() => {
     if (!isLotteryMenuOpen) return
 
     function handleDocumentClick(event: MouseEvent) {
@@ -241,7 +268,7 @@ export function AppShell({ children }: PropsWithChildren) {
   function openChartCenter() {
     setSidebarMode('workspace')
     setIsSidebarOpen(false)
-    navigate(`${HOME_TAB_PATHS.charts}#number-analysis`)
+    navigate(`${HOME_TAB_PATHS.charts}#number-base`)
   }
 
   function openSettingsCenter() {
@@ -377,21 +404,68 @@ export function AppShell({ children }: PropsWithChildren) {
                 ) : null}
               </div>
               <div className="crm-chart-nav" aria-label="图表目录">
-                {CHART_CENTER_GROUPS.map((group) => (
-                  <button
-                    key={group.id}
-                    type="button"
-                    className={clsx(
-                      'crm-nav-item',
-                      'crm-chart-nav__item',
-                      (location.hash === `#${group.id}` || (!location.hash && group.id === 'number-analysis')) && 'is-active',
-                    )}
-                    title={group.title}
-                    aria-current={location.hash === `#${group.id}` || (!location.hash && group.id === 'number-analysis') ? 'page' : undefined}
-                    onClick={() => openChartDirectoryItem(group.id)}
-                  >
-                    <span>{group.title}</span>
-                  </button>
+                {CHART_CENTER_GROUPS.filter(hasChartSubItems).map((group) => (
+                  <div key={group.id} className="crm-chart-nav__group">
+                    <div
+                      className={clsx(
+                        'crm-nav-item',
+                        'crm-nav-item--with-toggle',
+                        'crm-chart-nav__item',
+                        (
+                          group.id === 'number-analysis'
+                            ? ['#number-base']
+                            : ['#backtest-base', '#backtest-revenue', '#backtest-stability']
+                        ).includes(location.hash) && 'is-active',
+                      )}
+                      title={group.title}
+                    >
+                      <button className="crm-nav-item__main" type="button" onClick={() => openChartDirectoryItem(group.items[0].id)}>
+                        <span>{group.title}</span>
+                      </button>
+                      <button
+                        className={clsx('crm-nav-submenu__toggle', (group.id === 'number-analysis' ? isChartNumberMenuOpen : isChartBacktestMenuOpen) && 'is-open')}
+                        type="button"
+                        aria-label={
+                          group.id === 'number-analysis'
+                            ? (isChartNumberMenuOpen ? '收起号码分析目录' : '展开号码分析目录')
+                            : (isChartBacktestMenuOpen ? '收起回溯分析目录' : '展开回溯分析目录')
+                        }
+                        title={
+                          group.id === 'number-analysis'
+                            ? (isChartNumberMenuOpen ? '收起号码分析目录' : '展开号码分析目录')
+                            : (isChartBacktestMenuOpen ? '收起回溯分析目录' : '展开回溯分析目录')
+                        }
+                        aria-controls={group.id === 'number-analysis' ? 'chart-number-submenu' : 'chart-backtest-submenu'}
+                        aria-expanded={group.id === 'number-analysis' ? isChartNumberMenuOpen : isChartBacktestMenuOpen}
+                        onClick={() =>
+                          group.id === 'number-analysis'
+                            ? setIsChartNumberMenuOpen((current) => !current)
+                            : setIsChartBacktestMenuOpen((current) => !current)
+                        }
+                      >
+                        <ChevronDown size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                    <div
+                      className={clsx('crm-nav-submenu', !(group.id === 'number-analysis' ? isChartNumberMenuOpen : isChartBacktestMenuOpen) && 'is-collapsed')}
+                      id={group.id === 'number-analysis' ? 'chart-number-submenu' : 'chart-backtest-submenu'}
+                      aria-label={group.id === 'number-analysis' ? '号码分析子菜单' : '回溯分析子菜单'}
+                      aria-hidden={!(group.id === 'number-analysis' ? isChartNumberMenuOpen : isChartBacktestMenuOpen)}
+                    >
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={clsx('crm-nav-submenu__item', location.hash === `#${item.id}` && 'is-active')}
+                          title={item.label}
+                          aria-current={location.hash === `#${item.id}` ? 'page' : undefined}
+                          onClick={() => openChartDirectoryItem(item.id)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </>

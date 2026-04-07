@@ -136,8 +136,10 @@ const HistoryProfitDistributionChartCard = lazy(() =>
 const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ default: module.MyBetsPanel })))
 
 const CHART_CENTER_ITEMS = {
-  numberAnalysis: 'number-analysis',
-  backtestAnalysis: 'backtest-analysis',
+  numberBase: 'number-base',
+  backtestBase: 'backtest-base',
+  backtestRevenue: 'backtest-revenue',
+  backtestStability: 'backtest-stability',
 } as const
 
 type ChartCenterItemKey = (typeof CHART_CENTER_ITEMS)[keyof typeof CHART_CENTER_ITEMS]
@@ -829,9 +831,17 @@ export function HomePage() {
   useEffect(() => {
     if (activeTab !== 'charts') return
     if (!location.hash) {
-      navigate(`${HOME_TAB_PATHS.charts}#${CHART_CENTER_ITEMS.numberAnalysis}`, { replace: true })
+      navigate(`${HOME_TAB_PATHS.charts}#${CHART_CENTER_ITEMS.numberBase}`, { replace: true })
+      return
     }
-  }, [activeTab, location.hash])
+    if (location.hash === '#number-analysis') {
+      navigate(`${HOME_TAB_PATHS.charts}#${CHART_CENTER_ITEMS.numberBase}`, { replace: true })
+      return
+    }
+    if (location.hash === '#backtest-analysis') {
+      navigate(`${HOME_TAB_PATHS.charts}#${CHART_CENTER_ITEMS.backtestBase}`, { replace: true })
+    }
+  }, [activeTab, location.hash, navigate])
 
   useEffect(() => {
     if (activeTab !== 'history') return
@@ -1272,22 +1282,33 @@ export function HomePage() {
 
   const hashTarget = location.hash.replace('#', '').trim() as ChartCenterItemKey
   const supportedChartCenterItems = Object.values(CHART_CENTER_ITEMS) as ChartCenterItemKey[]
-  const activeChartCenterItem = supportedChartCenterItems.includes(hashTarget) ? hashTarget : CHART_CENTER_ITEMS.numberAnalysis
+  const activeChartCenterItem = supportedChartCenterItems.includes(hashTarget) ? hashTarget : CHART_CENTER_ITEMS.numberBase
 
-  const isChartBacktestView = activeChartCenterItem === CHART_CENTER_ITEMS.backtestAnalysis
+  const isChartBacktestView =
+    activeChartCenterItem === CHART_CENTER_ITEMS.backtestBase ||
+    activeChartCenterItem === CHART_CENTER_ITEMS.backtestRevenue ||
+    activeChartCenterItem === CHART_CENTER_ITEMS.backtestStability
   const chartMetaMap: Record<ChartCenterItemKey, { title: string; subtitle: string }> = {
-    [CHART_CENTER_ITEMS.numberAnalysis]: {
-      title: '号码分析',
+    [CHART_CENTER_ITEMS.numberBase]: {
+      title: '基础分析',
       subtitle: '集中查看热号、和值趋势和奇偶结构走势。',
     },
-    [CHART_CENTER_ITEMS.backtestAnalysis]: {
-      title: '回溯分析',
-      subtitle: '统一查看命中趋势、堆叠统计和盈亏走势。',
+    [CHART_CENTER_ITEMS.backtestBase]: {
+      title: '基础趋势',
+      subtitle: '聚焦命中与盈亏的基础走势判断。',
+    },
+    [CHART_CENTER_ITEMS.backtestRevenue]: {
+      title: '收益分析',
+      subtitle: '用累计收益、ROI 与排名变化观察长期赚钱能力。',
+    },
+    [CHART_CENTER_ITEMS.backtestStability]: {
+      title: '稳定性分析',
+      subtitle: '通过滚动命中、回撤和分布视角评估模型稳定性。',
     },
   }
   const activeChartMeta = chartMetaMap[activeChartCenterItem]
 
-  function openChartCenter(targetHash: ChartCenterItemKey = CHART_CENTER_ITEMS.numberAnalysis) {
+  function openChartCenter(targetHash: ChartCenterItemKey = CHART_CENTER_ITEMS.numberBase) {
     navigate(`${HOME_TAB_PATHS.charts}#${targetHash}`)
   }
 
@@ -1326,7 +1347,7 @@ export function HomePage() {
             </article>
           </div>
           <div className="chart-center-summary-actions">
-            <button className="ghost-button" type="button" onClick={() => openChartCenter(CHART_CENTER_ITEMS.numberAnalysis)}>
+            <button className="ghost-button" type="button" onClick={() => openChartCenter(CHART_CENTER_ITEMS.numberBase)}>
               进入图表中心
             </button>
             <button className="ghost-button ghost-button--compact" type="button" onClick={() => openHistoryTab()}>
@@ -1750,7 +1771,7 @@ export function HomePage() {
               ) : null}
 
               <div className="chart-center-content" data-chart-center-item={activeChartCenterItem}>
-                {activeChartCenterItem === CHART_CENTER_ITEMS.numberAnalysis ? (
+                {activeChartCenterItem === CHART_CENTER_ITEMS.numberBase ? (
                   <>
                     <AnalysisHotChartsPanel
                       lotteryCode={selectedLottery}
@@ -1763,108 +1784,108 @@ export function HomePage() {
                     <AnalysisOddEvenTrendChartCard lotteryCode={selectedLottery} oddEvenChart={oddEvenChart} />
                   </>
                 ) : null}
-                {activeChartCenterItem === CHART_CENTER_ITEMS.backtestAnalysis ? (
-                  <>
-                    <section className="chart-center-group">
-                      <div className="chart-center-group__header">
-                        <div>
-                          <h3 className="chart-center-group__title">基础趋势</h3>
-                          <p className="chart-center-group__subtitle">保留现有命中与盈亏基础视图，快速判断短期表现。</p>
-                        </div>
+                {activeChartCenterItem === CHART_CENTER_ITEMS.backtestBase ? (
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">基础趋势</h3>
+                        <p className="chart-center-group__subtitle">同屏查看命中趋势、堆叠统计和盈亏趋势，快速判断短期表现。</p>
                       </div>
-                      <div className="history-hit-trend__charts">
-                        <HistoryHitTrendLineChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyHitTrend={chartCenterHistoryHitTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryHitTrendStackedChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyHitTrend={chartCenterHistoryHitTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryProfitTrendChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyProfitTrend={chartCenterHistoryProfitTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
+                    </div>
+                    <div className="history-hit-trend__charts">
+                      <HistoryHitTrendLineChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyHitTrend={chartCenterHistoryHitTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryHitTrendStackedChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyHitTrend={chartCenterHistoryHitTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryProfitTrendChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyProfitTrend={chartCenterHistoryProfitTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                    </div>
+                  </section>
+                ) : null}
+                {activeChartCenterItem === CHART_CENTER_ITEMS.backtestRevenue ? (
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">收益分析</h3>
+                        <p className="chart-center-group__subtitle">同屏查看累计盈亏、累计 ROI 和排名变化，更直观看长期赚钱能力。</p>
                       </div>
-                    </section>
-
-                    <section className="chart-center-group">
-                      <div className="chart-center-group__header">
-                        <div>
-                          <h3 className="chart-center-group__title">收益分析</h3>
-                          <p className="chart-center-group__subtitle">更关注长期赚钱能力，而不是单期波动。</p>
-                        </div>
+                    </div>
+                    <div className="history-hit-trend__charts">
+                      <HistoryCumulativeProfitChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyTrend={chartCenterHistoryCumulativeProfitTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryCumulativeRoiChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyTrend={chartCenterHistoryCumulativeRoiTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryRankTrendChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyTrend={chartCenterHistoryRankTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                    </div>
+                  </section>
+                ) : null}
+                {activeChartCenterItem === CHART_CENTER_ITEMS.backtestStability ? (
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">稳定性分析</h3>
+                        <p className="chart-center-group__subtitle">同屏查看滚动命中率、回撤、热力图和胜负分布，评估模型稳定性。</p>
                       </div>
-                      <div className="history-hit-trend__charts">
-                        <HistoryCumulativeProfitChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyTrend={chartCenterHistoryCumulativeProfitTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryCumulativeRoiChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyTrend={chartCenterHistoryCumulativeRoiTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryRankTrendChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyTrend={chartCenterHistoryRankTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                      </div>
-                    </section>
-
-                    <section className="chart-center-group">
-                      <div className="chart-center-group__header">
-                        <div>
-                          <h3 className="chart-center-group__title">稳定性分析</h3>
-                          <p className="chart-center-group__subtitle">从滚动命中、回撤和期数分布看模型是否足够稳。</p>
-                        </div>
-                        <div className="chart-center-window-switch" role="group" aria-label="滚动窗口切换">
-                          {HISTORY_ROLLING_WINDOW_OPTIONS.map((windowSize) => (
-                            <button
-                              key={`rolling-window-${windowSize}`}
-                              type="button"
-                              className={clsx('filter-chip', rollingHitWindow === windowSize ? 'is-active' : 'is-inactive')}
-                              onClick={() => setRollingHitWindow(windowSize)}
-                            >
-                              近 {windowSize} 期
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="history-hit-trend__charts">
-                        <HistoryRollingHitRateChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyTrend={chartCenterHistoryRollingHitRateTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                          rollingWindow={rollingHitWindow}
-                        />
-                        <HistoryDrawdownChartCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          historyTrend={chartCenterHistoryDrawdownTrend}
-                          selectedPeriod={selectedHistoryPeriod}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryHitHeatmapCard
-                          historyVisibleModels={chartCenterHistoryVisibleModels}
-                          heatmap={chartCenterHistoryHeatmap}
-                          onPeriodSelect={openHistoryTab}
-                        />
-                        <HistoryProfitDistributionChartCard distribution={chartCenterHistoryProfitDistribution} />
-                      </div>
-                    </section>
-                  </>
+                    </div>
+                    <div className="chart-center-window-switch" role="group" aria-label="滚动窗口切换">
+                      {HISTORY_ROLLING_WINDOW_OPTIONS.map((windowSize) => (
+                        <button
+                          key={`rolling-window-${windowSize}`}
+                          type="button"
+                          className={clsx('filter-chip', rollingHitWindow === windowSize ? 'is-active' : 'is-inactive')}
+                          onClick={() => setRollingHitWindow(windowSize)}
+                        >
+                          近 {windowSize} 期
+                        </button>
+                      ))}
+                    </div>
+                    <div className="history-hit-trend__charts">
+                      <HistoryRollingHitRateChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyTrend={chartCenterHistoryRollingHitRateTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                        rollingWindow={rollingHitWindow}
+                      />
+                      <HistoryDrawdownChartCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        historyTrend={chartCenterHistoryDrawdownTrend}
+                        selectedPeriod={selectedHistoryPeriod}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryHitHeatmapCard
+                        historyVisibleModels={chartCenterHistoryVisibleModels}
+                        heatmap={chartCenterHistoryHeatmap}
+                        onPeriodSelect={openHistoryTab}
+                      />
+                      <HistoryProfitDistributionChartCard distribution={chartCenterHistoryProfitDistribution} />
+                    </div>
+                  </section>
                 ) : null}
               </div>
             </StatusCard>

@@ -1700,28 +1700,37 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
   })
 
-  it('shows grouped backtest analysis charts and filters on backtest tab', async () => {
-    renderPage('/dashboard/charts#backtest-analysis')
+  it('shows base backtest dashboard with filters on backtest base tab', async () => {
+    renderPage('/dashboard/charts#backtest-base')
 
     expect(await screen.findByRole('heading', { name: '命中趋势折线' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '命中堆叠柱形统计' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '盈亏趋势折线' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '累计盈亏曲线' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '累计 ROI 曲线' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '滚动命中率（近 10 期）' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '最大回撤曲线' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '模型排名变化图' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '命中热力图' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '胜负分布图' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '近 10 期' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '累计盈亏曲线' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '滚动命中率（近 10 期）' })).not.toBeInTheDocument()
     expect(screen.getByText('模型')).toBeInTheDocument()
     expect(screen.getByText('期号')).toBeInTheDocument()
     expect(screen.getByText('方案')).toBeInTheDocument()
     expect(screen.getByText('玩法模式')).toBeInTheDocument()
   })
 
+  it('shows all revenue analysis charts together', async () => {
+    renderPage('/dashboard/charts#backtest-revenue')
+
+    expect(await screen.findByRole('heading', { name: '累计盈亏曲线' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '累计 ROI 曲线' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '模型排名变化图' })).toBeInTheDocument()
+  })
+
+  it('shows all stability analysis charts together', async () => {
+    renderPage('/dashboard/charts#backtest-stability')
+    expect(await screen.findByRole('heading', { name: '滚动命中率（近 10 期）' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '近 10 期' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '最大回撤曲线' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '命中热力图' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '胜负分布图' })).toBeInTheDocument()
+  })
+
   it('hides backtest filters on number analysis views', async () => {
-    renderPage('/dashboard/charts#number-analysis')
+    renderPage('/dashboard/charts#number-base')
 
     expect(await screen.findByRole('heading', { name: '前区和值趋势' })).toBeInTheDocument()
     expect(screen.queryByText('模型')).not.toBeInTheDocument()

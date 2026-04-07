@@ -3318,6 +3318,10 @@ a {
   gap: 0.95rem;
 }
 
+.history-hit-trend__charts--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .chart-center-page {
   gap: 1rem;
 }
@@ -3413,6 +3417,12 @@ a {
 }
 
 .chart-center-window-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chart-center-mode-switch {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.45rem;
