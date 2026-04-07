@@ -11290,18 +11290,22 @@ a {
 
 .crm-chart-nav {
   display: grid;
-  gap: 0.52rem;
-  margin-top: 0.16rem;
+  gap: 0.72rem;
+  margin-top: 0.28rem;
 }
 
 .crm-chart-nav__group {
   display: grid;
-  gap: 0.16rem;
-}
-
-.crm-chart-nav__items {
-  display: grid;
-  gap: 0.12rem;
+  gap: 0.36rem;
+  padding: 0.22rem;
+  border-radius: 1.08rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
+    linear-gradient(180deg, rgba(17, 38, 70, 0.82), rgba(10, 28, 56, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 28px rgba(5, 12, 24, 0.2);
 }
 
 .crm-chart-nav__item {
@@ -11311,10 +11315,52 @@ a {
   text-align: left;
 }
 
-.crm-chart-nav__item svg {
-  width: 0.92rem;
-  height: 0.92rem;
-  flex: none;
+.crm-chart-nav__group.is-active {
+  border-color: rgba(255, 187, 123, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(255, 153, 78, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    linear-gradient(180deg, rgba(18, 43, 79, 0.94), rgba(10, 29, 58, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 32px rgba(5, 12, 24, 0.24);
+}
+
+.crm-chart-nav__group-head {
+  min-height: 3rem;
+  padding: 0.55rem 0.58rem 0.55rem 0.66rem;
+  border-radius: 0.92rem;
+  border-color: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 16px rgba(5, 12, 24, 0.12);
+}
+
+.crm-chart-nav__group.is-active .crm-chart-nav__group-head {
+  border-color: rgba(255, 188, 128, 0.24);
+  background:
+    linear-gradient(135deg, rgba(255, 163, 87, 0.2), rgba(255, 255, 255, 0.05)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 241, 226, 0.16),
+    0 10px 18px rgba(5, 12, 24, 0.18);
+}
+
+.crm-chart-nav__group-mark {
+  width: 0.42rem;
+  min-width: 0.42rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 208, 163, 0.38), rgba(255, 255, 255, 0.1));
+  box-shadow: 0 0 0 1px rgba(255, 214, 176, 0.08);
+}
+
+.crm-chart-nav__group.is-active .crm-chart-nav__group-mark {
+  background: linear-gradient(180deg, #ffcf93, #ff8c42);
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 176, 0.28),
+    0 0 18px rgba(255, 146, 77, 0.32);
 }
 
 .crm-nav-item--with-toggle {
@@ -11330,30 +11376,39 @@ a {
   color: inherit;
   display: inline-flex;
   align-items: center;
-  gap: 0.42rem;
+  gap: 0.58rem;
   padding: 0;
   text-align: left;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .crm-nav-submenu__toggle {
-  width: 1.6rem;
-  min-width: 1.6rem;
-  min-height: 1.6rem;
-  border-radius: 0.58rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(231, 240, 251, 0.88);
-  background: rgba(255, 255, 255, 0.05);
+  width: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(236, 243, 252, 0.82);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 16px rgba(5, 12, 24, 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: border-color 160ms var(--motion-ease-standard), background 160ms var(--motion-ease-standard), color 160ms var(--motion-ease-standard),
-    transform 160ms var(--motion-ease-standard);
+    transform 160ms var(--motion-ease-standard), box-shadow 160ms var(--motion-ease-standard);
 }
 
 .crm-nav-submenu__toggle:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 10px 18px rgba(5, 12, 24, 0.16);
 }
 
 .crm-nav-submenu__toggle svg {
@@ -11361,9 +11416,14 @@ a {
 }
 
 .crm-nav-submenu__toggle.is-open {
-  color: #ffd4a8;
-  border-color: rgba(255, 186, 122, 0.46);
-  background: rgba(245, 138, 64, 0.18);
+  color: #ffe2bd;
+  border-color: rgba(255, 186, 122, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 189, 131, 0.22), rgba(255, 140, 71, 0.14)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 214, 0.14),
+    0 10px 20px rgba(5, 12, 24, 0.16);
 }
 
 .crm-nav-submenu__toggle.is-open svg {
@@ -11371,12 +11431,11 @@ a {
 }
 
 .crm-nav-submenu {
-  margin: -0.1rem 0 0.2rem 1.05rem;
-  padding-left: 0.42rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  margin: -0.02rem 0 0.06rem;
+  padding: 0.16rem 0.08rem 0.08rem 0.72rem;
   display: grid;
-  gap: 0.18rem;
-  max-height: 7rem;
+  gap: 0.34rem;
+  max-height: 10rem;
   opacity: 1;
   overflow: hidden;
   transform: translateY(0);
@@ -11384,37 +11443,92 @@ a {
     margin 220ms var(--motion-ease-standard);
 }
 
+.crm-chart-nav__submenu {
+  position: relative;
+}
+
+.crm-chart-nav__submenu::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0.2rem 0.18rem;
+  width: 1px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 198, 150, 0.18), rgba(255, 255, 255, 0.04));
+}
+
 .crm-nav-submenu.is-collapsed {
   max-height: 0;
   opacity: 0;
   transform: translateY(-0.22rem);
-  margin-top: -0.18rem;
+  margin-top: -0.24rem;
   margin-bottom: 0;
   pointer-events: none;
 }
 
 .crm-nav-submenu__item {
-  min-height: 1.84rem;
-  border-radius: 0.5rem;
-  padding: 0.26rem 0.44rem;
-  color: rgba(232, 240, 250, 0.82);
-  font-size: 0.74rem;
+  position: relative;
+  min-height: 2.2rem;
+  border-radius: 0.82rem;
+  padding: 0.4rem 0.66rem 0.4rem 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+  color: rgba(236, 243, 252, 0.86);
+  font-size: 0.8rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 14px rgba(5, 12, 24, 0.12);
+  transition:
+    background 180ms var(--motion-ease-standard),
+    border-color 180ms var(--motion-ease-standard),
+    color 180ms var(--motion-ease-standard),
+    transform 180ms var(--motion-ease-standard),
+    box-shadow 180ms var(--motion-ease-standard);
+}
+
+.crm-chart-nav__subitem::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -0.5rem;
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: 999px;
+  background: rgba(255, 214, 176, 0.28);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.02);
 }
 
 .crm-nav-submenu__item:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateX(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 18px rgba(5, 12, 24, 0.15);
 }
 
 .crm-nav-submenu__item.is-active {
   color: #fff;
-  background: rgba(245, 138, 64, 0.26);
-  box-shadow: inset 0 0 0 1px rgba(255, 189, 142, 0.3);
+  border-color: rgba(255, 194, 142, 0.34);
+  background:
+    linear-gradient(135deg, rgba(255, 171, 103, 0.2), rgba(255, 255, 255, 0.06)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 238, 216, 0.14),
+    inset 0 0 0 1px rgba(255, 189, 142, 0.16),
+    0 12px 20px rgba(5, 12, 24, 0.18);
+}
+
+.crm-nav-submenu__item.is-active::before {
+  background: linear-gradient(180deg, #ffd5a1, #ff974d);
+  box-shadow:
+    0 0 0 4px rgba(255, 165, 98, 0.08),
+    0 0 18px rgba(255, 146, 77, 0.26);
 }
 
 .crm-nav-item:hover {
