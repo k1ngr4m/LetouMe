@@ -1737,6 +1737,16 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })
 
+  it('shows chart help tooltip next to chart titles', async () => {
+    renderPage('/dashboard/charts#number-base')
+
+    const helpButton = await screen.findByRole('button', { name: '前区和值趋势说明' })
+    await userEvent.hover(helpButton)
+
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    expect(screen.getByText('展示前区号码和值随期数变化的趋势，用来判断和值是否处于高位、低位或中枢附近震荡。适合观察节奏变化，不适合单独做号码判断。')).toBeInTheDocument()
+  })
+
   it('shows number distribution dashboard charts together', async () => {
     renderPage('/dashboard/charts#number-distribution')
 

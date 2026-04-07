@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Area,
   AreaChart,
@@ -83,11 +83,53 @@ function formatProfitValue(value: number) {
   return `${new Intl.NumberFormat('zh-CN', { signDisplay: 'exceptZero' }).format(Number(value) || 0)} 元`
 }
 
-function ChartCard({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+function ChartInfoTooltip({ title, description }: { title: string; description: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div
+      className="chart-info-tooltip"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onFocus={() => setIsOpen(true)}
+      onBlur={() => setIsOpen(false)}
+    >
+      <button
+        type="button"
+        className="chart-info-tooltip__trigger"
+        aria-label={`${title}说明`}
+        onClick={(event) => event.preventDefault()}
+      >
+        ?
+      </button>
+      {isOpen ? (
+        <div className="chart-info-tooltip__panel" role="tooltip">
+          <strong>{title}</strong>
+          <span>{description}</span>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ChartCard({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  className?: string
+}) {
   return (
     <section className={`panel-card chart-card${className ? ` ${className}` : ''}`}>
       <div className="panel-card__header">
-        <h2 className="panel-card__title">{title}</h2>
+        <div className="chart-card__title-row">
+          <h2 className="panel-card__title">{title}</h2>
+          {description ? <ChartInfoTooltip title={title} description={description} /> : null}
+        </div>
       </div>
       {children}
     </section>
@@ -195,7 +237,7 @@ export function AnalysisHotChartsPanel({
   if (lotteryCode === 'pl3') {
     return (
       <div className="page-section chart-grid">
-        <ChartCard title="百位热号 Top 10">
+        <ChartCard title="百位热号 Top 10" description="统计最近样本中百位数字的出现次数，快速找出当前更活跃的候选数字。柱子越高，说明该数字近期出现越频繁。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={redChart}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -206,7 +248,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="十位热号 Top 10">
+        <ChartCard title="十位热号 Top 10" description="统计最近样本中十位数字的出现次数，用来判断十位号码的近期热度分布。适合和百位、个位热号一起交叉观察。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={blueChart}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -217,7 +259,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="个位热号 Top 10">
+        <ChartCard title="个位热号 Top 10" description="统计最近样本中个位数字的出现次数，帮助识别个位数字的短期活跃区间。可配合和值和奇偶结构一起解读。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={pl3UnitChart}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -236,7 +278,7 @@ export function AnalysisHotChartsPanel({
     const [tenThousands = [], thousands = [], hundreds = [], tens = [], units = []] = pl5PositionCharts
     return (
       <div className="page-section chart-grid">
-        <ChartCard title="万位热号 Top 10">
+        <ChartCard title="万位热号 Top 10" description="统计最近样本中万位数字的出现次数，帮助识别万位近期更常出现的数字。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={tenThousands}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -247,7 +289,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="千位热号 Top 10">
+        <ChartCard title="千位热号 Top 10" description="统计最近样本中千位数字的出现次数，适合观察千位号码是否出现明显集中。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={thousands}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -258,7 +300,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="百位热号 Top 10">
+        <ChartCard title="百位热号 Top 10" description="统计最近样本中百位数字的出现次数，用来判断这一位是否存在持续活跃的候选数字。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={hundreds}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -269,7 +311,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="十位热号 Top 10">
+        <ChartCard title="十位热号 Top 10" description="统计最近样本中十位数字的出现次数，帮助识别十位近期的热度变化。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={tens}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -280,7 +322,7 @@ export function AnalysisHotChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="个位热号 Top 10">
+        <ChartCard title="个位热号 Top 10" description="统计最近样本中个位数字的出现次数，观察个位数字是否出现局部聚集或轮动。">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={units}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -297,7 +339,7 @@ export function AnalysisHotChartsPanel({
 
   return (
     <div className="page-section chart-grid">
-      <ChartCard title="前区热号 Top 12">
+      <ChartCard title="前区热号 Top 12" description="统计最近样本中前区号码的出现次数，帮助判断当前更热的前区号码。它回答的是“哪些号更常出现”，不表示命中概率保证。">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={redChart}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -308,7 +350,7 @@ export function AnalysisHotChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="后区热号 Top 12">
+      <ChartCard title="后区热号 Top 12" description="统计最近样本中后区号码的出现次数，适合用来观察后区近期的热度集中和轮动情况。">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={blueChart}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -334,7 +376,13 @@ export function AnalysisSumTrendChartCard({
 
   return (
     <div className="page-section chart-grid chart-grid--single">
-      <ChartCard title={title} className="chart-card--focus">
+      <ChartCard
+        title={title}
+        description={lotteryCode === 'dlt'
+          ? '展示前区号码和值随期数变化的趋势，用来判断和值是否处于高位、低位或中枢附近震荡。适合观察节奏变化，不适合单独做号码判断。'
+          : '展示当期开奖号码和值随期数变化的趋势，用来判断和值是否集中在某个区间，或是否出现明显波动。'}
+        className="chart-card--focus"
+      >
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={sumTrendChart}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -360,7 +408,7 @@ export function AnalysisOddEvenTrendChartCard({
     const structureTrend = oddEvenChart as Pl3OddEvenStructureChartItem[]
     return (
       <div className="page-section chart-grid chart-grid--single">
-        <ChartCard title="奇偶结构走势" className="chart-card--focus">
+        <ChartCard title="奇偶结构走势" description="展示每期号码中的奇偶数量结构，帮助判断近期更偏奇数还是偶数，以及结构是否稳定。适合配合和值和热号一起看整体形态。" className="chart-card--focus">
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={structureTrend}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -379,7 +427,7 @@ export function AnalysisOddEvenTrendChartCard({
     const structureTrend = oddEvenChart as Pl5OddEvenStructureChartItem[]
     return (
       <div className="page-section chart-grid chart-grid--single">
-        <ChartCard title="奇偶结构走势" className="chart-card--focus">
+        <ChartCard title="奇偶结构走势" description="展示每期号码中的奇偶数量结构，帮助观察排列5近期是否偏奇、偏偶或在不同结构间切换。" className="chart-card--focus">
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={structureTrend}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -397,7 +445,7 @@ export function AnalysisOddEvenTrendChartCard({
   const oddEvenTrend = oddEvenChart as OddEvenChartItem[]
   return (
     <div className="page-section chart-grid chart-grid--single">
-      <ChartCard title="奇偶结构走势" className="chart-card--focus">
+      <ChartCard title="奇偶结构走势" description="展示每期前区号码的奇偶结构变化，用来判断当前更常见的奇偶配比以及切换节奏。" className="chart-card--focus">
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={oddEvenTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -459,7 +507,10 @@ export function AnalysisDistributionChartsPanel({
 }) {
   return (
     <div className="page-section chart-grid">
-      <ChartCard title={lotteryCode === 'dlt' ? '前区和值分布' : '和值分布'}>
+      <ChartCard
+        title={lotteryCode === 'dlt' ? '前区和值分布' : '和值分布'}
+        description="统计最近样本里不同和值区间出现了多少次，用来判断和值更常落在哪些位置。它强调的是整体分布，而不是逐期走势。"
+      >
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={sumDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -470,7 +521,7 @@ export function AnalysisDistributionChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="奇偶比分布">
+      <ChartCard title="奇偶比分布" description="统计最近样本里不同奇偶配比出现的次数，帮助识别当前更常见的奇偶结构。适合用来验证结构是否偏向某一类组合。">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={oddEvenDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -481,7 +532,7 @@ export function AnalysisDistributionChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="区间占比分布">
+      <ChartCard title="区间占比分布" description="统计最近样本中全部号码落入各区间的总体占比，帮助判断号码更集中在哪个区段。它看的是整体落点占比，不是每期结构模式。">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={zoneShareDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -515,7 +566,7 @@ export function AnalysisPatternChartsPanel({
 }) {
   return (
     <div className="page-section chart-grid">
-      <ChartCard title="跨度趋势">
+      <ChartCard title="跨度趋势" description="展示每期号码最大值与最小值的差距变化，用来观察号码分散程度是放大还是收缩。跨度越大，说明号码分布越开。">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={spanTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -526,7 +577,7 @@ export function AnalysisPatternChartsPanel({
           </LineChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title={lotteryCode === 'dlt' ? '区间分布' : '区段分布'}>
+      <ChartCard title={lotteryCode === 'dlt' ? '区间分布' : '区段分布'} description="统计每期开奖结果在各区间结构组合上的出现次数，用来观察近期更常见的结构模式。它和区间占比分布不同，这里强调的是“每期结构组合”。">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={zoneDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -537,7 +588,7 @@ export function AnalysisPatternChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="012路走势">
+      <ChartCard title="012路走势" description="按号码除以 3 后的余数结构展示每期变化，用来观察 0 路、1 路、2 路的组合是否存在明显偏态或轮动。">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={moduloTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -567,7 +618,7 @@ export function HistoryHitTrendLineChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="命中趋势折线" className="chart-card--focus">
+    <ChartCard title="命中趋势折线" description="展示各模型在每一期的最佳命中数量变化，用来观察命中表现是否持续稳定。折线越平稳，通常代表表现波动越小。" className="chart-card--focus">
       {historyVisibleModels.length && historyHitTrend.length ? (
         <HistoryChartShell title="模型命中趋势" ariaLabel="模型命中趋势图">
           <ResponsiveContainer width="100%" height={320}>
@@ -615,7 +666,7 @@ export function HistoryHitTrendStackedChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="命中堆叠柱形统计" className="chart-card--focus">
+    <ChartCard title="命中堆叠柱形统计" description="把同一期不同模型的命中数量堆叠在一起，方便横向比较同一期里谁贡献更高。它更适合看结构占比，而不是连续趋势。" className="chart-card--focus">
       {historyVisibleModels.length && historyHitTrend.length ? (
         <HistoryChartShell title="模型命中堆叠统计" ariaLabel="模型命中堆叠统计图">
           <ResponsiveContainer width="100%" height={320}>
@@ -661,7 +712,7 @@ export function HistoryProfitTrendChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="盈亏趋势折线" className="chart-card--focus">
+    <ChartCard title="盈亏趋势折线" description="展示各模型每一期的单期净盈亏变化，用来快速识别大赚、大亏和波动放大的阶段。适合观察短期收益节奏。 " className="chart-card--focus">
       {historyVisibleModels.length && historyProfitTrend.length ? (
         <HistoryChartShell title="模型盈亏趋势" ariaLabel="模型盈亏趋势图">
           <ResponsiveContainer width="100%" height={320}>
@@ -717,7 +768,7 @@ export function HistoryCumulativeProfitChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="累计盈亏曲线" className="chart-card--focus">
+    <ChartCard title="累计盈亏曲线" description="按时间累加每期净盈亏，直接判断模型长期是否整体向上。曲线越平滑且向上，通常代表长期收益更稳。 " className="chart-card--focus">
       {historyVisibleModels.length && historyTrend.length ? (
         <HistoryChartShell title="累计净盈亏" ariaLabel="模型累计盈亏曲线">
           <ResponsiveContainer width="100%" height={320}>
@@ -757,7 +808,7 @@ export function HistoryCumulativeRoiChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="累计 ROI 曲线" className="chart-card--focus">
+    <ChartCard title="累计 ROI 曲线" description="用累计收益相对累计成本的比值来比较模型效率，适合不同投注规模之间做标准化对比。数值越高，代表资金使用效率越好。 " className="chart-card--focus">
       {historyVisibleModels.length && historyTrend.length ? (
         <HistoryChartShell title="累计收益率" ariaLabel="模型累计ROI曲线">
           <ResponsiveContainer width="100%" height={320}>
@@ -799,7 +850,7 @@ export function HistoryRollingHitRateChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title={`滚动命中率（近 ${rollingWindow} 期）`} className="chart-card--focus">
+    <ChartCard title={`滚动命中率（近 ${rollingWindow} 期）`} description="按滚动窗口计算近几期的命中率，用来观察模型稳定性而不是单期波动。窗口越大，曲线越平滑，越适合看趋势。 " className="chart-card--focus">
       {historyVisibleModels.length && historyTrend.length ? (
         <HistoryChartShell title="滚动命中稳定性" ariaLabel="模型滚动命中率曲线">
           <ResponsiveContainer width="100%" height={320}>
@@ -838,7 +889,7 @@ export function HistoryDrawdownChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="最大回撤曲线" className="chart-card--focus">
+    <ChartCard title="最大回撤曲线" description="展示模型从阶段高点回落的幅度，帮助判断策略在盈利过程中承受了多大回吐。越接近 0，通常说明风险控制越稳。 " className="chart-card--focus">
       {historyVisibleModels.length && historyTrend.length ? (
         <HistoryChartShell title="回撤风险" ariaLabel="模型最大回撤曲线">
           <ResponsiveContainer width="100%" height={320}>
@@ -878,7 +929,7 @@ export function HistoryRankTrendChartCard({
   const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
 
   return (
-    <ChartCard title="模型排名变化图" className="chart-card--focus">
+    <ChartCard title="模型排名变化图" description="按累计表现给模型排序，观察每一期谁领先、谁掉队。排名越靠前越强，适合看 leader 是否频繁切换。 " className="chart-card--focus">
       {historyVisibleModels.length && historyTrend.length ? (
         <HistoryChartShell title="累计收益排名" ariaLabel="模型排名变化图">
           <ResponsiveContainer width="100%" height={320}>
@@ -908,7 +959,7 @@ export function HistoryProfitDistributionChartCard({
   distribution: HistoryProfitDistributionItem[]
 }) {
   return (
-    <ChartCard title="胜负分布图" className="chart-card--focus">
+    <ChartCard title="胜负分布图" description="统计每个模型盈利期、亏损期和持平期的数量分布，帮助判断它更常见的是小赚小亏还是稳定正向。 " className="chart-card--focus">
       {distribution.length ? (
         <HistoryChartShell title="盈利 / 亏损 / 持平期数分布" ariaLabel="模型胜负分布图">
           <ResponsiveContainer width="100%" height={320}>
@@ -944,7 +995,7 @@ export function HistoryHitHeatmapCard({
   const cellsByKey = new Map(heatmap.map((item) => [`${item.model_id}::${item.period}`, item]))
 
   return (
-    <ChartCard title="命中热力图" className="chart-card--focus">
+    <ChartCard title="命中热力图" description="用模型和期号构成二维热力图，快速看出哪些模型更稳定、哪些阶段明显失真。颜色越暖，通常代表命中更强。 " className="chart-card--focus">
       {heatmap.length && historyVisibleModels.length ? (
         <HistoryChartShell title="模型 × 期号命中热度" ariaLabel="模型命中热力图">
           <div className="history-heatmap">
@@ -1006,7 +1057,7 @@ export function HistoryHitTrendCard({
   onPeriodSelect?: (period: string) => void
 }) {
   return (
-    <ChartCard title="模型历史命中趋势">
+    <ChartCard title="模型历史命中趋势" description="汇总展示模型历史命中趋势、堆叠统计和盈亏趋势，适合作为回溯分析的总览入口。">
       {historyVisibleModels.length && historyHitTrend.length ? (
         <div className="history-hit-trend__charts">
           <HistoryHitTrendLineChartCard
