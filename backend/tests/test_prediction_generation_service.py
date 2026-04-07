@@ -409,6 +409,46 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertIn("模型：DLT Compound Demo Model (dlt_compound_model_demo)", rendered)
         self.assertIn('"period": "26067"', rendered)
 
+    def test_qxc_compound_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("qxc", prediction_play_mode="compound")
+        required_phrases = [
+            "仅输出 4 组预测",
+            "qxc_compound",
+            "增强型综合决策者",
+            "position_selections",
+            "核心覆盖",
+            "前位扩展",
+            "末位扩展",
+            "全面扩展",
+            "前 6 位只能使用 `00-09`",
+            "第 7 位只能使用 `00-14`",
+            "核心逻辑",
+            "执行步骤",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
+    def test_qxc_compound_prompt_template_can_be_formatted(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("qxc", prediction_play_mode="compound")
+        rendered = template.format(
+            target_period="2026033",
+            target_date="2026年03月22日",
+            lottery_history=json.dumps(
+                [
+                    {"period": "2026032", "date": "2026-03-20", "digits": ["00", "01", "02", "03", "04", "05", "10"]},
+                    {"period": "2026031", "date": "2026-03-17", "digits": ["09", "08", "07", "06", "05", "04", "14"]},
+                ],
+                ensure_ascii=False,
+                indent=2,
+            ),
+            prediction_date="2026-03-21",
+            model_id="qxc_compound_model_demo",
+            model_name="QXC Compound Demo Model",
+        )
+        self.assertIn("目标期号：2026033", rendered)
+        self.assertIn("模型：QXC Compound Demo Model (qxc_compound_model_demo)", rendered)
+        self.assertIn('"period": "2026032"', rendered)
+
     def test_validate_prediction_pl3_requires_direct_and_three_digits(self) -> None:
         service = PredictionGenerationService()
         valid_prediction = {
