@@ -1,33 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import get_connection
-
-
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-
-def _parse_datetime(value: Any) -> datetime | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value
-    text = str(value).strip()
-    if not text:
-        return None
-    for fmt in (DATETIME_FORMAT, "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(text, fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def _format_datetime(value: Any) -> str | None:
-    parsed = _parse_datetime(value)
-    return parsed.strftime(DATETIME_FORMAT) if parsed else None
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 class MaintenanceRunLogRepository:
@@ -41,7 +17,7 @@ class MaintenanceRunLogRepository:
         mode: str | None = None,
         model_code: str | None = None,
         status: str,
-        created_at: str | None = None,
+        created_at: int | None = None,
     ) -> dict[str, Any]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
@@ -57,7 +33,7 @@ class MaintenanceRunLogRepository:
                         status,
                         created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, ?))
                     ON DUPLICATE KEY UPDATE
                         lottery_code = VALUES(lottery_code),
                         trigger_type = VALUES(trigger_type),
@@ -65,9 +41,9 @@ class MaintenanceRunLogRepository:
                         mode = VALUES(mode),
                         model_code = VALUES(model_code),
                         status = VALUES(status),
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = VALUES(created_at)
                     """,
-                    (task_id, lottery_code, trigger_type, task_type, mode, model_code, status, _parse_datetime(created_at)),
+                    (task_id, lottery_code, trigger_type, task_type, mode, model_code, status, ensure_timestamp(created_at), now_ts()),
                 )
         return {
             "task_id": task_id,
@@ -86,8 +62,8 @@ class MaintenanceRunLogRepository:
             "task_type": str(payload.get("task_type") or "lottery_fetch"),
             "mode": payload.get("mode"),
             "model_code": payload.get("model_code"),
-            "started_at": _parse_datetime(payload.get("started_at")),
-            "finished_at": _parse_datetime(payload.get("finished_at")),
+            "started_at": ensure_timestamp(payload.get("started_at")),
+            "finished_at": ensure_timestamp(payload.get("finished_at")),
             "fetched_count": int(payload.get("fetched_count") or 0),
             "saved_count": int(payload.get("saved_count") or 0),
             "processed_count": int(payload.get("processed_count") or 0),
@@ -98,14 +74,14 @@ class MaintenanceRunLogRepository:
             "error_message": payload.get("error_message"),
         }
         assignments = ", ".join(f"{column} = ?" for column in fields)
-        params = tuple(fields.values()) + (task_id,)
+        params = tuple(fields.values()) + (now_ts(), task_id)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
                     UPDATE maintenance_run_log
                     SET {assignments},
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE task_id = ?
                     """,
                     params,
@@ -176,8 +152,8 @@ class MaintenanceRunLogRepository:
             "mode": str(row["mode"]) if row.get("mode") else None,
             "model_code": str(row["model_code"]) if row.get("model_code") else None,
             "status": str(row.get("status") or "queued"),
-            "started_at": _format_datetime(row.get("started_at")),
-            "finished_at": _format_datetime(row.get("finished_at")),
+            "started_at": ensure_timestamp(row.get("started_at")),
+            "finished_at": ensure_timestamp(row.get("finished_at")),
             "fetched_count": int(row.get("fetched_count") or 0),
             "saved_count": int(row.get("saved_count") or 0),
             "processed_count": int(row.get("processed_count") or 0),
@@ -186,6 +162,6 @@ class MaintenanceRunLogRepository:
             "latest_period": str(row["latest_period"]) if row.get("latest_period") else None,
             "duration_ms": float(row.get("duration_ms") or 0),
             "error_message": str(row["error_message"]) if row.get("error_message") else None,
-            "created_at": _format_datetime(row.get("created_at")),
-            "updated_at": _format_datetime(row.get("updated_at")),
+            "created_at": ensure_timestamp(row.get("created_at")),
+            "updated_at": ensure_timestamp(row.get("updated_at")),
         }

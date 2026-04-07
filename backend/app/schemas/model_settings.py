@@ -40,7 +40,7 @@ class ModelResponse(BaseModel):
     is_active: bool
     is_deleted: bool
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])
-    updated_at: str = ""
+    updated_at: int = 0
 
 
 class ModelListResponse(BaseModel):

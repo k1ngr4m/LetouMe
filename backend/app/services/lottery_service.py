@@ -7,6 +7,7 @@ from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import get_lottery_definition, normalize_digit_balls, normalize_lottery_code
 from backend.app.repositories.lottery_repository import LotteryRepository
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 class LotteryService:
@@ -64,11 +65,11 @@ class LotteryService:
             latest_draw = draws[0] if draws and offset == 0 else self.repository.get_latest_draw(lottery_code=normalized_code)
             last_updated = max(
                 (draw.get("updated_at") for draw in draws if draw.get("updated_at")),
-                default=datetime.utcnow(),
+                default=now_ts(),
             )
             payload = {
                 "lottery_code": normalized_code,
-                "last_updated": last_updated.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "last_updated": int(ensure_timestamp(last_updated) or now_ts()),
                 "data": [self.normalize_draw(draw, normalized_code) for draw in draws],
                 "total_count": total_count,
             }

@@ -29,7 +29,7 @@ export type NextDraw = {
 
 export type LotteryHistoryResponse = {
   lottery_code: LotteryCode
-  last_updated: string
+  last_updated: number
   data: LotteryDraw[]
   next_draw: NextDraw | null
   total_count: number
@@ -254,7 +254,7 @@ export type SimulationTicketRecord = {
   sum_values?: string[]
   bet_count: number
   amount: number
-  created_at: string
+  created_at: number
 }
 
 export type SimulationTicketListResponse = {
@@ -295,8 +295,8 @@ export type MyBetRecordPayload = {
   ticket_image_url?: string
   ocr_text?: string
   ocr_provider?: string | null
-  ocr_recognized_at?: string | null
-  ticket_purchased_at?: string | null
+  ocr_recognized_at?: number | null
+  ticket_purchased_at?: number | null
   discount_amount?: number
   lines?: MyBetLinePayload[]
 }
@@ -384,17 +384,17 @@ export type MyBetRecord = {
   prize_level: string | null
   prize_amount: number
   net_profit: number
-  settled_at: string | null
+  settled_at: number | null
   source_type: 'manual' | 'ocr'
   ticket_image_url: string
   ocr_text: string
   ocr_provider: string | null
-  ocr_recognized_at: string | null
-  ticket_purchased_at?: string | null
+  ocr_recognized_at: number | null
+  ticket_purchased_at?: number | null
   actual_result?: LotteryDraw | null
   lines: MyBetLine[]
-  created_at: string
-  updated_at: string
+  created_at: number
+  updated_at: number
 }
 
 export type MyBetSummary = {
@@ -428,8 +428,8 @@ export type MyBetOCRDraftResponse = {
   ticket_image_url: string
   ocr_text: string
   ocr_provider: string | null
-  ocr_recognized_at: string | null
-  ticket_purchased_at?: string | null
+  ocr_recognized_at: number | null
+  ticket_purchased_at?: number | null
   lines: MyBetLine[]
   warnings: string[]
 }
@@ -456,8 +456,8 @@ export type SiteMessage = {
   content: string
   snapshot?: Record<string, unknown> | null
   is_read: boolean
-  read_at: string | null
-  created_at: string
+  read_at: number | null
+  created_at: number
 }
 
 export type SiteMessageListResponse = {
@@ -490,7 +490,7 @@ export type SettingsModel = {
   is_active: boolean
   is_deleted: boolean
   lottery_codes: LotteryCode[]
-  updated_at: string
+  updated_at: number
 }
 
 export type SettingsModelListResponse = {
@@ -641,9 +641,9 @@ export type PredictionGenerationTask = {
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   mode: 'current' | 'history'
   model_code: string
-  created_at: string
-  started_at?: string | null
-  finished_at?: string | null
+  created_at: number
+  started_at?: number | null
+  finished_at?: number | null
   progress_summary: {
     mode: string
     model_code: string
@@ -672,9 +672,9 @@ export type LotteryFetchTask = {
   task_id: string
   lottery_code?: LotteryCode
   status: 'queued' | 'running' | 'succeeded' | 'failed'
-  created_at: string
-  started_at?: string | null
-  finished_at?: string | null
+  created_at: number
+  started_at?: number | null
+  finished_at?: number | null
   progress_summary: {
     fetched_count: number
     saved_count: number
@@ -693,8 +693,8 @@ export type MaintenanceRunLog = {
   mode?: 'current' | 'history' | string | null
   model_code?: string | null
   status: 'queued' | 'running' | 'succeeded' | 'failed'
-  started_at?: string | null
-  finished_at?: string | null
+  started_at?: number | null
+  finished_at?: number | null
   fetched_count: number
   saved_count: number
   processed_count?: number
@@ -703,8 +703,8 @@ export type MaintenanceRunLog = {
   latest_period?: string | null
   duration_ms: number
   error_message?: string | null
-  created_at?: string | null
-  updated_at?: string | null
+  created_at?: number | null
+  updated_at?: number | null
 }
 
 export type MaintenanceRunLogListResponse = {
@@ -746,8 +746,8 @@ export type AuthUser = {
   role_name: string
   is_active: boolean
   permissions: string[]
-  last_login_at?: string | null
-  created_at?: string | null
+  last_login_at?: number | null
+  created_at?: number | null
 }
 
 export type CurrentUserResponse = {
@@ -873,14 +873,14 @@ export type ScheduleTask = {
   weekdays: number[]
   cron_expression?: string | null
   is_active: boolean
-  next_run_at?: string | null
-  last_run_at?: string | null
+  next_run_at?: number | null
+  last_run_at?: number | null
   last_run_status?: string | null
   last_error_message?: string | null
   last_task_id?: string | null
   rule_summary?: string | null
-  created_at?: string | null
-  updated_at?: string | null
+  created_at?: number | null
+  updated_at?: number | null
 }
 
 export type ScheduleTaskPayload = {

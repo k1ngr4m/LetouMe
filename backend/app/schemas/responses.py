@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class LotteryHistoryResponse(BaseModel):
     lottery_code: str = "dlt"
-    last_updated: str
+    last_updated: int
     data: list[dict[str, Any]]
     next_draw: dict[str, Any] | None = None
     total_count: int = 0
@@ -32,9 +32,9 @@ class PredictionGenerationTaskResponse(BaseModel):
     status: str
     mode: str
     model_code: str
-    created_at: str
-    started_at: str | None = None
-    finished_at: str | None = None
+    created_at: int
+    started_at: int | None = None
+    finished_at: int | None = None
     progress_summary: dict[str, Any]
     error_message: str | None = None
 
@@ -43,9 +43,9 @@ class LotteryFetchTaskResponse(BaseModel):
     lottery_code: str = "dlt"
     task_id: str
     status: str
-    created_at: str
-    started_at: str | None = None
-    finished_at: str | None = None
+    created_at: int
+    started_at: int | None = None
+    finished_at: int | None = None
     progress_summary: dict[str, Any]
     error_message: str | None = None
 
@@ -59,8 +59,8 @@ class MaintenanceRunLogItemResponse(BaseModel):
     mode: str | None = None
     model_code: str | None = None
     status: str
-    started_at: str | None = None
-    finished_at: str | None = None
+    started_at: int | None = None
+    finished_at: int | None = None
     fetched_count: int = 0
     saved_count: int = 0
     processed_count: int = 0
@@ -69,8 +69,8 @@ class MaintenanceRunLogItemResponse(BaseModel):
     latest_period: str | None = None
     duration_ms: float = 0
     error_message: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: int | None = None
+    updated_at: int | None = None
 
 
 class MaintenanceRunLogListResponse(BaseModel):
@@ -130,7 +130,7 @@ class SimulationTicketRecordResponse(BaseModel):
     group_numbers: list[str] = Field(default_factory=list)
     bet_count: int = 0
     amount: int = 0
-    created_at: str
+    created_at: int
 
 
 class SimulationTicketListResponse(BaseModel):
@@ -177,17 +177,17 @@ class MyBetRecordResponse(BaseModel):
     prize_level: str | None = None
     prize_amount: int = 0
     net_profit: int = 0
-    settled_at: str | None = None
+    settled_at: int | None = None
     source_type: str = "manual"
     ticket_image_url: str = ""
     ocr_text: str = ""
     ocr_provider: str | None = None
-    ocr_recognized_at: str | None = None
-    ticket_purchased_at: str | None = None
+    ocr_recognized_at: int | None = None
+    ticket_purchased_at: int | None = None
     actual_result: dict[str, Any] | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
-    created_at: str
-    updated_at: str
+    created_at: int
+    updated_at: int
 
 
 class MyBetSummaryResponse(BaseModel):
@@ -221,8 +221,8 @@ class MyBetOCRDraftResponse(BaseModel):
     ticket_image_url: str = ""
     ocr_text: str = ""
     ocr_provider: str | None = None
-    ocr_recognized_at: str | None = None
-    ticket_purchased_at: str | None = None
+    ocr_recognized_at: int | None = None
+    ticket_purchased_at: int | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -242,8 +242,8 @@ class SiteMessageResponse(BaseModel):
     content: str
     snapshot: dict[str, Any] | None = None
     is_read: bool = False
-    read_at: str | None = None
-    created_at: str
+    read_at: int | None = None
+    created_at: int
 
 
 class SiteMessageListResponse(BaseModel):
@@ -274,14 +274,14 @@ class ScheduleTaskResponse(BaseModel):
     weekdays: list[int] = Field(default_factory=list)
     cron_expression: str | None = None
     is_active: bool = True
-    next_run_at: str | None = None
-    last_run_at: str | None = None
+    next_run_at: int | None = None
+    last_run_at: int | None = None
     last_run_status: str | None = None
     last_error_message: str | None = None
     last_task_id: str | None = None
     rule_summary: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: int | None = None
+    updated_at: int | None = None
 
 
 class ScheduleTaskListResponse(BaseModel):

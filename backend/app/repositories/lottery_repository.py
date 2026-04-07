@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.lotteries import display_period, normalize_lottery_code, storage_issue_no
 from backend.app.repositories.write_log_repository import WriteLogRepository
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 IN_QUERY_CHUNK_SIZE = 200
@@ -323,9 +323,7 @@ class LotteryRepository:
         if normalized_code in {"pl3", "pl5"} and not red_balls and digits:
             red_balls = list(digits)
         draw_date = row.get("draw_date") or ""
-        updated_at = row.get("updated_at")
-        if isinstance(updated_at, str):
-            updated_at = _parse_timestamp(updated_at)
+        updated_at = ensure_timestamp(row.get("updated_at"))
 
         return {
             "lottery_code": normalized_code,
@@ -336,7 +334,7 @@ class LotteryRepository:
             "jackpot_pool_balance": int(row.get("jackpot_pool_balance") or 0),
             "prize_breakdown": list(prizes or []),
             "date": draw_date,
-            "updated_at": updated_at,
+            "updated_at": updated_at or 0,
         }
 
 
@@ -366,18 +364,18 @@ def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str,
                         UPDATE draw_issue
                         SET draw_date = ?,
                             status = ?,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = ?
                         WHERE id = ?
                         """,
-                        (draw_date, status, issue_id),
+                        (draw_date, status, now_ts(), issue_id),
                     )
                 return issue_id
             cursor.execute(
                 """
-                INSERT INTO draw_issue (issue_no, draw_date, status, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO draw_issue (issue_no, draw_date, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (stored_issue_no, draw_date, status),
+                (stored_issue_no, draw_date, status, now_ts(), now_ts()),
             )
             return int(cursor.lastrowid)
 
@@ -429,15 +427,6 @@ def _insert_number_rows(
                 """,
                 (owner_id, normalized_role, index, str(ball).zfill(2)),
             )
-
-
-def _parse_timestamp(value: str) -> datetime | str:
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            return datetime.strptime(value, fmt)
-        except ValueError:
-            continue
-    return value
 
 
 def _iter_chunks(values: list[Any], chunk_size: int) -> list[list[Any]]:

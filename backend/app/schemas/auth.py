@@ -46,8 +46,8 @@ class AuthUserResponse(BaseModel):
     role_name: str
     is_active: bool
     permissions: list[str] = Field(default_factory=list)
-    last_login_at: str | None = None
-    created_at: str | None = None
+    last_login_at: int | None = None
+    created_at: int | None = None
 
 
 class CurrentUserResponse(BaseModel):

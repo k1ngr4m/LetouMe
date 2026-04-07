@@ -3,30 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import get_connection
-
-
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-
-def _parse_datetime(value: Any) -> datetime | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value
-    text = str(value).strip()
-    if not text:
-        return None
-    for fmt in (DATETIME_FORMAT, "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(text, fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def _format_datetime(value: Any) -> str | None:
-    parsed = _parse_datetime(value)
-    return parsed.strftime(DATETIME_FORMAT) if parsed else None
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 class ScheduleRepository:
@@ -107,8 +84,8 @@ class ScheduleRepository:
                         payload.get("time_of_day"),
                         payload.get("cron_expression"),
                         1 if payload.get("is_active", True) else 0,
-                        _parse_datetime(payload.get("next_run_at")),
-                        _parse_datetime(payload.get("last_run_at")),
+                        ensure_timestamp(payload.get("next_run_at")),
+                        ensure_timestamp(payload.get("last_run_at")),
                         payload.get("last_run_status"),
                         payload.get("last_error_message"),
                         payload.get("last_task_id"),
@@ -138,7 +115,7 @@ class ScheduleRepository:
                         cron_expression = ?,
                         is_active = ?,
                         next_run_at = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE task_code = ?
                     """,
                     (
@@ -153,7 +130,8 @@ class ScheduleRepository:
                         payload.get("time_of_day"),
                         payload.get("cron_expression"),
                         1 if payload.get("is_active", True) else 0,
-                        _parse_datetime(payload.get("next_run_at")),
+                        ensure_timestamp(payload.get("next_run_at")),
+                        now_ts(),
                         task_code,
                     ),
                 )
@@ -161,7 +139,7 @@ class ScheduleRepository:
                 self._replace_task_weekdays(cursor, task_id, payload.get("weekdays") or [])
         return self.get_task(task_code) or {}
 
-    def set_task_active(self, task_code: str, is_active: bool, next_run_at: str | None) -> dict[str, Any]:
+    def set_task_active(self, task_code: str, is_active: bool, next_run_at: int | None) -> dict[str, Any]:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -169,10 +147,10 @@ class ScheduleRepository:
                     UPDATE scheduled_task
                     SET is_active = ?,
                         next_run_at = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE task_code = ?
                     """,
-                    (1 if is_active else 0, _parse_datetime(next_run_at), task_code),
+                    (1 if is_active else 0, ensure_timestamp(next_run_at), now_ts(), task_code),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(task_code)
@@ -194,10 +172,10 @@ class ScheduleRepository:
                     cursor.execute(
                         """
                         UPDATE scheduled_task
-                        SET updated_at = CURRENT_TIMESTAMP
+                        SET updated_at = ?
                         WHERE task_code = ?
                         """,
-                        (task_code,),
+                        (now_ts(), task_code),
                     )
                 else:
                     cursor.execute(
@@ -205,10 +183,10 @@ class ScheduleRepository:
                         UPDATE scheduled_task
                         SET is_active = ?,
                             next_run_at = NULL,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = ?
                         WHERE task_code = ?
                         """,
-                        (next_active, task_code),
+                        (next_active, now_ts(), task_code),
                     )
                 self._replace_task_models(cursor, task_id, normalized_codes)
         return self.get_task(task_code) or {}
@@ -222,21 +200,21 @@ class ScheduleRepository:
 
     def update_run_state(self, task_code: str, updates: dict[str, Any]) -> dict[str, Any]:
         fields = {
-            "next_run_at": _parse_datetime(updates.get("next_run_at")),
-            "last_run_at": _parse_datetime(updates.get("last_run_at")),
+            "next_run_at": ensure_timestamp(updates.get("next_run_at")),
+            "last_run_at": ensure_timestamp(updates.get("last_run_at")),
             "last_run_status": updates.get("last_run_status"),
             "last_error_message": updates.get("last_error_message"),
             "last_task_id": updates.get("last_task_id"),
         }
         assignments = ", ".join(f"{column} = ?" for column in fields)
-        params = tuple(fields.values()) + (task_code,)
+        params = tuple(fields.values()) + (now_ts(), task_code)
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
                     UPDATE scheduled_task
                     SET {assignments},
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE task_code = ?
                     """,
                     params,
@@ -267,17 +245,18 @@ class ScheduleRepository:
                         UPDATE scheduled_task
                         SET next_run_at = ?,
                             last_run_status = ?,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = ?
                         WHERE id = ?
                           AND is_active = 1
                           AND next_run_at IS NOT NULL
                           AND next_run_at <= ?
                         """,
                         (
-                            claim_until,
+                            ensure_timestamp(claim_until),
                             self.CLAIMED_RUN_STATUS,
+                            now_ts(),
                             task_id,
-                            due_before,
+                            ensure_timestamp(due_before),
                         ),
                     )
                     if cursor.rowcount > 0:
@@ -295,7 +274,7 @@ class ScheduleRepository:
               AND next_run_at <= ?
             ORDER BY next_run_at ASC, id ASC
             """,
-            (due_before,),
+            (ensure_timestamp(due_before),),
         )
         return [int(row["id"]) for row in cursor.fetchall()]
 
@@ -348,13 +327,13 @@ class ScheduleRepository:
             "weekdays": [int(value) for value in weekdays],
             "cron_expression": str(row["cron_expression"]) if row.get("cron_expression") else None,
             "is_active": bool(row.get("is_active")),
-            "next_run_at": _format_datetime(row.get("next_run_at")),
-            "last_run_at": _format_datetime(row.get("last_run_at")),
+            "next_run_at": ensure_timestamp(row.get("next_run_at")),
+            "last_run_at": ensure_timestamp(row.get("last_run_at")),
             "last_run_status": str(row["last_run_status"]) if row.get("last_run_status") else None,
             "last_error_message": str(row["last_error_message"]) if row.get("last_error_message") else None,
             "last_task_id": str(row["last_task_id"]) if row.get("last_task_id") else None,
-            "created_at": _format_datetime(row.get("created_at")),
-            "updated_at": _format_datetime(row.get("updated_at")),
+            "created_at": ensure_timestamp(row.get("created_at")),
+            "updated_at": ensure_timestamp(row.get("updated_at")),
         }
 
     @staticmethod

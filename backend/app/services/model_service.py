@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from time import perf_counter
 from typing import Any
 
@@ -9,6 +8,7 @@ from openai import OpenAI
 from backend.app.cache import runtime_cache
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.model_repository import ModelRepository
+from backend.app.time_utils import ensure_timestamp
 from backend.core.model_config import LMSTUDIO_BASE_URL, ModelDefinition
 from backend.core.model_factory import ModelFactory
 
@@ -319,9 +319,5 @@ class ModelService:
         return normalized
 
 
-def _format_datetime(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return str(value)
+def _format_datetime(value: Any) -> int | None:
+    return ensure_timestamp(value)

@@ -202,8 +202,8 @@ class MyBetRecordPayload(BaseModel):
     ticket_image_url: str = ""
     ocr_text: str = ""
     ocr_provider: str | None = None
-    ocr_recognized_at: str | None = None
-    ticket_purchased_at: str | None = None
+    ocr_recognized_at: int | None = None
+    ticket_purchased_at: int | None = None
     discount_amount: int = Field(default=0, ge=0)
     lines: list[MyBetLinePayload] = Field(default_factory=list)
 

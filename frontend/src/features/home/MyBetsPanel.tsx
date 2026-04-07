@@ -44,7 +44,7 @@ type BetFormState = {
   ticketImagePreviewUrl: string
   ocrText: string
   ocrProvider: string | null
-  ocrRecognizedAt: string | null
+  ocrRecognizedAt: number | null
   ticketPurchasedAt: string
   lines: EditableLine[]
 }
@@ -184,9 +184,9 @@ function createDefaultFormState(targetPeriod: string, lotteryCode: LotteryCode):
   }
 }
 
-function formatBeijingDateTimeInput(value?: string | null) {
+function formatBeijingDateTimeInput(value?: number | null) {
   if (!value) return ''
-  const date = new Date(value)
+  const date = new Date(value * 1000)
   if (Number.isNaN(date.getTime())) return ''
   const formatter = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
@@ -202,14 +202,14 @@ function formatBeijingDateTimeInput(value?: string | null) {
   return `${pick('year')}-${pick('month')}-${pick('day')}T${pick('hour')}:${pick('minute')}`
 }
 
-function beijingInputToUtcIso(value: string) {
+function beijingInputToTimestamp(value: string) {
   const text = value.trim()
   if (!text) return null
   const matched = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
   if (!matched) return null
   const [, year, month, day, hour, minute] = matched
   const utcMs = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour) - 8, Number(minute), 0)
-  return new Date(utcMs).toISOString().replace('.000Z', 'Z')
+  return Math.floor(utcMs / 1000)
 }
 
 function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableLine {
@@ -719,7 +719,7 @@ export function MyBetsPanel({
         ocr_text: form.ocrText,
         ocr_provider: form.ocrProvider,
         ocr_recognized_at: form.ocrRecognizedAt,
-        ticket_purchased_at: beijingInputToUtcIso(form.ticketPurchasedAt),
+        ticket_purchased_at: beijingInputToTimestamp(form.ticketPurchasedAt),
         lines: form.lines.map((line) => buildLinePayload(lotteryCode, line)),
       }
       if (editingRecord) {

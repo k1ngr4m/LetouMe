@@ -27,6 +27,7 @@ from backend.app.rbac import (
 from backend.app.repositories.role_repository import RoleRepository
 from backend.app.repositories.user_repository import UserRepository
 from backend.app.services.email_service import EmailService
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 logger = get_logger("auth")
@@ -95,7 +96,7 @@ class AuthService:
         self.repository.create_session(
             user_id=int(user["id"]),
             session_token=token,
-            expires_at=datetime.utcnow() + timedelta(days=self.settings.auth_session_days),
+            expires_at=now_ts() + self.settings.auth_session_days * 24 * 60 * 60,
             user_agent=user_agent,
             ip_address=ip_address,
         )
@@ -129,7 +130,7 @@ class AuthService:
         self.repository.create_session(
             user_id=int(created["id"]),
             session_token=token,
-            expires_at=datetime.utcnow() + timedelta(days=self.settings.auth_session_days),
+            expires_at=now_ts() + self.settings.auth_session_days * 24 * 60 * 60,
             user_agent=user_agent,
             ip_address=ip_address,
         )
@@ -148,10 +149,8 @@ class AuthService:
         user = self.repository.get_user_by_session_token(session_token)
         if not user:
             return None
-        expires_at = user.get("expires_at")
-        if isinstance(expires_at, str):
-            expires_at = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
-        if not isinstance(expires_at, datetime) or expires_at <= datetime.utcnow():
+        expires_at = ensure_timestamp(user.get("expires_at"))
+        if expires_at is None or expires_at <= now_ts():
             self.repository.delete_session(session_token)
             return None
         if not user or not user.get("is_active"):
@@ -241,13 +240,9 @@ class AuthService:
             purpose=purpose,
         )
         if latest_code:
-            expires_at = _to_datetime(latest_code.get("expires_at"))
-            sent_at = (
-                expires_at - timedelta(minutes=self.settings.auth_email_code_expire_minutes)
-                if expires_at
-                else None
-            )
-            if sent_at and sent_at + timedelta(seconds=self.settings.auth_email_code_cooldown_seconds) > datetime.utcnow():
+            expires_at = ensure_timestamp(latest_code.get("expires_at"))
+            sent_at = expires_at - self.settings.auth_email_code_expire_minutes * 60 if expires_at is not None else None
+            if sent_at and sent_at + self.settings.auth_email_code_cooldown_seconds > now_ts():
                 raise ValueError("验证码发送过于频繁，请稍后再试")
 
         code = "".join(secrets.choice(string.digits) for _ in range(6))
@@ -257,7 +252,7 @@ class AuthService:
             email=email,
             purpose=purpose,
             code_hash=code_hash,
-            expires_at=datetime.utcnow() + timedelta(minutes=self.settings.auth_email_code_expire_minutes),
+            expires_at=now_ts() + self.settings.auth_email_code_expire_minutes * 60,
         )
 
     def reset_password_by_email_code(self, email: str, code: str, new_password: str) -> None:
@@ -286,8 +281,8 @@ class AuthService:
         if int(latest_code.get("attempt_count") or 0) >= 5:
             self.repository.consume_email_verification_code(code_id)
             raise ValueError("验证码错误次数过多，请重新获取")
-        expires_at = _to_datetime(latest_code.get("expires_at"))
-        if not expires_at or expires_at <= datetime.utcnow():
+        expires_at = ensure_timestamp(latest_code.get("expires_at"))
+        if expires_at is None or expires_at <= now_ts():
             self.repository.consume_email_verification_code(code_id)
             raise ValueError("验证码已过期")
         expected_hash = str(latest_code.get("code_hash") or "")
@@ -382,7 +377,7 @@ class AuthService:
         self.repository.create_session(
             user_id=int(user["id"]),
             session_token=session_token,
-            expires_at=datetime.utcnow() + timedelta(days=self.settings.auth_session_days),
+            expires_at=now_ts() + self.settings.auth_session_days * 24 * 60 * 60,
             user_agent=user_agent,
             ip_address=ip_address,
         )
@@ -588,24 +583,13 @@ class AuthService:
         return role_code
 
 
-def _format_datetime(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return str(value)
+def _format_datetime(value: Any) -> int | None:
+    return ensure_timestamp(value)
 
 
 def _to_datetime(value: Any) -> datetime | None:
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"):
-            try:
-                return datetime.strptime(value, fmt)
-            except ValueError:
-                continue
-    return None
+    timestamp = ensure_timestamp(value)
+    return datetime.fromtimestamp(timestamp) if timestamp is not None else None
 
 
 def _is_valid_email(email: str) -> bool:

@@ -6,6 +6,7 @@ from typing import Any
 from backend.app.cache import runtime_cache
 from backend.app.db.connection import get_connection
 from backend.app.rbac import NORMAL_USER_ROLE, SUPER_ADMIN_ROLE
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 
 class UserRepository:
@@ -150,14 +151,14 @@ class UserRepository:
     def touch_last_login(self, user_id: int) -> None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("UPDATE app_user SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
+                cursor.execute("UPDATE app_user SET last_login_at = ? WHERE id = ?", (now_ts(), user_id))
 
     def create_session(
         self,
         *,
         user_id: int,
         session_token: str,
-        expires_at: datetime,
+        expires_at: int,
         user_agent: str,
         ip_address: str,
     ) -> None:
@@ -168,7 +169,7 @@ class UserRepository:
                     INSERT INTO user_session (user_id, session_token, expires_at, user_agent, ip_address)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (user_id, session_token, expires_at.strftime("%Y-%m-%d %H:%M:%S"), user_agent[:255], ip_address[:64]),
+                    (user_id, session_token, ensure_timestamp(expires_at), user_agent[:255], ip_address[:64]),
                 )
 
     def get_session(self, session_token: str) -> dict[str, Any] | None:
@@ -224,8 +225,8 @@ class UserRepository:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "UPDATE user_session SET last_seen_at = CURRENT_TIMESTAMP WHERE session_token = ?",
-                    (session_token,),
+                    "UPDATE user_session SET last_seen_at = ? WHERE session_token = ?",
+                    (now_ts(), session_token),
                 )
 
     def delete_session(self, session_token: str) -> None:
@@ -244,24 +245,24 @@ class UserRepository:
         email: str,
         purpose: str,
         code_hash: str,
-        expires_at: datetime,
+        expires_at: int,
     ) -> None:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE auth_email_code
-                    SET consumed_at = CURRENT_TIMESTAMP
+                    SET consumed_at = ?
                     WHERE email = ? AND purpose = ? AND consumed_at IS NULL
                     """,
-                    (email, purpose),
+                    (now_ts(), email, purpose),
                 )
                 cursor.execute(
                     """
                     INSERT INTO auth_email_code (email, purpose, code_hash, expires_at)
                     VALUES (?, ?, ?, ?)
                     """,
-                    (email, purpose, code_hash, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+                    (email, purpose, code_hash, ensure_timestamp(expires_at)),
                 )
 
     def get_latest_active_email_verification_code(self, *, email: str, purpose: str) -> dict[str, Any] | None:
@@ -297,10 +298,10 @@ class UserRepository:
                 cursor.execute(
                     """
                     UPDATE auth_email_code
-                    SET consumed_at = CURRENT_TIMESTAMP
+                    SET consumed_at = ?
                     WHERE id = ?
                     """,
-                    (code_id,),
+                    (now_ts(), code_id),
                 )
 
     def _get_user(self, where_clause: str, params: tuple[Any, ...]) -> dict[str, Any] | None:

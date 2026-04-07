@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from backend.app.db.connection import get_connection
+from backend.app.time_utils import beijing_date_end_ts, beijing_date_start_ts, now_ts
 
 
 class MessageRepository:
@@ -78,10 +78,10 @@ class MessageRepository:
             start_date, end_date = end_date, start_date
         if start_date:
             where_clauses.append("created_at >= ?")
-            params.append(f"{start_date.strftime('%Y-%m-%d')} 00:00:00")
+            params.append(beijing_date_start_ts(start_date))
         if end_date:
             where_clauses.append("created_at <= ?")
-            params.append(f"{end_date.strftime('%Y-%m-%d')} 23:59:59")
+            params.append(beijing_date_end_ts(end_date))
         where_sql = " AND ".join(where_clauses)
 
         with get_connection() as connection:
@@ -124,10 +124,7 @@ class MessageRepository:
         raw = str(raw_value or "").strip()
         if not raw:
             return None
-        try:
-            return datetime.strptime(raw, "%Y-%m-%d").date()
-        except ValueError:
-            return None
+        return raw
 
     def get_unread_count(self, *, user_id: int, lottery_code: str | None = None) -> int:
         where_clauses = ["user_id = ?", "deleted_at IS NULL", "read_at IS NULL"]
@@ -154,10 +151,10 @@ class MessageRepository:
                 cursor.execute(
                     """
                     UPDATE site_message
-                    SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+                    SET read_at = COALESCE(read_at, ?)
                     WHERE id = ? AND user_id = ? AND deleted_at IS NULL
                     """,
-                    (int(message_id), int(user_id)),
+                    (now_ts(), int(message_id), int(user_id)),
                 )
                 return cursor.rowcount > 0
 
@@ -175,7 +172,7 @@ class MessageRepository:
                     SET read_at = ?
                     WHERE {" AND ".join(where_clauses)}
                     """,
-                    (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), *params),
+                    (now_ts(), *params),
                 )
                 return int(cursor.rowcount or 0)
 
@@ -185,9 +182,9 @@ class MessageRepository:
                 cursor.execute(
                     """
                     UPDATE site_message
-                    SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP)
+                    SET deleted_at = COALESCE(deleted_at, ?)
                     WHERE id = ? AND user_id = ? AND deleted_at IS NULL
                     """,
-                    (int(message_id), int(user_id)),
+                    (now_ts(), int(message_id), int(user_id)),
                 )
                 return cursor.rowcount > 0

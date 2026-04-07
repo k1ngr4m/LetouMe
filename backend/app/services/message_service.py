@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from backend.app.lotteries import normalize_lottery_code
@@ -10,6 +10,7 @@ from backend.app.repositories.lottery_repository import LotteryRepository
 from backend.app.repositories.message_repository import MessageRepository
 from backend.app.repositories.my_bet_repository import MyBetRepository
 from backend.app.services.my_bet_service import MyBetService
+from backend.app.time_utils import as_beijing_datetime, ensure_timestamp, now_ts
 
 
 class MessageService:
@@ -96,7 +97,10 @@ class MessageService:
         draws = self.lottery_repository.list_draws(limit=limit, lottery_code=normalized_code)
         if not draws:
             return 0
-        cutoff_date = datetime.utcnow().date() - timedelta(days=max(0, int(recent_days)))
+        now_beijing = as_beijing_datetime(now_ts())
+        cutoff_date = now_beijing.date() - timedelta(days=max(0, int(recent_days))) if now_beijing else None
+        if cutoff_date is None:
+            return 0
         excluded = {str(period).strip() for period in (excluded_periods or set()) if str(period).strip()}
         periods: list[str] = []
         for draw in draws:
@@ -234,8 +238,8 @@ class MessageService:
             "content": str(message.get("content") or ""),
             "snapshot": snapshot,
             "is_read": bool(message.get("read_at")),
-            "read_at": str(message.get("read_at") or "") or None,
-            "created_at": str(message.get("created_at") or ""),
+            "read_at": ensure_timestamp(message.get("read_at")),
+            "created_at": int(ensure_timestamp(message.get("created_at")) or 0),
         }
 
     @staticmethod

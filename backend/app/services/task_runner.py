@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 from threading import Lock, Thread
 from typing import Any, Callable
 from uuid import uuid4
 
 from backend.app.logging_utils import get_logger
+from backend.app.time_utils import now_ts
 
 
 class BackgroundTaskRunner:
@@ -86,5 +86,5 @@ class BackgroundTaskRunner:
             on_update(snapshot)
 
     @staticmethod
-    def _timestamp() -> str:
-        return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    def _timestamp() -> int:
+        return now_ts()

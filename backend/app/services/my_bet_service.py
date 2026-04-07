@@ -16,6 +16,7 @@ from backend.app.lotteries import normalize_digit_balls, normalize_lottery_code
 from backend.app.repositories.lottery_repository import LotteryRepository
 from backend.app.repositories.my_bet_repository import MyBetRepository
 from backend.app.services.prediction_service import PredictionService
+from backend.app.time_utils import ensure_timestamp, now_ts
 from backend.app.services.ticket_ocr_service import TicketOCRService
 
 
@@ -110,8 +111,8 @@ class MyBetService:
             "ticket_image_url": str(draft.get("ticket_image_url") or ""),
             "ocr_text": str(draft.get("ocr_text") or ""),
             "ocr_provider": str(draft.get("ocr_provider") or "baidu"),
-            "ocr_recognized_at": str(draft.get("ocr_recognized_at") or datetime.now(self.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")),
-            "ticket_purchased_at": str(draft.get("ticket_purchased_at") or "") or None,
+            "ocr_recognized_at": int(ensure_timestamp(draft.get("ocr_recognized_at"), assume_beijing=True) or now_ts()),
+            "ticket_purchased_at": ensure_timestamp(draft.get("ticket_purchased_at"), assume_beijing=True),
             "lines": serialized_lines,
             "warnings": warnings,
         }
@@ -172,8 +173,8 @@ class MyBetService:
             "ticket_image_url": str(payload.get("ticket_image_url") or ""),
             "ocr_text": str(payload.get("ocr_text") or ""),
             "ocr_provider": str(payload.get("ocr_provider") or "") or None,
-            "ocr_recognized_at": str(payload.get("ocr_recognized_at") or "") or None,
-            "ticket_purchased_at": str(payload.get("ticket_purchased_at") or "") or None,
+            "ocr_recognized_at": ensure_timestamp(payload.get("ocr_recognized_at"), assume_beijing=True),
+            "ticket_purchased_at": ensure_timestamp(payload.get("ticket_purchased_at"), assume_beijing=True),
             "lines": built_lines,
         }
 
@@ -550,7 +551,7 @@ class MyBetService:
             "prize_level": best_level,
             "prize_amount": total_prize_amount,
             "net_profit": total_prize_amount - int(record.get("net_amount") or 0),
-            "settled_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "settled_at": now_ts(),
             "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code, target_period=target_period),
             "lines": lines_with_hits,
         }
@@ -848,18 +849,10 @@ class MyBetService:
         updated_at = record.get("updated_at")
         ocr_recognized_at = record.get("ocr_recognized_at")
         ticket_purchased_at = record.get("ticket_purchased_at")
-        if isinstance(created_at, datetime):
-            created_at = created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if isinstance(updated_at, datetime):
-            updated_at = updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if isinstance(ocr_recognized_at, datetime):
-            if ocr_recognized_at.tzinfo is None:
-                ocr_recognized_at = ocr_recognized_at.replace(tzinfo=MyBetService.BEIJING_TIMEZONE)
-            ocr_recognized_at = ocr_recognized_at.astimezone(MyBetService.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
-        if isinstance(ticket_purchased_at, datetime):
-            if ticket_purchased_at.tzinfo is None:
-                ticket_purchased_at = ticket_purchased_at.replace(tzinfo=MyBetService.BEIJING_TIMEZONE)
-            ticket_purchased_at = ticket_purchased_at.astimezone(MyBetService.BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+        created_at = ensure_timestamp(created_at)
+        updated_at = ensure_timestamp(updated_at)
+        ocr_recognized_at = ensure_timestamp(ocr_recognized_at, assume_beijing=True)
+        ticket_purchased_at = ensure_timestamp(ticket_purchased_at, assume_beijing=True)
 
         raw_lines = record.get("lines") if isinstance(record.get("lines"), list) else []
         lines = [MyBetService._serialize_line(item) for item in raw_lines]
@@ -921,12 +914,12 @@ class MyBetService:
             "ticket_image_url": str(record.get("ticket_image_url") or ""),
             "ocr_text": str(record.get("ocr_text") or ""),
             "ocr_provider": str(record.get("ocr_provider") or "") or None,
-            "ocr_recognized_at": str(ocr_recognized_at or "") or None,
-            "ticket_purchased_at": str(ticket_purchased_at or "") or None,
+            "ocr_recognized_at": ocr_recognized_at,
+            "ticket_purchased_at": ticket_purchased_at,
             "actual_result": record.get("actual_result") if isinstance(record.get("actual_result"), dict) else None,
             "lines": lines,
-            "created_at": created_at or "",
-            "updated_at": updated_at or created_at or "",
+            "created_at": created_at or 0,
+            "updated_at": updated_at or created_at or 0,
         }
 
     @staticmethod

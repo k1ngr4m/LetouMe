@@ -16,6 +16,7 @@ from backend.app.cache import runtime_cache
 from backend.app.config import Settings, load_settings
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
+from backend.app.time_utils import ensure_timestamp, now_ts
 
 BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
@@ -318,7 +319,7 @@ class TicketOCRService:
         if not target_period:
             warnings.append("未稳定识别到期号，请手动补录")
         return {
-            "recognized_at": self._current_beijing_iso_timestamp(),
+            "recognized_at": self._current_beijing_timestamp(),
             "ticket_purchased_at": self._extract_ticket_purchased_at(ocr_text=ocr_text),
             "target_period": target_period,
             "lines": lines,
@@ -326,8 +327,8 @@ class TicketOCRService:
         }
 
     @staticmethod
-    def _current_beijing_iso_timestamp() -> str:
-        return datetime.now(BEIJING_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    def _current_beijing_timestamp() -> int:
+        return now_ts()
 
     @staticmethod
     def _extract_target_period(*, ocr_text: str) -> str:
@@ -340,7 +341,7 @@ class TicketOCRService:
         return ""
 
     @staticmethod
-    def _extract_ticket_purchased_at(*, ocr_text: str) -> str | None:
+    def _extract_ticket_purchased_at(*, ocr_text: str) -> int | None:
         compact_patterns = [
             re.compile(r"(\d{2})[/-](\d{2})[/-](\d{2})\s*([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?!\d)"),
             re.compile(r"(?<!\d)(20\d{2})[\/\.-](\d{1,2})[\/\.-](\d{1,2})\s*([01]?\d|2[0-3]):([0-5]\d):([0-5]\d)(?!\d)"),
@@ -373,7 +374,7 @@ class TicketOCRService:
                 )
             except ValueError:
                 continue
-            return parsed.strftime("%Y-%m-%dT%H:%M:%S+08:00")
+            return ensure_timestamp(parsed, assume_beijing=True)
         return None
 
     def _parse_pl3_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:

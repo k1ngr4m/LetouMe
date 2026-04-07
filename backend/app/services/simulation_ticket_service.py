@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
 from math import comb
 from typing import Any
 
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.simulation_ticket_repository import SimulationTicketRepository
 from backend.app.services.prediction_service import PredictionService
+from backend.app.time_utils import ensure_timestamp
 
 
 class SimulationTicketService:
@@ -262,9 +262,7 @@ class SimulationTicketService:
 
     @staticmethod
     def _serialize_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
-        created_at = ticket.get("created_at")
-        if isinstance(created_at, datetime):
-            created_at = created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        created_at = ensure_timestamp(ticket.get("created_at"))
         return {
             "id": int(ticket.get("id") or 0),
             "lottery_code": str(ticket.get("lottery_code") or "dlt"),
@@ -284,5 +282,5 @@ class SimulationTicketService:
             "sum_values": [item for item in str(ticket.get("sum_values") or "").split(",") if item],
             "bet_count": int(ticket.get("bet_count") or 0),
             "amount": int(ticket.get("amount") or 0),
-            "created_at": created_at or "",
+            "created_at": created_at or 0,
         }

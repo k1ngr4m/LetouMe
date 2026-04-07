@@ -16,6 +16,7 @@ from backend.app.repositories.schedule_repository import ScheduleRepository
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
+from backend.app.time_utils import ensure_timestamp
 
 
 TIME_OF_DAY_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
@@ -397,11 +398,11 @@ class ScheduleService:
         return normalized.astimezone(BEIJING_TIMEZONE)
 
     @staticmethod
-    def _format_datetime(value: datetime | None) -> str | None:
+    def _format_datetime(value: datetime | None) -> int | None:
         if not value:
             return None
         normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        return normalized.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return ensure_timestamp(normalized)
 
     def _refresh_active_task_next_runs(self) -> None:
         now = self._utc_now()

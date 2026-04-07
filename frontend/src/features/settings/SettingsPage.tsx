@@ -1058,10 +1058,10 @@ export function SettingsPage() {
     const items = [...models]
     items.sort((left, right) => {
       if (modelSortOption === 'updated_desc') {
-        return new Date(right.updated_at || 0).getTime() - new Date(left.updated_at || 0).getTime()
+        return (right.updated_at || 0) - (left.updated_at || 0)
       }
       if (modelSortOption === 'updated_asc') {
-        return new Date(left.updated_at || 0).getTime() - new Date(right.updated_at || 0).getTime()
+        return (left.updated_at || 0) - (right.updated_at || 0)
       }
       if (modelSortOption === 'name_asc') {
         return left.display_name.localeCompare(right.display_name)
@@ -2513,7 +2513,7 @@ export function SettingsPage() {
                                 </span>
                               </td>
                               <td>
-                                <time className="settings-model-table__time" dateTime={model.updated_at}>
+                                <time className="settings-model-table__time" dateTime={String(model.updated_at || '')}>
                                   {formatDateTimeLocal(model.updated_at)}
                                 </time>
                               </td>

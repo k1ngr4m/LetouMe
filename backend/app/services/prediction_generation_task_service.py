@@ -52,7 +52,7 @@ class PredictionGenerationTaskService:
             mode=mode,
             model_code=model_code,
             status=str(task["status"]),
-            created_at=str(task.get("created_at") or ""),
+            created_at=task.get("created_at"),
         )
         return task
 
@@ -94,7 +94,7 @@ class PredictionGenerationTaskService:
                     mode=mode_value,
                     model_code=model_code_value,
                     status=payload["status"],
-                    created_at=str(state.get("created_at") or ""),
+                    created_at=state.get("created_at"),
                 )
                 self.maintenance_log_repository.update_by_task_id(task_id, payload)
             except Exception:

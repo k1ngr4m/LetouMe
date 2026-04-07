@@ -7,14 +7,15 @@ export function formatDateLabel(value?: string | null) {
   return value
 }
 
-export function formatDateTimeLocal(value?: string | null) {
+export function formatDateTimeLocal(value?: string | number | null) {
   return formatDateTimeInTimeZone(value, 'Asia/Shanghai')
 }
 
-export function formatDateTimeInTimeZone(value: string | null | undefined, timeZone: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+export function formatDateTimeInTimeZone(value: string | number | null | undefined, timeZone: string) {
+  if (value === null || value === undefined || value === '') return '-'
+  const timestampMs = typeof value === 'number' ? value * 1000 : Number(value)
+  const date = Number.isFinite(timestampMs) ? new Date(timestampMs) : new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
 
   const formatter = new Intl.DateTimeFormat('zh-CN', {
     timeZone,
@@ -35,7 +36,7 @@ export function formatDateTimeInTimeZone(value: string | null | undefined, timeZ
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-export function formatDateTimeBeijing(value?: string | null) {
+export function formatDateTimeBeijing(value?: string | number | null) {
   return formatDateTimeInTimeZone(value, 'Asia/Shanghai')
 }
 

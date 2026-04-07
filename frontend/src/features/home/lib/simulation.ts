@@ -72,7 +72,7 @@ export function normalizeSimulationTicket(ticket: SimulationTicketRecord): Simul
     sum_values: (ticket.sum_values || []).map(padBall).sort((left, right) => Number(left) - Number(right)),
     bet_count: Number(ticket.bet_count || 0),
     amount: Number(ticket.amount || 0),
-    created_at: ticket.created_at || '',
+    created_at: ticket.created_at || 0,
   }
 }
 
