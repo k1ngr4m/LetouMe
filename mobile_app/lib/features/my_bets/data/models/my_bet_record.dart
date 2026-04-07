@@ -145,6 +145,17 @@ class MyBetLine {
     required this.playType,
     required this.frontNumbers,
     required this.backNumbers,
+    required this.frontDan,
+    required this.frontTuo,
+    required this.backDan,
+    required this.backTuo,
+    required this.directTenThousands,
+    required this.directThousands,
+    required this.directHundreds,
+    required this.directTens,
+    required this.directUnits,
+    required this.groupNumbers,
+    required this.sumValues,
     required this.multiplier,
     required this.isAppend,
     required this.betCount,
@@ -155,6 +166,17 @@ class MyBetLine {
   final String playType;
   final List<String> frontNumbers;
   final List<String> backNumbers;
+  final List<String> frontDan;
+  final List<String> frontTuo;
+  final List<String> backDan;
+  final List<String> backTuo;
+  final List<String> directTenThousands;
+  final List<String> directThousands;
+  final List<String> directHundreds;
+  final List<String> directTens;
+  final List<String> directUnits;
+  final List<String> groupNumbers;
+  final List<String> sumValues;
   final int multiplier;
   final bool isAppend;
   final int betCount;
@@ -166,6 +188,17 @@ class MyBetLine {
       playType: json['play_type']?.toString() ?? 'dlt',
       frontNumbers: (json['front_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
       backNumbers: (json['back_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      frontDan: (json['front_dan'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      frontTuo: (json['front_tuo'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      backDan: (json['back_dan'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      backTuo: (json['back_tuo'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      directTenThousands: (json['direct_ten_thousands'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      directThousands: (json['direct_thousands'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      directHundreds: (json['direct_hundreds'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      directTens: (json['direct_tens'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      directUnits: (json['direct_units'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      groupNumbers: (json['group_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      sumValues: (json['sum_values'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
       multiplier: (json['multiplier'] as num?)?.toInt() ?? 1,
       isAppend: json['is_append'] == true,
       betCount: (json['bet_count'] as num?)?.toInt() ?? 0,
@@ -221,23 +254,56 @@ class UpdateMyBetPayload {
 class UpdateMyBetLinePayload {
   const UpdateMyBetLinePayload({
     required this.playType,
-    required this.frontNumbers,
-    required this.backNumbers,
     required this.multiplier,
     required this.isAppend,
+    this.frontNumbers = const [],
+    this.backNumbers = const [],
+    this.frontDan = const [],
+    this.frontTuo = const [],
+    this.backDan = const [],
+    this.backTuo = const [],
+    this.directTenThousands = const [],
+    this.directThousands = const [],
+    this.directHundreds = const [],
+    this.directTens = const [],
+    this.directUnits = const [],
+    this.groupNumbers = const [],
+    this.sumValues = const [],
   });
 
   final String playType;
-  final List<String> frontNumbers;
-  final List<String> backNumbers;
   final int multiplier;
   final bool isAppend;
+  final List<String> frontNumbers;
+  final List<String> backNumbers;
+  final List<String> frontDan;
+  final List<String> frontTuo;
+  final List<String> backDan;
+  final List<String> backTuo;
+  final List<String> directTenThousands;
+  final List<String> directThousands;
+  final List<String> directHundreds;
+  final List<String> directTens;
+  final List<String> directUnits;
+  final List<String> groupNumbers;
+  final List<String> sumValues;
 
   Map<String, dynamic> toMap() {
     return {
       'play_type': playType,
       'front_numbers': frontNumbers,
       'back_numbers': backNumbers,
+      'front_dan': frontDan,
+      'front_tuo': frontTuo,
+      'back_dan': backDan,
+      'back_tuo': backTuo,
+      'direct_ten_thousands': directTenThousands,
+      'direct_thousands': directThousands,
+      'direct_hundreds': directHundreds,
+      'direct_tens': directTens,
+      'direct_units': directUnits,
+      'group_numbers': groupNumbers,
+      'sum_values': sumValues,
       'multiplier': multiplier,
       'is_append': isAppend,
     };

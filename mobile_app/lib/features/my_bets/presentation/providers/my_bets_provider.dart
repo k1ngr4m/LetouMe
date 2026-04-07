@@ -16,5 +16,8 @@ final myBetsListProvider = FutureProvider<MyBetRecordListResponse>((ref) {
 
 final myBetDetailProvider = FutureProvider.family<MyBetRecord, int>((ref, recordId) async {
   final payload = await ref.watch(myBetsListProvider.future);
-  return payload.records.firstWhere((record) => record.id == recordId);
+  return payload.records.firstWhere(
+    (record) => record.id == recordId,
+    orElse: () => throw StateError('未找到投注记录 #$recordId'),
+  );
 });
