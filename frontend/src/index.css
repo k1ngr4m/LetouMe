@@ -3376,6 +3376,8 @@ a {
 
 .chart-center-content {
   min-height: 24rem;
+  display: grid;
+  gap: 1rem;
 }
 
 .chart-grid--single {
@@ -3384,6 +3386,36 @@ a {
 
 .chart-card--focus {
   min-height: 24rem;
+}
+
+.chart-center-group {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.chart-center-group__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.chart-center-group__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.chart-center-group__subtitle {
+  margin: 0.22rem 0 0;
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+.chart-center-window-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .chart-center-summary-grid,
@@ -3437,9 +3469,77 @@ a {
   font-size: 0.78rem;
 }
 
+.history-heatmap {
+  display: grid;
+  gap: 0.75rem;
+  overflow-x: auto;
+}
+
+.history-heatmap__header,
+.history-heatmap__row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.history-heatmap__corner,
+.history-heatmap__label {
+  color: var(--text-2);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.history-heatmap__periods,
+.history-heatmap__cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(3.1rem, 1fr);
+  gap: 0.45rem;
+  min-width: max-content;
+}
+
+.history-heatmap__period,
+.history-heatmap__cell {
+  min-height: 2.5rem;
+  border-radius: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
+  font-weight: 700;
+}
+
+.history-heatmap__period {
+  background: color-mix(in srgb, var(--surface-soft) 80%, transparent);
+  color: var(--text-2);
+}
+
+.history-heatmap__cell {
+  color: #fff;
+}
+
+.history-heatmap__cell--strong {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+}
+
+.history-heatmap__cell--warm {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.history-heatmap__cell--win {
+  background: linear-gradient(135deg, #22c55e, #14b8a6);
+}
+
+.history-heatmap__cell--cool {
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
 @media (max-width: 767px) {
   .chart-center-toolbar {
     padding: 0.88rem;
+  }
+
+  .history-heatmap__header,
+  .history-heatmap__row {
+    grid-template-columns: 88px minmax(0, 1fr);
   }
 }
 

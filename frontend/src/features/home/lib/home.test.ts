@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildHistoryCumulativeProfitTrend,
+  buildHistoryCumulativeRoiTrend,
+  buildHistoryDrawdownTrend,
   buildHistoryHitTrend,
+  buildHistoryHitHeatmap,
+  buildHistoryProfitDistribution,
   buildHistoryProfitTrend,
+  buildHistoryRankTrend,
+  buildHistoryRollingHitRateTrend,
   buildModelScores,
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
@@ -111,6 +118,78 @@ describe('buildHistoryProfitTrend', () => {
     expect(result).toEqual([
       { period: '26021', m1: 225, m2: -5 },
       { period: '26022', m1: -10, m2: 0 },
+    ])
+  })
+})
+
+describe('advanced history trend builders', () => {
+  const records = [
+    {
+      prediction_date: '2026-03-01',
+      target_period: '26021',
+      actual_result: null,
+      models: [
+        { model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', best_hit_count: 4, cost_amount: 80, prize_amount: 305, hit_period_win: true },
+        { model_id: 'm2', model_name: 'Model 2', model_provider: 'gemini', best_hit_count: 1, cost_amount: 20, prize_amount: 15, hit_period_win: false },
+      ],
+    },
+    {
+      prediction_date: '2026-03-02',
+      target_period: '26022',
+      actual_result: null,
+      models: [
+        { model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', best_hit_count: 2, cost_amount: 130, prize_amount: 120, hit_period_win: false },
+        { model_id: 'm2', model_name: 'Model 2', model_provider: 'gemini', best_hit_count: 3, cost_amount: 0, prize_amount: 0, hit_period_win: true },
+      ],
+    },
+  ]
+
+  it('builds cumulative profit trend', () => {
+    expect(buildHistoryCumulativeProfitTrend(records, ['m1', 'm2'])).toEqual([
+      { period: '26021', m1: 225, m2: -5 },
+      { period: '26022', m1: 215, m2: -5 },
+    ])
+  })
+
+  it('builds cumulative roi trend and guards zero cost', () => {
+    expect(buildHistoryCumulativeRoiTrend(records, ['m1', 'm2'])).toEqual([
+      { period: '26021', m1: 2.8125, m2: -0.25 },
+      { period: '26022', m1: 215 / 210, m2: -0.25 },
+    ])
+  })
+
+  it('builds rolling hit-rate trend', () => {
+    expect(buildHistoryRollingHitRateTrend(records, ['m1', 'm2'], 2)).toEqual([
+      { period: '26021', m1: 1, m2: 0 },
+      { period: '26022', m1: 0.5, m2: 0.5 },
+    ])
+  })
+
+  it('builds drawdown trend from cumulative profits', () => {
+    expect(buildHistoryDrawdownTrend(records, ['m1', 'm2'])).toEqual([
+      { period: '26021', m1: 0, m2: -5 },
+      { period: '26022', m1: -10, m2: -5 },
+    ])
+  })
+
+  it('builds ranking trend with stable ordering', () => {
+    expect(buildHistoryRankTrend(records, ['m1', 'm2'])).toEqual([
+      { period: '26021', m1: 1, m2: 2 },
+      { period: '26022', m1: 1, m2: 2 },
+    ])
+  })
+
+  it('builds heatmap cells and profit distribution', () => {
+    expect(buildHistoryHitHeatmap(records, ['m1', 'm2'])).toEqual([
+      { period: '26021', model_id: 'm1', model_name: 'Model 1', hit_count: 4, is_winning_period: true },
+      { period: '26021', model_id: 'm2', model_name: 'Model 2', hit_count: 1, is_winning_period: false },
+      { period: '26022', model_id: 'm1', model_name: 'Model 1', hit_count: 2, is_winning_period: false },
+      { period: '26022', model_id: 'm2', model_name: 'Model 2', hit_count: 3, is_winning_period: true },
+    ])
+
+    expect(buildHistoryProfitDistribution(records, ['m1', 'm2'])).toEqual([
+      { model_id: 'm1', model_name: 'Model 1', profitPeriods: 1, lossPeriods: 1, flatPeriods: 0 },
+      { model_id: 'm2', model_name: 'Model 2', profitPeriods: 0, lossPeriods: 1, flatPeriods: 1 },
     ])
   })
 })

@@ -51,6 +51,22 @@ type HistoryModelRef = {
 
 type HistoryTrendItem = Record<string, string | number>
 
+type HistoryHeatmapCell = {
+  period: string
+  model_id: string
+  model_name: string
+  hit_count: number
+  is_winning_period: boolean
+}
+
+type HistoryProfitDistributionItem = {
+  model_id: string
+  model_name: string
+  profitPeriods: number
+  lossPeriods: number
+  flatPeriods: number
+}
+
 function formatProfitValue(value: number) {
   return `${new Intl.NumberFormat('zh-CN', { signDisplay: 'exceptZero' }).format(Number(value) || 0)} 元`
 }
@@ -134,6 +150,21 @@ function buildHistoryChartClickHandler(onPeriodSelect?: (period: string) => void
     const period = state?.activeLabel
     if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
   }
+}
+
+function formatRoiValue(value: number) {
+  return `${(Number(value || 0) * 100).toFixed(1)}%`
+}
+
+function formatPercentValue(value: number) {
+  return `${(Number(value || 0) * 100).toFixed(0)}%`
+}
+
+function resolveHeatmapCellTone(hitCount: number, isWinningPeriod: boolean) {
+  if (hitCount >= 4) return 'history-heatmap__cell--strong'
+  if (hitCount >= 2) return 'history-heatmap__cell--warm'
+  if (isWinningPeriod) return 'history-heatmap__cell--win'
+  return 'history-heatmap__cell--cool'
 }
 
 export function AnalysisHotChartsPanel({
@@ -548,6 +579,296 @@ export function HistoryProfitTrendChartCard({
         </HistoryChartShell>
       ) : (
         <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryCumulativeProfitChartCard({
+  historyVisibleModels,
+  historyTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="累计盈亏曲线" className="chart-card--focus">
+      {historyVisibleModels.length && historyTrend.length ? (
+        <HistoryChartShell title="累计净盈亏" ariaLabel="模型累计盈亏曲线">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line key={`cum-profit-${model.model_id}`} type="monotone" dataKey={model.model_id} name={model.model_name} stroke={getModelTrendColor(index)} strokeWidth={3} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的累计盈亏数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryCumulativeRoiChartCard({
+  historyVisibleModels,
+  historyTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="累计 ROI 曲线" className="chart-card--focus">
+      {historyVisibleModels.length && historyTrend.length ? (
+        <HistoryChartShell title="累计收益率" ariaLabel="模型累计ROI曲线">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis tickFormatter={(value) => `${Math.round(Number(value) * 100)}%`} />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => formatRoiValue(Number(value || 0))} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line key={`cum-roi-${model.model_id}`} type="monotone" dataKey={model.model_id} name={model.model_name} stroke={getModelTrendColor(index)} strokeWidth={3} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的累计 ROI 数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryRollingHitRateChartCard({
+  historyVisibleModels,
+  historyTrend,
+  selectedPeriod,
+  onPeriodSelect,
+  rollingWindow,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+  rollingWindow: number
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title={`滚动命中率（近 ${rollingWindow} 期）`} className="chart-card--focus">
+      {historyVisibleModels.length && historyTrend.length ? (
+        <HistoryChartShell title="滚动命中稳定性" ariaLabel="模型滚动命中率曲线">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(Number(value) * 100)}%`} />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => formatPercentValue(Number(value || 0))} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line key={`rolling-hit-${model.model_id}`} type="monotone" dataKey={model.model_id} name={model.model_name} stroke={getModelTrendColor(index)} strokeWidth={3} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的滚动命中率数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryDrawdownChartCard({
+  historyVisibleModels,
+  historyTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="最大回撤曲线" className="chart-card--focus">
+      {historyVisibleModels.length && historyTrend.length ? (
+        <HistoryChartShell title="回撤风险" ariaLabel="模型最大回撤曲线">
+          <ResponsiveContainer width="100%" height={320}>
+            <AreaChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Area key={`drawdown-${model.model_id}`} type="monotone" dataKey={model.model_id} name={model.model_name} stroke={getModelTrendColor(index)} fill={getModelTrendColor(index)} fillOpacity={0.18} />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的回撤数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryRankTrendChartCard({
+  historyVisibleModels,
+  historyTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="模型排名变化图" className="chart-card--focus">
+      {historyVisibleModels.length && historyTrend.length ? (
+        <HistoryChartShell title="累计收益排名" ariaLabel="模型排名变化图">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} reversed domain={[1, Math.max(historyVisibleModels.length, 1)]} />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `第 ${Number(value || 0)} 名`} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line key={`rank-${model.model_id}`} type="monotone" dataKey={model.model_id} name={model.model_name} stroke={getModelTrendColor(index)} strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的排名变化数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryProfitDistributionChartCard({
+  distribution,
+}: {
+  distribution: HistoryProfitDistributionItem[]
+}) {
+  return (
+    <ChartCard title="胜负分布图" className="chart-card--focus">
+      {distribution.length ? (
+        <HistoryChartShell title="盈利 / 亏损 / 持平期数分布" ariaLabel="模型胜负分布图">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={distribution} layout="vertical" margin={{ left: 16, right: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="model_name" width={90} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Legend />
+              <Bar dataKey="profitPeriods" name="盈利期" stackId="profitMix" fill="var(--green-500, #22c55e)" />
+              <Bar dataKey="flatPeriods" name="持平期" stackId="profitMix" fill="var(--amber-500)" />
+              <Bar dataKey="lossPeriods" name="亏损期" stackId="profitMix" fill="var(--red-500)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的胜负分布数据。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryHitHeatmapCard({
+  heatmap,
+  historyVisibleModels,
+  onPeriodSelect,
+}: {
+  heatmap: HistoryHeatmapCell[]
+  historyVisibleModels: HistoryModelRef[]
+  onPeriodSelect?: (period: string) => void
+}) {
+  const periods = Array.from(new Set(heatmap.map((item) => item.period)))
+  const cellsByKey = new Map(heatmap.map((item) => [`${item.model_id}::${item.period}`, item]))
+
+  return (
+    <ChartCard title="命中热力图" className="chart-card--focus">
+      {heatmap.length && historyVisibleModels.length ? (
+        <HistoryChartShell title="模型 × 期号命中热度" ariaLabel="模型命中热力图">
+          <div className="history-heatmap">
+            <div className="history-heatmap__header">
+              <span className="history-heatmap__corner">模型/期号</span>
+              <div className="history-heatmap__periods">
+                {periods.map((period) => (
+                  <button key={period} type="button" className="history-heatmap__period" onClick={() => onPeriodSelect?.(period)}>
+                    {period}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="history-heatmap__rows">
+              {historyVisibleModels.map((model) => (
+                <div key={`heatmap-${model.model_id}`} className="history-heatmap__row">
+                  <span className="history-heatmap__label">{model.model_name}</span>
+                  <div className="history-heatmap__cells">
+                    {periods.map((period) => {
+                      const cell = cellsByKey.get(`${model.model_id}::${period}`)
+                      const hitCount = Number(cell?.hit_count || 0)
+                      const isWinningPeriod = Boolean(cell?.is_winning_period)
+                      return (
+                        <button
+                          key={`${model.model_id}-${period}`}
+                          type="button"
+                          className={`history-heatmap__cell ${resolveHeatmapCellTone(hitCount, isWinningPeriod)}`}
+                          title={`${model.model_name} · ${period} · 命中 ${hitCount}`}
+                          onClick={() => onPeriodSelect?.(period)}
+                        >
+                          {hitCount}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的热力图数据。</div>
       )}
     </ChartCard>
   )

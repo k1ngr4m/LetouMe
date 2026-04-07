@@ -70,6 +70,24 @@ export type HistoryFallbackResolution = {
   noCurrentModelData: boolean
 }
 
+export type HistoryTrendPoint = Record<string, string | number>
+
+export type HistoryHeatmapCell = {
+  period: string
+  model_id: string
+  model_name: string
+  hit_count: number
+  is_winning_period: boolean
+}
+
+export type HistoryProfitDistributionItem = {
+  model_id: string
+  model_name: string
+  profitPeriods: number
+  lossPeriods: number
+  flatPeriods: number
+}
+
 export type PredictionHitComparison = {
   redHits: string[]
   redHitCount: number
@@ -869,7 +887,7 @@ export function buildHistoryHitTrend(
       )
 
   return (records || []).map((record) => {
-    const point: Record<string, string | number> = {
+    const point: HistoryTrendPoint = {
       period: record.target_period,
     }
 
@@ -895,7 +913,7 @@ export function buildHistoryProfitTrend(
       )
 
   return (records || []).map((record) => {
-    const point: Record<string, string | number> = {
+    const point: HistoryTrendPoint = {
       period: record.target_period,
     }
 
@@ -905,6 +923,208 @@ export function buildHistoryProfitTrend(
     }
 
     return point
+  })
+}
+
+function resolveHistorySeriesModelIds(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  return selectedModelIds.length
+    ? selectedModelIds
+    : Array.from(new Set((records || []).flatMap((record) => record.models.map((model) => model.model_id))))
+}
+
+function sortHistoryRecordsByPeriod(records: PredictionsHistoryListResponse['predictions_history']) {
+  return [...(records || [])].sort((left, right) => {
+    const leftPeriod = Number(left.target_period)
+    const rightPeriod = Number(right.target_period)
+    if (Number.isFinite(leftPeriod) && Number.isFinite(rightPeriod)) return leftPeriod - rightPeriod
+    return String(left.target_period || '').localeCompare(String(right.target_period || ''))
+  })
+}
+
+function resolveModelPeriodNetProfit(record: PredictionsHistoryListResponse['predictions_history'][number], modelId: string) {
+  const model = record.models.find((item) => item.model_id === modelId)
+  return Number(model?.prize_amount || 0) - Number(model?.cost_amount || 0)
+}
+
+function resolveModelPeriodCost(record: PredictionsHistoryListResponse['predictions_history'][number], modelId: string) {
+  const model = record.models.find((item) => item.model_id === modelId)
+  return Number(model?.cost_amount || 0)
+}
+
+function resolveModelPeriodHitCount(record: PredictionsHistoryListResponse['predictions_history'][number], modelId: string) {
+  const model = record.models.find((item) => item.model_id === modelId)
+  return Number(model?.best_hit_count || 0)
+}
+
+function resolveModelPeriodWin(record: PredictionsHistoryListResponse['predictions_history'][number], modelId: string) {
+  const model = record.models.find((item) => item.model_id === modelId)
+  return Boolean(model?.hit_period_win)
+}
+
+export function buildHistoryCumulativeProfitTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const cumulativeMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+
+  return sortedRecords.map((record) => {
+    const point: HistoryTrendPoint = { period: record.target_period }
+    for (const modelId of seriesModelIds) {
+      const nextValue = Number(cumulativeMap.get(modelId) || 0) + resolveModelPeriodNetProfit(record, modelId)
+      cumulativeMap.set(modelId, nextValue)
+      point[modelId] = nextValue
+    }
+    return point
+  })
+}
+
+export function buildHistoryCumulativeRoiTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const cumulativeProfitMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+  const cumulativeCostMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+
+  return sortedRecords.map((record) => {
+    const point: HistoryTrendPoint = { period: record.target_period }
+    for (const modelId of seriesModelIds) {
+      const nextProfit = Number(cumulativeProfitMap.get(modelId) || 0) + resolveModelPeriodNetProfit(record, modelId)
+      const nextCost = Number(cumulativeCostMap.get(modelId) || 0) + resolveModelPeriodCost(record, modelId)
+      cumulativeProfitMap.set(modelId, nextProfit)
+      cumulativeCostMap.set(modelId, nextCost)
+      point[modelId] = nextCost > 0 ? nextProfit / nextCost : 0
+    }
+    return point
+  })
+}
+
+export function buildHistoryRollingHitRateTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+  windowSize: number = 10,
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const safeWindowSize = Math.max(1, Math.trunc(windowSize) || 1)
+
+  return sortedRecords.map((record, index) => {
+    const windowRecords = sortedRecords.slice(Math.max(0, index - safeWindowSize + 1), index + 1)
+    const point: HistoryTrendPoint = { period: record.target_period }
+    for (const modelId of seriesModelIds) {
+      const wins = windowRecords.reduce((sum, item) => sum + (resolveModelPeriodWin(item, modelId) ? 1 : 0), 0)
+      point[modelId] = windowRecords.length ? wins / windowRecords.length : 0
+    }
+    return point
+  })
+}
+
+export function buildHistoryDrawdownTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const cumulativeMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+  const peakMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+
+  return sortedRecords.map((record) => {
+    const point: HistoryTrendPoint = { period: record.target_period }
+    for (const modelId of seriesModelIds) {
+      const nextCumulative = Number(cumulativeMap.get(modelId) || 0) + resolveModelPeriodNetProfit(record, modelId)
+      const nextPeak = Math.max(Number(peakMap.get(modelId) || 0), nextCumulative)
+      cumulativeMap.set(modelId, nextCumulative)
+      peakMap.set(modelId, nextPeak)
+      point[modelId] = nextCumulative - nextPeak
+    }
+    return point
+  })
+}
+
+export function buildHistoryRankTrend(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const cumulativeMap = new Map(seriesModelIds.map((modelId) => [modelId, 0]))
+
+  return sortedRecords.map((record) => {
+    for (const modelId of seriesModelIds) {
+      cumulativeMap.set(modelId, Number(cumulativeMap.get(modelId) || 0) + resolveModelPeriodNetProfit(record, modelId))
+    }
+
+    const rankings = [...seriesModelIds]
+      .sort((left, right) => Number(cumulativeMap.get(right) || 0) - Number(cumulativeMap.get(left) || 0) || left.localeCompare(right))
+      .reduce<Record<string, number>>((result, modelId, index) => {
+        result[modelId] = index + 1
+        return result
+      }, {})
+
+    const point: HistoryTrendPoint = { period: record.target_period }
+    for (const modelId of seriesModelIds) {
+      point[modelId] = rankings[modelId] || seriesModelIds.length
+    }
+    return point
+  })
+}
+
+export function buildHistoryHitHeatmap(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+  modelNameMap?: Record<string, string>,
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const fallbackNameMap = modelNameMap || {}
+
+  return sortedRecords.flatMap((record) =>
+    seriesModelIds.map((modelId) => ({
+      period: record.target_period,
+      model_id: modelId,
+      model_name:
+        record.models.find((item) => item.model_id === modelId)?.model_name || fallbackNameMap[modelId] || modelId,
+      hit_count: resolveModelPeriodHitCount(record, modelId),
+      is_winning_period: resolveModelPeriodWin(record, modelId),
+    })),
+  )
+}
+
+export function buildHistoryProfitDistribution(
+  records: PredictionsHistoryListResponse['predictions_history'],
+  selectedModelIds: string[],
+  modelNameMap?: Record<string, string>,
+) {
+  const seriesModelIds = resolveHistorySeriesModelIds(records, selectedModelIds)
+  const sortedRecords = sortHistoryRecordsByPeriod(records)
+  const fallbackNameMap = modelNameMap || {}
+
+  return seriesModelIds.map((modelId) => {
+    let profitPeriods = 0
+    let lossPeriods = 0
+    let flatPeriods = 0
+
+    for (const record of sortedRecords) {
+      const netProfit = resolveModelPeriodNetProfit(record, modelId)
+      if (netProfit > 0) profitPeriods += 1
+      else if (netProfit < 0) lossPeriods += 1
+      else flatPeriods += 1
+    }
+
+    const sampleModel = sortedRecords.flatMap((record) => record.models).find((item) => item.model_id === modelId)
+    return {
+      model_id: modelId,
+      model_name: sampleModel?.model_name || fallbackNameMap[modelId] || modelId,
+      profitPeriods,
+      lossPeriods,
+      flatPeriods,
+    }
   })
 }
 

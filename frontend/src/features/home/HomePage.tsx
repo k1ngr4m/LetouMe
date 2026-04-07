@@ -16,8 +16,15 @@ import {
   type BallStatItem,
   buildSummary,
   buildHistoryHitTrend,
+  buildHistoryCumulativeProfitTrend,
+  buildHistoryCumulativeRoiTrend,
+  buildHistoryDrawdownTrend,
+  buildHistoryHitHeatmap,
   buildBlueFrequencyChart,
+  buildHistoryProfitDistribution,
   buildHistoryProfitTrend,
+  buildHistoryRankTrend,
+  buildHistoryRollingHitRateTrend,
   buildOddEvenChart,
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
@@ -65,6 +72,7 @@ import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+const HISTORY_ROLLING_WINDOW_OPTIONS = [10, 20, 30] as const
 const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
 const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
@@ -103,6 +111,27 @@ const HistoryHitTrendStackedChartCard = lazy(() =>
 )
 const HistoryProfitTrendChartCard = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.HistoryProfitTrendChartCard })),
+)
+const HistoryCumulativeProfitChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryCumulativeProfitChartCard })),
+)
+const HistoryCumulativeRoiChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryCumulativeRoiChartCard })),
+)
+const HistoryRollingHitRateChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryRollingHitRateChartCard })),
+)
+const HistoryDrawdownChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryDrawdownChartCard })),
+)
+const HistoryRankTrendChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryRankTrendChartCard })),
+)
+const HistoryHitHeatmapCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitHeatmapCard })),
+)
+const HistoryProfitDistributionChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryProfitDistributionChartCard })),
 )
 const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ default: module.MyBetsPanel })))
 
@@ -501,6 +530,7 @@ export function HomePage() {
   const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
+  const [rollingHitWindow, setRollingHitWindow] = useState<(typeof HISTORY_ROLLING_WINDOW_OPTIONS)[number]>(10)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
@@ -991,6 +1021,42 @@ export function HomePage() {
   const chartCenterHistoryProfitTrend = useMemo(
     () => buildHistoryProfitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
     [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryCumulativeProfitTrend = useMemo(
+    () => buildHistoryCumulativeProfitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryCumulativeRoiTrend = useMemo(
+    () => buildHistoryCumulativeRoiTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryRollingHitRateTrend = useMemo(
+    () => buildHistoryRollingHitRateTrend(filteredHistory, chartCenterHistoryVisibleModelIds, rollingHitWindow),
+    [chartCenterHistoryVisibleModelIds, filteredHistory, rollingHitWindow],
+  )
+  const chartCenterHistoryDrawdownTrend = useMemo(
+    () => buildHistoryDrawdownTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryRankTrend = useMemo(
+    () => buildHistoryRankTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryModelNameMap = useMemo(
+    () =>
+      chartCenterHistoryVisibleModels.reduce<Record<string, string>>((result, model) => {
+        result[model.model_id] = model.model_name
+        return result
+      }, {}),
+    [chartCenterHistoryVisibleModels],
+  )
+  const chartCenterHistoryHeatmap = useMemo(
+    () => buildHistoryHitHeatmap(filteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
+    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryProfitDistribution = useMemo(
+    () => buildHistoryProfitDistribution(filteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
+    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, filteredHistory],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const chartCenterSummary = useMemo(() => {
@@ -1698,26 +1764,107 @@ export function HomePage() {
                   </>
                 ) : null}
                 {activeChartCenterItem === CHART_CENTER_ITEMS.backtestAnalysis ? (
-                  <div className="history-hit-trend__charts">
-                    <HistoryHitTrendLineChartCard
-                      historyVisibleModels={chartCenterHistoryVisibleModels}
-                      historyHitTrend={chartCenterHistoryHitTrend}
-                      selectedPeriod={selectedHistoryPeriod}
-                      onPeriodSelect={openHistoryTab}
-                    />
-                    <HistoryHitTrendStackedChartCard
-                      historyVisibleModels={chartCenterHistoryVisibleModels}
-                      historyHitTrend={chartCenterHistoryHitTrend}
-                      selectedPeriod={selectedHistoryPeriod}
-                      onPeriodSelect={openHistoryTab}
-                    />
-                    <HistoryProfitTrendChartCard
-                      historyVisibleModels={chartCenterHistoryVisibleModels}
-                      historyProfitTrend={chartCenterHistoryProfitTrend}
-                      selectedPeriod={selectedHistoryPeriod}
-                      onPeriodSelect={openHistoryTab}
-                    />
-                  </div>
+                  <>
+                    <section className="chart-center-group">
+                      <div className="chart-center-group__header">
+                        <div>
+                          <h3 className="chart-center-group__title">基础趋势</h3>
+                          <p className="chart-center-group__subtitle">保留现有命中与盈亏基础视图，快速判断短期表现。</p>
+                        </div>
+                      </div>
+                      <div className="history-hit-trend__charts">
+                        <HistoryHitTrendLineChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyHitTrend={chartCenterHistoryHitTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryHitTrendStackedChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyHitTrend={chartCenterHistoryHitTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryProfitTrendChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyProfitTrend={chartCenterHistoryProfitTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                      </div>
+                    </section>
+
+                    <section className="chart-center-group">
+                      <div className="chart-center-group__header">
+                        <div>
+                          <h3 className="chart-center-group__title">收益分析</h3>
+                          <p className="chart-center-group__subtitle">更关注长期赚钱能力，而不是单期波动。</p>
+                        </div>
+                      </div>
+                      <div className="history-hit-trend__charts">
+                        <HistoryCumulativeProfitChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyTrend={chartCenterHistoryCumulativeProfitTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryCumulativeRoiChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyTrend={chartCenterHistoryCumulativeRoiTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryRankTrendChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyTrend={chartCenterHistoryRankTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                      </div>
+                    </section>
+
+                    <section className="chart-center-group">
+                      <div className="chart-center-group__header">
+                        <div>
+                          <h3 className="chart-center-group__title">稳定性分析</h3>
+                          <p className="chart-center-group__subtitle">从滚动命中、回撤和期数分布看模型是否足够稳。</p>
+                        </div>
+                        <div className="chart-center-window-switch" role="group" aria-label="滚动窗口切换">
+                          {HISTORY_ROLLING_WINDOW_OPTIONS.map((windowSize) => (
+                            <button
+                              key={`rolling-window-${windowSize}`}
+                              type="button"
+                              className={clsx('filter-chip', rollingHitWindow === windowSize ? 'is-active' : 'is-inactive')}
+                              onClick={() => setRollingHitWindow(windowSize)}
+                            >
+                              近 {windowSize} 期
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="history-hit-trend__charts">
+                        <HistoryRollingHitRateChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyTrend={chartCenterHistoryRollingHitRateTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                          rollingWindow={rollingHitWindow}
+                        />
+                        <HistoryDrawdownChartCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          historyTrend={chartCenterHistoryDrawdownTrend}
+                          selectedPeriod={selectedHistoryPeriod}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryHitHeatmapCard
+                          historyVisibleModels={chartCenterHistoryVisibleModels}
+                          heatmap={chartCenterHistoryHeatmap}
+                          onPeriodSelect={openHistoryTab}
+                        />
+                        <HistoryProfitDistributionChartCard distribution={chartCenterHistoryProfitDistribution} />
+                      </div>
+                    </section>
+                  </>
                 ) : null}
               </div>
             </StatusCard>
