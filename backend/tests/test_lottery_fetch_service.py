@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from bs4 import BeautifulSoup
 
+from backend.app.lotteries import build_qxc_prize_breakdown
 from backend.app.services.lottery_fetch_service import LotteryFetchService
 
 
@@ -192,6 +193,74 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
         self.assertIsNotNone(soup)
         self.assertEqual(response.encoding, "gb2312")
+
+    def test_fetch_page_sets_qxc_encoding_from_apparent_encoding(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.logger = Mock()
+        response = Mock(status_code=200, text="<html></html>", apparent_encoding="gb2312")
+        service.session = Mock()
+        service.session.get.return_value = response
+
+        soup = service.fetch_page("https://www.500.com/lottery/qxc/", retry=1)
+
+        self.assertIsNotNone(soup)
+        self.assertEqual(response.encoding, "gb2312")
+
+    def test_parse_qxc_data_from_zj_table_rows(self) -> None:
+        html = """
+        <table class="zj_table">
+          <thead><tr><th>时间</th><th>期号</th><th>开奖号码</th></tr></thead>
+          <tbody>
+            <tr><td>21:25:00</td><td><span>26037</span></td><td><em class="red">9,9,6,9,4,0,1</em></td></tr>
+            <tr><td>21:25:00</td><td><span>26033</span></td><td><em class="red">1,8,9,1,9,3,14</em></td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.logger = Mock()
+        service.fetch_draw_detail = Mock(
+            side_effect=[
+                {"jackpot_pool_balance": 289159709, "prize_breakdown": build_qxc_prize_breakdown()},
+                {"jackpot_pool_balance": 275120000, "prize_breakdown": build_qxc_prize_breakdown()},
+            ]
+        )
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_qxc_data(soup)
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["period"], "26037")
+        self.assertEqual(data[0]["digits"], ["09", "09", "06", "09", "04", "00", "01"])
+        self.assertEqual(data[1]["period"], "26033")
+        self.assertEqual(data[1]["digits"], ["01", "08", "09", "01", "09", "03", "14"])
+
+    def test_parse_qxc_prize_breakdown_supports_td_header_table(self) -> None:
+        html = """
+        <table class="kj_tablelist02">
+          <tr><td colspan="3">开奖详情</td></tr>
+          <tr><td>奖项</td><td>中奖注数</td><td>单注奖金（元）</td></tr>
+          <tr><td>一等奖</td><td>2</td><td>5,000,000</td></tr>
+          <tr><td>二等奖</td><td>3</td><td>129,823</td></tr>
+          <tr><td>三等奖</td><td>23</td><td>3,000</td></tr>
+          <tr><td>四等奖</td><td>829</td><td>500</td></tr>
+          <tr><td>五等奖</td><td>16283</td><td>30</td></tr>
+          <tr><td>六等奖</td><td>739232</td><td>5</td></tr>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        soup = BeautifulSoup(html, "html.parser")
+
+        breakdown = service.parse_qxc_prize_breakdown(soup)
+        prize_map = {item["prize_level"]: item for item in breakdown}
+
+        self.assertEqual(prize_map["一等奖"]["winner_count"], 2)
+        self.assertEqual(prize_map["一等奖"]["prize_amount"], 5000000)
+        self.assertEqual(prize_map["二等奖"]["winner_count"], 3)
+        self.assertEqual(prize_map["二等奖"]["prize_amount"], 129823)
+        self.assertEqual(prize_map["六等奖"]["winner_count"], 739232)
+        self.assertEqual(prize_map["六等奖"]["prize_amount"], 5)
 
     def test_fetch_and_save_applies_limit(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)

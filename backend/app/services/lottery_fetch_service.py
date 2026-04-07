@@ -146,10 +146,7 @@ class LotteryFetchService:
                     extra={"context": {"attempt": attempt + 1, "retry": retry, "url": url}},
                 )
                 response = self.session.get(url, timeout=30)
-                if self.lottery_code in {"pl3", "pl5"}:
-                    response.encoding = response.apparent_encoding or "gb18030"
-                else:
-                    response.encoding = "utf-8"
+                response.encoding = self._resolve_response_encoding(response)
                 if response.status_code == 200:
                     return BeautifulSoup(response.text, "html.parser")
                 self.logger.warning("Unexpected HTTP status", extra={"context": {"status_code": response.status_code}})
@@ -279,12 +276,12 @@ class LotteryFetchService:
                     }
                 )
 
-        for row in soup.select("table tr"):
+        for row in soup.select("table.zj_table tbody tr"):
             cols = row.find_all("td")
             if len(cols) < 3:
                 continue
-            period_match = re.search(r"(\d{5,})", cols[0].get_text(" ", strip=True))
-            digits = re.findall(r"\d{1,2}", cols[1].get_text(" ", strip=True))
+            period_match = re.search(r"(\d{5,})", cols[1].get_text(" ", strip=True))
+            digits = re.findall(r"\d{1,2}", cols[2].get_text(" ", strip=True))
             date_match = re.search(r"(\d{4}-\d{2}-\d{2})", row.get_text(" ", strip=True))
             if not period_match or len(digits) < 7:
                 continue
@@ -386,14 +383,31 @@ class LotteryFetchService:
     def parse_qxc_prize_breakdown(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         for table in soup.find_all("table"):
             headers = [cell.get_text(strip=True) for cell in table.find_all("th")]
-            if "奖级" not in headers and "奖项" not in headers and "中奖注数" not in headers:
+            if not headers:
+                for row in table.find_all("tr")[:4]:
+                    candidate_headers = [cell.get_text(strip=True) for cell in row.find_all("td")]
+                    if len(candidate_headers) < 3:
+                        continue
+                    normalized_candidate_headers = [
+                        header.replace("（", "(").replace("）", ")").replace(" ", "") for header in candidate_headers
+                    ]
+                    if any(header in {"奖级", "奖项"} for header in normalized_candidate_headers):
+                        headers = candidate_headers
+                        break
+            normalized_headers = [header.replace("（", "(").replace("）", ")").replace(" ", "") for header in headers]
+            has_prize_header = any(header in {"奖级", "奖项"} for header in normalized_headers)
+            has_count_header = any("中奖注数" in header for header in normalized_headers)
+            has_amount_header = any("每注奖额" in header or "单注奖金" in header for header in normalized_headers)
+            if not has_prize_header or not has_count_header or not has_amount_header:
                 continue
             breakdown: list[dict[str, Any]] = []
             for row in table.find_all("tr"):
                 cells = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
                 if len(cells) < 3:
                     continue
-                prize_level = cells[0].replace("等奖", "等奖").strip()
+                prize_level = cells[0].strip()
+                if not prize_level.endswith("等奖"):
+                    continue
                 if "注" not in cells[1] and not re.search(r"\d", cells[1]):
                     continue
                 breakdown.append(
@@ -409,6 +423,11 @@ class LotteryFetchService:
                 prize_map = {item["prize_level"]: item for item in breakdown}
                 return [prize_map.get(item["prize_level"], item) for item in build_qxc_prize_breakdown()]
         return build_qxc_prize_breakdown()
+
+    def _resolve_response_encoding(self, response: requests.Response) -> str:
+        if self.lottery_code in {"pl3", "pl5", "qxc"}:
+            return response.apparent_encoding or "gb18030"
+        return "utf-8"
 
     def build_fallback_prize_breakdown(self) -> list[dict[str, Any]]:
         return [
