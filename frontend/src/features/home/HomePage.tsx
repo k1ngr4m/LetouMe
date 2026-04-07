@@ -54,6 +54,7 @@ import {
 import type { LotteryCode, LotteryDraw, PredictionGroup, PredictionModel, PredictionsHistoryListRecord, SimulationTicketPayload, SimulationTicketRecord } from '../../shared/types/api'
 import {
   getHomeTabFromPath,
+  HOME_TAB_PATHS,
   type HomeDetailRouteState,
   type HomeModelView,
   type HomePredictionReturnState,
@@ -64,7 +65,6 @@ import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
-const LOTTERY_DEFAULT_PAGE_SIZE = 10
 const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
 const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
@@ -482,14 +482,13 @@ export function HomePage() {
   const [scoreViewSortDirection, setScoreViewSortDirection] = useState<ScoreViewSortDirection>('desc')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
-  const [lotteryPage, setLotteryPage] = useState(1)
-  const [lotteryPageSize, setLotteryPageSize] = useState(LOTTERY_DEFAULT_PAGE_SIZE)
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
   const [exportingModelId, setExportingModelId] = useState<string | null>(null)
   const [isExportingSummary, setIsExportingSummary] = useState(false)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
+  const [selectedHistoryPeriod, setSelectedHistoryPeriod] = useState<string | null>(null)
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
   const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'compound' | 'dantuo'>('direct')
@@ -527,19 +526,19 @@ export function HomePage() {
   const canNavigateDashboardTab = () =>
     activeTab !== 'my-bets' || !myBetsFormDirty || window.confirm('有未保存内容，确定离开当前页面吗？')
 
-  const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
+  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(
     selectedLottery,
     historyPage,
     historyPageSize,
     historyStrategyFilters,
     historyPlayTypeFilters,
-    lotteryPage,
-    lotteryPageSize,
+    1,
+    10,
     {
       enableCurrentPredictions: true,
       enableLotteryCharts: true,
-      enablePredictionsHistory: activeTab === 'history',
-      enablePagedLotteryHistory: activeTab === 'history',
+      enablePredictionsHistory: activeTab === 'charts' || activeTab === 'history' || activeTab === 'prediction',
+      enablePagedLotteryHistory: false,
     },
   )
   const lotteryLabel = selectedLottery === 'dlt' ? '大乐透' : selectedLottery === 'pl3' ? '排列3' : '排列5'
@@ -556,7 +555,6 @@ export function HomePage() {
   )
   const history = predictionsHistory.data
   const chartDraws = lotteryCharts.data?.data || []
-  const pagedDraws = pagedLotteryHistory.data?.data || []
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
   const {
     isModelFilterOpen,
@@ -629,7 +627,6 @@ export function HomePage() {
     }
     setHistoryFallbackSignature(null)
     setHistoryPage(1)
-    setLotteryPage(1)
     setSummaryStrategyFilters([])
     setHistoryStrategyFilters([])
     setIsSummaryModelChipsExpanded(false)
@@ -778,6 +775,30 @@ export function HomePage() {
     const frameId = requestAnimationFrame(() => scrollToSection(section))
     return () => cancelAnimationFrame(frameId)
   }, [activeTab, location.hash])
+
+  useEffect(() => {
+    if (activeTab !== 'charts') return
+    const hashTarget = location.hash.replace('#', '').trim()
+    if (!hashTarget) return
+    const frameId = requestAnimationFrame(() => {
+      document.getElementById(hashTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [activeTab, location.hash])
+
+  useEffect(() => {
+    if (activeTab !== 'history') return
+    const targetPeriod = navigationState?.targetHistoryPeriod
+    if (!targetPeriod) return
+    setSelectedHistoryPeriod(targetPeriod)
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        scrollY: navigationState?.scrollY,
+        predictionPlayMode: navigationState?.predictionPlayMode,
+      } satisfies HomeDetailRouteState,
+    })
+  }, [activeTab, location.pathname, navigate, navigationState])
 
   const historyAllModelRefs = useMemo<HistoryModelRef[]>(() => {
     const references = new Map<string, HistoryModelRef>()
@@ -934,6 +955,7 @@ export function HomePage() {
   const summaryHiddenModelChipCount = Math.max(0, summarySelectableModels.length - summaryVisibleModelChips.length)
   const mobileExportDisabled = isMobileExportDisabled()
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
+  const topHistoryModel = historyModelStats[0] || null
   const historyHitTrend = useMemo(
     () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
     [filteredHistory, historyVisibleModelIds],
@@ -943,7 +965,21 @@ export function HomePage() {
     [filteredHistory, historyVisibleModelIds],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
-  const totalLotteryPages = Math.max(1, Math.ceil((pagedLotteryHistory.data?.total_count || 0) / lotteryPageSize))
+  const chartCenterSummary = useMemo(() => {
+    const totalNetProfit = historyModelStats.reduce((sum, item) => sum + (item.prize_amount - item.cost_amount), 0)
+    const averageWinRate =
+      historyModelStats.length > 0
+        ? historyModelStats.reduce((sum, item) => sum + item.win_rate_by_period, 0) / historyModelStats.length
+        : 0
+    const latestTrendPeriod = historyHitTrend.at(-1)?.period
+    return {
+      totalNetProfit,
+      averageWinRate,
+      latestTrendPeriod: latestTrendPeriod ? String(latestTrendPeriod) : '—',
+      topModelName: topHistoryModel?.model_name || '—',
+      topModelScore: topHistoryModel?.score_profile?.overall_score || 0,
+    }
+  }, [historyHitTrend, historyModelStats, topHistoryModel])
   const isPl3Lottery = selectedLottery === 'pl3'
   const isPl5Lottery = selectedLottery === 'pl5'
   const redChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 0) : buildRedFrequencyChart(chartDraws)
@@ -988,8 +1024,11 @@ export function HomePage() {
   }, [totalHistoryPages])
 
   useEffect(() => {
-    setLotteryPage((currentPage) => Math.min(currentPage, totalLotteryPages))
-  }, [totalLotteryPages])
+    if (!selectedHistoryPeriod) return
+    if (!filteredHistory.some((record) => record.target_period === selectedHistoryPeriod)) {
+      setSelectedHistoryPeriod(null)
+    }
+  }, [filteredHistory, selectedHistoryPeriod])
 
   function togglePinned(modelId: string) {
     setPinnedModelIds((previous) => {
@@ -1112,11 +1151,6 @@ export function HomePage() {
     setHistoryPageSize(nextPageSize)
   }
 
-  function handleLotteryPageSizeChange(nextPageSize: number) {
-    setLotteryPage((currentPage) => calculatePageForPageSize(currentPage, lotteryPageSize, nextPageSize))
-    setLotteryPageSize(nextPageSize)
-  }
-
   function toggleSummaryStrategyFilter(strategy: string) {
     const normalized = normalizeStrategyLabel(strategy)
     setSummaryStrategyFilters((previous) =>
@@ -1136,9 +1170,54 @@ export function HomePage() {
     )
   }
 
+  function openChartCenter(targetHash?: 'overview' | 'trend' | 'history-trend') {
+    navigate(`${HOME_TAB_PATHS.charts}${targetHash ? `#${targetHash}` : ''}`)
+  }
+
+  function openHistoryTab(targetPeriod?: string) {
+    navigate(HOME_TAB_PATHS.history, {
+      state: targetPeriod
+        ? ({
+            scrollY: window.scrollY,
+            targetHistoryPeriod: targetPeriod,
+          } satisfies HomeDetailRouteState)
+        : undefined,
+    })
+  }
+
   return (
     <div className="page-stack">
       <HomeDashboardTabStrip activeTab={activeTab} beforeNavigate={canNavigateDashboardTab} />
+
+      {activeTab === 'prediction' ? (
+        <StatusCard title="图表中心摘要" subtitle="保留关键判断指标，详细趋势与回溯进入图表中心查看。">
+          <div className="chart-center-summary-grid">
+            <article className="chart-center-summary-card">
+              <span>历史净盈亏</span>
+              <strong>{formatCurrency(chartCenterSummary.totalNetProfit)}</strong>
+              <small>基于当前筛选模型汇总</small>
+            </article>
+            <article className="chart-center-summary-card">
+              <span>平均按期中奖率</span>
+              <strong>{formatPercent(chartCenterSummary.averageWinRate)}</strong>
+              <small>最新趋势期号 {chartCenterSummary.latestTrendPeriod}</small>
+            </article>
+            <article className="chart-center-summary-card chart-center-summary-card--accent">
+              <span>当前 Top 模型</span>
+              <strong>{chartCenterSummary.topModelName}</strong>
+              <small>综合分 {chartCenterSummary.topModelScore}</small>
+            </article>
+          </div>
+          <div className="chart-center-summary-actions">
+            <button className="ghost-button" type="button" onClick={() => openChartCenter('overview')}>
+              进入图表中心
+            </button>
+            <button className="ghost-button ghost-button--compact" type="button" onClick={() => openHistoryTab()}>
+              查看开奖回溯
+            </button>
+          </div>
+        </StatusCard>
+      ) : null}
 
       {activeTab === 'prediction' ? (
         <>
@@ -1465,27 +1544,68 @@ export function HomePage() {
         </>
       ) : null}
 
-      {activeTab === 'analysis' ? (
+      {activeTab === 'charts' ? (
         <Suspense fallback={<div className="state-shell">正在加载分析图表...</div>}>
-          <AnalysisChartsPanel
-            lotteryCode={selectedLottery}
-            redChart={redChart}
-            blueChart={blueChart}
-            pl3UnitChart={pl3UnitChart}
-            pl5PositionCharts={pl5PositionCharts}
-            oddEvenChart={oddEvenChart}
-            sumTrendChart={sumTrendChart}
-          />
+          <div className="page-stack chart-center-page">
+            <StatusCard title="图表总览" subtitle="统一查看历史命中、盈亏趋势与高分模型表现。">
+              <div id="overview" className="chart-center-summary-grid">
+                <article className="chart-center-summary-card">
+                  <span>历史净盈亏</span>
+                  <strong>{formatCurrency(chartCenterSummary.totalNetProfit)}</strong>
+                  <small>当前筛选模型累计表现</small>
+                </article>
+                <article className="chart-center-summary-card">
+                  <span>平均按期中奖率</span>
+                  <strong>{formatPercent(chartCenterSummary.averageWinRate)}</strong>
+                  <small>点击趋势图可联动到对应期号</small>
+                </article>
+                <article className="chart-center-summary-card chart-center-summary-card--accent">
+                  <span>领先模型</span>
+                  <strong>{chartCenterSummary.topModelName}</strong>
+                  <small>综合分 {chartCenterSummary.topModelScore}</small>
+                </article>
+              </div>
+            </StatusCard>
+
+            <div id="trend">
+              <AnalysisChartsPanel
+                lotteryCode={selectedLottery}
+                redChart={redChart}
+                blueChart={blueChart}
+                pl3UnitChart={pl3UnitChart}
+                pl5PositionCharts={pl5PositionCharts}
+                oddEvenChart={oddEvenChart}
+                sumTrendChart={sumTrendChart}
+              />
+            </div>
+
+            <div id="history-trend">
+              <HistoryHitTrendCard
+                historyVisibleModels={historyVisibleModels}
+                historyHitTrend={historyHitTrend}
+                historyProfitTrend={historyProfitTrend}
+                onPeriodSelect={openHistoryTab}
+              />
+            </div>
+          </div>
         </Suspense>
       ) : null}
 
-      {activeTab === 'simulation' ? <SimulationPlayground lotteryCode={selectedLottery} draws={chartDraws} targetPeriod={currentPredictions.data?.target_period || ''} /> : null}
-
       {activeTab === 'history' ? (
-        <div className="page-section">
-          <Suspense fallback={<div className="state-shell">正在加载历史图表...</div>}>
-            <HistoryHitTrendCard historyVisibleModels={historyVisibleModels} historyHitTrend={historyHitTrend} historyProfitTrend={historyProfitTrend} />
-          </Suspense>
+        <div className="page-section" id="history">
+          <StatusCard title="模型对比" subtitle="按综合分、中奖率和净盈亏快速比较当前筛选模型。">
+            <div id="compare" className="chart-center-compare-grid">
+              {historyModelStats.slice(0, 6).map((item) => (
+                <article key={`compare-${item.model_id}`} className="chart-center-compare-card">
+                  <strong>{item.model_name}</strong>
+                  <span>综合分 {item.score_profile?.overall_score || 0}</span>
+                  <span>按期中奖率 {formatPercent(item.win_rate_by_period)}</span>
+                  <span>净盈亏 {formatCurrency(item.prize_amount - item.cost_amount)}</span>
+                </article>
+              ))}
+              {!historyModelStats.length ? <div className="state-shell">当前筛选条件下暂无可对比模型。</div> : null}
+            </div>
+          </StatusCard>
 
           <StatusCard title="命中回溯" subtitle="按模型和期号筛选历史预测表现。">
             {isModelFilterOpen ? (
@@ -1626,6 +1746,7 @@ export function HomePage() {
                       playTypeFilters={historyPlayTypeFilters}
                       onShowExportToast={showExportToast}
                       hideExport={mobileExportDisabled}
+                      isHighlighted={selectedHistoryPeriod === record.target_period}
                     />
                   ))}
                 </div>
@@ -1644,58 +1765,10 @@ export function HomePage() {
               onNext={() => setHistoryPage((value) => Math.min(totalHistoryPages, value + 1))}
             />
           </StatusCard>
-
-          <StatusCard title="开奖历史" subtitle="分页查看历史开奖号码。">
-            <div className="table-shell">
-              <table className="history-table">
-                <thead>
-                  <tr>
-                    <th>期号</th>
-                    <th>日期</th>
-                    <th>号码</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedDraws.map((draw) => {
-                    const mainBalls = selectedLottery === 'dlt' ? draw.red_balls : (draw.digits?.length ? draw.digits : draw.red_balls)
-                    return (
-                      <tr key={draw.period}>
-                        <td>{draw.period}</td>
-                        <td>{draw.date}</td>
-                        <td>
-                          <div className="number-row number-row--tight">
-                            {mainBalls.map((ball, index) => (
-                              <NumberBall key={`${draw.period}-r-${index}-${ball}`} value={ball} color="red" size="sm" />
-                            ))}
-                            {selectedLottery === 'dlt' ? <span className="number-row__divider" /> : null}
-                            {selectedLottery === 'dlt'
-                              ? draw.blue_balls.map((ball, index) => (
-                                  <NumberBall key={`${draw.period}-b-${index}-${ball}`} value={ball} color="blue" size="sm" />
-                                ))
-                              : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <PagerControls
-              page={lotteryPage}
-              totalPages={totalLotteryPages}
-              totalCount={pagedLotteryHistory.data?.total_count || 0}
-              pageSize={lotteryPageSize}
-              pageSizeOptions={HISTORY_PAGE_SIZE_OPTIONS}
-              unitLabel="期"
-              onPageSizeChange={handleLotteryPageSizeChange}
-              onPrevious={() => setLotteryPage((value) => Math.max(1, value - 1))}
-              onNext={() => setLotteryPage((value) => Math.min(totalLotteryPages, value + 1))}
-            />
-          </StatusCard>
         </div>
       ) : null}
+
+      {activeTab === 'simulation' ? <SimulationPlayground lotteryCode={selectedLottery} draws={chartDraws} targetPeriod={currentPredictions.data?.target_period || ''} /> : null}
 
       {activeTab === 'my-bets' ? (
         <Suspense fallback={<div className="state-shell">正在加载投注面板...</div>}>
@@ -3866,6 +3939,7 @@ function HistoryRecordCard({
   playTypeFilters,
   onShowExportToast,
   hideExport,
+  isHighlighted = false,
 }: {
   record: PredictionsHistoryListRecord
   lotteryCode: LotteryCode
@@ -3874,6 +3948,7 @@ function HistoryRecordCard({
   playTypeFilters: PredictionPlayType[]
   onShowExportToast: (message: string, tone: 'success' | 'error') => void
   hideExport: boolean
+  isHighlighted?: boolean
 }) {
   const [expandedModelIds, setExpandedModelIds] = useState<string[]>([])
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
@@ -4005,6 +4080,11 @@ function HistoryRecordCard({
     })
   }, [availableModelModeKeys])
 
+  useEffect(() => {
+    if (!isHighlighted) return
+    recordCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [isHighlighted])
+
   function toggleModelExpansion(modelModeKey: string) {
     setExpandedModelIds((previous) =>
       previous.includes(modelModeKey) ? previous.filter((id) => id !== modelModeKey) : [...previous, modelModeKey],
@@ -4049,7 +4129,7 @@ function HistoryRecordCard({
   }
 
   return (
-    <article ref={recordCardRef} className="history-record-card">
+    <article ref={recordCardRef} className={clsx('history-record-card', isHighlighted && 'is-highlighted')}>
       <div className="history-record-card__header">
         <div className="history-record-card__title-block">
           <p className="history-record-card__eyebrow">第 {record.target_period} 期</p>

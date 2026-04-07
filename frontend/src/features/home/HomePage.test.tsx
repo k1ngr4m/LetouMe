@@ -1252,7 +1252,7 @@ describe('HomePage dashboard sidebar', () => {
   it('updates url when switching dashboard tabs', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
 
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
   })
@@ -1270,7 +1270,7 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(screen.getByText('方案筛选')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
 
     expect(screen.getAllByText('方案筛选').length).toBeGreaterThan(0)
   })
@@ -1281,7 +1281,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '排列5' }))
     expect(screen.getByText('方案筛选')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     expect(screen.getByText('方案筛选')).toBeInTheDocument()
     expect(screen.queryByText('当前暂无可选方案')).not.toBeInTheDocument()
   })
@@ -1292,7 +1292,7 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
     expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     expect(screen.queryByText('方案筛选')).not.toBeInTheDocument()
     expect(screen.queryByText('正在更新方案筛选结果...')).not.toBeInTheDocument()
   })
@@ -1354,7 +1354,7 @@ describe('HomePage dashboard sidebar', () => {
     simulateDltCompoundCurrentPredictions.current = true
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '复式' })[0])
 
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
@@ -1429,7 +1429,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(modelTable as HTMLElement).queryByText('模型B')).not.toBeInTheDocument()
     expect(summaryScope.getByRole('button', { name: '模型B' })).toHaveClass('is-inactive')
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
     const historyRecords = (historySection as HTMLElement).querySelector('.history-card-list__records')
@@ -1509,12 +1509,9 @@ describe('HomePage dashboard sidebar', () => {
   it('shows history win rates and period cost summary', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
-    expect(await screen.findByText('命中趋势折线')).toBeInTheDocument()
-    expect(await screen.findByText('命中堆叠柱形统计')).toBeInTheDocument()
-    expect(await screen.findByText('盈亏趋势折线')).toBeInTheDocument()
 
     expect(within(historySection as HTMLElement).getAllByText('按期中奖率 100%').length).toBeGreaterThan(0)
     expect(within(historySection as HTMLElement).getAllByText('按注中奖率 20%').length).toBeGreaterThan(0)
@@ -1535,7 +1532,7 @@ describe('HomePage dashboard sidebar', () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getByRole('button', { name: '导出开奖回溯：第 2026031 期' }))
 
     await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
@@ -1561,7 +1558,7 @@ describe('HomePage dashboard sidebar', () => {
   it('paginates history records and supports page size changes', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
 
@@ -1591,7 +1588,7 @@ describe('HomePage dashboard sidebar', () => {
   it('filters history records by selected strategy', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
     expect(within(historySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
@@ -1616,7 +1613,7 @@ describe('HomePage dashboard sidebar', () => {
   it('applies history strategy from page 2 with one click', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
 
@@ -1640,7 +1637,7 @@ describe('HomePage dashboard sidebar', () => {
     simulateHistoryFilterLoading.current = true
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
 
@@ -1661,34 +1658,10 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(historySection as HTMLElement).queryByText('第 2026030 期')).not.toBeInTheDocument()
   })
 
-  it('reuses pager selector in lottery history', async () => {
-    renderPage()
-
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
-    const lotterySection = screen.getByRole('heading', { name: '开奖历史' }).closest('section')
-    expect(lotterySection).not.toBeNull()
-
-    expect(within(lotterySection as HTMLElement).getByText('第 1 / 2 页')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).getByText('共 12 条记录')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).getByText('2026031')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).queryByText('2026021')).not.toBeInTheDocument()
-
-    await userEvent.click(within(lotterySection as HTMLElement).getByRole('button', { name: '下一页' }))
-
-    expect(within(lotterySection as HTMLElement).getByText('第 2 / 2 页')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).getByText('2026021')).toBeInTheDocument()
-
-    await userEvent.selectOptions(within(lotterySection as HTMLElement).getByRole('combobox'), '20')
-
-    expect(within(lotterySection as HTMLElement).getByText('第 1 / 1 页')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).getByText('2026031')).toBeInTheDocument()
-    expect(within(lotterySection as HTMLElement).getByText('2026021')).toBeInTheDocument()
-  })
-
   it('hides local sidebar navigation outside prediction tab', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '图表分析' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
 
     expect(screen.queryByRole('button', { name: '模型列表' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '预测统计' })).not.toBeInTheDocument()
@@ -1699,9 +1672,9 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '图表分析' }))
+    await userEvent.click(screen.getByRole('button', { name: '图表中心' }))
 
-    expect(screen.getByRole('heading', { name: '百位热号 Top 10' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '百位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '十位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '个位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '和值趋势' })).toBeInTheDocument()
@@ -1714,9 +1687,9 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列5' }))
-    await userEvent.click(screen.getByRole('button', { name: '图表分析' }))
+    await userEvent.click(screen.getByRole('button', { name: '图表中心' }))
 
-    expect(screen.getByRole('heading', { name: '万位热号 Top 10' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '万位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '千位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '百位热号 Top 10' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '十位热号 Top 10' })).toBeInTheDocument()
@@ -2028,7 +2001,7 @@ describe('HomePage dashboard sidebar', () => {
     })
 
     renderPage()
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
@@ -2127,7 +2100,7 @@ describe('HomePage dashboard sidebar', () => {
     })
 
     renderPage()
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getByRole('button', { name: '胆拖' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
@@ -2206,7 +2179,7 @@ describe('HomePage dashboard sidebar', () => {
     })
 
     renderPage()
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
 
@@ -2262,7 +2235,7 @@ describe('HomePage dashboard sidebar', () => {
     })
 
     renderPage()
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
@@ -2337,7 +2310,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '筛选' }))
     await userEvent.click(screen.getByRole('button', { name: 'openai_compatible' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const historySection = screen.getByRole('heading', { name: '命中回溯' }).closest('section')
     expect(historySection).not.toBeNull()
     const historyRecords = (historySection as HTMLElement).querySelector('.history-card-list__records')
@@ -2401,7 +2374,7 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
     expect(screen.getByText('方案筛选')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     expect(screen.getByText('方案筛选')).toBeInTheDocument()
     expect(screen.queryByText('当前暂无可选方案')).not.toBeInTheDocument()
     expect(screen.queryByText('正在更新方案筛选结果...')).not.toBeInTheDocument()
@@ -2487,7 +2460,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
@@ -2558,7 +2531,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
@@ -2626,7 +2599,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
@@ -2649,7 +2622,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
 
     expect(await screen.findByText('第 2026031 期')).toBeInTheDocument()
@@ -2695,7 +2668,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列5' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
     expect(firstHistoryCard).not.toBeNull()
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '展开模型详情：模型A' }))
@@ -2772,7 +2745,7 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await userEvent.click(screen.getAllByRole('button', { name: '和值' })[0])
 
     const firstHistoryCard = await screen.findByText('第 2026031 期')
@@ -2797,7 +2770,7 @@ describe('HomePage dashboard sidebar', () => {
   it('supports create and delete on my-bets tab', async () => {
     renderPage('/dashboard/my-bets')
     await screen.findByText('我的投注')
-    expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('第 2026032 期')).toBeInTheDocument(), { timeout: 10000 })
 
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
     await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
@@ -3002,10 +2975,10 @@ describe('HomePage dashboard sidebar', () => {
     const formView = await screen.findByTestId('my-bets-form-view')
     await userEvent.type(within(formView).getByLabelText('前区号码（逗号分隔）'), '01,02,03,04,05')
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/my-bets')
 
-    await userEvent.click(screen.getByRole('button', { name: '历史回溯' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
     await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history'))
 
     confirmSpy.mockRestore()

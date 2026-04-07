@@ -5,7 +5,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
   BookOpen,
-  ChartColumnIncreasing,
   ChevronDown,
   CheckSquare,
   CircleDollarSign,
@@ -96,6 +95,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const canManageRoles = hasPermission('role_management')
   const isSettingsRoute = location.pathname.startsWith('/settings')
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
+  const isChartCenterRoute = location.pathname === HOME_TAB_PATHS.charts
   const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
   const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
@@ -132,8 +132,8 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '设置中心'
-    if (location.pathname === HOME_TAB_PATHS.analysis) return '图表分析'
-    if (location.pathname === HOME_TAB_PATHS.history) return '历史回溯'
+    if (location.pathname === HOME_TAB_PATHS.charts) return '图表中心'
+    if (location.pathname === HOME_TAB_PATHS.history) return '开奖回溯'
     if (location.pathname === HOME_TAB_PATHS.simulation) return '模拟试玩'
     if (location.pathname === HOME_TAB_PATHS['my-bets']) return '我的投注'
     if (location.pathname === HOME_RULES_PATH) return '规则说明'
@@ -225,6 +225,12 @@ export function AppShell({ children }: PropsWithChildren) {
     setSidebarMode('workspace')
     setIsSidebarOpen(false)
     navigate(HOME_TAB_PATHS.prediction)
+  }
+
+  function openChartCenter() {
+    setSidebarMode('workspace')
+    setIsSidebarOpen(false)
+    navigate(HOME_TAB_PATHS.charts)
   }
 
   function openSettingsCenter() {
@@ -408,13 +414,9 @@ export function AppShell({ children }: PropsWithChildren) {
                 <CircleDollarSign size={16} aria-hidden="true" />
                 <span>模拟试玩</span>
               </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.analysis} onClick={onWorkspaceNavigate} title="图表分析">
-                <ChartColumnIncreasing size={16} aria-hidden="true" />
-                <span>图表分析</span>
-              </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="历史回溯">
+              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="开奖回溯">
                 <History size={16} aria-hidden="true" />
-                <span>历史回溯</span>
+                <span>开奖回溯</span>
               </NavLink>
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS['my-bets']} onClick={onWorkspaceNavigate} title="我的投注">
                 <WalletCards size={16} aria-hidden="true" />
@@ -503,15 +505,26 @@ export function AppShell({ children }: PropsWithChildren) {
               <h2 className="crm-topbar__title">{pageTitle}</h2>
             </div>
           </div>
-          <button
-            className={clsx('crm-topbar__workspace-btn', isDashboardRoute && 'is-active')}
-            type="button"
-            onClick={openWorkspaceCenter}
-            aria-label="工作台"
-            title="工作台"
-          >
-            工作台
-          </button>
+          <div className="crm-topbar__workspace-actions">
+            <button
+              className={clsx('crm-topbar__workspace-btn', isDashboardRoute && !isChartCenterRoute && 'is-active')}
+              type="button"
+              onClick={openWorkspaceCenter}
+              aria-label="工作台"
+              title="工作台"
+            >
+              工作台
+            </button>
+            <button
+              className={clsx('crm-topbar__workspace-btn crm-topbar__workspace-btn--secondary', location.pathname === HOME_TAB_PATHS.charts && 'is-active')}
+              type="button"
+              onClick={openChartCenter}
+              aria-label="图表中心"
+              title="图表中心"
+            >
+              图表中心
+            </button>
+          </div>
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button

@@ -68,7 +68,7 @@ export function App() {
               }
             />
             <Route
-              path={HOME_TAB_PATHS.analysis}
+              path={HOME_TAB_PATHS.charts}
               element={
                 <ProtectedRoute>
                   <AppShell>
@@ -87,6 +87,7 @@ export function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/dashboard/analysis" element={<Navigate to={`${HOME_TAB_PATHS.charts}#trend`} replace />} />
             <Route
               path={HOME_TAB_PATHS['my-bets']}
               element={

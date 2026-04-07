@@ -1388,6 +1388,11 @@ a {
   box-shadow: 0 30px 56px rgba(8, 12, 22, 0.28);
 }
 
+.history-record-card.is-highlighted {
+  border-color: rgba(242, 165, 79, 0.5);
+  box-shadow: 0 0 0 1px rgba(242, 165, 79, 0.28), 0 30px 56px rgba(8, 12, 22, 0.3);
+}
+
 .tab-strip {
   display: inline-flex;
   gap: 0.25rem;
@@ -3311,6 +3316,50 @@ a {
 .history-hit-trend__charts {
   display: grid;
   gap: 0.95rem;
+}
+
+.chart-center-page {
+  gap: 1rem;
+}
+
+.chart-center-summary-grid,
+.chart-center-compare-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.chart-center-summary-card,
+.chart-center-compare-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--panel-card-bg) 82%, transparent);
+}
+
+.chart-center-summary-card span,
+.chart-center-summary-card small,
+.chart-center-compare-card span {
+  color: var(--text-2);
+}
+
+.chart-center-summary-card strong,
+.chart-center-compare-card strong {
+  font-size: 1.05rem;
+}
+
+.chart-center-summary-card--accent {
+  border-color: rgba(242, 165, 79, 0.38);
+  background: color-mix(in srgb, rgba(242, 165, 79, 0.18) 70%, var(--panel-card-bg));
+}
+
+.chart-center-summary-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .history-hit-trend__chart-shell {
@@ -11274,10 +11323,16 @@ a {
   gap: 0.65rem;
 }
 
-.crm-topbar__workspace-btn {
+.crm-topbar__workspace-actions {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crm-topbar__workspace-btn {
   min-width: 5.2rem;
   min-height: 2.1rem;
   padding: 0.4rem 0.86rem;
@@ -11304,7 +11359,11 @@ a {
 }
 
 .crm-topbar__workspace-btn:active {
-  transform: translateX(-50%) translateY(0.3px) scale(0.998);
+  transform: translateY(0.3px) scale(0.998);
+}
+
+.crm-topbar__workspace-btn--secondary {
+  min-width: 6rem;
 }
 
 .crm-topbar__icon-btn.crm-topbar__menu-btn {
@@ -12488,6 +12547,10 @@ a {
 @media (max-width: 767px) {
   .crm-topbar {
     padding: 0.75rem 0.78rem;
+  }
+
+  .crm-topbar__workspace-actions {
+    display: none;
   }
 
   .crm-topbar__workspace-btn {

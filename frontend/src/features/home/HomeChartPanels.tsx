@@ -326,10 +326,14 @@ export function HistoryHitTrendCard({
   historyVisibleModels,
   historyHitTrend,
   historyProfitTrend,
+  selectedPeriod,
+  onPeriodSelect,
 }: {
   historyVisibleModels: HistoryModelRef[]
   historyHitTrend: HistoryTrendItem[]
   historyProfitTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
 }) {
   const sortedTrendData = [...historyHitTrend].sort((left, right) => {
     const leftPeriod = Number(left.period)
@@ -355,10 +359,17 @@ export function HistoryHitTrendCard({
           <div className="history-hit-trend__chart-shell">
             <p className="history-hit-trend__chart-title">命中趋势折线</p>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={sortedTrendData}>
+              <LineChart
+                data={sortedTrendData}
+                onClick={(state) => {
+                  const period = state?.activeLabel
+                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis allowDecimals={false} />
+                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
                 <Tooltip {...commonChartTooltipProps} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
@@ -379,10 +390,17 @@ export function HistoryHitTrendCard({
           <div className="history-hit-trend__chart-shell" aria-label="模型命中堆叠统计图">
             <p className="history-hit-trend__chart-title">命中堆叠柱形统计</p>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={sortedTrendData}>
+              <BarChart
+                data={sortedTrendData}
+                onClick={(state) => {
+                  const period = state?.activeLabel
+                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis allowDecimals={false} />
+                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
                 <Tooltip {...commonChartTooltipProps} />
                 <Legend />
                 {historyVisibleModels.map((model, index) => (
@@ -401,7 +419,13 @@ export function HistoryHitTrendCard({
           <div className="history-hit-trend__chart-shell" aria-label="模型盈亏趋势图">
             <p className="history-hit-trend__chart-title">盈亏趋势折线</p>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={sortedProfitData}>
+              <LineChart
+                data={sortedProfitData}
+                onClick={(state) => {
+                  const period = state?.activeLabel
+                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" />
                 <YAxis
@@ -412,6 +436,7 @@ export function HistoryHitTrendCard({
                     return [Math.min(min, 0), Math.max(max, 0)]
                   }}
                 />
+                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
                 <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
                 <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
                 <Legend />

@@ -1,6 +1,6 @@
 import type { PredictionPlayMode } from '../../shared/types/api'
 
-export type HomeTab = 'prediction' | 'analysis' | 'history' | 'simulation' | 'my-bets'
+export type HomeTab = 'prediction' | 'charts' | 'history' | 'simulation' | 'my-bets'
 export type HomeModelView = 'card' | 'list' | 'score'
 export type ScoreViewSortKey =
   | 'overallScore'
@@ -38,6 +38,7 @@ export type HomeDetailRouteState = {
   predictionPlayMode?: PredictionPlayMode
   focusBetRecordId?: number
   focusNonce?: string
+  targetHistoryPeriod?: string
   predictionReturnState?: HomePredictionReturnState
 }
 
@@ -47,7 +48,7 @@ export type HomeRulesRouteState = {
 
 export const HOME_TAB_PATHS: Record<HomeTab, string> = {
   prediction: '/dashboard/prediction',
-  analysis: '/dashboard/analysis',
+  charts: '/dashboard/charts',
   history: '/dashboard/history',
   simulation: '/dashboard/simulation',
   'my-bets': '/dashboard/my-bets',
