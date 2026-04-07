@@ -69,6 +69,35 @@ const PL3_RULE_CHAPTERS = [
   },
 ] as const
 
+const QXC_RULE_CHAPTERS = [
+  {
+    title: '第二章 投注',
+    items: [
+      '第六条 7星彩投注是指从000000-999999中选取1个6位数字作为前六位、从0-14中选取1个数字作为最后一位，共同组成一注号码进行的投注。每注金额人民币2元。',
+      '第七条 购买者可以进行复式投注。前六位、最后一位或全部位置都可进行复式选择。',
+      '第八条 购买者可进行2-99倍投注，单张彩票投注金额最高不超过20000元。',
+    ],
+  },
+  {
+    title: '第三章 设奖',
+    items: [
+      '第十三条 7星彩共设六个奖级，一、二等奖为浮动奖，三至六等奖为固定奖。',
+      '第三等奖固定3000元，第四等奖固定500元，第五等奖固定30元，第六等奖固定5元。',
+    ],
+  },
+  {
+    title: '第五章 中奖',
+    items: [
+      '一等奖：全部位置号码与开奖号码对应位置完全一致。',
+      '二等奖：前六位全部一致。',
+      '三等奖：前六位任意5位一致且最后一位一致。',
+      '四等奖：任意5位一致。',
+      '五等奖：任意4位一致。',
+      '六等奖：任意3位一致，或前六位任意1位一致且最后一位一致，或仅最后一位一致。',
+    ],
+  },
+] as const
+
 export function HomeRulesPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -83,6 +112,7 @@ export function HomeRulesPage() {
 
   const isPl3 = selectedLottery === 'pl3'
   const isPl5 = selectedLottery === 'pl5'
+  const isQxc = selectedLottery === 'qxc'
 
   return (
     <div className="page-stack rules-page">
@@ -90,13 +120,13 @@ export function HomeRulesPage() {
         <div className="panel-card__header">
           <div>
             <p className="modal-card__eyebrow">Game Rules</p>
-            <h2 className="panel-card__title">{isPl3 ? '排列3规则' : isPl5 ? '排列5规则' : '大乐透规则'}</h2>
+            <h2 className="panel-card__title">{isPl3 ? '排列3规则' : isPl5 ? '排列5规则' : isQxc ? '七星彩规则' : '大乐透规则'}</h2>
           </div>
           <button className="ghost-button" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
             返回预测总览
           </button>
         </div>
-        <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : '大乐透'}</div>
+        <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : isQxc ? '七星彩' : '大乐透'}</div>
       </section>
       <HomeDashboardTabStrip activeTab="rules" />
 
@@ -167,6 +197,30 @@ export function HomeRulesPage() {
                 <span>组选3</span>
                 <strong>346 元 / 注</strong>
               </article>
+            </div>
+          </StatusCard>
+        </>
+      ) : isQxc ? (
+        <>
+          <StatusCard title="七星彩规则正文" subtitle="根据本次接入口径整理的核心规则。">
+            <div className="rules-page__text-shell">
+              {QXC_RULE_CHAPTERS.map((chapter) => (
+                <section key={chapter.title} className="rules-page__chapter">
+                  <h3>{chapter.title}</h3>
+                  {chapter.items.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </section>
+              ))}
+            </div>
+          </StatusCard>
+
+          <StatusCard title="七星彩奖级" subtitle="一、二等奖为浮动奖；三至六等奖为固定奖。">
+            <div className="rules-page__prize-grid">
+              <article><span>三等奖</span><strong>3000 元 / 注</strong></article>
+              <article><span>四等奖</span><strong>500 元 / 注</strong></article>
+              <article><span>五等奖</span><strong>30 元 / 注</strong></article>
+              <article><span>六等奖</span><strong>5 元 / 注</strong></article>
             </div>
           </StatusCard>
         </>

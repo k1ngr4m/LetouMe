@@ -24,6 +24,8 @@ DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
 PL3_SUM_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_sum_prompt.md"
 PL5_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl5_prompt.md"
+QXC_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_prompt.md"
+QXC_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_compound_prompt.md"
 DLT_DANTUO_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_dantuo_prompt.md"
 DLT_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_compound_prompt.md"
 DEFAULT_CONTEXT_SIZE = 30
@@ -921,6 +923,8 @@ class PredictionGenerationService:
             path = PL3_SUM_PROMPT_PATH if normalized_play_mode == "direct_sum" else PL3_PROMPT_PATH
         elif normalized_code == "pl5":
             path = PL5_PROMPT_PATH
+        elif normalized_code == "qxc":
+            path = QXC_COMPOUND_PROMPT_PATH if normalized_play_mode == "compound" else QXC_PROMPT_PATH
         return path.read_text(encoding="utf-8")
 
     def _load_lottery_history(self, lottery_code: str = "dlt") -> dict[str, Any]:
@@ -1292,6 +1296,23 @@ class PredictionGenerationService:
                 if len(digits) != 5:
                     return False
                 continue
+            if normalized_code == "qxc":
+                play_type = str(group.get("play_type") or "").strip().lower()
+                position_selections = PredictionService._normalize_qxc_position_selections(group.get("position_selections"))
+                if normalized_play_mode == "compound":
+                    if play_type != "qxc_compound":
+                        return False
+                    if len(position_selections) != 7:
+                        return False
+                    if any(not values for values in position_selections):
+                        return False
+                else:
+                    digits = normalize_digit_balls(group.get("digits", []))
+                    if play_type != "direct":
+                        return False
+                    if len(digits) != 7:
+                        return False
+                continue
             if normalized_play_mode == "dantuo":
                 play_type = str(group.get("play_type") or "").strip().lower()
                 if play_type != "dlt_dantuo":
@@ -1374,6 +1395,10 @@ class PredictionGenerationService:
             if normalized_mode != "direct":
                 raise ValueError("排列5预测模式仅支持 direct")
             return "direct"
+        if normalized_code == "qxc":
+            if normalized_mode not in {"direct", "compound"}:
+                raise ValueError("七星彩预测模式仅支持 direct / compound")
+            return normalized_mode
         if normalized_mode not in {"direct", "direct_sum"}:
             raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
         return normalized_mode
@@ -1407,6 +1432,16 @@ class PredictionGenerationService:
             if normalized_play_mode == "compound":
                 return has_compound
             return not has_dantuo and not has_compound
+        if normalized_code == "qxc":
+            groups = prediction_model_payload.get("predictions")
+            if not isinstance(groups, list) or not groups:
+                return normalized_play_mode == "direct"
+            has_compound = any(
+                str(group.get("play_type") or "").strip().lower() == "qxc_compound"
+                for group in groups
+                if isinstance(group, dict)
+            )
+            return has_compound if normalized_play_mode == "compound" else not has_compound
         if normalized_code != "pl3":
             return True
         groups = prediction_model_payload.get("predictions")
@@ -1466,6 +1501,13 @@ class PredictionGenerationService:
                 if has_compound:
                     return "compound"
                 return "dantuo" if has_dantuo else "direct"
+            if normalized_lottery_code == "qxc":
+                has_compound = any(
+                    str(group.get("play_type") or "").strip().lower() == "qxc_compound"
+                    for group in groups
+                    if isinstance(group, dict)
+                )
+                return "compound" if has_compound else "direct"
             has_direct_sum = any(
                 str(group.get("play_type") or "").strip().lower() == "direct_sum"
                 for group in groups

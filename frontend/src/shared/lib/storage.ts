@@ -28,7 +28,7 @@ export function savePinnedModels(modelIds: string[], lotteryCode: LotteryCode = 
 export function loadSelectedLottery(): LotteryCode {
   try {
     const raw = window.localStorage.getItem(SELECTED_LOTTERY_KEY)
-    return raw === 'pl3' || raw === 'pl5' ? raw : 'dlt'
+    return raw === 'pl3' || raw === 'pl5' || raw === 'qxc' ? raw : 'dlt'
   } catch {
     return 'dlt'
   }

@@ -1,7 +1,7 @@
 import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
-export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum'
+export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'qxc_compound'
 export type PrizeLevel =
   | '一等奖'
   | '二等奖'
@@ -38,6 +38,7 @@ export type SimulationSelection = {
   directUnits: string[]
   groupNumbers: string[]
   sumValues: string[]
+  positionSelections?: string[][]
 }
 
 export type SimulationMatchRecord = {
@@ -70,6 +71,7 @@ export function normalizeSimulationTicket(ticket: SimulationTicketRecord): Simul
     direct_units: (ticket.direct_units || []).map(padBall).sort(),
     group_numbers: (ticket.group_numbers || []).map(padBall).sort(),
     sum_values: (ticket.sum_values || []).map(padBall).sort((left, right) => Number(left) - Number(right)),
+    position_selections: (ticket.position_selections || []).map((values) => (values || []).map(padBall).sort((left, right) => Number(left) - Number(right))),
     bet_count: Number(ticket.bet_count || 0),
     amount: Number(ticket.amount || 0),
     created_at: ticket.created_at || 0,
@@ -126,6 +128,10 @@ export function calculateBetCount(selection: SimulationSelection) {
       selection.directUnits.length
     )
   }
+  if (selection.lotteryCode === 'qxc') {
+    if (!(selection.positionSelections || []).length || (selection.positionSelections || []).length !== 7) return 0
+    return (selection.positionSelections || []).reduce((product, values) => (values.length ? product * values.length : 0), 1)
+  }
   if (selection.playType === 'direct') {
     if (!selection.directHundreds.length || !selection.directTens.length || !selection.directUnits.length) return 0
     return selection.directHundreds.length * selection.directTens.length * selection.directUnits.length
@@ -175,6 +181,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
         directUnits: [],
         groupNumbers: [],
         sumValues: [],
+        positionSelections: [],
       }
     }
     return {
@@ -193,6 +200,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       directUnits: [],
       groupNumbers: [],
       sumValues: [],
+      positionSelections: [],
     }
   }
 
@@ -215,6 +223,35 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
         directUnits: pickRandomBalls(digits, 1),
         groupNumbers: [],
         sumValues: [],
+        positionSelections: [],
+      }
+    }
+    if (lotteryCode === 'qxc') {
+      return {
+        lotteryCode,
+        playType,
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
+        directTenThousands: [],
+        directThousands: [],
+        directHundreds: [],
+        directTens: [],
+        directUnits: [],
+        groupNumbers: [],
+        sumValues: [],
+        positionSelections: [
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(digits, 1),
+          pickRandomBalls(buildBallRange(15, 0), 1),
+        ],
       }
     }
     return {
@@ -233,6 +270,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       directUnits: pickRandomBalls(digits, 1),
       groupNumbers: [],
       sumValues: [],
+      positionSelections: [],
     }
   }
 
@@ -253,6 +291,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
       directUnits: [],
       groupNumbers: [],
       sumValues: pickRandomBalls(pl3SumOptions, 1),
+      positionSelections: [],
     }
   }
 
@@ -273,6 +312,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     directUnits: [],
     groupNumbers: pickRandomBalls(buildBallRange(10, 0), groupSize),
     sumValues: [],
+    positionSelections: [],
   }
 }
 
@@ -359,10 +399,12 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
   return draws
     .slice(0, limit)
     .map((draw) => {
-      const expectedLength = selection.lotteryCode === 'pl5' ? 5 : 3
+      const expectedLength = selection.lotteryCode === 'qxc' ? 7 : selection.lotteryCode === 'pl5' ? 5 : 3
       const actualDigits = resolveDigits(draw, expectedLength)
       const directDigits = (
-        selection.lotteryCode === 'pl5'
+        selection.lotteryCode === 'qxc'
+          ? (selection.positionSelections || [])
+          : selection.lotteryCode === 'pl5'
           ? [selection.directTenThousands, selection.directThousands, selection.directHundreds, selection.directTens, selection.directUnits]
           : [selection.directHundreds, selection.directTens, selection.directUnits]
       ).map((values) => values.map(padBall))
@@ -371,6 +413,8 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         : []
       const winningPrizes = selection.lotteryCode === 'pl5'
         ? calculatePl5PrizeBreakdown(selection, actualDigits)
+        : selection.lotteryCode === 'qxc'
+          ? calculateQxcPrizeBreakdown(selection, actualDigits)
         : calculatePl3PrizeBreakdown(selection, actualDigits)
 
       return {
@@ -515,6 +559,22 @@ function calculatePl5PrizeBreakdown(selection: SimulationSelection, actualDigits
     selection.directTens.includes(actualDigits[3]) &&
     selection.directUnits.includes(actualDigits[4])
   return matched ? [{ level: '直选', count: 1 }] : []
+}
+
+function calculateQxcPrizeBreakdown(selection: SimulationSelection, actualDigits: string[]): SimulationMatchPrize[] {
+  const positions = (selection.positionSelections || []).map((values) => values.map(padBall))
+  if (positions.length !== 7 || actualDigits.length !== 7) return []
+  const matchFlags = positions.map((values, index) => values.includes(actualDigits[index]))
+  const frontHits = matchFlags.slice(0, 6).filter(Boolean).length
+  const totalHits = matchFlags.filter(Boolean).length
+  const lastHit = Boolean(matchFlags[6])
+  if (totalHits === 7) return [{ level: '一等奖', count: 1 }]
+  if (frontHits === 6) return [{ level: '二等奖', count: Math.max(1, positions[6].length - (lastHit ? 1 : 0)) }]
+  if (frontHits === 5 && lastHit) return [{ level: '三等奖', count: 1 }]
+  if (totalHits === 5) return [{ level: '四等奖', count: 1 }]
+  if (totalHits === 4) return [{ level: '五等奖', count: 1 }]
+  if (totalHits === 3 || (frontHits === 1 && lastHit) || (!frontHits && lastHit)) return [{ level: '六等奖', count: 1 }]
+  return []
 }
 
 function resolveDigits(draw: LotteryDraw, expectedLength: number): string[] {

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 
-SUPPORTED_LOTTERY_CODES = ("dlt", "pl3", "pl5")
+SUPPORTED_LOTTERY_CODES = ("dlt", "pl3", "pl5", "qxc")
 
 
 def normalize_lottery_code(value: str | None) -> str:
@@ -41,6 +41,20 @@ def normalize_group_digits(values: list[Any] | None) -> list[str]:
     return sorted(normalize_digit_balls(values)[:3])
 
 
+def normalize_qxc_position_digits(values: list[Any] | None, *, last: bool = False) -> list[str]:
+    normalized = normalize_digit_balls(values)
+    valid_range = range(0, 15) if last else range(0, 10)
+    result: list[str] = []
+    for value in normalized:
+        if not value.isdigit():
+            continue
+        number = int(value)
+        if number not in valid_range:
+            continue
+        result.append(value)
+    return result
+
+
 def build_pl3_prize_breakdown() -> list[dict[str, Any]]:
     return [
         {"prize_level": "直选", "prize_type": "basic", "winner_count": 0, "prize_amount": 1040, "total_amount": 0},
@@ -55,6 +69,17 @@ def build_pl5_prize_breakdown() -> list[dict[str, Any]]:
     ]
 
 
+def build_qxc_prize_breakdown() -> list[dict[str, Any]]:
+    return [
+        {"prize_level": "一等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 0, "total_amount": 0},
+        {"prize_level": "二等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 0, "total_amount": 0},
+        {"prize_level": "三等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 3000, "total_amount": 0},
+        {"prize_level": "四等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 500, "total_amount": 0},
+        {"prize_level": "五等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 30, "total_amount": 0},
+        {"prize_level": "六等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 5, "total_amount": 0},
+    ]
+
+
 @dataclass(frozen=True)
 class LotteryDefinition:
     code: str
@@ -63,7 +88,7 @@ class LotteryDefinition:
     ball_layout: str
 
     def predict_next_draw(self, latest_period: str, latest_date: str) -> dict[str, Any] | None:
-        if self.code == "dlt":
+        if self.code in {"dlt", "qxc"}:
             return _predict_next_dlt_draw(latest_period, latest_date)
         return _predict_next_daily_draw(latest_period, latest_date, self.draw_time)
 
@@ -72,6 +97,7 @@ LOTTERY_DEFINITIONS: dict[str, LotteryDefinition] = {
     "dlt": LotteryDefinition(code="dlt", name="大乐透", draw_time="21:25", ball_layout="dual"),
     "pl3": LotteryDefinition(code="pl3", name="排列3", draw_time="20:30", ball_layout="digit"),
     "pl5": LotteryDefinition(code="pl5", name="排列5", draw_time="20:30", ball_layout="digit"),
+    "qxc": LotteryDefinition(code="qxc", name="七星彩", draw_time="21:25", ball_layout="digit"),
 }
 
 

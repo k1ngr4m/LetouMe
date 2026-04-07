@@ -254,4 +254,36 @@ describe('simulation helpers', () => {
     expect(matches[0].totalWinningBets).toBe(1)
     expect(matches[0].prizes).toEqual([{ level: '直选', count: 1 }])
   })
+
+  it('calculates qxc compound bets and matches second prize', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['09'], ['09'], ['06'], ['09'], ['04'], ['00'], ['02', '03']],
+    }
+
+    expect(calculateBetCount(selection)).toBe(2)
+    expect(calculateAmount(selection)).toBe(4)
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{ period: '26037', date: '2026-04-05', red_balls: [], blue_balls: [], digits: ['09', '09', '06', '09', '04', '00', '01'] }],
+      30,
+    )
+    expect(matches[0].topPrizeLevel).toBe('二等奖')
+    expect(matches[0].totalWinningBets).toBe(2)
+  })
 })

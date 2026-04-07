@@ -129,6 +129,35 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["jackpot_pool_balance"], 17610500)
 
+    def test_parse_qxc_data_from_overview_block(self) -> None:
+        html = """
+        <div class="qxc_info">
+          <h3>七星彩 第26037期</h3>
+          <p>开奖日期：2026-04-05</p>
+          <div class="numballs">
+            <b>9</b><b>9</b><b>6</b><b>9</b><b>4</b><b>0</b><b>1</b>
+          </div>
+          <p>奖池累计金额：289,159,709元</p>
+        </div>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.logger = Mock()
+        service.fetch_draw_detail = Mock(
+            return_value={
+                "jackpot_pool_balance": 289159709,
+                "prize_breakdown": [{"prize_level": "三等奖", "prize_type": "basic", "winner_count": 23, "prize_amount": 3000, "total_amount": 69000}],
+            }
+        )
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_qxc_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26037")
+        self.assertEqual(data[0]["digits"], ["09", "09", "06", "09", "04", "00", "01"])
+        self.assertEqual(data[0]["jackpot_pool_balance"], 289159709)
+
     def test_parse_pl5_data_falls_back_to_detail_jackpot(self) -> None:
         html = """
         <table>

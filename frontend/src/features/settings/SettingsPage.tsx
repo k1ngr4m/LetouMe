@@ -319,7 +319,7 @@ const MAINTENANCE_COLUMN_MIN_WIDTHS: Record<MaintenanceColumnKey, number> = {
 }
 
 function getLotteryLabel(lotteryCode: LotteryCode) {
-  return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+  return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : lotteryCode === 'pl5' ? '排列5' : '七星彩'
 }
 
 function SvgIcon({ children }: { children: ReactNode }) {
@@ -635,6 +635,9 @@ function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predict
   if (lotteryCode === 'pl3') {
     return predictionPlayMode === 'direct_sum' ? 'direct_sum' : 'direct'
   }
+  if (lotteryCode === 'qxc') {
+    return predictionPlayMode === 'compound' ? 'compound' : 'direct'
+  }
   if (lotteryCode === 'dlt') {
     if (predictionPlayMode === 'dantuo') return 'dantuo'
     if (predictionPlayMode === 'compound') return 'compound'
@@ -652,6 +655,9 @@ function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode,
     if (normalizedMode === 'dantuo') return '胆拖'
     if (normalizedMode === 'compound') return '复式'
     return '普通'
+  }
+  if (lotteryCode === 'qxc') {
+    return normalizedMode === 'compound' ? '复式' : '直选'
   }
   return '直选'
 }
@@ -725,7 +731,7 @@ export function SettingsPage() {
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
-  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null })
+  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null, qxc: null })
   const [maintenanceLogFilter, setMaintenanceLogFilter] = useState<MaintenanceLogFilter>('all')
   const [maintenanceLogOffset, setMaintenanceLogOffset] = useState(0)
   const [scheduleColumnWidths, setScheduleColumnWidths] = useState<Record<ScheduleColumnKey, number>>(() => (
@@ -1004,6 +1010,34 @@ export function SettingsPage() {
     }, 1200)
     return () => window.clearTimeout(timer)
   }, [lotteryFetchTasks.pl5, queryClient])
+
+  useEffect(() => {
+    const task = lotteryFetchTasks.qxc
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryFetchTasks((previous) => ({ ...previous, qxc: nextTask }))
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`七星彩数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['lottery-history', 'qxc'] })
+          void queryClient.invalidateQueries({ queryKey: ['current-predictions', 'qxc'] })
+          void queryClient.invalidateQueries({ queryKey: ['predictions-history', 'qxc'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '七星彩数据更新失败')
+          setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取七星彩抓取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [lotteryFetchTasks.qxc, queryClient])
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
@@ -1347,6 +1381,20 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建排列5数据更新任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const fetchQxcLotteryMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsLotteryHistory('qxc'),
+    onSuccess: (task) => {
+      setLotteryFetchTasks((previous) => ({ ...previous, qxc: task }))
+      setMessage('七星彩数据更新任务已创建，正在后台执行。')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建七星彩数据更新任务失败')
       setMessageType('error')
     },
   })
@@ -2691,9 +2739,9 @@ export function SettingsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((lotteryCode) => {
+                          {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((lotteryCode) => {
                             const task = lotteryFetchTasks[lotteryCode]
-                            const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : fetchDltLotteryMutation
+                            const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : lotteryCode === 'qxc' ? fetchQxcLotteryMutation : fetchDltLotteryMutation
                             const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
                             return (
                               <tr key={lotteryCode}>
@@ -2733,6 +2781,7 @@ export function SettingsPage() {
                             { value: 'dlt', label: '大乐透' },
                             { value: 'pl3', label: '排列3' },
                             { value: 'pl5', label: '排列5' },
+                            { value: 'qxc', label: '七星彩' },
                           ].map((option) => (
                             <button
                               key={option.value}
@@ -3549,7 +3598,7 @@ export function SettingsPage() {
                   <div className="field model-config-modal__lottery-field">
                     <span>适用彩种</span>
                     <div className="filter-chip-group">
-                      {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => {
+                      {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((code) => {
                         const active = modelForm.lottery_codes.includes(code)
                         return (
                           <button
@@ -3876,6 +3925,7 @@ export function SettingsPage() {
                   <option value="dlt">大乐透</option>
                   <option value="pl3">排列3</option>
                   <option value="pl5">排列5</option>
+                  <option value="qxc">七星彩</option>
                 </select>
               </label>
               <label className="field">
@@ -3891,7 +3941,7 @@ export function SettingsPage() {
               </label>
               {scheduleForm.task_type === 'prediction_generate' ? (
                 <>
-                  {scheduleForm.lottery_code === 'pl3' || scheduleForm.lottery_code === 'dlt' ? (
+                  {scheduleForm.lottery_code === 'pl3' || scheduleForm.lottery_code === 'dlt' || scheduleForm.lottery_code === 'qxc' ? (
                     <label className="field">
                       <span>预测玩法</span>
                       <select
@@ -3905,6 +3955,11 @@ export function SettingsPage() {
                           <>
                             <option value="direct">直选</option>
                             <option value="direct_sum">和值</option>
+                          </>
+                        ) : scheduleForm.lottery_code === 'qxc' ? (
+                          <>
+                            <option value="direct">直选</option>
+                            <option value="compound">复式</option>
                           </>
                         ) : (
                           <>
@@ -4063,6 +4118,7 @@ export function SettingsPage() {
                       <option value="dlt">大乐透</option>
                       <option value="pl3">排列3</option>
                       <option value="pl5">排列5</option>
+                      <option value="qxc">七星彩</option>
                     </select>
                   </label>
                   <label className="field">
@@ -4075,9 +4131,9 @@ export function SettingsPage() {
                       <option value="history">历史重算</option>
                     </select>
                   </label>
-                  {generationForm.lotteryCode === 'pl3' || generationForm.lotteryCode === 'dlt' ? (
+                  {generationForm.lotteryCode === 'pl3' || generationForm.lotteryCode === 'dlt' || generationForm.lotteryCode === 'qxc' ? (
                     <label className="field">
-                      <span>{generationForm.lotteryCode === 'pl3' ? '排列3预测玩法' : '大乐透预测玩法'}</span>
+                      <span>{generationForm.lotteryCode === 'pl3' ? '排列3预测玩法' : generationForm.lotteryCode === 'qxc' ? '七星彩预测玩法' : '大乐透预测玩法'}</span>
                       <select
                         value={generationForm.predictionPlayMode}
                         onChange={(event) => setGenerationForm((previous) => ({ ...previous, predictionPlayMode: event.target.value as ModelPredictionPlayMode }))}
@@ -4086,6 +4142,11 @@ export function SettingsPage() {
                           <>
                             <option value="direct">直选预测</option>
                             <option value="direct_sum">和值预测</option>
+                          </>
+                        ) : generationForm.lotteryCode === 'qxc' ? (
+                          <>
+                            <option value="direct">直选预测</option>
+                            <option value="compound">复式预测</option>
                           </>
                         ) : (
                           <>

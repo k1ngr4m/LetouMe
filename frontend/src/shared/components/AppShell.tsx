@@ -43,6 +43,7 @@ const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
   { code: 'dlt', label: '大乐透' },
   { code: 'pl3', label: '排列3' },
   { code: 'pl5', label: '排列5' },
+  { code: 'qxc', label: '七星彩' },
 ]
 const MESSAGE_BIZ_CODE = 'draw'
 const MESSAGE_STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string }> = [
@@ -94,6 +95,7 @@ function SidebarCollapseIcon() {
 function getLotteryLogoSrc(code: LotteryCode) {
   if (code === 'pl3') return '/lottery/pl3.png'
   if (code === 'pl5') return '/lottery/pl5.png'
+  if (code === 'qxc') return '/lottery/pl5.png'
   return '/lottery/dlt.png'
 }
 

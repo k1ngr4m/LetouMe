@@ -66,6 +66,12 @@ class PredictionService:
     PL5_FIXED_PRIZE_RULES = {
         "直选": 100000,
     }
+    QXC_FIXED_PRIZE_RULES = {
+        "三等奖": 3000,
+        "四等奖": 500,
+        "五等奖": 30,
+        "六等奖": 5,
+    }
 
     def __init__(
         self,
@@ -105,6 +111,7 @@ class PredictionService:
             back_dan = self._normalize_dlt_zone_numbers(group.get("back_dan"), zone="back") or []
             back_tuo = self._normalize_dlt_zone_numbers(group.get("back_tuo"), zone="back") or []
             red_balls = sorted(str(item).zfill(2) for item in group.get("red_balls", []))
+            position_selections = self._normalize_qxc_position_selections(group.get("position_selections")) if normalized_code == "qxc" else []
             if normalized_code == "dlt" and play_type == "dlt_dantuo":
                 red_balls = sorted({*front_dan, *front_tuo})
                 blue_balls = sorted({*back_dan, *back_tuo})
@@ -116,6 +123,7 @@ class PredictionService:
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
                     "digits": normalize_digit_balls(group.get("digits", [])),
+                    "position_selections": position_selections,
                     "front_dan": front_dan,
                     "front_tuo": front_tuo,
                     "back_dan": back_dan,
@@ -536,6 +544,8 @@ class PredictionService:
                 "total_hits": len(digit_hits),
                 "is_exact_match": digits == actual_digits and len(digits) == 5,
             }
+        if normalized_code == "qxc":
+            return cls._calculate_qxc_hit_result(prediction_group, actual_result)
 
         play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
         if play_type == "dlt_dantuo":
@@ -785,6 +795,57 @@ class PredictionService:
         digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
         return sum(1 for digit, actual in zip(digits, actual_digits) if digit == actual)
 
+    @classmethod
+    def _calculate_qxc_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+        actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))[:7]
+        position_selections = cls._normalize_qxc_position_selections(prediction_group.get("position_selections"))
+        if len(position_selections) != 7:
+            digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))[:7]
+            position_selections = [[digit] for digit in digits]
+        position_hits = [
+            [actual_digits[index]]
+            if index < len(actual_digits) and actual_digits[index] in (position_selections[index] if index < len(position_selections) else [])
+            else []
+            for index in range(7)
+        ]
+        digit_hits = [values[0] for values in position_hits if values]
+        front_hit_count = sum(1 for values in position_hits[:6] if values)
+        last_hit = bool(position_hits[6]) if len(position_hits) >= 7 else False
+        total_hit_count = len(digit_hits)
+        winning_bet_count = 0
+        best_prize_level = None
+        if total_hit_count == 7:
+            winning_bet_count = 1
+            best_prize_level = "一等奖"
+        elif front_hit_count == 6:
+            winning_bet_count = max(1, len(position_selections[6]) - (1 if last_hit else 0))
+            best_prize_level = "二等奖"
+        elif front_hit_count == 5 and last_hit:
+            winning_bet_count = 1
+            best_prize_level = "三等奖"
+        elif total_hit_count == 5:
+            winning_bet_count = 1
+            best_prize_level = "四等奖"
+        elif total_hit_count == 4:
+            winning_bet_count = 1
+            best_prize_level = "五等奖"
+        elif total_hit_count == 3 or (front_hit_count == 1 and last_hit) or (front_hit_count == 0 and last_hit):
+            winning_bet_count = 1
+            best_prize_level = "六等奖"
+        return {
+            "digit_hits": digit_hits,
+            "digit_hit_count": total_hit_count,
+            "position_hits": position_hits,
+            "red_hits": [],
+            "red_hit_count": 0,
+            "blue_hits": [],
+            "blue_hit_count": 0,
+            "total_hits": total_hit_count,
+            "is_exact_match": total_hit_count == 7,
+            "winning_bet_count": winning_bet_count,
+            "best_prize_level": best_prize_level,
+        }
+
     def _resolve_trend_hit_count(
         self,
         prediction_group: dict[str, Any],
@@ -798,6 +859,8 @@ class PredictionService:
             return self._calculate_pl3_trend_hit_count(prediction_group, actual_result)
         if normalized_code == "pl5":
             return self._calculate_pl5_trend_hit_count(prediction_group, actual_result)
+        if normalized_code == "qxc":
+            return int((hit_result or {}).get("digit_hit_count") or 0)
         if hit_result is not None:
             return int(hit_result.get("total_hits") or 0)
         return int(prediction_group.get("total_hits") or 0)
@@ -827,6 +890,16 @@ class PredictionService:
             if len(front_tuo) < front_pick_count or len(back_tuo) < back_pick_count:
                 return cls.BET_COST
             bet_count = math.comb(len(front_tuo), front_pick_count) * math.comb(len(back_tuo), back_pick_count)
+            return max(1, int(bet_count)) * cls.BET_COST
+        if normalized_code == "qxc":
+            position_selections = cls._normalize_qxc_position_selections(prediction_group.get("position_selections"))
+            if len(position_selections) != 7:
+                return cls.BET_COST
+            bet_count = 1
+            for values in position_selections:
+                if not values:
+                    return cls.BET_COST
+                bet_count *= len(values)
             return max(1, int(bet_count)) * cls.BET_COST
         if normalized_code != "pl3":
             return cls.BET_COST
@@ -1743,6 +1816,8 @@ class PredictionService:
             if is_exact_match is None:
                 is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 5
             return "直选" if bool(is_exact_match) else None
+        if lottery_code == "qxc":
+            return str(hit_result.get("best_prize_level") or "").strip() or None
         play_type = str((prediction_group or {}).get("play_type") or "").strip().lower()
         if play_type in {"dlt_dantuo", "dlt_compound"}:
             best_prize_level = str(hit_result.get("best_prize_level") or "").strip()
@@ -1769,6 +1844,8 @@ class PredictionService:
             return {"amount": self.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         if lottery_code == "pl5" and prize_level in self.PL5_FIXED_PRIZE_RULES:
             return {"amount": self.PL5_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
+        if lottery_code == "qxc" and prize_level in self.QXC_FIXED_PRIZE_RULES:
+            return {"amount": self.QXC_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
         if lottery_code == "dlt":
             previous_jackpot_pool = int(actual_result.get("previous_jackpot_pool") or 0)
             if previous_jackpot_pool <= 0:
@@ -1784,6 +1861,21 @@ class PredictionService:
             if amount > 0:
                 return {"amount": amount, "source": "fallback"}
         return {"amount": 0, "source": "missing"}
+
+    @staticmethod
+    def _normalize_qxc_position_selections(value: Any) -> list[list[str]]:
+        if not isinstance(value, list):
+            return []
+        result: list[list[str]] = []
+        for index, row in enumerate(value[:7]):
+            if not isinstance(row, list):
+                result.append([])
+                continue
+            normalized = sorted({str(item).zfill(2) for item in row if str(item).strip()}, key=int)
+            valid_max = 14 if index == 6 else 9
+            normalized = [item for item in normalized if item.isdigit() and 0 <= int(item) <= valid_max]
+            result.append(normalized)
+        return result
 
     @staticmethod
     def _empty_period_summary() -> dict[str, int]:

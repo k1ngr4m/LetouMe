@@ -9,7 +9,13 @@ from bs4 import BeautifulSoup
 
 from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
-from backend.app.lotteries import build_pl3_prize_breakdown, build_pl5_prize_breakdown, normalize_digit_balls, normalize_lottery_code
+from backend.app.lotteries import (
+    build_pl3_prize_breakdown,
+    build_pl5_prize_breakdown,
+    build_qxc_prize_breakdown,
+    normalize_digit_balls,
+    normalize_lottery_code,
+)
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.message_service import MessageService
 
@@ -19,6 +25,7 @@ class LotteryFetchService:
         "dlt": "https://kaijiang.500.com/shtml/dlt/{period}.shtml",
         "pl3": "https://kaijiang.500.com/shtml/pls/{period}.shtml",
         "pl5": "https://kaijiang.500.com/shtml/plw/{period}.shtml",
+        "qxc": "https://kaijiang.500.com/shtml/qxc/{period}.shtml",
     }
     FIXED_PRIZE_RULES = {
         "三等奖": 10000,
@@ -28,6 +35,10 @@ class LotteryFetchService:
         "七等奖": 100,
         "八等奖": 15,
         "九等奖": 5,
+        "三等奖": 3000,
+        "四等奖": 500,
+        "五等奖": 30,
+        "六等奖": 5,
     }
 
     def __init__(
@@ -43,6 +54,8 @@ class LotteryFetchService:
             else "https://www.500.com/kaijiang/p3/lskj/"
             if self.lottery_code == "pl3"
             else "https://datachart.500.com/plw/history/inc/history.php"
+            if self.lottery_code == "pl5"
+            else "https://www.500.com/lottery/qxc/"
         )
         self.headers = {
             "User-Agent": (
@@ -58,6 +71,8 @@ class LotteryFetchService:
                 else "https://www.500.com/kaijiang/p3/lskj/"
                 if self.lottery_code == "pl3"
                 else "https://datachart.500.com/plw/history/history.shtml"
+                if self.lottery_code == "pl5"
+                else "https://www.500.com/lottery/qxc/"
             ),
         }
         self.session = requests.Session()
@@ -149,6 +164,8 @@ class LotteryFetchService:
             return self.parse_pl3_data(soup)
         if self.lottery_code == "pl5":
             return self.parse_pl5_data(soup)
+        if self.lottery_code == "qxc":
+            return self.parse_qxc_data(soup)
         data_list: list[dict[str, Any]] = []
         table = soup.find("tbody") or soup.find("table")
         if not table:
@@ -240,6 +257,55 @@ class LotteryFetchService:
         self.logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list), "lottery_code": self.lottery_code}})
         return data_list
 
+    def parse_qxc_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        data_list: list[dict[str, Any]] = []
+        detail_nodes = soup.select(".qxc_info")
+        if detail_nodes:
+            period_text = detail_nodes[0].get_text(" ", strip=True)
+            period_match = re.search(r"第?(\d{5,})期", period_text)
+            date_match = re.search(r"(\d{4}-\d{2}-\d{2})", period_text)
+            digits = [item.get_text(strip=True) for item in detail_nodes[0].select(".numballs b") if item.get_text(strip=True)]
+            jackpot = self.parse_jackpot_pool_balance(detail_nodes[0])
+            if period_match and len(digits) >= 7:
+                period = period_match.group(1)
+                detail_payload = self.fetch_draw_detail(period)
+                data_list.append(
+                    {
+                        "period": period,
+                        "digits": normalize_digit_balls(digits[:7]),
+                        "date": date_match.group(1) if date_match else "",
+                        "jackpot_pool_balance": jackpot or int(detail_payload.get("jackpot_pool_balance") or 0),
+                        "prize_breakdown": detail_payload.get("prize_breakdown") or build_qxc_prize_breakdown(),
+                    }
+                )
+
+        for row in soup.select("table tr"):
+            cols = row.find_all("td")
+            if len(cols) < 3:
+                continue
+            period_match = re.search(r"(\d{5,})", cols[0].get_text(" ", strip=True))
+            digits = re.findall(r"\d{1,2}", cols[1].get_text(" ", strip=True))
+            date_match = re.search(r"(\d{4}-\d{2}-\d{2})", row.get_text(" ", strip=True))
+            if not period_match or len(digits) < 7:
+                continue
+            period = period_match.group(1)
+            detail_payload = self.fetch_draw_detail(period)
+            data_list.append(
+                {
+                    "period": period,
+                    "digits": normalize_digit_balls(digits[:7]),
+                    "date": date_match.group(1) if date_match else cols[-1].get_text(strip=True),
+                    "jackpot_pool_balance": int(detail_payload.get("jackpot_pool_balance") or 0),
+                    "prize_breakdown": detail_payload.get("prize_breakdown") or build_qxc_prize_breakdown(),
+                }
+            )
+        deduplicated: dict[str, dict[str, Any]] = {}
+        for item in data_list:
+            deduplicated[str(item.get("period") or "")] = item
+        result = sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
+        self.logger.info("Parsed lottery draws", extra={"context": {"count": len(result), "lottery_code": self.lottery_code}})
+        return result
+
     def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
         return self.fetch_draw_detail(period)["prize_breakdown"]
 
@@ -256,6 +322,17 @@ class LotteryFetchService:
                 }
             return {
                 "prize_breakdown": build_pl3_prize_breakdown() if self.lottery_code == "pl3" else build_pl5_prize_breakdown(),
+                "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+            }
+        if self.lottery_code == "qxc":
+            soup = self.fetch_page(detail_url, retry=2)
+            if not soup:
+                return {
+                    "prize_breakdown": build_qxc_prize_breakdown(),
+                    "jackpot_pool_balance": 0,
+                }
+            return {
+                "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
                 "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
             }
         soup = self.fetch_page(detail_url, retry=2)
@@ -305,6 +382,33 @@ class LotteryFetchService:
             if breakdown:
                 return breakdown
         return []
+
+    def parse_qxc_prize_breakdown(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        for table in soup.find_all("table"):
+            headers = [cell.get_text(strip=True) for cell in table.find_all("th")]
+            if "奖级" not in headers and "奖项" not in headers and "中奖注数" not in headers:
+                continue
+            breakdown: list[dict[str, Any]] = []
+            for row in table.find_all("tr"):
+                cells = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
+                if len(cells) < 3:
+                    continue
+                prize_level = cells[0].replace("等奖", "等奖").strip()
+                if "注" not in cells[1] and not re.search(r"\d", cells[1]):
+                    continue
+                breakdown.append(
+                    {
+                        "prize_level": prize_level,
+                        "prize_type": "basic",
+                        "winner_count": self.parse_money_value(cells[1]),
+                        "prize_amount": self.parse_money_value(cells[2]),
+                        "total_amount": self.parse_money_value(cells[3]) if len(cells) > 3 else 0,
+                    }
+                )
+            if breakdown:
+                prize_map = {item["prize_level"]: item for item in breakdown}
+                return [prize_map.get(item["prize_level"], item) for item in build_qxc_prize_breakdown()]
+        return build_qxc_prize_breakdown()
 
     def build_fallback_prize_breakdown(self) -> list[dict[str, Any]]:
         return [

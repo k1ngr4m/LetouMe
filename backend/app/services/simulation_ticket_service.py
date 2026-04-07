@@ -13,6 +13,7 @@ class SimulationTicketService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
+    QXC_LAST_RANGE = range(0, 15)
     PL3_DIRECT_SUM_BET_COUNTS = {
         int(sum_value): int(cost / 2) for sum_value, cost in PredictionService.PL3_DIRECT_SUM_COST_RULES.items()
     }
@@ -30,8 +31,10 @@ class SimulationTicketService:
             ticket_payload = self._build_dlt_ticket_payload(payload)
         elif lottery_code == "pl3":
             ticket_payload = self._build_pl3_ticket_payload(payload)
-        else:
+        elif lottery_code == "pl5":
             ticket_payload = self._build_pl5_ticket_payload(payload)
+        else:
+            ticket_payload = self._build_qxc_ticket_payload(payload)
         created = self.repository.create_ticket(user_id, {"lottery_code": lottery_code, **ticket_payload})
         return self._serialize_ticket(created)
 
@@ -43,8 +46,10 @@ class SimulationTicketService:
                 ticket_payload = self._build_dlt_ticket_payload(payload)
             elif lottery_code == "pl3":
                 ticket_payload = self._build_pl3_ticket_payload(payload)
-            else:
+            elif lottery_code == "pl5":
                 ticket_payload = self._build_pl5_ticket_payload(payload)
+            else:
+                ticket_payload = self._build_qxc_ticket_payload(payload)
         except ValueError:
             return {
                 "lottery_code": lottery_code,
@@ -78,6 +83,15 @@ class SimulationTicketService:
             raise ValueError("号码格式不正确")
         normalized = sorted({str(item).zfill(2) for item in values})
         if any(not number.isdigit() or int(number) not in self.DIGIT_RANGE for number in normalized):
+            raise ValueError("号码超出可选范围")
+        return normalized
+
+    def _normalize_qxc_position_numbers(self, values: Any, *, last: bool = False) -> list[str]:
+        if not isinstance(values, list):
+            raise ValueError("号码格式不正确")
+        normalized = sorted({str(item).zfill(2) for item in values})
+        valid_range = self.QXC_LAST_RANGE if last else self.DIGIT_RANGE
+        if any(not number.isdigit() or int(number) not in valid_range for number in normalized):
             raise ValueError("号码超出可选范围")
         return normalized
 
@@ -260,6 +274,42 @@ class SimulationTicketService:
             "amount": bet_count * 2,
         }
 
+    def _build_qxc_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "direct").strip().lower() or "direct"
+        if play_type not in {"direct", "qxc_compound"}:
+            raise ValueError("七星彩玩法仅支持 direct / qxc_compound")
+        raw_positions = payload.get("position_selections")
+        if not isinstance(raw_positions, list) or len(raw_positions) != 7:
+            raise ValueError("七星彩需提供 7 位定位选号")
+        normalized_positions = [
+            self._normalize_qxc_position_numbers(values, last=index == 6)
+            for index, values in enumerate(raw_positions)
+        ]
+        if any(not values for values in normalized_positions):
+            raise ValueError("七星彩每一位至少选择 1 个号码")
+        bet_count = 1
+        for values in normalized_positions:
+            bet_count *= len(values)
+        return {
+            "play_type": "direct" if play_type == "direct" else "qxc_compound",
+            "front_numbers": "",
+            "back_numbers": "",
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "group_numbers": None,
+            "sum_values": None,
+            "position_selections": normalized_positions,
+            "bet_count": bet_count,
+            "amount": bet_count * 2,
+        }
+
     @staticmethod
     def _serialize_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
         created_at = ensure_timestamp(ticket.get("created_at"))
@@ -280,6 +330,11 @@ class SimulationTicketService:
             "direct_units": [item for item in str(ticket.get("direct_units") or "").split(",") if item],
             "group_numbers": [item for item in str(ticket.get("group_numbers") or "").split(",") if item],
             "sum_values": [item for item in str(ticket.get("sum_values") or "").split(",") if item],
+            "position_selections": [
+                [str(item).zfill(2) for item in values]
+                for values in list(ticket.get("position_selections") or [])
+                if isinstance(values, list)
+            ],
             "bet_count": int(ticket.get("bet_count") or 0),
             "amount": int(ticket.get("amount") or 0),
             "created_at": created_at or 0,

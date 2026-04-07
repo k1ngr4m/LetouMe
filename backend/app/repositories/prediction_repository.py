@@ -693,7 +693,11 @@ class PredictionRepository:
                                 "back_tuo": group.get("back_tuo", []),
                             }
                             if str(group.get("play_type") or "").strip().lower() == "dlt_dantuo"
-                            else None
+                            else {
+                                f"position_{index + 1}": values
+                                for index, values in enumerate(list(group.get("position_selections") or []))
+                                if isinstance(values, list) and values
+                            }
                         ),
                     )
                     if persist_hit_details and draw_result_id and group.get("hit_result"):
@@ -762,6 +766,14 @@ class PredictionRepository:
             return rows
 
         play_type = str(group.get("play_type") or "direct").strip().lower()
+        if normalized_code == "qxc":
+            rows: list[tuple[str, int | None, str]] = []
+            for index, values in enumerate(list(hit_result.get("position_hits") or []), start=1):
+                if not isinstance(values, list):
+                    continue
+                for value in values:
+                    rows.append((f"position_{index}", 1, str(value).zfill(2)))
+            return rows
         if normalized_code == "pl5" or play_type == "direct":
             predicted_digits = normalize_digit_balls(group.get("digits", group.get("red_balls", [])))
             actual_digits = normalize_digit_balls((actual_result or {}).get("digits", (actual_result or {}).get("red_balls", [])))
@@ -1136,6 +1148,10 @@ class PredictionRepository:
             red_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "red"]
             blue_balls = [item["ball_value"] for item in numbers if item["ball_color"] == "blue"]
             digits = [item["ball_value"] for item in numbers if item["ball_color"] == "digit"]
+            position_selections = [
+                [item["ball_value"] for item in numbers if item["ball_color"] == f"position_{index}" ]
+                for index in range(1, 8)
+            ]
             front_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "front_dan"]
             front_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "front_tuo"]
             back_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "back_dan"]
@@ -1156,6 +1172,7 @@ class PredictionRepository:
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
                     "digits": digits,
+                    "position_selections": position_selections if any(position_selections) else [],
                     "front_dan": front_dan,
                     "front_tuo": front_tuo,
                     "back_dan": back_dan,
@@ -1277,13 +1294,18 @@ class PredictionRepository:
                 tuple(chunk),
             )
             for row in cursor.fetchall():
-                entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": [], "digit": []})
-                entry[row["ball_color"]].append(row["ball_value"])
+                entry = hits_by_summary.setdefault(int(row["hit_summary_id"]), {"red": [], "blue": [], "digit": [], "positions": {}})
+                ball_color = str(row["ball_color"])
+                if ball_color in {"red", "blue", "digit"}:
+                    entry[ball_color].append(row["ball_value"])
+                elif ball_color.startswith("position_"):
+                    entry["positions"].setdefault(ball_color, []).append(row["ball_value"])
 
         result: dict[int, dict[str, Any]] = {}
         for row in summary_rows:
             summary_id = int(row["id"])
             hit_values = hits_by_summary.get(summary_id, {"red": [], "blue": [], "digit": []})
+            position_hits = [hit_values.get("positions", {}).get(f"position_{index}", []) for index in range(1, 8)]
             result[int(row["prediction_group_id"])] = {
                 "red_hits": hit_values["red"],
                 "red_hit_count": int(row["red_hit_count"]),
@@ -1291,7 +1313,8 @@ class PredictionRepository:
                 "blue_hit_count": int(row["blue_hit_count"]),
                 "digit_hits": hit_values["digit"],
                 "digit_hit_count": len(hit_values["digit"]),
-                "total_hits": len(hit_values["red"]) + len(hit_values["blue"]) + len(hit_values["digit"]),
+                "position_hits": position_hits,
+                "total_hits": len(hit_values["red"]) + len(hit_values["blue"]) + len(hit_values["digit"]) + sum(len(item) for item in position_hits),
             }
         return result
 

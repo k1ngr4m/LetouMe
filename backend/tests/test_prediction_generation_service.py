@@ -683,6 +683,47 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         for phrase in required_phrases:
             self.assertIn(phrase, template)
 
+    def test_qxc_prompt_template_can_be_formatted(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("qxc")
+        rendered = template.format(
+            target_period="26068",
+            target_date="2026年03月19日",
+            lottery_history=json.dumps(
+                [
+                    {"period": "26067", "date": "2026-03-18", "digits": ["00", "01", "02", "03", "04", "05", "06"]},
+                    {"period": "26066", "date": "2026-03-17", "digits": ["01", "02", "03", "04", "05", "06", "07"]},
+                ],
+                ensure_ascii=False,
+                indent=2,
+            ),
+            prediction_date="2026-03-18",
+            model_id="qxc_model_demo",
+            model_name="QXC Demo Model",
+        )
+        self.assertIn("为 **26068** 期", rendered)
+        self.assertIn('"period": "26067"', rendered)
+        self.assertIn("增强型综合决策者", rendered)
+
+    def test_qxc_prompt_template_has_required_output_constraints(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("qxc")
+        required_phrases = [
+            "必须正好输出 5 组",
+            "`play_type` 只能是 `direct`",
+            "`digits` 必须是长度为 7 的数组",
+            "前 6 位只能使用 `00-09`",
+            "第 7 位只能使用 `00-14`",
+            "group_id=1",
+            "增强型热号追随者",
+            "增强型冷号逆向者",
+            "增强型位置平衡师",
+            "增强型周期理论家",
+            "增强型综合决策者",
+            "输出前自检清单",
+            "只输出纯 JSON",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, template)
+
     def test_generate_prediction_logs_response_summary(self) -> None:
         service = PredictionGenerationService()
         model = Mock()

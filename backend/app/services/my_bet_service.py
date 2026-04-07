@@ -36,6 +36,7 @@ class MyBetService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
     DIGIT_RANGE = range(0, 10)
+    QXC_LAST_RANGE = range(0, 15)
     DLT_FIXED_RULES = dict(DLT_OLD_FIXED_PRIZE_RULES)
     PL3_PRIZE_LEVEL_ORDER = ["直选", "和值", "组选3", "组选6"]
     PL3_DIRECT_SUM_BET_COUNTS = {
@@ -43,6 +44,7 @@ class MyBetService:
     }
     PL3_GROUP_SUM_BET_COUNTS = build_pl3_group_sum_bet_counts()
     PL5_PRIZE_LEVEL_ORDER = ["直选"]
+    QXC_PRIZE_LEVEL_ORDER = ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖"]
 
     def __init__(
         self,
@@ -189,7 +191,9 @@ class MyBetService:
             return self._build_dlt_line_payload(payload, multiplier=int(payload.get("multiplier") or 1))
         if lottery_code == "pl3":
             return self._build_pl3_line_payload(payload, multiplier=int(payload.get("multiplier") or 1))
-        return self._build_pl5_line_payload(payload, multiplier=int(payload.get("multiplier") or 1))
+        if lottery_code == "pl5":
+            return self._build_pl5_line_payload(payload, multiplier=int(payload.get("multiplier") or 1))
+        return self._build_qxc_line_payload(payload, multiplier=int(payload.get("multiplier") or 1))
 
     def _build_line_payload(self, line: Any, *, lottery_code: str) -> dict[str, Any]:
         if not isinstance(line, dict):
@@ -201,7 +205,9 @@ class MyBetService:
             return self._build_dlt_line_payload(line, multiplier=multiplier)
         if lottery_code == "pl3":
             return self._build_pl3_line_payload(line, multiplier=multiplier)
-        return self._build_pl5_line_payload(line, multiplier=multiplier)
+        if lottery_code == "pl5":
+            return self._build_pl5_line_payload(line, multiplier=multiplier)
+        return self._build_qxc_line_payload(line, multiplier=multiplier)
 
     @staticmethod
     def _build_empty_draft_line(*, lottery_code: str) -> dict[str, Any]:
@@ -241,6 +247,7 @@ class MyBetService:
             "direct_units": "",
             "group_numbers": None,
             "sum_values": None,
+            "position_selections": [],
             "multiplier": 1,
             "is_append": False,
             "bet_count": 0,
@@ -415,6 +422,39 @@ class MyBetService:
             "sum_values": None,
             "multiplier": multiplier,
             "is_append": False,
+            "position_selections": [],
+            "bet_count": bet_count,
+            "amount": bet_count * 2 * multiplier,
+        }
+
+    def _build_qxc_line_payload(self, payload: dict[str, Any], *, multiplier: int) -> dict[str, Any]:
+        play_type = str(payload.get("play_type") or "direct").strip().lower() or "direct"
+        if play_type not in {"direct", "qxc_compound"}:
+            raise ValueError("七星彩玩法仅支持 direct / qxc_compound")
+        position_selections = self._normalize_qxc_position_selections(payload.get("position_selections"))
+        if any(not values for values in position_selections):
+            raise ValueError("七星彩每一位至少选择 1 个号码")
+        bet_count = 1
+        for values in position_selections:
+            bet_count *= len(values)
+        return {
+            "play_type": "direct" if play_type == "direct" else "qxc_compound",
+            "front_numbers": "",
+            "back_numbers": "",
+            "front_dan": None,
+            "front_tuo": None,
+            "back_dan": None,
+            "back_tuo": None,
+            "direct_ten_thousands": None,
+            "direct_thousands": None,
+            "direct_hundreds": None,
+            "direct_tens": None,
+            "direct_units": None,
+            "group_numbers": None,
+            "sum_values": None,
+            "position_selections": position_selections,
+            "multiplier": multiplier,
+            "is_append": False,
             "bet_count": bet_count,
             "amount": bet_count * 2 * multiplier,
         }
@@ -474,6 +514,19 @@ class MyBetService:
             raise ValueError("号码超出可选范围")
         return normalized
 
+    def _normalize_qxc_position_selections(self, values: Any) -> list[list[str]]:
+        if not isinstance(values, list) or len(values) != 7:
+            raise ValueError("七星彩需提供 7 位定位选号")
+        normalized_positions: list[list[str]] = []
+        for index, item in enumerate(values):
+            normalized_positions.append(
+                self._normalize_numbers(
+                    item,
+                    valid_range=self.QXC_LAST_RANGE if index == 6 else self.DIGIT_RANGE,
+                )
+            )
+        return normalized_positions
+
     def _serialize_with_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         serialized = self._serialize_record(record)
         settlement = self._calculate_settlement(serialized, lottery_code=lottery_code)
@@ -519,7 +572,7 @@ class MyBetService:
         level_order = (
             dlt_prize_level_order(draw.get("period"))
             if lottery_code == "dlt"
-            else self.PL3_PRIZE_LEVEL_ORDER if lottery_code == "pl3" else self.PL5_PRIZE_LEVEL_ORDER
+            else self.PL3_PRIZE_LEVEL_ORDER if lottery_code == "pl3" else self.PL5_PRIZE_LEVEL_ORDER if lottery_code == "pl5" else self.QXC_PRIZE_LEVEL_ORDER
         )
         level_priority = {level: index for index, level in enumerate(level_order)}
         lines_with_hits: list[dict[str, Any]] = []
@@ -540,6 +593,7 @@ class MyBetService:
                     "hit_direct_units": list(line_result.get("hit_direct_units") or []),
                     "hit_group_numbers": list(line_result.get("hit_group_numbers") or []),
                     "hit_sum_values": list(line_result.get("hit_sum_values") or []),
+                    "hit_position_selections": list(line_result.get("hit_position_selections") or []),
                 }
             )
             level = line_result.get("prize_level")
@@ -561,7 +615,9 @@ class MyBetService:
             return self._calculate_dlt_line_settlement(line, draw)
         if lottery_code == "pl3":
             return self._calculate_pl3_line_settlement(line, draw)
-        return self._calculate_pl5_line_settlement(line, draw)
+        if lottery_code == "pl5":
+            return self._calculate_pl5_line_settlement(line, draw)
+        return self._calculate_qxc_line_settlement(line, draw)
 
     def _calculate_dlt_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
         play_type = str(line.get("play_type") or "dlt").strip().lower() or "dlt"
@@ -609,6 +665,7 @@ class MyBetService:
                 "hit_direct_units": [],
                 "hit_group_numbers": [],
                 "hit_sum_values": [],
+                "hit_position_selections": [],
             }
         front_numbers = list(line.get("front_numbers") or [])
         back_numbers = list(line.get("back_numbers") or [])
@@ -653,6 +710,7 @@ class MyBetService:
             "hit_direct_units": [],
             "hit_group_numbers": [],
             "hit_sum_values": [],
+            "hit_position_selections": [],
         }
 
     def _calculate_pl3_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
@@ -713,6 +771,7 @@ class MyBetService:
             "hit_direct_units": hit_units,
             "hit_group_numbers": hit_groups,
             "hit_sum_values": hit_sums,
+            "hit_position_selections": [],
         }
 
     def _calculate_pl5_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
@@ -747,6 +806,68 @@ class MyBetService:
             "hit_direct_units": [item for item in units if len(digits) == 5 and item == digits[4]],
             "hit_group_numbers": [],
             "hit_sum_values": [],
+            "hit_position_selections": [],
+        }
+
+    def _calculate_qxc_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
+        digits = normalize_digit_balls(draw.get("digits", draw.get("red_balls", [])))[:7]
+        position_selections = [list(item) for item in list(line.get("position_selections") or [])]
+        if len(position_selections) != 7:
+            position_selections = [[] for _ in range(7)]
+        exact_match = len(digits) == 7 and all(digits[index] in position_selections[index] for index in range(7))
+        match_counts = [1 if len(digits) == 7 and digits[index] in position_selections[index] else 0 for index in range(7)]
+        front_hit_count = sum(match_counts[:6])
+        last_hit = bool(match_counts[6])
+        total_hit_count = sum(match_counts)
+        winning_count = 0
+        level = None
+        if exact_match:
+            winning_count = 1
+            level = "一等奖"
+        elif front_hit_count == 6:
+            winning_count = max(1, len(position_selections[6]) - (1 if last_hit else 0))
+            level = "二等奖"
+        elif front_hit_count == 5 and last_hit:
+            winning_count = 1
+            level = "三等奖"
+        elif total_hit_count == 5:
+            winning_count = 1
+            level = "四等奖"
+        elif total_hit_count == 4:
+            winning_count = 1
+            level = "五等奖"
+        elif total_hit_count == 3 or (front_hit_count == 1 and last_hit) or (front_hit_count == 0 and last_hit):
+            winning_count = 1
+            level = "六等奖"
+        prize_map = {
+            "三等奖": 3000,
+            "四等奖": 500,
+            "五等奖": 30,
+            "六等奖": 5,
+        }
+        per_bet_amount = 0
+        if level in {"一等奖", "二等奖"}:
+            for prize in draw.get("prize_breakdown", []) or []:
+                if str(prize.get("prize_level") or "") == level and str(prize.get("prize_type") or "basic") == "basic":
+                    per_bet_amount = int(prize.get("prize_amount") or 0)
+                    break
+        else:
+            per_bet_amount = prize_map.get(level or "", 0)
+        hit_positions = [[digits[index]] if index < len(digits) and digits[index] in position_selections[index] else [] for index in range(7)]
+        return {
+            "winning_bet_count": winning_count,
+            "prize_level": level,
+            "prize_amount": winning_count * per_bet_amount * int(line.get("multiplier") or 1),
+            "hit_front_numbers": [],
+            "hit_back_numbers": [],
+            "hit_direct_ten_thousands": [],
+            "hit_direct_thousands": [],
+            "hit_direct_hundreds": [],
+            "hit_direct_tens": [],
+            "hit_direct_units": [],
+            "hit_group_numbers": [],
+            "hit_sum_values": [],
+            "hit_position_selections": hit_positions,
         }
 
     @staticmethod
@@ -758,7 +879,7 @@ class MyBetService:
             "date": str(draw.get("date") or ""),
             "red_balls": sorted(set(normalize_digit_balls(draw.get("red_balls", [])))),
             "blue_balls": sorted(set(normalize_digit_balls(draw.get("blue_balls", [])))),
-            "digits": digits[:5] if lottery_code == "pl5" else digits[:3],
+            "digits": digits[:7] if lottery_code == "qxc" else digits[:5] if lottery_code == "pl5" else digits[:3],
             "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
             "previous_jackpot_pool": int(draw.get("previous_jackpot_pool") or 0),
         }
@@ -874,6 +995,7 @@ class MyBetService:
                     "direct_units": normalize_numbers(record.get("direct_units")),
                     "group_numbers": normalize_numbers(record.get("group_numbers")),
                     "sum_values": normalize_numbers(record.get("sum_values")),
+                    "position_selections": list(record.get("position_selections") or []),
                     "multiplier": int(record.get("multiplier") or 1),
                     "is_append": bool(record.get("is_append")),
                     "bet_count": int(record.get("bet_count") or 0),
@@ -904,6 +1026,7 @@ class MyBetService:
             "direct_units": list(first_line.get("direct_units") or []),
             "group_numbers": list(first_line.get("group_numbers") or []),
             "sum_values": list(first_line.get("sum_values") or []),
+            "position_selections": [list(item) for item in list(first_line.get("position_selections") or [])],
             "multiplier": int(record.get("multiplier") or first_line.get("multiplier") or 1),
             "is_append": bool(record.get("is_append") if record.get("is_append") is not None else first_line.get("is_append")),
             "bet_count": int(record.get("bet_count") or 0),
@@ -949,6 +1072,11 @@ class MyBetService:
             "direct_units": normalize_numbers(line.get("direct_units")),
             "group_numbers": normalize_numbers(line.get("group_numbers")),
             "sum_values": normalize_numbers(line.get("sum_values")),
+            "position_selections": [
+                normalize_numbers(item)
+                for item in list(line.get("position_selections") or [])
+                if isinstance(item, list)
+            ],
             "hit_front_numbers": normalize_numbers(line.get("hit_front_numbers")),
             "hit_back_numbers": normalize_numbers(line.get("hit_back_numbers")),
             "hit_direct_ten_thousands": normalize_numbers(line.get("hit_direct_ten_thousands")),
@@ -958,6 +1086,11 @@ class MyBetService:
             "hit_direct_units": normalize_numbers(line.get("hit_direct_units")),
             "hit_group_numbers": normalize_numbers(line.get("hit_group_numbers")),
             "hit_sum_values": normalize_numbers(line.get("hit_sum_values")),
+            "hit_position_selections": [
+                normalize_numbers(item)
+                for item in list(line.get("hit_position_selections") or [])
+                if isinstance(item, list)
+            ],
             "multiplier": int(line.get("multiplier") or 1),
             "is_append": bool(line.get("is_append")),
             "bet_count": int(line.get("bet_count") or 0),

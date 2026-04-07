@@ -103,6 +103,53 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["winning_bet_count"], 5)
         self.assertEqual(result["prize_amount"], 180)
 
+    def test_build_qxc_line_payload_calculates_compound_bet_count(self) -> None:
+        payload = self.service._build_qxc_line_payload(
+            {
+                "play_type": "qxc_compound",
+                "position_selections": [
+                    ["00", "01"],
+                    ["02"],
+                    ["03"],
+                    ["04"],
+                    ["05"],
+                    ["06"],
+                    ["07", "08"],
+                ],
+            },
+            multiplier=2,
+        )
+        self.assertEqual(payload["play_type"], "qxc_compound")
+        self.assertEqual(payload["bet_count"], 4)
+        self.assertEqual(payload["amount"], 16)
+
+    def test_qxc_settlement_uses_confirmed_rule_structure(self) -> None:
+        result = self.service._calculate_qxc_line_settlement(
+            line={
+                "play_type": "qxc_compound",
+                "position_selections": [
+                    ["09"],
+                    ["09"],
+                    ["06"],
+                    ["09"],
+                    ["04"],
+                    ["00"],
+                    ["02", "03"],
+                ],
+                "multiplier": 1,
+            },
+            draw={
+                "digits": ["09", "09", "06", "09", "04", "00", "01"],
+                "prize_breakdown": [
+                    {"prize_level": "一等奖", "prize_type": "basic", "prize_amount": 5000000},
+                    {"prize_level": "二等奖", "prize_type": "basic", "prize_amount": 129823},
+                ],
+            },
+        )
+        self.assertEqual(result["prize_level"], "二等奖")
+        self.assertEqual(result["winning_bet_count"], 2)
+        self.assertEqual(result["prize_amount"], 259646)
+
     def test_build_payload_accepts_discount_amount_within_total(self) -> None:
         payload = self.service._build_payload(
             {

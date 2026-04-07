@@ -141,6 +141,7 @@ class SimulationTicketPayload(BaseModel):
     direct_units: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
     sum_values: list[str] = Field(default_factory=list)
+    position_selections: list[list[str]] = Field(default_factory=list)
 
 
 class SimulationTicketQuotePayload(SimulationTicketPayload):
@@ -175,6 +176,7 @@ class MyBetLinePayload(BaseModel):
     direct_units: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
     sum_values: list[str] = Field(default_factory=list)
+    position_selections: list[list[str]] = Field(default_factory=list)
     multiplier: int = Field(default=1, ge=1, le=99)
     is_append: bool = False
 
@@ -196,6 +198,7 @@ class MyBetRecordPayload(BaseModel):
     direct_units: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
     sum_values: list[str] = Field(default_factory=list)
+    position_selections: list[list[str]] = Field(default_factory=list)
     multiplier: int = Field(default=1, ge=1, le=99)
     is_append: bool = False
     source_type: str = "manual"

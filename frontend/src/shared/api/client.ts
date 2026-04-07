@@ -228,7 +228,7 @@ export const apiClient = {
     limit?: number
     offset?: number
     strategy_filters?: string[]
-    play_type_filters?: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound'>
+    play_type_filters?: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'>
     strategy_match_mode?: 'all'
   }) {
     return requestJson<PredictionsHistoryListResponse>('/api/predictions/history/list', {
