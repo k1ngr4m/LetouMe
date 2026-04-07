@@ -44,6 +44,17 @@ type SumTrendChartItem = {
   sum: number
 }
 
+type NumberDistributionChartItem = {
+  label: string
+  count: number
+}
+
+type NumberTrendChartItem = {
+  period: string
+  value: number
+  pattern?: string
+}
+
 type HistoryModelRef = {
   model_id: string
   model_name: string
@@ -431,6 +442,108 @@ export function AnalysisChartsPanel({
       <AnalysisSumTrendChartCard lotteryCode={lotteryCode} sumTrendChart={sumTrendChart} />
       <AnalysisOddEvenTrendChartCard lotteryCode={lotteryCode} oddEvenChart={oddEvenChart} />
     </>
+  )
+}
+
+export function AnalysisDistributionChartsPanel({
+  lotteryCode,
+  sumDistribution,
+  oddEvenDistribution,
+  positionDistributionCharts,
+}: {
+  lotteryCode: LotteryCode
+  sumDistribution: NumberDistributionChartItem[]
+  oddEvenDistribution: NumberDistributionChartItem[]
+  positionDistributionCharts: Array<{ title: string; data: FrequencyChartItem[] }>
+}) {
+  return (
+    <div className="page-section chart-grid">
+      <ChartCard title={lotteryCode === 'dlt' ? '前区和值分布' : '和值分布'}>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={sumDistribution}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" />
+            <YAxis allowDecimals={false} />
+            <Tooltip {...commonChartTooltipProps} />
+            <Bar dataKey="count" fill="var(--blue-500)" radius={[10, 10, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+      <ChartCard title="奇偶比分布">
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={oddEvenDistribution}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" />
+            <YAxis allowDecimals={false} />
+            <Tooltip {...commonChartTooltipProps} />
+            <Bar dataKey="count" fill="var(--amber-500)" radius={[10, 10, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+      {positionDistributionCharts.map((chart, index) => (
+        <ChartCard key={`${chart.title}-${index}`} title={chart.title}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill={getModelTrendColor(index)} radius={[10, 10, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      ))}
+    </div>
+  )
+}
+
+export function AnalysisPatternChartsPanel({
+  lotteryCode,
+  spanTrend,
+  zoneDistribution,
+  moduloTrend,
+}: {
+  lotteryCode: LotteryCode
+  spanTrend: NumberTrendChartItem[]
+  zoneDistribution: NumberDistributionChartItem[]
+  moduloTrend: NumberTrendChartItem[]
+}) {
+  return (
+    <div className="page-section chart-grid">
+      <ChartCard title="跨度趋势">
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={spanTrend}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="period" />
+            <YAxis allowDecimals={false} />
+            <Tooltip {...commonChartTooltipProps} />
+            <Line type="monotone" dataKey="value" stroke="var(--red-500)" strokeWidth={3} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+      <ChartCard title={lotteryCode === 'dlt' ? '区间分布' : '区段分布'}>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={zoneDistribution}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" />
+            <YAxis allowDecimals={false} />
+            <Tooltip {...commonChartTooltipProps} />
+            <Bar dataKey="count" fill="var(--blue-500)" radius={[10, 10, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+      <ChartCard title="012路走势">
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={moduloTrend}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="period" />
+            <YAxis allowDecimals={false} tickFormatter={(value) => String(value)} />
+            <Tooltip {...commonChartTooltipProps} formatter={(_, __, payload) => payload?.payload?.pattern || ''} />
+            <Line type="monotone" dataKey="value" stroke="var(--amber-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+    </div>
   )
 }
 

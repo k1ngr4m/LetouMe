@@ -21,22 +21,28 @@ import {
   buildHistoryDrawdownTrend,
   buildHistoryHitHeatmap,
   buildBlueFrequencyChart,
+  buildModuloTrendChart,
+  buildOddEvenDistributionChart,
   buildHistoryProfitDistribution,
   buildHistoryProfitTrend,
   buildHistoryRankTrend,
   buildHistoryRollingHitRateTrend,
   buildOddEvenChart,
+  buildPositionDistributionCharts,
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
   buildPl3SumTrendChart,
   buildPl5OddEvenStructureChart,
   buildPl5PositionHotChart,
   buildPl5SumTrendChart,
+  buildSpanTrendChart,
   filterPredictionGroupsByPlayType,
   getPredictionPlayTypeLabel,
   buildRedFrequencyChart,
   resolveHistoryFallbackState,
+  buildSumDistributionChart,
   buildSumTrendChart,
+  buildZoneDistributionChart,
   compareNumbers,
   getActualResult,
   type ModelScore,
@@ -103,6 +109,12 @@ const AnalysisSumTrendChartCard = lazy(() =>
 const AnalysisOddEvenTrendChartCard = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.AnalysisOddEvenTrendChartCard })),
 )
+const AnalysisDistributionChartsPanel = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisDistributionChartsPanel })),
+)
+const AnalysisPatternChartsPanel = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisPatternChartsPanel })),
+)
 const HistoryHitTrendLineChartCard = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendLineChartCard })),
 )
@@ -137,6 +149,8 @@ const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ defau
 
 const CHART_CENTER_ITEMS = {
   numberBase: 'number-base',
+  numberDistribution: 'number-distribution',
+  numberPattern: 'number-pattern',
   backtestBase: 'backtest-base',
   backtestRevenue: 'backtest-revenue',
   backtestStability: 'backtest-stability',
@@ -1102,6 +1116,30 @@ export function HomePage() {
     : isPl5Lottery
       ? buildPl5SumTrendChart(chartDraws)
       : buildSumTrendChart(chartDraws)
+  const sumDistributionChart = useMemo(
+    () => buildSumDistributionChart(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
+  const oddEvenDistributionChart = useMemo(
+    () => buildOddEvenDistributionChart(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
+  const positionDistributionCharts = useMemo(
+    () => buildPositionDistributionCharts(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
+  const spanTrendChart = useMemo(
+    () => buildSpanTrendChart(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
+  const zoneDistributionChart = useMemo(
+    () => buildZoneDistributionChart(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
+  const moduloTrendChart = useMemo(
+    () => buildModuloTrendChart(chartDraws, selectedLottery),
+    [chartDraws, selectedLottery],
+  )
   const scoreViewModels = useMemo(
     () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
     [effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortDirection, scoreViewSortKey],
@@ -1292,6 +1330,14 @@ export function HomePage() {
     [CHART_CENTER_ITEMS.numberBase]: {
       title: '基础分析',
       subtitle: '集中查看热号、和值趋势和奇偶结构走势。',
+    },
+    [CHART_CENTER_ITEMS.numberDistribution]: {
+      title: '分布分析',
+      subtitle: '从和值、奇偶比和位置频次三个维度观察号码分布特征。',
+    },
+    [CHART_CENTER_ITEMS.numberPattern]: {
+      title: '形态分析',
+      subtitle: '通过跨度、区间和 012 路走势，判断号码结构变化。',
     },
     [CHART_CENTER_ITEMS.backtestBase]: {
       title: '基础趋势',
@@ -1772,7 +1818,13 @@ export function HomePage() {
 
               <div className="chart-center-content" data-chart-center-item={activeChartCenterItem}>
                 {activeChartCenterItem === CHART_CENTER_ITEMS.numberBase ? (
-                  <>
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">基础分析</h3>
+                        <p className="chart-center-group__subtitle">同屏查看热号、和值趋势和奇偶结构走势，快速把握当前号码面貌。</p>
+                      </div>
+                    </div>
                     <AnalysisHotChartsPanel
                       lotteryCode={selectedLottery}
                       redChart={redChart}
@@ -1782,7 +1834,39 @@ export function HomePage() {
                     />
                     <AnalysisSumTrendChartCard lotteryCode={selectedLottery} sumTrendChart={sumTrendChart} />
                     <AnalysisOddEvenTrendChartCard lotteryCode={selectedLottery} oddEvenChart={oddEvenChart} />
-                  </>
+                  </section>
+                ) : null}
+                {activeChartCenterItem === CHART_CENTER_ITEMS.numberDistribution ? (
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">分布分析</h3>
+                        <p className="chart-center-group__subtitle">同屏查看和值分布、奇偶比分布和位置频次分布，识别号码集中与离散特征。</p>
+                      </div>
+                    </div>
+                    <AnalysisDistributionChartsPanel
+                      lotteryCode={selectedLottery}
+                      sumDistribution={sumDistributionChart}
+                      oddEvenDistribution={oddEvenDistributionChart}
+                      positionDistributionCharts={positionDistributionCharts}
+                    />
+                  </section>
+                ) : null}
+                {activeChartCenterItem === CHART_CENTER_ITEMS.numberPattern ? (
+                  <section className="chart-center-group">
+                    <div className="chart-center-group__header">
+                      <div>
+                        <h3 className="chart-center-group__title">形态分析</h3>
+                        <p className="chart-center-group__subtitle">同屏查看跨度、区间分布和 012 路走势，观察号码结构变化节奏。</p>
+                      </div>
+                    </div>
+                    <AnalysisPatternChartsPanel
+                      lotteryCode={selectedLottery}
+                      spanTrend={spanTrendChart}
+                      zoneDistribution={zoneDistributionChart}
+                      moduloTrend={moduloTrendChart}
+                    />
+                  </section>
                 ) : null}
                 {activeChartCenterItem === CHART_CENTER_ITEMS.backtestBase ? (
                   <section className="chart-center-group">

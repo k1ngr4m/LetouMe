@@ -59,6 +59,8 @@ const CHART_CENTER_GROUPS = [
     title: '号码分析',
     items: [
       { id: 'number-base', label: '基础分析' },
+      { id: 'number-distribution', label: '分布分析' },
+      { id: 'number-pattern', label: '形态分析' },
     ],
   },
   {
@@ -200,7 +202,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [location.pathname])
 
   useEffect(() => {
-    const isNumberHash = ['#number-base'].includes(location.hash)
+    const isNumberHash = ['#number-base', '#number-distribution', '#number-pattern'].includes(location.hash)
     const isBacktestHash = ['#backtest-base', '#backtest-revenue', '#backtest-stability'].includes(location.hash)
     if (isNumberHash) {
       setIsChartNumberMenuOpen(true)
@@ -411,7 +413,7 @@ export function AppShell({ children }: PropsWithChildren) {
                       'crm-chart-nav__group',
                       (
                         group.id === 'number-analysis'
-                          ? ['#number-base']
+                          ? ['#number-base', '#number-distribution', '#number-pattern']
                           : ['#backtest-base', '#backtest-revenue', '#backtest-stability']
                       ).includes(location.hash) && 'is-active',
                     )}
@@ -424,7 +426,7 @@ export function AppShell({ children }: PropsWithChildren) {
                         'crm-chart-nav__item',
                         (
                           group.id === 'number-analysis'
-                            ? ['#number-base']
+                            ? ['#number-base', '#number-distribution', '#number-pattern']
                             : ['#backtest-base', '#backtest-revenue', '#backtest-stability']
                         ).includes(location.hash) && 'is-active',
                       )}

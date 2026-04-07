@@ -1737,6 +1737,26 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })
 
+  it('shows number distribution dashboard charts together', async () => {
+    renderPage('/dashboard/charts#number-distribution')
+
+    expect(await screen.findByRole('heading', { name: '前区和值分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '奇偶比分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '前区频次分布' })).toBeInTheDocument()
+    expect(screen.queryByText('模型')).not.toBeInTheDocument()
+    expect(screen.queryByText('方案')).not.toBeInTheDocument()
+  })
+
+  it('shows number pattern dashboard charts together', async () => {
+    renderPage('/dashboard/charts#number-pattern')
+
+    expect(await screen.findByRole('heading', { name: '跨度趋势' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '区间分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '012路走势' })).toBeInTheDocument()
+    expect(screen.queryByText('模型')).not.toBeInTheDocument()
+    expect(screen.queryByText('方案')).not.toBeInTheDocument()
+  })
+
   it('supports simulation pick, matching, save and delete flows', async () => {
     getSimulationTickets
       .mockResolvedValueOnce({ tickets: [] })
