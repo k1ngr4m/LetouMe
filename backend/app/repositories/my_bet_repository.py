@@ -111,7 +111,17 @@ class MyBetRepository:
                         ),
                     )
                     if cursor.rowcount <= 0:
-                        return None
+                        cursor.execute(
+                            """
+                            SELECT id
+                            FROM my_bet_record
+                            WHERE id = ? AND user_id = ?
+                            LIMIT 1
+                            """,
+                            (record_id, user_id),
+                        )
+                        if cursor.fetchone() is None:
+                            return None
                     self._replace_lines(cursor, record_id=record_id, lottery_code=lottery_code, lines=payload.get("lines"))
                     self._upsert_meta(cursor, record_id=record_id, lottery_code=lottery_code, payload=payload)
         return self.get_record(record_id, user_id, lottery_code=lottery_code)

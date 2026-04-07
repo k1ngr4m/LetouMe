@@ -3921,17 +3921,20 @@ function HistoryRecordCard({
   )
   const hasScopedFilters = normalizedStrategyFilters.length > 0 || normalizedPlayTypeFilters.length > 0
   const filteredListModelMetrics = useMemo(() => {
-    const metrics = new Map<string, { bet_count: number; cost_amount: number; prize_amount: number }>()
+    const metrics = new Map<string, { bet_count: number; cost_amount: number; prize_amount: number; is_usable: boolean }>()
     for (const detailModel of detailRecord?.models || []) {
       const modeKey = resolveHistoryModelModeKey(detailModel)
-      let filteredPredictions = filterPredictionGroupsByPlayType(detailModel.predictions || [], normalizedPlayTypeFilters)
+      const playTypeFilteredPredictions = filterPredictionGroupsByPlayType(detailModel.predictions || [], normalizedPlayTypeFilters)
+      let filteredPredictions = playTypeFilteredPredictions
       if (normalizedStrategyFilters.length) {
         filteredPredictions = filteredPredictions.filter((group) => strategyFilterSet.has(normalizeStrategyLabel(group.strategy)))
       }
+      const isUsable = normalizedPlayTypeFilters.length === 0 || playTypeFilteredPredictions.length > 0
       metrics.set(modeKey, {
         bet_count: filteredPredictions.length,
         cost_amount: filteredPredictions.reduce((sum, group) => sum + resolveHistoryPredictionGroupCost(group, lotteryCode), 0),
         prize_amount: filteredPredictions.reduce((sum, group) => sum + Number(group.prize_amount || 0), 0),
+        is_usable: isUsable,
       })
     }
     return metrics
@@ -3942,10 +3945,13 @@ function HistoryRecordCard({
         (accumulator, model) => {
           const modeKey = resolveHistoryModelModeKey(model)
           const scoped = hasScopedFilters ? filteredListModelMetrics.get(modeKey) : null
+          const betCount = scoped?.is_usable ? scoped.bet_count : (model.bet_count ?? 0)
+          const costAmount = scoped?.is_usable ? scoped.cost_amount : (model.cost_amount ?? 0)
+          const prizeAmount = scoped?.is_usable ? scoped.prize_amount : (model.prize_amount ?? 0)
           return {
-            total_bet_count: accumulator.total_bet_count + (scoped?.bet_count ?? model.bet_count ?? 0),
-            total_cost_amount: accumulator.total_cost_amount + (scoped?.cost_amount ?? model.cost_amount ?? 0),
-            total_prize_amount: accumulator.total_prize_amount + (scoped?.prize_amount ?? model.prize_amount ?? 0),
+            total_bet_count: accumulator.total_bet_count + betCount,
+            total_cost_amount: accumulator.total_cost_amount + costAmount,
+            total_prize_amount: accumulator.total_prize_amount + prizeAmount,
           }
         },
         { total_bet_count: 0, total_cost_amount: 0, total_prize_amount: 0 },
@@ -4107,6 +4113,9 @@ function HistoryRecordCard({
         {listModels.map((model) => {
           const modelModeKey = resolveHistoryModelModeKey(model)
           const scopedMetrics = hasScopedFilters ? filteredListModelMetrics.get(modelModeKey) : null
+          const effectiveBetCount = scopedMetrics?.is_usable ? scopedMetrics.bet_count : (model.bet_count ?? 0)
+          const effectiveCostAmount = scopedMetrics?.is_usable ? scopedMetrics.cost_amount : (model.cost_amount ?? 0)
+          const effectivePrizeAmount = scopedMetrics?.is_usable ? scopedMetrics.prize_amount : (model.prize_amount ?? 0)
           const isExpanded = expandedModelIds.includes(modelModeKey)
           const listModelMode = normalizePredictionModelPlayMode(model)
           const currentPl3Mode: 'direct' | 'direct_sum' | null = lotteryCode === 'pl3' ? (isPl3SumMode ? 'direct_sum' : 'direct') : null
@@ -4175,15 +4184,15 @@ function HistoryRecordCard({
                 <div className="history-record-card__model-grid">
                   <span className="history-record-card__metric-cell">
                     <small>注数</small>
-                    <strong>{scopedMetrics?.bet_count ?? model.bet_count ?? 0}</strong>
+                    <strong>{effectiveBetCount}</strong>
                   </span>
                   <span className="history-record-card__metric-cell">
                     <small>成本</small>
-                    <strong>{formatCurrency(scopedMetrics?.cost_amount ?? model.cost_amount)}</strong>
+                    <strong>{formatCurrency(effectiveCostAmount)}</strong>
                   </span>
                   <span className="history-record-card__metric-cell">
                     <small>奖金</small>
-                    <strong>{formatCurrency(scopedMetrics?.prize_amount ?? model.prize_amount)}</strong>
+                    <strong>{formatCurrency(effectivePrizeAmount)}</strong>
                   </span>
                 </div>
                 <span className={clsx('history-record-card__model-expand-indicator', isExpanded && 'is-expanded')} aria-hidden="true">
