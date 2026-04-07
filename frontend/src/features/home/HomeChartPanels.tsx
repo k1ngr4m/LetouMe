@@ -1,4 +1,5 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Area,
   AreaChart,
@@ -85,6 +86,52 @@ function formatProfitValue(value: number) {
 
 function ChartInfoTooltip({ title, description }: { title: string; description: string }) {
   const [isOpen, setIsOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const [position, setPosition] = useState<{ top: number; left: number; arrowLeft: number; placement: 'top' | 'bottom' } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!isOpen || !triggerRef.current || !panelRef.current || typeof window === 'undefined') return
+
+    const gutter = 12
+    const offset = 12
+
+    const updatePosition = () => {
+      if (!triggerRef.current || !panelRef.current) return
+
+      const triggerRect = triggerRef.current.getBoundingClientRect()
+      const panelRect = panelRef.current.getBoundingClientRect()
+      const panelWidth = panelRect.width
+      const panelHeight = panelRect.height
+
+      const preferredLeft = triggerRect.right - panelWidth
+      const left = Math.min(Math.max(gutter, preferredLeft), Math.max(gutter, window.innerWidth - panelWidth - gutter))
+
+      const spaceAbove = triggerRect.top - gutter
+      const spaceBelow = window.innerHeight - triggerRect.bottom - gutter
+      const placement: 'top' | 'bottom' =
+        spaceAbove >= panelHeight + offset || spaceAbove >= spaceBelow ? 'top' : 'bottom'
+
+      const rawTop =
+        placement === 'top'
+          ? triggerRect.top - panelHeight - offset
+          : triggerRect.bottom + offset
+      const top = Math.min(Math.max(gutter, rawTop), Math.max(gutter, window.innerHeight - panelHeight - gutter))
+
+      const arrowLeft = Math.min(panelWidth - 18, Math.max(18, triggerRect.left + triggerRect.width / 2 - left))
+
+      setPosition({ top, left, arrowLeft, placement })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isOpen])
 
   return (
     <div
@@ -95,6 +142,7 @@ function ChartInfoTooltip({ title, description }: { title: string; description: 
       onBlur={() => setIsOpen(false)}
     >
       <button
+        ref={triggerRef}
         type="button"
         className="chart-info-tooltip__trigger"
         aria-label={`${title}说明`}
@@ -102,12 +150,28 @@ function ChartInfoTooltip({ title, description }: { title: string; description: 
       >
         ?
       </button>
-      {isOpen ? (
-        <div className="chart-info-tooltip__panel" role="tooltip">
-          <strong>{title}</strong>
-          <span>{description}</span>
-        </div>
-      ) : null}
+      {isOpen
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="chart-info-tooltip__panel"
+              data-placement={position?.placement || 'top'}
+              role="tooltip"
+              style={{
+                position: 'fixed',
+                left: `${position?.left ?? -9999}px`,
+                top: `${position?.top ?? -9999}px`,
+                width: `${Math.min(288, typeof window === 'undefined' ? 288 : window.innerWidth - 24)}px`,
+                visibility: position ? 'visible' : 'hidden',
+              }}
+            >
+              <strong>{title}</strong>
+              <span>{description}</span>
+              <span className="chart-info-tooltip__arrow" aria-hidden="true" style={{ left: `${position?.arrowLeft ?? 24}px` }} />
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
