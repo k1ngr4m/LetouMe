@@ -222,8 +222,8 @@ class LotteryFetchServiceTests(unittest.TestCase):
         service.logger = Mock()
         service.fetch_draw_detail = Mock(
             side_effect=[
-                {"jackpot_pool_balance": 289159709, "prize_breakdown": build_qxc_prize_breakdown()},
-                {"jackpot_pool_balance": 275120000, "prize_breakdown": build_qxc_prize_breakdown()},
+                {"jackpot_pool_balance": 289159709, "prize_breakdown": build_qxc_prize_breakdown(), "draw_date": "2026-04-05"},
+                {"jackpot_pool_balance": 275120000, "prize_breakdown": build_qxc_prize_breakdown(), "draw_date": "2026-03-31"},
             ]
         )
         soup = BeautifulSoup(html, "html.parser")
@@ -233,8 +233,10 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0]["period"], "26037")
         self.assertEqual(data[0]["digits"], ["09", "09", "06", "09", "04", "00", "01"])
+        self.assertEqual(data[0]["date"], "2026-04-05")
         self.assertEqual(data[1]["period"], "26033")
         self.assertEqual(data[1]["digits"], ["01", "08", "09", "01", "09", "03", "14"])
+        self.assertEqual(data[1]["date"], "2026-03-31")
 
     def test_parse_qxc_prize_breakdown_supports_td_header_table(self) -> None:
         html = """
@@ -261,6 +263,19 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(prize_map["二等奖"]["prize_amount"], 129823)
         self.assertEqual(prize_map["六等奖"]["winner_count"], 739232)
         self.assertEqual(prize_map["六等奖"]["prize_amount"], 5)
+
+    def test_parse_draw_date_supports_cn_date_format(self) -> None:
+        html = """
+        <div>
+          <p>7星彩 第 26037 期 开奖日期：2026年4月5日</p>
+        </div>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        soup = BeautifulSoup(html, "html.parser")
+
+        draw_date = service.parse_draw_date(soup)
+
+        self.assertEqual(draw_date, "2026-04-05")
 
     def test_fetch_and_save_applies_limit(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)

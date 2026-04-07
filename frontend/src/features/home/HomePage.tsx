@@ -381,6 +381,10 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
+function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' {
+  return lotteryCode === 'qxc' && index === total - 1 ? 'blue' : 'red'
+}
+
 function formatJackpotInYiYuan(value: number | undefined) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return '—'
@@ -3142,6 +3146,22 @@ function SavedSimulationTicketCard({
               <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="red" size="sm" />
             ))}
           </div>
+        ) : lotteryCode === 'qxc' && (ticket.position_selections || []).length === 7 ? (
+          <div className="number-row number-row--tight">
+            {(ticket.position_selections || []).slice(0, 7).map((values, positionIndex) => (
+              <span key={`${ticket.id}-position-${positionIndex}`} className="number-row__segment">
+                {positionIndex > 0 ? <span className="number-row__divider" /> : null}
+                {(values || []).map((ball) => (
+                  <NumberBall
+                    key={`${ticket.id}-position-${positionIndex}-${ball}`}
+                    value={ball}
+                    color={resolveDigitBallColor('qxc', positionIndex, 7)}
+                    size="sm"
+                  />
+                ))}
+              </span>
+            ))}
+          </div>
         ) : ticket.play_type === 'direct' ? (
           <div className="number-row number-row--tight">
             {(ticket.direct_hundreds || []).map((ball) => (
@@ -3651,9 +3671,9 @@ function PredictionNumberRow({
       </div>
     )
   }
-  const digitLength = inferredLotteryCode === 'pl5' ? 5 : 3
+  const digitLength = inferredLotteryCode === 'qxc' ? 7 : inferredLotteryCode === 'pl5' ? 5 : 3
   const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).slice(0, digitLength)
-  if (inferredLotteryCode === 'pl3' || inferredLotteryCode === 'pl5') {
+  if (inferredLotteryCode === 'pl3' || inferredLotteryCode === 'pl5' || inferredLotteryCode === 'qxc') {
     return (
       <div className={clsx('number-row', compact && 'number-row--compact')}>
         {digits.map((digit, index) => {
@@ -3662,7 +3682,7 @@ function PredictionNumberRow({
             <NumberBall
               key={`d-${group.group_id}-${index}-${digit}`}
               value={digit}
-              color="red"
+              color={resolveDigitBallColor(inferredLotteryCode, index, digits.length)}
               isHit={isHit}
               tone={grayMisses && !isHit ? 'muted' : 'default'}
             />
@@ -4560,7 +4580,11 @@ function HistoryRecordCard({
       {record.actual_result ? (
         <div className="number-row history-record-card__numbers">
           {actualMainBalls.map((ball, index) => (
-            <NumberBall key={`${record.target_period}-red-${index}-${ball}`} value={ball} color="red" />
+            <NumberBall
+              key={`${record.target_period}-red-${index}-${ball}`}
+              value={ball}
+              color={resolveDigitBallColor(actualLotteryCode as LotteryCode, index, actualMainBalls.length)}
+            />
           ))}
           {actualLotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
           {actualLotteryCode === 'dlt'

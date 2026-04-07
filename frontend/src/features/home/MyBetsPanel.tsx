@@ -473,6 +473,10 @@ function formatPlayType(playType: string) {
   return '大乐透'
 }
 
+function resolveQxcDigitColor(index: number, total: number): 'red' | 'blue' {
+  return index === total - 1 ? 'blue' : 'red'
+}
+
 function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
   if (!record.actual_result) {
     return <span className="my-bets-card__meta">待开奖，暂无开奖号码</span>
@@ -490,12 +494,17 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
       </div>
     )
   }
-  const digitLength = lotteryCode === 'pl5' ? 5 : 3
+  const digitLength = lotteryCode === 'qxc' ? 7 : lotteryCode === 'pl5' ? 5 : 3
   const digits = (record.actual_result.digits || record.actual_result.red_balls || []).slice(0, digitLength)
   return (
     <div className="number-row number-row--tight">
-      {digits.map((ball) => (
-        <NumberBall key={`${record.id}-actual-digit-${ball}`} value={ball} color="red" size="sm" />
+      {digits.map((ball, index) => (
+        <NumberBall
+          key={`${record.id}-actual-digit-${index}-${ball}`}
+          value={ball}
+          color={lotteryCode === 'qxc' ? resolveQxcDigitColor(index, digits.length) : 'red'}
+          size="sm"
+        />
       ))}
     </div>
   )
@@ -543,6 +552,32 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
         <span className="number-row__divider" />
         {(line.back_numbers || []).map((ball) => (
           <NumberBall key={`${recordId}-line-${line.line_no}-back-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+        ))}
+      </div>
+    )
+  }
+  if (lotteryCode === 'qxc' && (line.position_selections || []).length === 7) {
+    const positionSelections = (line.position_selections || []).slice(0, 7)
+    const hitPositionSelections = (line.hit_position_selections || []).slice(0, 7)
+    return (
+      <div className="number-row number-row--tight">
+        {positionSelections.map((values, positionIndex) => (
+          <span key={`${recordId}-line-${line.line_no}-position-${positionIndex}`} className="number-row__segment">
+            {positionIndex > 0 ? <span className="number-row__divider" /> : null}
+            {(values || []).map((ball) => {
+              const isHit = Boolean((hitPositionSelections[positionIndex] || []).includes(ball))
+              return (
+                <NumberBall
+                  key={`${recordId}-line-${line.line_no}-position-${positionIndex}-${ball}`}
+                  value={ball}
+                  color={resolveQxcDigitColor(positionIndex, positionSelections.length)}
+                  size="sm"
+                  isHit={isHit}
+                  tone={resolveTone(isHit)}
+                />
+              )
+            })}
+          </span>
         ))}
       </div>
     )

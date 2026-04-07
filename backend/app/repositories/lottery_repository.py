@@ -6,7 +6,7 @@ from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.lotteries import display_period, normalize_lottery_code, storage_issue_no
 from backend.app.repositories.write_log_repository import WriteLogRepository
-from backend.app.time_utils import ensure_timestamp, now_ts
+from backend.app.time_utils import ensure_timestamp
 
 
 IN_QUERY_CHUNK_SIZE = 200
@@ -364,18 +364,18 @@ def _upsert_issue(connection, issue_no: str, draw_date: str | None, status: str,
                         UPDATE draw_issue
                         SET draw_date = ?,
                             status = ?,
-                            updated_at = ?
+                            updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                         """,
-                        (draw_date, status, now_ts(), issue_id),
+                        (draw_date, status, issue_id),
                     )
                 return issue_id
             cursor.execute(
                 """
                 INSERT INTO draw_issue (issue_no, draw_date, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
-                (stored_issue_no, draw_date, status, now_ts(), now_ts()),
+                (stored_issue_no, draw_date, status),
             )
             return int(cursor.lastrowid)
 

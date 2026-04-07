@@ -291,7 +291,7 @@ class LotteryFetchService:
                 {
                     "period": period,
                     "digits": normalize_digit_balls(digits[:7]),
-                    "date": date_match.group(1) if date_match else cols[-1].get_text(strip=True),
+                    "date": date_match.group(1) if date_match else str(detail_payload.get("draw_date") or ""),
                     "jackpot_pool_balance": int(detail_payload.get("jackpot_pool_balance") or 0),
                     "prize_breakdown": detail_payload.get("prize_breakdown") or build_qxc_prize_breakdown(),
                 }
@@ -327,10 +327,12 @@ class LotteryFetchService:
                 return {
                     "prize_breakdown": build_qxc_prize_breakdown(),
                     "jackpot_pool_balance": 0,
+                    "draw_date": "",
                 }
             return {
                 "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
                 "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+                "draw_date": self.parse_draw_date(soup),
             }
         soup = self.fetch_page(detail_url, retry=2)
         if not soup:
@@ -428,6 +430,19 @@ class LotteryFetchService:
         if self.lottery_code in {"pl3", "pl5", "qxc"}:
             return response.apparent_encoding or "gb18030"
         return "utf-8"
+
+    @staticmethod
+    def parse_draw_date(soup: BeautifulSoup) -> str:
+        text_content = soup.get_text(" ", strip=True).replace("\xa0", " ")
+        match = re.search(r"开奖日期[：:\s]*([0-9]{4}[-/.年][0-9]{1,2}[-/.月][0-9]{1,2})", text_content)
+        if not match:
+            return ""
+        raw_value = match.group(1).replace("年", "-").replace("月", "-").replace("日", "")
+        normalized = raw_value.replace("/", "-").replace(".", "-")
+        date_match = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", normalized)
+        if not date_match:
+            return ""
+        return f"{int(date_match.group(1)):04d}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
 
     def build_fallback_prize_breakdown(self) -> list[dict[str, Any]]:
         return [
