@@ -8,8 +8,8 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   ReferenceLine,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -55,9 +55,9 @@ function formatProfitValue(value: number) {
   return `${new Intl.NumberFormat('zh-CN', { signDisplay: 'exceptZero' }).format(Number(value) || 0)} 元`
 }
 
-function ChartCard({ title, children }: { title: string; children: ReactNode }) {
+function ChartCard({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className="panel-card chart-card">
+    <section className={`panel-card chart-card${className ? ` ${className}` : ''}`}>
       <div className="panel-card__header">
         <h2 className="panel-card__title">{title}</h2>
       </div>
@@ -104,25 +104,52 @@ const commonChartTooltipProps = {
   } satisfies CSSProperties,
 }
 
-export function AnalysisChartsPanel({
+function HistoryChartShell({ title, children, ariaLabel }: { title: string; children: ReactNode; ariaLabel?: string }) {
+  return (
+    <div className="history-hit-trend__chart-shell" aria-label={ariaLabel}>
+      <p className="history-hit-trend__chart-title">{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function getSortedHistoryData(historyHitTrend: HistoryTrendItem[], historyProfitTrend: HistoryTrendItem[]) {
+  const sortByPeriod = (left: HistoryTrendItem, right: HistoryTrendItem) => {
+    const leftPeriod = Number(left.period)
+    const rightPeriod = Number(right.period)
+    const leftIsNumber = Number.isFinite(leftPeriod)
+    const rightIsNumber = Number.isFinite(rightPeriod)
+    if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
+    return String(left.period || '').localeCompare(String(right.period || ''))
+  }
+
+  return {
+    sortedTrendData: [...historyHitTrend].sort(sortByPeriod),
+    sortedProfitData: [...historyProfitTrend].sort(sortByPeriod),
+  }
+}
+
+function buildHistoryChartClickHandler(onPeriodSelect?: (period: string) => void) {
+  return (state?: { activeLabel?: string | number | null }) => {
+    const period = state?.activeLabel
+    if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
+  }
+}
+
+export function AnalysisHotChartsPanel({
   lotteryCode,
   redChart,
   blueChart,
   pl3UnitChart,
   pl5PositionCharts,
-  oddEvenChart,
-  sumTrendChart,
 }: {
   lotteryCode: LotteryCode
   redChart: FrequencyChartItem[]
   blueChart: FrequencyChartItem[]
   pl3UnitChart: FrequencyChartItem[]
   pl5PositionCharts: FrequencyChartItem[][]
-  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem | Pl5OddEvenStructureChartItem>
-  sumTrendChart: SumTrendChartItem[]
 }) {
   if (lotteryCode === 'pl3') {
-    const structureTrend = oddEvenChart as Pl3OddEvenStructureChartItem[]
     return (
       <div className="page-section chart-grid">
         <ChartCard title="百位热号 Top 10">
@@ -158,33 +185,11 @@ export function AnalysisChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="和值趋势">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={sumTrendChart}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="period" />
-              <YAxis allowDecimals={false} />
-              <Tooltip {...commonChartTooltipProps} />
-              <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-        <ChartCard title="奇偶结构走势">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={structureTrend}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="period" />
-              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3]} tickFormatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
-              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
-              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
       </div>
     )
   }
+
   if (lotteryCode === 'pl5') {
-    const structureTrend = oddEvenChart as Pl5OddEvenStructureChartItem[]
     const [tenThousands = [], thousands = [], hundreds = [], tens = [], units = []] = pl5PositionCharts
     return (
       <div className="page-section chart-grid">
@@ -243,32 +248,9 @@ export function AnalysisChartsPanel({
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="和值趋势">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={sumTrendChart}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="period" />
-              <YAxis allowDecimals={false} />
-              <Tooltip {...commonChartTooltipProps} />
-              <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-        <ChartCard title="奇偶结构走势">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={structureTrend}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="period" />
-              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3, 4, 5]} tickFormatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
-              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
-              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
       </div>
     )
   }
-  const oddEvenTrend = oddEvenChart as OddEvenChartItem[]
 
   return (
     <div className="page-section chart-grid">
@@ -294,8 +276,86 @@ export function AnalysisChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="奇偶结构走势">
-        <ResponsiveContainer width="100%" height={280}>
+    </div>
+  )
+}
+
+export function AnalysisSumTrendChartCard({
+  lotteryCode,
+  sumTrendChart,
+}: {
+  lotteryCode: LotteryCode
+  sumTrendChart: SumTrendChartItem[]
+}) {
+  const title = lotteryCode === 'dlt' ? '前区和值趋势' : '和值趋势'
+
+  return (
+    <div className="page-section chart-grid chart-grid--single">
+      <ChartCard title={title} className="chart-card--focus">
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={sumTrendChart}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="period" />
+            <YAxis allowDecimals={false} />
+            <Tooltip {...commonChartTooltipProps} />
+            <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+    </div>
+  )
+}
+
+export function AnalysisOddEvenTrendChartCard({
+  lotteryCode,
+  oddEvenChart,
+}: {
+  lotteryCode: LotteryCode
+  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem | Pl5OddEvenStructureChartItem>
+}) {
+  if (lotteryCode === 'pl3') {
+    const structureTrend = oddEvenChart as Pl3OddEvenStructureChartItem[]
+    return (
+      <div className="page-section chart-grid chart-grid--single">
+        <ChartCard title="奇偶结构走势" className="chart-card--focus">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={structureTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3]} tickFormatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${3 - Number(value)}`} />
+              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+
+  if (lotteryCode === 'pl5') {
+    const structureTrend = oddEvenChart as Pl5OddEvenStructureChartItem[]
+    return (
+      <div className="page-section chart-grid chart-grid--single">
+        <ChartCard title="奇偶结构走势" className="chart-card--focus">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={structureTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3, 4, 5]} tickFormatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${5 - Number(value)}`} />
+              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+
+  const oddEvenTrend = oddEvenChart as OddEvenChartItem[]
+  return (
+    <div className="page-section chart-grid chart-grid--single">
+      <ChartCard title="奇偶结构走势" className="chart-card--focus">
+        <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={oddEvenTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="period" />
@@ -307,18 +367,189 @@ export function AnalysisChartsPanel({
           </AreaChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="前区和值趋势">
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={sumTrendChart}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="period" />
-            <YAxis />
-            <Tooltip {...commonChartTooltipProps} />
-            <Line type="monotone" dataKey="sum" stroke="var(--blue-500)" strokeWidth={3} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartCard>
     </div>
+  )
+}
+
+export function AnalysisChartsPanel({
+  lotteryCode,
+  redChart,
+  blueChart,
+  pl3UnitChart,
+  pl5PositionCharts,
+  oddEvenChart,
+  sumTrendChart,
+}: {
+  lotteryCode: LotteryCode
+  redChart: FrequencyChartItem[]
+  blueChart: FrequencyChartItem[]
+  pl3UnitChart: FrequencyChartItem[]
+  pl5PositionCharts: FrequencyChartItem[][]
+  oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem | Pl5OddEvenStructureChartItem>
+  sumTrendChart: SumTrendChartItem[]
+}) {
+  return (
+    <>
+      <AnalysisHotChartsPanel
+        lotteryCode={lotteryCode}
+        redChart={redChart}
+        blueChart={blueChart}
+        pl3UnitChart={pl3UnitChart}
+        pl5PositionCharts={pl5PositionCharts}
+      />
+      <AnalysisSumTrendChartCard lotteryCode={lotteryCode} sumTrendChart={sumTrendChart} />
+      <AnalysisOddEvenTrendChartCard lotteryCode={lotteryCode} oddEvenChart={oddEvenChart} />
+    </>
+  )
+}
+
+export function HistoryHitTrendLineChartCard({
+  historyVisibleModels,
+  historyHitTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyHitTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyHitTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="命中趋势折线" className="chart-card--focus">
+      {historyVisibleModels.length && historyHitTrend.length ? (
+        <HistoryChartShell title="模型命中趋势" ariaLabel="模型命中趋势图">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <Tooltip {...commonChartTooltipProps} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line
+                  key={model.model_id}
+                  type="monotone"
+                  dataKey={model.model_id}
+                  name={model.model_name}
+                  stroke={getModelTrendColor(index)}
+                  strokeWidth={3}
+                  dot={{ r: 2 }}
+                  activeDot={{ r: 5 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryHitTrendStackedChartCard({
+  historyVisibleModels,
+  historyHitTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyHitTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedTrendData } = getSortedHistoryData(historyHitTrend, [])
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="命中堆叠柱形统计" className="chart-card--focus">
+      {historyVisibleModels.length && historyHitTrend.length ? (
+        <HistoryChartShell title="模型命中堆叠统计" ariaLabel="模型命中堆叠统计图">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={sortedTrendData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <Tooltip {...commonChartTooltipProps} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Bar
+                  key={`stack-${model.model_id}`}
+                  dataKey={model.model_id}
+                  name={model.model_name}
+                  stackId="hitStack"
+                  fill={getModelTrendColor(index)}
+                  radius={[6, 6, 0, 0]}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
+      )}
+    </ChartCard>
+  )
+}
+
+export function HistoryProfitTrendChartCard({
+  historyVisibleModels,
+  historyProfitTrend,
+  selectedPeriod,
+  onPeriodSelect,
+}: {
+  historyVisibleModels: HistoryModelRef[]
+  historyProfitTrend: HistoryTrendItem[]
+  selectedPeriod?: string | null
+  onPeriodSelect?: (period: string) => void
+}) {
+  const { sortedProfitData } = getSortedHistoryData([], historyProfitTrend)
+  const onChartClick = buildHistoryChartClickHandler(onPeriodSelect)
+
+  return (
+    <ChartCard title="盈亏趋势折线" className="chart-card--focus">
+      {historyVisibleModels.length && historyProfitTrend.length ? (
+        <HistoryChartShell title="模型盈亏趋势" ariaLabel="模型盈亏趋势图">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={sortedProfitData} onClick={onChartClick}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis
+                domain={([dataMin, dataMax]) => {
+                  const min = Number.isFinite(Number(dataMin)) ? Number(dataMin) : 0
+                  const max = Number.isFinite(Number(dataMax)) ? Number(dataMax) : 0
+                  if (min === max) return [min - 1, max + 1]
+                  return [Math.min(min, 0), Math.max(max, 0)]
+                }}
+              />
+              {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
+              <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
+              <Legend />
+              {historyVisibleModels.map((model, index) => (
+                <Line
+                  key={`prize-${model.model_id}`}
+                  type="monotone"
+                  dataKey={model.model_id}
+                  name={model.model_name}
+                  stroke={getModelTrendColor(index)}
+                  strokeWidth={3}
+                  dot={{ r: 2 }}
+                  activeDot={{ r: 5 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </HistoryChartShell>
+      ) : (
+        <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>
+      )}
+    </ChartCard>
   )
 }
 
@@ -335,126 +566,28 @@ export function HistoryHitTrendCard({
   selectedPeriod?: string | null
   onPeriodSelect?: (period: string) => void
 }) {
-  const sortedTrendData = [...historyHitTrend].sort((left, right) => {
-    const leftPeriod = Number(left.period)
-    const rightPeriod = Number(right.period)
-    const leftIsNumber = Number.isFinite(leftPeriod)
-    const rightIsNumber = Number.isFinite(rightPeriod)
-    if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
-    return String(left.period || '').localeCompare(String(right.period || ''))
-  })
-  const sortedProfitData = [...historyProfitTrend].sort((left, right) => {
-    const leftPeriod = Number(left.period)
-    const rightPeriod = Number(right.period)
-    const leftIsNumber = Number.isFinite(leftPeriod)
-    const rightIsNumber = Number.isFinite(rightPeriod)
-    if (leftIsNumber && rightIsNumber) return leftPeriod - rightPeriod
-    return String(left.period || '').localeCompare(String(right.period || ''))
-  })
-
   return (
     <ChartCard title="模型历史命中趋势">
       {historyVisibleModels.length && historyHitTrend.length ? (
         <div className="history-hit-trend__charts">
-          <div className="history-hit-trend__chart-shell">
-            <p className="history-hit-trend__chart-title">命中趋势折线</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={sortedTrendData}
-                onClick={(state) => {
-                  const period = state?.activeLabel
-                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" />
-                <YAxis allowDecimals={false} />
-                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
-                <Tooltip {...commonChartTooltipProps} />
-                <Legend />
-                {historyVisibleModels.map((model, index) => (
-                  <Line
-                    key={model.model_id}
-                    type="monotone"
-                    dataKey={model.model_id}
-                    name={model.model_name}
-                    stroke={getModelTrendColor(index)}
-                    strokeWidth={3}
-                    dot={{ r: 2 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="history-hit-trend__chart-shell" aria-label="模型命中堆叠统计图">
-            <p className="history-hit-trend__chart-title">命中堆叠柱形统计</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart
-                data={sortedTrendData}
-                onClick={(state) => {
-                  const period = state?.activeLabel
-                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" />
-                <YAxis allowDecimals={false} />
-                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
-                <Tooltip {...commonChartTooltipProps} />
-                <Legend />
-                {historyVisibleModels.map((model, index) => (
-                  <Bar
-                    key={`stack-${model.model_id}`}
-                    dataKey={model.model_id}
-                    name={model.model_name}
-                    stackId="hitStack"
-                    fill={getModelTrendColor(index)}
-                    radius={[6, 6, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="history-hit-trend__chart-shell" aria-label="模型盈亏趋势图">
-            <p className="history-hit-trend__chart-title">盈亏趋势折线</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={sortedProfitData}
-                onClick={(state) => {
-                  const period = state?.activeLabel
-                  if (period !== undefined && period !== null) onPeriodSelect?.(String(period))
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" />
-                <YAxis
-                  domain={([dataMin, dataMax]) => {
-                    const min = Number.isFinite(Number(dataMin)) ? Number(dataMin) : 0
-                    const max = Number.isFinite(Number(dataMax)) ? Number(dataMax) : 0
-                    if (min === max) return [min - 1, max + 1]
-                    return [Math.min(min, 0), Math.max(max, 0)]
-                  }}
-                />
-                {selectedPeriod ? <ReferenceLine x={selectedPeriod} stroke="rgba(242, 165, 79, 0.72)" strokeDasharray="4 4" /> : null}
-                <ReferenceLine y={0} stroke="rgba(173, 191, 220, 0.52)" strokeDasharray="4 4" />
-                <Tooltip {...commonChartTooltipProps} formatter={(value) => formatProfitValue(Number(value || 0))} />
-                <Legend />
-                {historyVisibleModels.map((model, index) => (
-                  <Line
-                    key={`prize-${model.model_id}`}
-                    type="monotone"
-                    dataKey={model.model_id}
-                    name={model.model_name}
-                    stroke={getModelTrendColor(index)}
-                    strokeWidth={3}
-                    dot={{ r: 2 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <HistoryHitTrendLineChartCard
+            historyVisibleModels={historyVisibleModels}
+            historyHitTrend={historyHitTrend}
+            selectedPeriod={selectedPeriod}
+            onPeriodSelect={onPeriodSelect}
+          />
+          <HistoryHitTrendStackedChartCard
+            historyVisibleModels={historyVisibleModels}
+            historyHitTrend={historyHitTrend}
+            selectedPeriod={selectedPeriod}
+            onPeriodSelect={onPeriodSelect}
+          />
+          <HistoryProfitTrendChartCard
+            historyVisibleModels={historyVisibleModels}
+            historyProfitTrend={historyProfitTrend}
+            selectedPeriod={selectedPeriod}
+            onPeriodSelect={onPeriodSelect}
+          />
         </div>
       ) : (
         <div className="state-shell">当前筛选条件下没有可展示的历史命中趋势。</div>

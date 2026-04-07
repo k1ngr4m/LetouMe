@@ -1668,7 +1668,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('heading', { name: '预测统计' })).not.toBeInTheDocument()
   })
 
-  it('shows pl3-specific analysis charts on analysis tab', async () => {
+  it('shows grouped number analysis charts on chart center by default for pl3', async () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
@@ -1683,7 +1683,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
   })
 
-  it('shows pl5-specific analysis charts on analysis tab', async () => {
+  it('shows grouped number analysis charts on chart center by default for pl5', async () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '排列5' }))
@@ -1698,6 +1698,26 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('heading', { name: '奇偶结构走势' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '前区热号 Top 12' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
+  })
+
+  it('shows grouped backtest analysis charts and filters on backtest tab', async () => {
+    renderPage('/dashboard/charts#backtest-analysis')
+
+    expect(await screen.findByRole('heading', { name: '命中趋势折线' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '命中堆叠柱形统计' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '盈亏趋势折线' })).toBeInTheDocument()
+    expect(screen.getByText('模型')).toBeInTheDocument()
+    expect(screen.getByText('期号')).toBeInTheDocument()
+    expect(screen.getByText('方案')).toBeInTheDocument()
+    expect(screen.getByText('玩法模式')).toBeInTheDocument()
+  })
+
+  it('hides backtest filters on number analysis views', async () => {
+    renderPage('/dashboard/charts#number-analysis')
+
+    expect(await screen.findByRole('heading', { name: '前区和值趋势' })).toBeInTheDocument()
+    expect(screen.queryByText('模型')).not.toBeInTheDocument()
+    expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })
 
   it('supports simulation pick, matching, save and delete flows', async () => {

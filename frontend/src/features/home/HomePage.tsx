@@ -86,13 +86,32 @@ const SCORE_SORT_KEY_OPTIONS: ScoreViewSortKey[] = [
   'ceiling',
   'floor',
 ]
-const AnalysisChartsPanel = lazy(() =>
-  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisChartsPanel })),
+const AnalysisHotChartsPanel = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisHotChartsPanel })),
 )
-const HistoryHitTrendCard = lazy(() =>
-  import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendCard })),
+const AnalysisSumTrendChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisSumTrendChartCard })),
+)
+const AnalysisOddEvenTrendChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.AnalysisOddEvenTrendChartCard })),
+)
+const HistoryHitTrendLineChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendLineChartCard })),
+)
+const HistoryHitTrendStackedChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryHitTrendStackedChartCard })),
+)
+const HistoryProfitTrendChartCard = lazy(() =>
+  import('./HomeChartPanels').then((module) => ({ default: module.HistoryProfitTrendChartCard })),
 )
 const MyBetsPanel = lazy(() => import('./MyBetsPanel').then((module) => ({ default: module.MyBetsPanel })))
+
+const CHART_CENTER_ITEMS = {
+  numberAnalysis: 'number-analysis',
+  backtestAnalysis: 'backtest-analysis',
+} as const
+
+type ChartCenterItemKey = (typeof CHART_CENTER_ITEMS)[keyof typeof CHART_CENTER_ITEMS]
 
 const MODEL_DETAIL_NAV_EXEMPT_SELECTOR = [
   'button',
@@ -489,6 +508,7 @@ export function HomePage() {
   const [isExportingSummary, setIsExportingSummary] = useState(false)
   const [historyPeriodQuery, setHistoryPeriodQuery] = useState('')
   const [selectedHistoryPeriod, setSelectedHistoryPeriod] = useState<string | null>(null)
+  const [chartHistoryModelIds, setChartHistoryModelIds] = useState<string[]>([])
   const [commonOnly, setCommonOnly] = useState(false)
   const [pl3PredictionMode, setPl3PredictionMode] = useState<'direct' | 'direct_sum'>('direct')
   const [dltPredictionMode, setDltPredictionMode] = useState<'direct' | 'compound' | 'dantuo'>('direct')
@@ -774,16 +794,13 @@ export function HomePage() {
     if (!section) return
     const frameId = requestAnimationFrame(() => scrollToSection(section))
     return () => cancelAnimationFrame(frameId)
-  }, [activeTab, location.hash])
+  }, [activeTab, location.hash, navigate])
 
   useEffect(() => {
     if (activeTab !== 'charts') return
-    const hashTarget = location.hash.replace('#', '').trim()
-    if (!hashTarget) return
-    const frameId = requestAnimationFrame(() => {
-      document.getElementById(hashTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    return () => cancelAnimationFrame(frameId)
+    if (!location.hash) {
+      navigate(`${HOME_TAB_PATHS.charts}#${CHART_CENTER_ITEMS.numberAnalysis}`, { replace: true })
+    }
   }, [activeTab, location.hash])
 
   useEffect(() => {
@@ -874,6 +891,9 @@ export function HomePage() {
     },
     [effectiveSelectedModels, historyAllModelRefs, shouldShowAllActiveHistoryModels, useHistoryFallbackModels],
   )
+  useEffect(() => {
+    setChartHistoryModelIds((previous) => previous.filter((modelId) => historyVisibleModels.some((item) => item.model_id === modelId)))
+  }, [historyVisibleModels])
   const summaryStrategyOptions = useMemo(
     () =>
       [...new Set(effectiveSelectedModels.flatMap((model) => (model.predictions || []).map((group) => normalizeStrategyLabel(group.strategy))))].sort((left, right) =>
@@ -960,9 +980,17 @@ export function HomePage() {
     () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
     [filteredHistory, historyVisibleModelIds],
   )
-  const historyProfitTrend = useMemo(
-    () => buildHistoryProfitTrend(filteredHistory, historyVisibleModelIds),
-    [filteredHistory, historyVisibleModelIds],
+  const chartCenterHistoryVisibleModelIds = chartHistoryModelIds.length ? chartHistoryModelIds : historyVisibleModelIds
+  const chartCenterHistoryVisibleModels = chartHistoryModelIds.length
+    ? historyVisibleModels.filter((model) => chartHistoryModelIds.includes(model.model_id))
+    : historyVisibleModels
+  const chartCenterHistoryHitTrend = useMemo(
+    () => buildHistoryHitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
+  )
+  const chartCenterHistoryProfitTrend = useMemo(
+    () => buildHistoryProfitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, filteredHistory],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const chartCenterSummary = useMemo(() => {
@@ -1170,8 +1198,31 @@ export function HomePage() {
     )
   }
 
-  function openChartCenter(targetHash?: 'overview' | 'trend' | 'history-trend') {
-    navigate(`${HOME_TAB_PATHS.charts}${targetHash ? `#${targetHash}` : ''}`)
+  function toggleChartHistoryModel(modelId: string) {
+    setChartHistoryModelIds((previous) =>
+      previous.includes(modelId) ? previous.filter((item) => item !== modelId) : [...previous, modelId],
+    )
+  }
+
+  const hashTarget = location.hash.replace('#', '').trim() as ChartCenterItemKey
+  const supportedChartCenterItems = Object.values(CHART_CENTER_ITEMS) as ChartCenterItemKey[]
+  const activeChartCenterItem = supportedChartCenterItems.includes(hashTarget) ? hashTarget : CHART_CENTER_ITEMS.numberAnalysis
+
+  const isChartBacktestView = activeChartCenterItem === CHART_CENTER_ITEMS.backtestAnalysis
+  const chartMetaMap: Record<ChartCenterItemKey, { title: string; subtitle: string }> = {
+    [CHART_CENTER_ITEMS.numberAnalysis]: {
+      title: '号码分析',
+      subtitle: '集中查看热号、和值趋势和奇偶结构走势。',
+    },
+    [CHART_CENTER_ITEMS.backtestAnalysis]: {
+      title: '回溯分析',
+      subtitle: '统一查看命中趋势、堆叠统计和盈亏走势。',
+    },
+  }
+  const activeChartMeta = chartMetaMap[activeChartCenterItem]
+
+  function openChartCenter(targetHash: ChartCenterItemKey = CHART_CENTER_ITEMS.numberAnalysis) {
+    navigate(`${HOME_TAB_PATHS.charts}#${targetHash}`)
   }
 
   function openHistoryTab(targetPeriod?: string) {
@@ -1209,7 +1260,7 @@ export function HomePage() {
             </article>
           </div>
           <div className="chart-center-summary-actions">
-            <button className="ghost-button" type="button" onClick={() => openChartCenter('overview')}>
+            <button className="ghost-button" type="button" onClick={() => openChartCenter(CHART_CENTER_ITEMS.numberAnalysis)}>
               进入图表中心
             </button>
             <button className="ghost-button ghost-button--compact" type="button" onClick={() => openHistoryTab()}>
@@ -1547,46 +1598,129 @@ export function HomePage() {
       {activeTab === 'charts' ? (
         <Suspense fallback={<div className="state-shell">正在加载分析图表...</div>}>
           <div className="page-stack chart-center-page">
-            <StatusCard title="图表总览" subtitle="统一查看历史命中、盈亏趋势与高分模型表现。">
-              <div id="overview" className="chart-center-summary-grid">
-                <article className="chart-center-summary-card">
-                  <span>历史净盈亏</span>
-                  <strong>{formatCurrency(chartCenterSummary.totalNetProfit)}</strong>
-                  <small>当前筛选模型累计表现</small>
-                </article>
-                <article className="chart-center-summary-card">
-                  <span>平均按期中奖率</span>
-                  <strong>{formatPercent(chartCenterSummary.averageWinRate)}</strong>
-                  <small>点击趋势图可联动到对应期号</small>
-                </article>
-                <article className="chart-center-summary-card chart-center-summary-card--accent">
-                  <span>领先模型</span>
-                  <strong>{chartCenterSummary.topModelName}</strong>
-                  <small>综合分 {chartCenterSummary.topModelScore}</small>
-                </article>
+            <StatusCard title={activeChartMeta.title} subtitle={activeChartMeta.subtitle}>
+              {isChartBacktestView ? (
+                <div className="chart-center-toolbar" aria-label="回溯分析筛选">
+                  <div className="chart-center-toolbar__section">
+                    <span className="chart-center-toolbar__label">模型</span>
+                    <div className="filter-chip-group chart-center-toolbar__chips">
+                      {historyVisibleModels.map((model) => {
+                        const isActive = chartCenterHistoryVisibleModelIds.includes(model.model_id)
+                        return (
+                          <button
+                            key={`chart-history-model-${model.model_id}`}
+                            className={clsx('filter-chip', isActive ? 'is-active' : 'is-inactive')}
+                            type="button"
+                            onClick={() => toggleChartHistoryModel(model.model_id)}
+                          >
+                            {model.model_name}
+                          </button>
+                        )
+                      })}
+                      {chartHistoryModelIds.length ? (
+                        <button className="ghost-button ghost-button--compact" type="button" onClick={() => setChartHistoryModelIds([])}>
+                          全部模型
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="chart-center-toolbar__row">
+                    <label className="chart-center-toolbar__field">
+                      <span className="chart-center-toolbar__label">期号</span>
+                      <input
+                        className="input chart-center-toolbar__input"
+                        type="search"
+                        value={historyPeriodQuery}
+                        onChange={(event) => {
+                          setHistoryPage(1)
+                          setHistoryPeriodQuery(event.target.value)
+                        }}
+                        placeholder="输入期号筛选"
+                      />
+                    </label>
+
+                    <div className="chart-center-toolbar__field">
+                      <span className="chart-center-toolbar__label">玩法模式</span>
+                      {selectedLottery === 'pl3' ? (
+                        <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} />
+                      ) : selectedLottery === 'dlt' ? (
+                        <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} />
+                      ) : (
+                        <span className="chart-center-toolbar__badge">直选</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="chart-center-toolbar__section">
+                    <span className="chart-center-toolbar__label">方案</span>
+                    {showHistoryStrategyFilters ? (
+                      historyStrategyOptions.length ? (
+                        <div className="filter-chip-group chart-center-toolbar__chips">
+                          {historyStrategyOptions.map((strategy) => (
+                            <button
+                              key={`chart-history-strategy-${strategy}`}
+                              className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
+                              type="button"
+                              onClick={() => toggleHistoryStrategyFilter(strategy)}
+                            >
+                              {strategy}
+                            </button>
+                          ))}
+                          {historyStrategyFilters.length ? (
+                            <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
+                              清空方案
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="model-filter-panel__empty">当前暂无可选方案</span>
+                      )
+                    ) : (
+                      <span className="chart-center-toolbar__badge">当前彩种暂无额外方案筛选</span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="chart-center-content" data-chart-center-item={activeChartCenterItem}>
+                {activeChartCenterItem === CHART_CENTER_ITEMS.numberAnalysis ? (
+                  <>
+                    <AnalysisHotChartsPanel
+                      lotteryCode={selectedLottery}
+                      redChart={redChart}
+                      blueChart={blueChart}
+                      pl3UnitChart={pl3UnitChart}
+                      pl5PositionCharts={pl5PositionCharts}
+                    />
+                    <AnalysisSumTrendChartCard lotteryCode={selectedLottery} sumTrendChart={sumTrendChart} />
+                    <AnalysisOddEvenTrendChartCard lotteryCode={selectedLottery} oddEvenChart={oddEvenChart} />
+                  </>
+                ) : null}
+                {activeChartCenterItem === CHART_CENTER_ITEMS.backtestAnalysis ? (
+                  <div className="history-hit-trend__charts">
+                    <HistoryHitTrendLineChartCard
+                      historyVisibleModels={chartCenterHistoryVisibleModels}
+                      historyHitTrend={chartCenterHistoryHitTrend}
+                      selectedPeriod={selectedHistoryPeriod}
+                      onPeriodSelect={openHistoryTab}
+                    />
+                    <HistoryHitTrendStackedChartCard
+                      historyVisibleModels={chartCenterHistoryVisibleModels}
+                      historyHitTrend={chartCenterHistoryHitTrend}
+                      selectedPeriod={selectedHistoryPeriod}
+                      onPeriodSelect={openHistoryTab}
+                    />
+                    <HistoryProfitTrendChartCard
+                      historyVisibleModels={chartCenterHistoryVisibleModels}
+                      historyProfitTrend={chartCenterHistoryProfitTrend}
+                      selectedPeriod={selectedHistoryPeriod}
+                      onPeriodSelect={openHistoryTab}
+                    />
+                  </div>
+                ) : null}
               </div>
             </StatusCard>
-
-            <div id="trend">
-              <AnalysisChartsPanel
-                lotteryCode={selectedLottery}
-                redChart={redChart}
-                blueChart={blueChart}
-                pl3UnitChart={pl3UnitChart}
-                pl5PositionCharts={pl5PositionCharts}
-                oddEvenChart={oddEvenChart}
-                sumTrendChart={sumTrendChart}
-              />
-            </div>
-
-            <div id="history-trend">
-              <HistoryHitTrendCard
-                historyVisibleModels={historyVisibleModels}
-                historyHitTrend={historyHitTrend}
-                historyProfitTrend={historyProfitTrend}
-                onPeriodSelect={openHistoryTab}
-              />
-            </div>
           </div>
         </Suspense>
       ) : null}

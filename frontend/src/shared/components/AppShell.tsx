@@ -53,6 +53,17 @@ const MESSAGE_STATUS_OPTIONS: Array<{ value: MessageStatusFilter; label: string 
 
 type SidebarPanelMode = 'workspace' | 'settings'
 
+const CHART_CENTER_GROUPS = [
+  {
+    id: 'number-analysis',
+    title: '号码分析',
+  },
+  {
+    id: 'backtest-analysis',
+    title: '回溯分析',
+  },
+] as const
+
 function SidebarCollapseIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -230,7 +241,7 @@ export function AppShell({ children }: PropsWithChildren) {
   function openChartCenter() {
     setSidebarMode('workspace')
     setIsSidebarOpen(false)
-    navigate(HOME_TAB_PATHS.charts)
+    navigate(`${HOME_TAB_PATHS.charts}#number-analysis`)
   }
 
   function openSettingsCenter() {
@@ -253,6 +264,12 @@ export function AppShell({ children }: PropsWithChildren) {
   function onSettingsNavigate() {
     setSidebarMode('settings')
     onNavigate()
+  }
+
+  function openChartDirectoryItem(itemId: string) {
+    setSidebarMode('workspace')
+    setIsSidebarOpen(false)
+    navigate(`${HOME_TAB_PATHS.charts}#${itemId}`)
   }
 
   function buildMessageCenterSearch(status: MessageStatusFilter, biz: string = MESSAGE_BIZ_CODE) {
@@ -322,6 +339,61 @@ export function AppShell({ children }: PropsWithChildren) {
               <button type="button" className="crm-message-nav-item is-active" title="开奖通知" onClick={() => onMessageCenterNav(messageStatus)}>
                 <span>开奖通知</span>
               </button>
+            </>
+          ) : sidebarMode === 'workspace' && isChartCenterRoute ? (
+            <>
+              <p className="crm-sidebar__group-title">图表中心</p>
+              <div className={clsx('crm-lottery-picker', isLotteryMenuOpen && 'is-open')} ref={lotteryMenuRef}>
+                <button
+                  className="crm-lottery-picker__trigger"
+                  type="button"
+                  aria-label="彩种切换"
+                  title={`彩种切换：${selectedLotteryLabel}`}
+                  aria-expanded={isLotteryMenuOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setIsLotteryMenuOpen((current) => !current)}
+                >
+                  <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />
+                  <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
+                  <ChevronDown size={14} aria-hidden="true" />
+                </button>
+                {isLotteryMenuOpen ? (
+                  <div className="crm-lottery-picker__menu" role="menu" aria-label="彩种菜单">
+                    {LOTTERY_OPTIONS.map((item) => (
+                      <button
+                        key={item.code}
+                        className={clsx('crm-lottery-picker__option', selectedLottery === item.code && 'is-active')}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={selectedLottery === item.code}
+                        title={item.label}
+                        onClick={() => handleLotterySelect(item.code)}
+                      >
+                        <LotterySwitchIcon code={item.code} label={item.label} />
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div className="crm-chart-nav" aria-label="图表目录">
+                {CHART_CENTER_GROUPS.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    className={clsx(
+                      'crm-nav-item',
+                      'crm-chart-nav__item',
+                      (location.hash === `#${group.id}` || (!location.hash && group.id === 'number-analysis')) && 'is-active',
+                    )}
+                    title={group.title}
+                    aria-current={location.hash === `#${group.id}` || (!location.hash && group.id === 'number-analysis') ? 'page' : undefined}
+                    onClick={() => openChartDirectoryItem(group.id)}
+                  >
+                    <span>{group.title}</span>
+                  </button>
+                ))}
+              </div>
             </>
           ) : sidebarMode === 'workspace' ? (
             <>

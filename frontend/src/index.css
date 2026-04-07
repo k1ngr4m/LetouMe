@@ -3322,6 +3322,70 @@ a {
   gap: 1rem;
 }
 
+.chart-center-toolbar {
+  display: grid;
+  gap: 0.95rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  background: color-mix(in srgb, var(--panel-card-bg) 86%, transparent);
+}
+
+.chart-center-toolbar__section,
+.chart-center-toolbar__row {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.chart-center-toolbar__row {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: end;
+}
+
+.chart-center-toolbar__field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.chart-center-toolbar__label {
+  color: var(--text-2);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.chart-center-toolbar__chips {
+  align-items: center;
+}
+
+.chart-center-toolbar__input {
+  min-height: 2.5rem;
+}
+
+.chart-center-toolbar__badge {
+  min-height: 2.5rem;
+  border-radius: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
+  padding: 0.66rem 0.9rem;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.chart-center-content {
+  min-height: 24rem;
+}
+
+.chart-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chart-card--focus {
+  min-height: 24rem;
+}
+
 .chart-center-summary-grid,
 .chart-center-compare-grid {
   display: grid;
@@ -3371,6 +3435,12 @@ a {
   margin: 0;
   color: var(--text-2);
   font-size: 0.78rem;
+}
+
+@media (max-width: 767px) {
+  .chart-center-toolbar {
+    padding: 0.88rem;
+  }
 }
 
 .history-toolbar {
@@ -10939,6 +11009,10 @@ a {
   text-overflow: ellipsis;
 }
 
+.crm-sidebar__group-title--chart {
+  margin-top: 0.52rem;
+}
+
 .crm-lottery-picker {
   position: relative;
   margin: 0 0.1rem 0.28rem;
@@ -11102,6 +11176,35 @@ a {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.crm-chart-nav {
+  display: grid;
+  gap: 0.52rem;
+  margin-top: 0.16rem;
+}
+
+.crm-chart-nav__group {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.crm-chart-nav__items {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.crm-chart-nav__item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.crm-chart-nav__item svg {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: none;
 }
 
 .crm-nav-item--with-toggle {
