@@ -8,6 +8,7 @@ import '../features/history/presentation/pages/history_detail_page.dart';
 import '../features/messages/presentation/pages/messages_page.dart';
 import '../features/model_detail/presentation/pages/model_detail_page.dart';
 import '../features/my_bets/presentation/pages/my_bets_page.dart';
+import '../features/my_bets/presentation/pages/my_bet_detail_page.dart';
 import '../features/prediction/presentation/pages/prediction_home_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
 import '../features/rules/presentation/pages/rules_page.dart';
@@ -85,6 +86,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: AppRoute.myBets.path,
                 name: AppRoute.myBets.name,
                 builder: (context, state) => const MyBetsPage(),
+                routes: [
+                  GoRoute(
+                    path: ':recordId',
+                    name: AppRoute.myBetDetail.name,
+                    builder: (context, state) => MyBetDetailPage(
+                      recordId: int.tryParse(state.pathParameters['recordId'] ?? '') ?? 0,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -131,6 +141,7 @@ enum AppRoute {
   history('/history'),
   historyDetail('/history/detail'),
   myBets('/my-bets'),
+  myBetDetail('/my-bets/detail'),
   messages('/messages'),
   profile('/profile'),
   rules('/profile/rules'),
@@ -147,6 +158,7 @@ enum AppRoute {
         history => 'history',
         historyDetail => 'history-detail',
         myBets => 'my-bets',
+        myBetDetail => 'my-bet-detail',
         messages => 'messages',
         profile => 'profile',
         rules => 'rules',

@@ -67,8 +67,16 @@ class MyBetRecord {
     required this.updatedAt,
     required this.frontNumbers,
     required this.backNumbers,
+    required this.lines,
     this.prizeLevel,
     this.actualResult,
+    this.discountAmount = 0,
+    this.sourceType = 'manual',
+    this.ticketImageUrl = '',
+    this.ocrText = '',
+    this.ocrProvider,
+    this.ocrRecognizedAt,
+    this.ticketPurchasedAt,
   });
 
   final int id;
@@ -86,8 +94,16 @@ class MyBetRecord {
   final String updatedAt;
   final List<String> frontNumbers;
   final List<String> backNumbers;
+  final List<MyBetLine> lines;
   final String? prizeLevel;
   final Map<String, dynamic>? actualResult;
+  final int discountAmount;
+  final String sourceType;
+  final String ticketImageUrl;
+  final String ocrText;
+  final String? ocrProvider;
+  final String? ocrRecognizedAt;
+  final String? ticketPurchasedAt;
 
   factory MyBetRecord.fromMap(Map<String, dynamic> json) {
     return MyBetRecord(
@@ -106,8 +122,124 @@ class MyBetRecord {
       updatedAt: json['updated_at']?.toString() ?? '',
       frontNumbers: (json['front_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
       backNumbers: (json['back_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      lines: (json['lines'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(MyBetLine.fromMap)
+          .toList(),
       prizeLevel: json['prize_level']?.toString(),
       actualResult: json['actual_result'] is Map<String, dynamic> ? json['actual_result'] as Map<String, dynamic> : null,
+      discountAmount: (json['discount_amount'] as num?)?.toInt() ?? 0,
+      sourceType: json['source_type']?.toString() ?? 'manual',
+      ticketImageUrl: json['ticket_image_url']?.toString() ?? '',
+      ocrText: json['ocr_text']?.toString() ?? '',
+      ocrProvider: json['ocr_provider']?.toString(),
+      ocrRecognizedAt: json['ocr_recognized_at']?.toString(),
+      ticketPurchasedAt: json['ticket_purchased_at']?.toString(),
     );
+  }
+}
+
+class MyBetLine {
+  const MyBetLine({
+    required this.lineNo,
+    required this.playType,
+    required this.frontNumbers,
+    required this.backNumbers,
+    required this.multiplier,
+    required this.isAppend,
+    required this.betCount,
+    required this.amount,
+  });
+
+  final int lineNo;
+  final String playType;
+  final List<String> frontNumbers;
+  final List<String> backNumbers;
+  final int multiplier;
+  final bool isAppend;
+  final int betCount;
+  final int amount;
+
+  factory MyBetLine.fromMap(Map<String, dynamic> json) {
+    return MyBetLine(
+      lineNo: (json['line_no'] as num?)?.toInt() ?? 0,
+      playType: json['play_type']?.toString() ?? 'dlt',
+      frontNumbers: (json['front_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      backNumbers: (json['back_numbers'] as List<dynamic>? ?? const []).map((item) => item.toString()).toList(),
+      multiplier: (json['multiplier'] as num?)?.toInt() ?? 1,
+      isAppend: json['is_append'] == true,
+      betCount: (json['bet_count'] as num?)?.toInt() ?? 0,
+      amount: (json['amount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class UpdateMyBetPayload {
+  const UpdateMyBetPayload({
+    required this.recordId,
+    required this.lotteryCode,
+    required this.targetPeriod,
+    required this.discountAmount,
+    required this.sourceType,
+    required this.ticketImageUrl,
+    required this.ocrText,
+    required this.ocrProvider,
+    required this.ocrRecognizedAt,
+    required this.ticketPurchasedAt,
+    required this.lines,
+  });
+
+  final int recordId;
+  final String lotteryCode;
+  final String targetPeriod;
+  final int discountAmount;
+  final String sourceType;
+  final String ticketImageUrl;
+  final String ocrText;
+  final String? ocrProvider;
+  final String? ocrRecognizedAt;
+  final String? ticketPurchasedAt;
+  final List<UpdateMyBetLinePayload> lines;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'record_id': recordId,
+      'lottery_code': lotteryCode,
+      'target_period': targetPeriod,
+      'discount_amount': discountAmount,
+      'source_type': sourceType,
+      'ticket_image_url': ticketImageUrl,
+      'ocr_text': ocrText,
+      'ocr_provider': ocrProvider,
+      'ocr_recognized_at': ocrRecognizedAt,
+      'ticket_purchased_at': ticketPurchasedAt,
+      'lines': lines.map((item) => item.toMap()).toList(),
+    };
+  }
+}
+
+class UpdateMyBetLinePayload {
+  const UpdateMyBetLinePayload({
+    required this.playType,
+    required this.frontNumbers,
+    required this.backNumbers,
+    required this.multiplier,
+    required this.isAppend,
+  });
+
+  final String playType;
+  final List<String> frontNumbers;
+  final List<String> backNumbers;
+  final int multiplier;
+  final bool isAppend;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'play_type': playType,
+      'front_numbers': frontNumbers,
+      'back_numbers': backNumbers,
+      'multiplier': multiplier,
+      'is_append': isAppend,
+    };
   }
 }

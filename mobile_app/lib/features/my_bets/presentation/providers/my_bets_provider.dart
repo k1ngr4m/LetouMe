@@ -13,3 +13,8 @@ final myBetsListProvider = FutureProvider<MyBetRecordListResponse>((ref) {
   final lotteryCode = ref.watch(selectedLotteryCodeProvider);
   return ref.watch(myBetsRepositoryProvider).listRecords(lotteryCode: lotteryCode);
 });
+
+final myBetDetailProvider = FutureProvider.family<MyBetRecord, int>((ref, recordId) async {
+  final payload = await ref.watch(myBetsListProvider.future);
+  return payload.records.firstWhere((record) => record.id == recordId);
+});

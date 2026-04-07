@@ -13,4 +13,14 @@ class MyBetsRepository {
     );
     return MyBetRecordListResponse.fromMap(data);
   }
+
+  Future<MyBetRecord> updateRecord(UpdateMyBetPayload payload) async {
+    final data = await _apiClient.post(
+      '/my-bets/update',
+      data: payload.toMap(),
+    );
+    return MyBetRecord.fromMap(
+      data['record'] is Map<String, dynamic> ? data['record'] as Map<String, dynamic> : const {},
+    );
+  }
 }

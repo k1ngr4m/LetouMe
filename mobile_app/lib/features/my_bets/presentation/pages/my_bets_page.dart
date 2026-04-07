@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../shared/widgets/feature_page_scaffold.dart';
 import '../../../../shared/widgets/panel_card.dart';
@@ -55,6 +57,7 @@ class MyBetsPage extends ConsumerWidget {
                   child: PanelCard(
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
+                      onTap: () => context.push('${AppRoute.myBets.path}/${record.id}'),
                       title: Text('第 ${record.targetPeriod} 期 · ${record.playType}'),
                       subtitle: Text(
                         '${record.frontNumbers.join(' ')}${record.backNumbers.isEmpty ? '' : ' + ${record.backNumbers.join(' ')}'}'
