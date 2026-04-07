@@ -29,6 +29,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -81,15 +83,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                           username: _usernameController.text.trim(),
                                           password: _passwordController.text.trim(),
                                         );
-                                    if (mounted) {
-                                      context.go(AppRoute.prediction.path);
-                                    }
+                                    if (!mounted) return;
+                                    router.go(AppRoute.prediction.path);
                                   } catch (error) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text(error.toString())),
-                                      );
-                                    }
+                                    if (!mounted) return;
+                                    messenger.showSnackBar(
+                                      SnackBar(content: Text(error.toString())),
+                                    );
                                   } finally {
                                     if (mounted) {
                                       setState(() => _isSubmitting = false);

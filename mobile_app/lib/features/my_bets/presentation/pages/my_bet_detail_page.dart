@@ -352,7 +352,7 @@ class _EditOverviewCard extends StatelessWidget {
             decoration: const InputDecoration(labelText: '优惠金额'),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('预计 ${totalBetCount} 注 · 总金额 $totalAmount 元 · 实付 $netAmount 元', style: theme.textTheme.bodyLarge),
+          Text('预计 $totalBetCount 注 · 总金额 $totalAmount 元 · 实付 $netAmount 元', style: theme.textTheme.bodyLarge),
           if (submitHint != null) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(submitHint!, style: TextStyle(color: theme.colorScheme.error)),

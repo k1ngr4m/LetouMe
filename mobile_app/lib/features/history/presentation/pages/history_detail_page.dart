@@ -5,7 +5,6 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../shared/widgets/feature_page_scaffold.dart';
 import '../../../../shared/widgets/panel_card.dart';
 import '../../../prediction/presentation/providers/prediction_overview_provider.dart';
-import '../../data/history_repository.dart';
 import '../../data/models/predictions_history_detail_response.dart';
 import 'history_page.dart';
 

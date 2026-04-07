@@ -61,7 +61,7 @@ class ModelDetailPage extends ConsumerWidget {
                       _MetricRow(label: '最佳命中', value: '${model.bestHitCount ?? 0}'),
                       _MetricRow(
                         label: '按期胜率',
-                        value: model.winRateByPeriod == null ? '-' : '${(model.winRateByPeriod * 100).toStringAsFixed(1)}%',
+                        value: model.winRateByPeriod == null ? '-' : '${(model.winRateByPeriod! * 100).toStringAsFixed(1)}%',
                       ),
                     ],
                   ),

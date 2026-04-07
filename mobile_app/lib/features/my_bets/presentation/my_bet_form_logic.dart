@@ -222,7 +222,7 @@ LineQuote quoteLine(String lotteryCode, EditableBetLine line) {
       }
       final frontPickCount = 5 - frontDan.length;
       final backPickCount = 2 - backDan.length;
-      if (frontDan.length < 1 || frontDan.length > 4) {
+      if (frontDan.isEmpty || frontDan.length > 4) {
         return const LineQuote(betCount: 0, amount: 0, valid: false, reason: '前区胆码数量应为 1-4 个');
       }
       if (frontTuo.length < 2) {
