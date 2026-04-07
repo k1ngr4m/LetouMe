@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildZoneShareDistributionChart,
   buildHistoryCumulativeProfitTrend,
   buildHistoryCumulativeRoiTrend,
   buildHistoryDrawdownTrend,
@@ -283,6 +284,66 @@ describe('pl3 analysis chart builders', () => {
     expect(chart).toEqual([
       { period: '2026031', oddCount: 1, structure: '1:2' },
       { period: '2026032', oddCount: 3, structure: '3:0' },
+    ])
+  })
+})
+
+describe('number distribution builders', () => {
+  it('builds dlt zone share distribution with stable ratios', () => {
+    const result = buildZoneShareDistributionChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'dlt',
+          red_balls: ['01', '13', '25', '12', '24'],
+          blue_balls: ['01', '02'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'dlt',
+          red_balls: ['02', '14', '26', '11', '35'],
+          blue_balls: ['03', '04'],
+        },
+      ],
+      'dlt',
+    )
+
+    expect(result).toEqual([
+      { label: '一区（01-12）', count: 4, ratio: 0.4 },
+      { label: '二区（13-24）', count: 3, ratio: 0.3 },
+      { label: '三区（25-35）', count: 3, ratio: 0.3 },
+    ])
+  })
+
+  it('builds pl3 zone share distribution from digits', () => {
+    const result = buildZoneShareDistributionChart(
+      [
+        {
+          period: '2026032',
+          date: '2026-03-11',
+          lottery_code: 'pl3',
+          red_balls: ['01', '04', '07'],
+          blue_balls: [],
+          digits: ['01', '04', '07'],
+        },
+        {
+          period: '2026031',
+          date: '2026-03-10',
+          lottery_code: 'pl3',
+          red_balls: ['03', '06', '09'],
+          blue_balls: [],
+          digits: ['03', '06', '09'],
+        },
+      ],
+      'pl3',
+    )
+
+    expect(result).toEqual([
+      { label: '低位区（0-3）', count: 2, ratio: 2 / 6 },
+      { label: '中位区（4-6）', count: 2, ratio: 2 / 6 },
+      { label: '高位区（7-9）', count: 2, ratio: 2 / 6 },
     ])
   })
 })

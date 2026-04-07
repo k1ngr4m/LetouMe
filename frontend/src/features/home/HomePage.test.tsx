@@ -1742,7 +1742,7 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(await screen.findByRole('heading', { name: '前区和值分布' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '奇偶比分布' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '前区频次分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '区间占比分布' })).toBeInTheDocument()
     expect(screen.queryByText('模型')).not.toBeInTheDocument()
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })

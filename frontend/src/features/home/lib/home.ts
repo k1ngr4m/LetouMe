@@ -91,6 +91,7 @@ export type HistoryProfitDistributionItem = {
 export type NumberDistributionChartItem = {
   label: string
   count: number
+  ratio?: number
 }
 
 export type NumberTrendChartItem = {
@@ -942,27 +943,50 @@ export function buildOddEvenDistributionChart(draws: LotteryDraw[], lotteryCode:
   return buildDistributionFromCounter(counter)
 }
 
-export function buildPositionDistributionCharts(draws: LotteryDraw[], lotteryCode: LotteryCode) {
-  if (lotteryCode === 'pl3') {
-    return [
-      { title: '百位频次分布', data: buildPl3PositionHotChart(draws, 0) },
-      { title: '十位频次分布', data: buildPl3PositionHotChart(draws, 1) },
-      { title: '个位频次分布', data: buildPl3PositionHotChart(draws, 2) },
-    ]
+export function buildZoneShareDistributionChart(draws: LotteryDraw[], lotteryCode: LotteryCode) {
+  const sourceDraws = draws.slice(0, 120)
+  const counter: Record<string, number> = {}
+  let total = 0
+
+  for (const draw of sourceDraws) {
+    const values =
+      lotteryCode === 'pl3'
+        ? resolvePl3Digits(draw).map(Number)
+        : lotteryCode === 'pl5'
+          ? resolvePl5Digits(draw).map(Number)
+          : draw.red_balls.map(Number)
+
+    for (const value of values) {
+      const label =
+        lotteryCode === 'dlt'
+          ? value <= 12
+            ? '一区（01-12）'
+            : value <= 24
+              ? '二区（13-24）'
+              : '三区（25-35）'
+          : value <= 3
+            ? '低位区（0-3）'
+            : value <= 6
+              ? '中位区（4-6）'
+              : '高位区（7-9）'
+      counter[label] = (counter[label] || 0) + 1
+      total += 1
+    }
   }
-  if (lotteryCode === 'pl5') {
-    return [
-      { title: '万位频次分布', data: buildPl5PositionHotChart(draws, 0) },
-      { title: '千位频次分布', data: buildPl5PositionHotChart(draws, 1) },
-      { title: '百位频次分布', data: buildPl5PositionHotChart(draws, 2) },
-      { title: '十位频次分布', data: buildPl5PositionHotChart(draws, 3) },
-      { title: '个位频次分布', data: buildPl5PositionHotChart(draws, 4) },
-    ]
-  }
-  return [
-    { title: '前区频次分布', data: buildRedFrequencyChart(draws) },
-    { title: '后区频次分布', data: buildBlueFrequencyChart(draws) },
-  ]
+
+  const orderedLabels =
+    lotteryCode === 'dlt'
+      ? ['一区（01-12）', '二区（13-24）', '三区（25-35）']
+      : ['低位区（0-3）', '中位区（4-6）', '高位区（7-9）']
+
+  return orderedLabels.map((label) => {
+    const count = counter[label] || 0
+    return {
+      label,
+      count,
+      ratio: total > 0 ? count / total : 0,
+    }
+  })
 }
 
 export function buildSpanTrendChart(draws: LotteryDraw[], lotteryCode: LotteryCode) {

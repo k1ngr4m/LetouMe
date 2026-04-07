@@ -47,6 +47,7 @@ type SumTrendChartItem = {
 type NumberDistributionChartItem = {
   label: string
   count: number
+  ratio?: number
 }
 
 type NumberTrendChartItem = {
@@ -449,12 +450,12 @@ export function AnalysisDistributionChartsPanel({
   lotteryCode,
   sumDistribution,
   oddEvenDistribution,
-  positionDistributionCharts,
+  zoneShareDistribution,
 }: {
   lotteryCode: LotteryCode
   sumDistribution: NumberDistributionChartItem[]
   oddEvenDistribution: NumberDistributionChartItem[]
-  positionDistributionCharts: Array<{ title: string; data: FrequencyChartItem[] }>
+  zoneShareDistribution: NumberDistributionChartItem[]
 }) {
   return (
     <div className="page-section chart-grid">
@@ -480,19 +481,23 @@ export function AnalysisDistributionChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      {positionDistributionCharts.map((chart, index) => (
-        <ChartCard key={`${chart.title}-${index}`} title={chart.title}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="ball" />
-              <YAxis allowDecimals={false} />
-              <Tooltip {...commonChartTooltipProps} />
-              <Bar dataKey="count" fill={getModelTrendColor(index)} radius={[10, 10, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      ))}
+      <ChartCard title="区间占比分布">
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={zoneShareDistribution}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" />
+            <YAxis allowDecimals={false} />
+            <Tooltip
+              {...commonChartTooltipProps}
+              formatter={(value, _name, item) => {
+                const ratio = Number(item?.payload?.ratio || 0)
+                return [`${value} 次（${formatPercentValue(ratio)}）`, '区间占比']
+              }}
+            />
+            <Bar dataKey="count" fill="var(--violet-500)" radius={[10, 10, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
     </div>
   )
 }

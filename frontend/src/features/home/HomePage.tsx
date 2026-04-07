@@ -28,7 +28,6 @@ import {
   buildHistoryRankTrend,
   buildHistoryRollingHitRateTrend,
   buildOddEvenChart,
-  buildPositionDistributionCharts,
   buildPl3OddEvenStructureChart,
   buildPl3PositionHotChart,
   buildPl3SumTrendChart,
@@ -42,6 +41,7 @@ import {
   resolveHistoryFallbackState,
   buildSumDistributionChart,
   buildSumTrendChart,
+  buildZoneShareDistributionChart,
   buildZoneDistributionChart,
   compareNumbers,
   getActualResult,
@@ -1124,8 +1124,8 @@ export function HomePage() {
     () => buildOddEvenDistributionChart(chartDraws, selectedLottery),
     [chartDraws, selectedLottery],
   )
-  const positionDistributionCharts = useMemo(
-    () => buildPositionDistributionCharts(chartDraws, selectedLottery),
+  const zoneShareDistributionChart = useMemo(
+    () => buildZoneShareDistributionChart(chartDraws, selectedLottery),
     [chartDraws, selectedLottery],
   )
   const spanTrendChart = useMemo(
@@ -1333,7 +1333,7 @@ export function HomePage() {
     },
     [CHART_CENTER_ITEMS.numberDistribution]: {
       title: '分布分析',
-      subtitle: '从和值、奇偶比和位置频次三个维度观察号码分布特征。',
+      subtitle: '从和值、奇偶比和区间占比三个维度观察号码分布特征。',
     },
     [CHART_CENTER_ITEMS.numberPattern]: {
       title: '形态分析',
@@ -1841,14 +1841,14 @@ export function HomePage() {
                     <div className="chart-center-group__header">
                       <div>
                         <h3 className="chart-center-group__title">分布分析</h3>
-                        <p className="chart-center-group__subtitle">同屏查看和值分布、奇偶比分布和位置频次分布，识别号码集中与离散特征。</p>
+                        <p className="chart-center-group__subtitle">同屏查看和值分布、奇偶比分布和区间占比分布，识别号码整体的集中与离散特征。</p>
                       </div>
                     </div>
                     <AnalysisDistributionChartsPanel
                       lotteryCode={selectedLottery}
                       sumDistribution={sumDistributionChart}
                       oddEvenDistribution={oddEvenDistributionChart}
-                      positionDistributionCharts={positionDistributionCharts}
+                      zoneShareDistribution={zoneShareDistributionChart}
                     />
                   </section>
                 ) : null}
