@@ -317,7 +317,7 @@ class PredictionRepository:
                         "AND am.is_active = 1 "
                         "AND am.is_deleted = 0 "
                         f"AND am.model_code IN ({active_code_placeholders}) "
-                        f"AND pg.play_type IN ({play_type_placeholders})"
+                        f"AND COALESCE(NULLIF(TRIM(pg.play_type), ''), 'direct') IN ({play_type_placeholders})"
                         ")"
                     ),
                 )
@@ -332,7 +332,7 @@ class PredictionRepository:
                         "FROM prediction_model_run pmr "
                         "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
                         "WHERE pmr.prediction_batch_id = pb.id "
-                        f"AND pg.play_type IN ({play_type_placeholders})"
+                        f"AND COALESCE(NULLIF(TRIM(pg.play_type), ''), 'direct') IN ({play_type_placeholders})"
                         ")"
                     ),
                 )
@@ -505,7 +505,7 @@ class PredictionRepository:
                                 "AND am.is_active = 1 "
                                 "AND am.is_deleted = 0 "
                                 f"AND am.model_code IN ({active_code_placeholders}) "
-                                f"AND pg.play_type IN ({play_type_placeholders})"
+                                f"AND COALESCE(NULLIF(TRIM(pg.play_type), ''), 'direct') IN ({play_type_placeholders})"
                                 ")"
                             )
                             params.extend(normalized_active_model_codes)
@@ -516,7 +516,7 @@ class PredictionRepository:
                                 "FROM prediction_model_run pmr "
                                 "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
                                 "WHERE pmr.prediction_batch_id = pb.id "
-                                f"AND pg.play_type IN ({play_type_placeholders})"
+                                f"AND COALESCE(NULLIF(TRIM(pg.play_type), ''), 'direct') IN ({play_type_placeholders})"
                                 ")"
                             )
                         params.extend(normalized_play_type_filters)
@@ -1254,7 +1254,7 @@ class PredictionRepository:
         params: list[Any] = list(tuple(model_run_ids))
         if normalized_play_type_filters:
             play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
-            filter_sql = f" AND play_type IN ({play_type_placeholders})"
+            filter_sql = f" AND COALESCE(NULLIF(TRIM(play_type), ''), 'direct') IN ({play_type_placeholders})"
             params.extend(normalized_play_type_filters)
         if compact_for_scoring:
             cursor.execute(
@@ -1348,7 +1348,7 @@ class PredictionRepository:
         filter_sql = ""
         if normalized_play_type_filters:
             play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
-            filter_sql = f" AND pg.play_type IN ({play_type_placeholders})"
+            filter_sql = f" AND COALESCE(NULLIF(TRIM(pg.play_type), ''), 'direct') IN ({play_type_placeholders})"
             params.extend(normalized_play_type_filters)
         cursor.execute(
             f"""
