@@ -108,6 +108,8 @@ class LotteryFetchService:
         lottery_data = self.parse_lottery_data(soup)
         if not lottery_data:
             raise ValueError("未解析到开奖数据")
+        if self.lottery_code == "qxc" and limit is not None and len(lottery_data) < max(1, int(limit)):
+            lottery_data = self._backfill_qxc_draws(lottery_data, target_count=max(1, int(limit)))
         if limit is not None:
             lottery_data = lottery_data[: max(1, int(limit))]
 
@@ -303,6 +305,69 @@ class LotteryFetchService:
         self.logger.info("Parsed lottery draws", extra={"context": {"count": len(result), "lottery_code": self.lottery_code}})
         return result
 
+    def _backfill_qxc_draws(self, draws: list[dict[str, Any]], *, target_count: int) -> list[dict[str, Any]]:
+        if target_count <= 0:
+            return draws
+        deduplicated: dict[str, dict[str, Any]] = {
+            str(item.get("period") or "").strip(): dict(item)
+            for item in draws
+            if str(item.get("period") or "").strip()
+        }
+        if len(deduplicated) >= target_count:
+            return sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
+        numeric_periods = [int(period) for period in deduplicated if period.isdigit()]
+        if not numeric_periods:
+            return sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
+        next_period = min(numeric_periods) - 1
+        consecutive_misses = 0
+        while len(deduplicated) < target_count and next_period > 0 and consecutive_misses < 12:
+            period = str(next_period)
+            next_period -= 1
+            if period in deduplicated:
+                continue
+            draw = self.fetch_qxc_draw_by_period(period)
+            if not draw:
+                consecutive_misses += 1
+                continue
+            deduplicated[period] = draw
+            consecutive_misses = 0
+        result = sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
+        self.logger.info(
+            "Backfilled qxc draws",
+            extra={
+                "context": {
+                    "requested_count": target_count,
+                    "result_count": len(result),
+                }
+            },
+        )
+        return result
+
+    def fetch_qxc_draw_by_period(self, period: str) -> dict[str, Any] | None:
+        if self.lottery_code != "qxc":
+            return None
+        detail_url = self.build_detail_url(period)
+        if not detail_url:
+            return None
+        soup = self.fetch_page(detail_url, retry=2)
+        if not soup:
+            return None
+        digits = self.parse_qxc_digits(soup)
+        if len(digits) < 7:
+            return None
+        detail_payload = {
+            "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
+            "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+            "draw_date": self.parse_draw_date(soup),
+        }
+        return {
+            "period": str(period),
+            "digits": normalize_digit_balls(digits[:7]),
+            "date": str(detail_payload.get("draw_date") or ""),
+            "jackpot_pool_balance": int(detail_payload.get("jackpot_pool_balance") or 0),
+            "prize_breakdown": detail_payload.get("prize_breakdown") or build_qxc_prize_breakdown(),
+        }
+
     def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
         return self.fetch_draw_detail(period)["prize_breakdown"]
 
@@ -425,6 +490,28 @@ class LotteryFetchService:
                 prize_map = {item["prize_level"]: item for item in breakdown}
                 return [prize_map.get(item["prize_level"], item) for item in build_qxc_prize_breakdown()]
         return build_qxc_prize_breakdown()
+
+    @staticmethod
+    def parse_qxc_digits(soup: BeautifulSoup) -> list[str]:
+        selectors = [
+            ".numballs b",
+            ".kj_tablelist01 .num em",
+            ".kj_tablelist01 td.redball",
+            ".open_num b",
+            ".ball_box li",
+        ]
+        for selector in selectors:
+            values = [item.get_text(strip=True) for item in soup.select(selector)]
+            digits = [value for value in values if re.fullmatch(r"\d{1,2}", value)]
+            if len(digits) >= 7:
+                return digits[:7]
+        text_content = soup.get_text(" ", strip=True).replace("\xa0", " ")
+        keyword_match = re.search(r"开奖号码[^0-9]{0,20}((?:\d{1,2}\D+){6}\d{1,2})", text_content)
+        if keyword_match:
+            digits = re.findall(r"\d{1,2}", keyword_match.group(1))
+            if len(digits) >= 7:
+                return digits[:7]
+        return []
 
     def _resolve_response_encoding(self, response: requests.Response) -> str:
         if self.lottery_code in {"pl3", "pl5", "qxc"}:

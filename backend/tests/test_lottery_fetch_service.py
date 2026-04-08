@@ -264,6 +264,18 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(prize_map["六等奖"]["winner_count"], 739232)
         self.assertEqual(prize_map["六等奖"]["prize_amount"], 5)
 
+    def test_parse_qxc_digits_from_keyword_text(self) -> None:
+        html = """
+        <div>
+          <p>七星彩 第26028期 开奖号码：09 01 08 06 03 04 14</p>
+        </div>
+        """
+        soup = BeautifulSoup(html, "html.parser")
+
+        digits = LotteryFetchService.parse_qxc_digits(soup)
+
+        self.assertEqual(digits, ["09", "01", "08", "06", "03", "04", "14"])
+
     def test_parse_draw_date_supports_cn_date_format(self) -> None:
         html = """
         <div>
@@ -301,6 +313,39 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(len(save_call_args.args[0]), 2)
         self.assertEqual(result["fetched_count"], 2)
         self.assertEqual(result["saved_count"], 2)
+
+    def test_fetch_and_save_qxc_backfills_to_requested_limit(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.base_url = "https://example.com"
+        service.logger = Mock()
+        service.fetch_page = Mock(return_value=BeautifulSoup("<html></html>", "html.parser"))
+        service.parse_lottery_data = Mock(
+            return_value=[
+                {"period": str(26038 - index), "digits": ["01", "02", "03", "04", "05", "06", "07"], "date": "2026-04-08", "prize_breakdown": []}
+                for index in range(10)
+            ]
+        )
+        service.fetch_qxc_draw_by_period = Mock(
+            side_effect=lambda period: {
+                "period": period,
+                "digits": ["01", "02", "03", "04", "05", "06", "07"],
+                "date": "2026-03-01",
+                "jackpot_pool_balance": 0,
+                "prize_breakdown": [],
+            }
+        )
+        service.lottery_service = Mock()
+        service.lottery_service.save_draws.return_value = [{"period": str(26038 - index)} for index in range(30)]
+        service.message_service = Mock()
+        service.message_service.generate_messages_for_periods.return_value = 0
+        service.message_service.generate_messages_for_recent_draws.return_value = 0
+
+        result = service.fetch_and_save(limit=30)
+
+        self.assertEqual(result["fetched_count"], 30)
+        self.assertEqual(result["saved_count"], 30)
+        self.assertEqual(service.fetch_qxc_draw_by_period.call_count, 20)
 
     def test_fetch_and_save_uses_default_limit_30(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
