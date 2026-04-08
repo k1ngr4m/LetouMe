@@ -6160,13 +6160,12 @@ a {
 }
 
 .settings-maintenance-table__col-actions {
-  width: 8rem;
-  min-width: 8rem;
+  width: 14rem;
+  min-width: 14rem;
 }
 
 .settings-schedule-table--task-list .settings-schedule-table__col-name,
-.settings-maintenance-table--task-list .settings-maintenance-table__col-lottery,
-.settings-maintenance-table--task-list .settings-maintenance-table__col-actions {
+.settings-maintenance-table--task-list .settings-maintenance-table__col-lottery {
   position: sticky;
   background: var(--panel-card-bg);
 }
@@ -6194,15 +6193,26 @@ a {
   z-index: 4;
 }
 
-.settings-maintenance-table--task-list .settings-maintenance-table__col-actions {
-  right: 0;
-  z-index: 4;
+.settings-schedule-table--task-list th.settings-schedule-table__col-name,
+.settings-maintenance-table--task-list th.settings-maintenance-table__col-lottery {
+  z-index: 6;
 }
 
-.settings-schedule-table--task-list th.settings-schedule-table__col-name,
-.settings-maintenance-table--task-list th.settings-maintenance-table__col-lottery,
-.settings-maintenance-table--task-list th.settings-maintenance-table__col-actions {
-  z-index: 6;
+.settings-maintenance-action-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.settings-maintenance-action-controls__input {
+  width: 4.8rem;
+  min-width: 4.8rem;
+  text-align: center;
+}
+
+.settings-maintenance-action-controls__unit {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
 .settings-schedule-table--task-list th.is-resizable,

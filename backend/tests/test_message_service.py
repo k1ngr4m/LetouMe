@@ -145,6 +145,11 @@ class MessageServiceTests(unittest.TestCase):
         self.assertEqual(unread_payload["unread_count"], 7)
         self.assertEqual((self.repository.last_list_kwargs or {}).get("result_filter"), "won")
 
+    def test_parse_draw_date_supports_datetime_text(self) -> None:
+        parsed = self.service._parse_draw_date("2026-04-07 21:46:12")
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed.isoformat(), "2026-04-07")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2810,24 +2810,25 @@ export function SettingsPage() {
                                 <td className="settings-maintenance-table__col-period" style={{ width: maintenanceColumnWidths.period, minWidth: maintenanceColumnWidths.period }}>{task?.progress_summary.latest_period || '-'}</td>
                                 <td className="settings-maintenance-table__col-time" style={{ width: maintenanceColumnWidths.created, minWidth: maintenanceColumnWidths.created }}>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
                                 <td className="settings-maintenance-table__col-actions" style={{ width: maintenanceColumnWidths.actions, minWidth: maintenanceColumnWidths.actions }}>
-                                  <div className="settings-schedule-list-toolbar">
-                                    <label className="field">
-                                      <span>抓取期数</span>
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        max={500}
-                                        step={1}
-                                        list="lottery-fetch-limit-presets"
-                                        value={limitInput}
-                                        onChange={(event) =>
-                                          setLotteryFetchLimitInputs((previous) => ({
-                                            ...previous,
-                                            [lotteryCode]: event.target.value,
-                                          }))
-                                        }
-                                      />
-                                    </label>
+                                  <div className="settings-maintenance-action-controls">
+                                    <input
+                                      className="settings-maintenance-action-controls__input"
+                                      type="number"
+                                      min={1}
+                                      max={500}
+                                      step={1}
+                                      list="lottery-fetch-limit-presets"
+                                      aria-label={`${getLotteryLabel(lotteryCode)}抓取期数`}
+                                      title="抓取期数（1-500）"
+                                      value={limitInput}
+                                      onChange={(event) =>
+                                        setLotteryFetchLimitInputs((previous) => ({
+                                          ...previous,
+                                          [lotteryCode]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <span className="settings-maintenance-action-controls__unit">期</span>
                                     <button
                                       className="secondary-button"
                                       type="button"

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+import datetime as datetime_module
+from datetime import timedelta
 from typing import Any
 
 from backend.app.lotteries import normalize_lottery_code
@@ -253,7 +254,7 @@ class MessageService:
                 continue
             for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S"):
                 try:
-                    return datetime.strptime(raw, fmt).date()
+                    return datetime_module.datetime.strptime(raw, fmt).date()
                 except ValueError:
                     continue
         return None
