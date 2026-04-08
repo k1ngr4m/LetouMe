@@ -53,6 +53,7 @@ class LotteryFetchTaskResponse(BaseModel):
 class MaintenanceRunLogItemResponse(BaseModel):
     id: int
     task_id: str
+    schedule_task_code: str | None = None
     lottery_code: str = "dlt"
     trigger_type: str = "manual"
     task_type: str = "lottery_fetch"

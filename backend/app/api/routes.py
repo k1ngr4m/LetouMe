@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import RedirectResponse
@@ -75,6 +77,7 @@ from backend.app.schemas.requests import (
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
     ScheduleTaskCodePayload,
+    ScheduleRunLogListPayload,
     ScheduleTaskPayload,
     ScheduleTaskStatusPayload,
     ScheduleTaskUpdatePayload,
@@ -138,6 +141,7 @@ profile_avatar_service = TicketOCRService()
 PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
 PROFILE_AVATAR_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 PROFILE_AVATAR_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
+BEIJING_TZ = ZoneInfo("Asia/Shanghai")
 
 
 def _validate_profile_avatar_upload(*, image: UploadFile, image_bytes: bytes) -> str:
@@ -705,6 +709,23 @@ def list_settings_lottery_fetch_logs(
 @router.post("/settings/schedules/list", response_model=ScheduleTaskListResponse)
 def list_schedule_tasks(_: dict = Depends(require_schedule_management_permission)) -> dict:
     return {"tasks": schedule_service.list_tasks()}
+
+
+@router.post("/settings/schedules/logs", response_model=MaintenanceRunLogListResponse)
+def list_schedule_run_logs(
+    payload: ScheduleRunLogListPayload,
+    _: dict = Depends(require_schedule_management_permission),
+) -> dict:
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="结束日期不能早于开始日期")
+    start_at = datetime.combine(payload.start_date, time.min, tzinfo=BEIJING_TZ)
+    end_at = datetime.combine(payload.end_date + timedelta(days=1), time.min, tzinfo=BEIJING_TZ)
+    return schedule_service.list_run_logs(
+        schedule_task_codes=payload.task_codes,
+        created_at_from=int(start_at.timestamp()),
+        created_at_to=int(end_at.timestamp()),
+        limit=payload.limit,
+    )
 
 
 @router.post("/settings/schedules/create", response_model=ScheduleTaskResponse)

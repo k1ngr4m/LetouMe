@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -296,3 +297,10 @@ class ScheduleTaskCodePayload(BaseModel):
 class ScheduleTaskStatusPayload(BaseModel):
     task_code: str
     is_active: bool
+
+
+class ScheduleRunLogListPayload(BaseModel):
+    start_date: date
+    end_date: date
+    task_codes: list[str] = Field(default_factory=list)
+    limit: int = Field(default=2000, ge=1, le=5000)

@@ -413,6 +413,12 @@ export const apiClient = {
       body: JSON.stringify(payload || {}),
     })
   },
+  listScheduleRunLogs(payload: { start_date: string; end_date: string; task_codes?: string[]; limit?: number }) {
+    return requestJson<MaintenanceRunLogListResponse>('/api/settings/schedules/logs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
   createSettingsModel(payload: SettingsModelPayload) {
     return requestJson<SettingsModel>('/api/settings/models/create', {
       method: 'POST',

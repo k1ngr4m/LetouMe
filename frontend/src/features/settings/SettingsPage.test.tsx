@@ -31,6 +31,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     fetchSettingsLotteryHistory: vi.fn(),
     getLotteryFetchTaskDetail: vi.fn(),
     listMaintenanceRunLogs: vi.fn(),
+    listScheduleRunLogs: vi.fn(),
     getSettingsPredictionRecords: vi.fn(),
     getSettingsPredictionRecordDetail: vi.fn(),
     createUser: vi.fn(),
@@ -100,6 +101,7 @@ describe('SettingsPage model management view switch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     apiClientMock.listScheduleTasks.mockResolvedValue({ tasks: [] })
+    apiClientMock.listScheduleRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
     apiClientMock.listMaintenanceRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
   })
 

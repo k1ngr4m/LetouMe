@@ -12,6 +12,7 @@ class MaintenanceRunLogRepository:
         *,
         task_id: str,
         lottery_code: str,
+        schedule_task_code: str | None,
         trigger_type: str,
         task_type: str = "lottery_fetch",
         mode: str | None = None,
@@ -25,6 +26,7 @@ class MaintenanceRunLogRepository:
                     """
                     INSERT INTO maintenance_run_log (
                         task_id,
+                        schedule_task_code,
                         lottery_code,
                         trigger_type,
                         task_type,
@@ -33,8 +35,9 @@ class MaintenanceRunLogRepository:
                         status,
                         created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, ?))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, ?))
                     ON DUPLICATE KEY UPDATE
+                        schedule_task_code = VALUES(schedule_task_code),
                         lottery_code = VALUES(lottery_code),
                         trigger_type = VALUES(trigger_type),
                         task_type = VALUES(task_type),
@@ -43,10 +46,22 @@ class MaintenanceRunLogRepository:
                         status = VALUES(status),
                         updated_at = VALUES(created_at)
                     """,
-                    (task_id, lottery_code, trigger_type, task_type, mode, model_code, status, ensure_timestamp(created_at), now_ts()),
+                    (
+                        task_id,
+                        schedule_task_code,
+                        lottery_code,
+                        trigger_type,
+                        task_type,
+                        mode,
+                        model_code,
+                        status,
+                        ensure_timestamp(created_at),
+                        now_ts(),
+                    ),
                 )
         return {
             "task_id": task_id,
+            "schedule_task_code": schedule_task_code,
             "lottery_code": lottery_code,
             "trigger_type": trigger_type,
             "task_type": task_type,
@@ -106,6 +121,9 @@ class MaintenanceRunLogRepository:
         self,
         *,
         lottery_code: str | None = None,
+        schedule_task_codes: list[str] | None = None,
+        created_at_from: int | None = None,
+        created_at_to: int | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -114,6 +132,18 @@ class MaintenanceRunLogRepository:
         if lottery_code:
             conditions.append("lottery_code = ?")
             params.append(lottery_code)
+        if schedule_task_codes:
+            normalized_codes = [str(code).strip() for code in schedule_task_codes if str(code).strip()]
+            if normalized_codes:
+                placeholders = ", ".join("?" for _ in normalized_codes)
+                conditions.append(f"schedule_task_code IN ({placeholders})")
+                params.extend(normalized_codes)
+        if created_at_from is not None:
+            conditions.append("created_at >= ?")
+            params.append(ensure_timestamp(created_at_from))
+        if created_at_to is not None:
+            conditions.append("created_at < ?")
+            params.append(ensure_timestamp(created_at_to))
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         with get_connection() as connection:
@@ -146,6 +176,7 @@ class MaintenanceRunLogRepository:
         return {
             "id": int(row["id"]),
             "task_id": str(row["task_id"]),
+            "schedule_task_code": str(row["schedule_task_code"]) if row.get("schedule_task_code") else None,
             "lottery_code": str(row.get("lottery_code") or "dlt"),
             "trigger_type": str(row.get("trigger_type") or "manual"),
             "task_type": str(row.get("task_type") or "lottery_fetch"),

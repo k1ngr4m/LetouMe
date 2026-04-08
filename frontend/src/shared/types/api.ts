@@ -699,6 +699,7 @@ export type LotteryFetchTask = {
 export type MaintenanceRunLog = {
   id: number
   task_id: string
+  schedule_task_code?: string | null
   lottery_code: LotteryCode
   trigger_type: 'manual' | 'schedule'
   task_type?: 'lottery_fetch' | 'prediction_generate'

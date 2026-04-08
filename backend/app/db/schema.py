@@ -534,6 +534,7 @@ SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS maintenance_run_log (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         task_id VARCHAR(64) NOT NULL,
+        schedule_task_code VARCHAR(64) NULL,
         lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
         trigger_type VARCHAR(16) NOT NULL DEFAULT 'manual',
         task_type VARCHAR(32) NOT NULL DEFAULT 'lottery_fetch',
@@ -553,6 +554,7 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_maintenance_run_log_task_id (task_id),
+        INDEX idx_maintenance_run_log_schedule_created (schedule_task_code, created_at),
         INDEX idx_maintenance_run_log_created (created_at),
         INDEX idx_maintenance_run_log_lottery_created (lottery_code, created_at),
         INDEX idx_maintenance_run_log_status_created (status, created_at)
@@ -951,6 +953,14 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         "ball_position": "ALTER TABLE prediction_hit_number ADD COLUMN ball_position INT NULL AFTER ball_color",
     },
     "maintenance_run_log": {
+        "schedule_task_code": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD COLUMN schedule_task_code VARCHAR(64) NULL AFTER task_id"
+        ),
+        "schedule_task_code_index": (
+            "ALTER TABLE maintenance_run_log "
+            "ADD INDEX idx_maintenance_run_log_schedule_created (schedule_task_code, created_at)"
+        ),
         "task_type": (
             "ALTER TABLE maintenance_run_log "
             "ADD COLUMN task_type VARCHAR(32) NOT NULL DEFAULT 'lottery_fetch' AFTER trigger_type"

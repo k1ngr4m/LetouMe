@@ -256,6 +256,17 @@ function parseFetchLimitInput(value: string): number | null {
   return rounded
 }
 
+function formatBeijingDateKey(value?: number | null) {
+  if (!value) return null
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return formatter.format(new Date(value * 1000))
+}
+
 const PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
 const PROFILE_AVATAR_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png'])
 const PROFILE_AVATAR_ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png']
@@ -851,6 +862,31 @@ export function SettingsPage() {
     }),
     enabled: isSuperAdmin,
   })
+  const scheduleLogQueryStartDate = useMemo(
+    () => `${scheduleCalendarMonth.year.toString().padStart(4, '0')}-${scheduleCalendarMonth.month.toString().padStart(2, '0')}-01`,
+    [scheduleCalendarMonth.month, scheduleCalendarMonth.year],
+  )
+  const scheduleLogQueryEndDate = useMemo(() => {
+    const endDate = new Date(Date.UTC(scheduleCalendarMonth.year, scheduleCalendarMonth.month, 0))
+    return `${endDate.getUTCFullYear().toString().padStart(4, '0')}-${String(endDate.getUTCMonth() + 1).padStart(2, '0')}-${String(endDate.getUTCDate()).padStart(2, '0')}`
+  }, [scheduleCalendarMonth.month, scheduleCalendarMonth.year])
+  const scheduleTaskCodesForLogs = useMemo(
+    () =>
+      (scheduleTasksQuery.data?.tasks ?? [])
+        .filter((task) => scheduleTaskFilter === 'all' || task.task_type === scheduleTaskFilter)
+        .map((task) => task.task_code),
+    [scheduleTaskFilter, scheduleTasksQuery.data?.tasks],
+  )
+  const scheduleRunLogsQuery = useQuery({
+    queryKey: ['settings-schedules-logs', scheduleLogQueryStartDate, scheduleLogQueryEndDate, scheduleTaskCodesForLogs.join('|')],
+    queryFn: () => apiClient.listScheduleRunLogs({
+      start_date: scheduleLogQueryStartDate,
+      end_date: scheduleLogQueryEndDate,
+      task_codes: scheduleTaskCodesForLogs,
+      limit: 5000,
+    }),
+    enabled: canManageSchedules && scheduleTaskCodesForLogs.length > 0,
+  })
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => apiClient.listUsers(),
@@ -1161,6 +1197,29 @@ export function SettingsPage() {
     if (!year || !month || !day) return selectedCalendarDateKey
     return `${year}年${month}月${day}日`
   }, [selectedCalendarDateKey])
+  const scheduleRunLogMapByDateAndTask = useMemo(() => {
+    const logs = scheduleRunLogsQuery.data?.logs ?? []
+    const byDate = new Map<string, Map<string, MaintenanceRunLog>>()
+    for (const item of logs) {
+      const taskCode = item.schedule_task_code || null
+      if (!taskCode) continue
+      const dateKey = formatBeijingDateKey(item.started_at || item.created_at)
+      if (!dateKey) continue
+      const byTask = byDate.get(dateKey) || new Map<string, MaintenanceRunLog>()
+      const current = byTask.get(taskCode)
+      const currentTime = current ? (current.started_at || current.created_at || 0) : 0
+      const nextTime = item.started_at || item.created_at || 0
+      if (!current || nextTime >= currentTime) {
+        byTask.set(taskCode, item)
+      }
+      byDate.set(dateKey, byTask)
+    }
+    return byDate
+  }, [scheduleRunLogsQuery.data?.logs])
+  const selectedCalendarDayRunLogMap = useMemo(
+    () => scheduleRunLogMapByDateAndTask.get(selectedCalendarDateKey) || new Map<string, MaintenanceRunLog>(),
+    [scheduleRunLogMapByDateAndTask, selectedCalendarDateKey],
+  )
   useEffect(() => {
     const keys = scheduleCalendarMonthData.cells.filter((item) => item.inCurrentMonth).map((item) => item.dateKey)
     if (!keys.length) return
@@ -3390,10 +3449,12 @@ export function SettingsPage() {
                             <div className="settings-schedule-calendar__detail-list">
                               {selectedCalendarDayEntries.map((entry) => {
                                 const task = entry.task
-                                const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
+                                const dayRunLog = selectedCalendarDayRunLogMap.get(task.task_code)
+                                const runStatusMeta = getScheduleRunStatusMeta(dayRunLog?.status || null)
                                 const enabledMeta = getScheduleEnabledMeta(task.is_active)
                                 const playModeLabel = getSchedulePredictionPlayModeLabel(task)
                                 const fetchLimitLabel = task.task_type === 'lottery_fetch' ? `近${normalizeFetchLimit(task.fetch_limit)}期` : null
+                                const dayRunAt = dayRunLog?.finished_at || dayRunLog?.started_at || dayRunLog?.created_at || null
                                 return (
                                   <article key={`${selectedCalendarDateKey}-${task.task_code}`} className="settings-schedule-calendar__detail-card">
                                     <div className="settings-schedule-calendar__detail-title">
@@ -3429,6 +3490,8 @@ export function SettingsPage() {
                                         </span>
                                         <span>{runStatusMeta.label}</span>
                                       </span>
+                                      <span>{dayRunAt ? `当日执行：${formatDateTimeBeijing(dayRunAt)}` : '当日执行：未执行'}</span>
+                                      {dayRunLog?.error_message ? <span>错误：{dayRunLog.error_message}</span> : null}
                                       <span>{task.next_run_at ? `下次执行：${formatDateTimeBeijing(task.next_run_at)}` : '下次执行：未安排'}</span>
                                     </div>
                                     <div className="settings-schedule-calendar__detail-actions">

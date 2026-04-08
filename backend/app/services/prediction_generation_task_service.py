@@ -20,6 +20,7 @@ class PredictionGenerationTaskService:
         mode: str,
         model_code: str,
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
+        schedule_task_code: str | None = None,
         trigger_type: str = "manual",
         on_update: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
@@ -42,11 +43,17 @@ class PredictionGenerationTaskService:
                 "error_message": None,
             },
             worker=worker,
-            on_update=lambda state: self._handle_task_update(state, trigger_type=trigger_type, on_update=on_update),
+            on_update=lambda state: self._handle_task_update(
+                state,
+                schedule_task_code=schedule_task_code,
+                trigger_type=trigger_type,
+                on_update=on_update,
+            ),
         )
         self.maintenance_log_repository.create_log(
             task_id=str(task["task_id"]),
             lottery_code=lottery_code,
+            schedule_task_code=schedule_task_code,
             trigger_type=trigger_type,
             task_type="prediction_generate",
             mode=mode,
@@ -59,7 +66,14 @@ class PredictionGenerationTaskService:
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         return self.runner.get_task(task_id)
 
-    def _handle_task_update(self, state: dict[str, Any], *, trigger_type: str, on_update=None) -> None:
+    def _handle_task_update(
+        self,
+        state: dict[str, Any],
+        *,
+        schedule_task_code: str | None,
+        trigger_type: str,
+        on_update=None,
+    ) -> None:
         task_id = str(state.get("task_id") or "")
         if not task_id:
             return
@@ -89,6 +103,7 @@ class PredictionGenerationTaskService:
                 self.maintenance_log_repository.create_log(
                     task_id=task_id,
                     lottery_code=str(state.get("lottery_code") or "dlt"),
+                    schedule_task_code=schedule_task_code,
                     trigger_type=trigger_type,
                     task_type="prediction_generate",
                     mode=mode_value,

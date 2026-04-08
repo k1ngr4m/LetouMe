@@ -12,6 +12,7 @@ from time import monotonic
 
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
+from backend.app.repositories.maintenance_run_log_repository import MaintenanceRunLogRepository
 from backend.app.repositories.schedule_repository import ScheduleRepository
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.prediction_generation_service import PredictionGenerationService
@@ -34,9 +35,11 @@ class ScheduleService:
         self,
         repository: ScheduleRepository | None = None,
         prediction_generation_service: PredictionGenerationService | None = None,
+        maintenance_log_repository: MaintenanceRunLogRepository | None = None,
     ) -> None:
         self.repository = repository or ScheduleRepository()
         self.prediction_generation_service = prediction_generation_service or PredictionGenerationService()
+        self.maintenance_log_repository = maintenance_log_repository or MaintenanceRunLogRepository()
         self.logger = get_logger("services.schedule")
         self._thread: Thread | None = None
         self._lock = Lock()
@@ -81,6 +84,22 @@ class ScheduleService:
         task = self.get_task(task_code)
         self._trigger_task(task, manual=True)
         return self.get_task(task_code)
+
+    def list_run_logs(
+        self,
+        *,
+        schedule_task_codes: list[str],
+        created_at_from: int,
+        created_at_to: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        return self.maintenance_log_repository.list_logs(
+            schedule_task_codes=schedule_task_codes,
+            created_at_from=created_at_from,
+            created_at_to=created_at_to,
+            limit=limit,
+            offset=0,
+        )
 
     def _loop(self) -> None:
         while True:
@@ -128,6 +147,7 @@ class ScheduleService:
             lottery_fetch_task_service.create_task(
                 task["lottery_code"],
                 limit=int(task.get("fetch_limit") or 30),
+                schedule_task_code=task["task_code"],
                 trigger_type="schedule",
                 on_update=handle_update,
             )
@@ -161,6 +181,7 @@ class ScheduleService:
             lottery_code=task["lottery_code"],
             mode=task.get("generation_mode") or "current",
             model_code="__bulk__",
+            schedule_task_code=task["task_code"],
             trigger_type="schedule",
             on_update=handle_update,
             worker=lambda progress_callback: self.prediction_generation_service.generate_for_models(

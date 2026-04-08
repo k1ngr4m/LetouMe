@@ -24,6 +24,7 @@ class LotteryFetchTaskService:
         lottery_code: str = "dlt",
         *,
         limit: int | None = 30,
+        schedule_task_code: str | None = None,
         trigger_type: str = "manual",
         on_update=None,
     ) -> dict:
@@ -41,11 +42,17 @@ class LotteryFetchTaskService:
                 }
             },
             worker=lambda _progress_callback: fetch_service.fetch_and_save(limit=limit),
-            on_update=lambda state: self._handle_task_update(state, trigger_type=trigger_type, on_update=on_update),
+            on_update=lambda state: self._handle_task_update(
+                state,
+                schedule_task_code=schedule_task_code,
+                trigger_type=trigger_type,
+                on_update=on_update,
+            ),
         )
         self.maintenance_log_repository.create_log(
             task_id=str(task["task_id"]),
             lottery_code=lottery_code,
+            schedule_task_code=schedule_task_code,
             trigger_type=trigger_type,
             task_type="lottery_fetch",
             status=str(task["status"]),
@@ -59,7 +66,14 @@ class LotteryFetchTaskService:
     def list_logs(self, *, lottery_code: str | None = None, limit: int = 20, offset: int = 0) -> dict[str, Any]:
         return self.maintenance_log_repository.list_logs(lottery_code=lottery_code, limit=limit, offset=offset)
 
-    def _handle_task_update(self, state: dict[str, Any], *, trigger_type: str, on_update=None) -> None:
+    def _handle_task_update(
+        self,
+        state: dict[str, Any],
+        *,
+        schedule_task_code: str | None,
+        trigger_type: str,
+        on_update=None,
+    ) -> None:
         task_id = str(state.get("task_id") or "")
         if not task_id:
             return
@@ -82,6 +96,7 @@ class LotteryFetchTaskService:
                 self.maintenance_log_repository.create_log(
                     task_id=task_id,
                     lottery_code=str(state.get("lottery_code") or "dlt"),
+                    schedule_task_code=schedule_task_code,
                     trigger_type=trigger_type,
                     task_type="lottery_fetch",
                     status=payload["status"],
