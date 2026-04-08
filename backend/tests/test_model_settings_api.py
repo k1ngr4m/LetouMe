@@ -411,6 +411,29 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "lottery-task-1")
         create_task.assert_called_once_with("dlt", limit=30)
 
+    def test_fetch_lottery_task_endpoint_accepts_custom_limit(self) -> None:
+        with patch("backend.app.api.routes.lottery_fetch_task_service.create_task") as create_task:
+            create_task.return_value = {
+                "task_id": "lottery-task-2",
+                "status": "queued",
+                "created_at": "2026-03-16T00:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "fetched_count": 0,
+                    "saved_count": 0,
+                    "latest_period": None,
+                    "duration_ms": 0,
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post("/api/settings/lottery/fetch", json={"lottery_code": "qxc", "limit": 120})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "lottery-task-2")
+        create_task.assert_called_once_with("qxc", limit=120)
+
     def test_fetch_lottery_logs_endpoint_returns_list_payload(self) -> None:
         with patch("backend.app.api.routes.lottery_fetch_task_service.list_logs") as list_logs:
             list_logs.return_value = {

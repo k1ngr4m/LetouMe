@@ -395,10 +395,10 @@ export const apiClient = {
       body: JSON.stringify({ provider_code: providerCode }),
     })
   },
-  fetchSettingsLotteryHistory(lotteryCode: LotteryCode = 'dlt') {
+  fetchSettingsLotteryHistory(lotteryCode: LotteryCode = 'dlt', limit: number = 30) {
     return requestJson<LotteryFetchTask>('/api/settings/lottery/fetch', {
       method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode }),
+      body: JSON.stringify({ lottery_code: lotteryCode, limit }),
     })
   },
   getLotteryFetchTaskDetail(taskId: string) {

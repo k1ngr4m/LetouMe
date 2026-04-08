@@ -56,6 +56,7 @@ class ScheduleRepository:
                         task_name,
                         task_type,
                         lottery_code,
+                        fetch_limit,
                         generation_mode,
                         prediction_play_mode,
                         overwrite_existing,
@@ -69,13 +70,14 @@ class ScheduleRepository:
                         last_run_status,
                         last_error_message,
                         last_task_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         payload["task_code"],
                         payload["task_name"],
                         payload["task_type"],
                         payload["lottery_code"],
+                        int(payload.get("fetch_limit") or 30),
                         payload.get("generation_mode") or "current",
                         payload.get("prediction_play_mode") or "direct",
                         1 if payload.get("overwrite_existing") else 0,
@@ -106,6 +108,7 @@ class ScheduleRepository:
                     SET task_name = ?,
                         task_type = ?,
                         lottery_code = ?,
+                        fetch_limit = ?,
                         generation_mode = ?,
                         prediction_play_mode = ?,
                         overwrite_existing = ?,
@@ -122,6 +125,7 @@ class ScheduleRepository:
                         payload["task_name"],
                         payload["task_type"],
                         payload["lottery_code"],
+                        int(payload.get("fetch_limit") or 30),
                         payload.get("generation_mode") or "current",
                         payload.get("prediction_play_mode") or "direct",
                         1 if payload.get("overwrite_existing") else 0,
@@ -317,6 +321,7 @@ class ScheduleRepository:
             "task_name": str(row["task_name"]),
             "task_type": str(row["task_type"]),
             "lottery_code": str(row.get("lottery_code") or "dlt"),
+            "fetch_limit": int(row.get("fetch_limit") or 30),
             "model_codes": [str(code) for code in model_codes],
             "generation_mode": str(row.get("generation_mode") or "current"),
             "prediction_play_mode": str(row.get("prediction_play_mode") or "direct"),

@@ -266,6 +266,7 @@ class ScheduleTaskResponse(BaseModel):
     task_name: str
     task_type: str
     lottery_code: str = "dlt"
+    fetch_limit: int = 30
     model_codes: list[str] = Field(default_factory=list)
     generation_mode: str = "current"
     prediction_play_mode: Literal["direct", "direct_sum", "compound", "dantuo"] = "direct"

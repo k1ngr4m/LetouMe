@@ -125,7 +125,12 @@ class ScheduleService:
             )
 
         if task["task_type"] == "lottery_fetch":
-            lottery_fetch_task_service.create_task(task["lottery_code"], trigger_type="schedule", on_update=handle_update)
+            lottery_fetch_task_service.create_task(
+                task["lottery_code"],
+                limit=int(task.get("fetch_limit") or 30),
+                trigger_type="schedule",
+                on_update=handle_update,
+            )
             return
 
         model_codes = [str(code).strip() for code in task.get("model_codes") or [] if str(code).strip()]
@@ -225,6 +230,7 @@ class ScheduleService:
             "task_name": task_name,
             "task_type": task_type,
             "lottery_code": lottery_code,
+            "fetch_limit": 30,
             "model_codes": model_codes,
             "generation_mode": generation_mode,
             "prediction_play_mode": prediction_play_mode,
@@ -236,6 +242,11 @@ class ScheduleService:
             "cron_expression": cron_expression,
             "is_active": bool(payload.get("is_active", True)),
         }
+        if task_type == "lottery_fetch":
+            fetch_limit = int(payload.get("fetch_limit") or 30)
+            if fetch_limit < 1 or fetch_limit > 500:
+                raise ValueError("抓取期数范围应为 1-500")
+            normalized["fetch_limit"] = fetch_limit
         normalized["next_run_at"] = self._format_datetime(
             self._compute_next_run(normalized, base_time=self._utc_now()) if normalized["is_active"] else None
         )

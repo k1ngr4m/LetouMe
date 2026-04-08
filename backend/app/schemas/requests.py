@@ -272,6 +272,7 @@ class ScheduleTaskPayload(BaseModel):
     task_name: str
     task_type: str
     lottery_code: str = "dlt"
+    fetch_limit: int = Field(default=30, ge=1, le=500)
     model_codes: list[str] = Field(default_factory=list)
     generation_mode: str = "current"
     prediction_play_mode: Literal["direct", "direct_sum", "compound", "dantuo"] = "direct"

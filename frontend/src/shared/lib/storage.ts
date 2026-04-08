@@ -6,6 +6,7 @@ const THEME_PREFERENCE_KEY = 'letoumeThemePreference'
 const MOTION_PREFERENCE_KEY = 'letoumeMotionPreference'
 const SETTINGS_TABLE_WIDTHS_KEY_PREFIX = 'letoumeSettingsTableWidths'
 const SIDEBAR_COLLAPSE_PREFERENCE_KEY = 'letoumeSidebarCollapsed'
+const SETTINGS_LOTTERY_FETCH_LIMITS_KEY = 'letoumeSettingsLotteryFetchLimits'
 
 export function loadPinnedModels(lotteryCode: LotteryCode = 'dlt') {
   try {
@@ -113,6 +114,31 @@ export function loadSidebarCollapsePreference() {
 export function saveSidebarCollapsePreference(isCollapsed: boolean) {
   try {
     window.localStorage.setItem(SIDEBAR_COLLAPSE_PREFERENCE_KEY, isCollapsed ? '1' : '0')
+  } catch {
+    // Ignore persistence failures in unsupported environments.
+  }
+}
+
+export function loadSettingsLotteryFetchLimits(): Partial<Record<LotteryCode, number>> {
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_LOTTERY_FETCH_LIMITS_KEY)
+    const parsed = JSON.parse(raw || '{}')
+    if (!parsed || typeof parsed !== 'object') return {}
+    const result: Partial<Record<LotteryCode, number>> = {}
+    for (const lotteryCode of ['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]) {
+      const value = Number((parsed as Record<string, unknown>)[lotteryCode])
+      if (!Number.isFinite(value)) continue
+      result[lotteryCode] = Math.max(1, Math.min(500, Math.round(value)))
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+export function saveSettingsLotteryFetchLimits(limits: Partial<Record<LotteryCode, number>>) {
+  try {
+    window.localStorage.setItem(SETTINGS_LOTTERY_FETCH_LIMITS_KEY, JSON.stringify(limits))
   } catch {
     // Ignore persistence failures in unsupported environments.
   }

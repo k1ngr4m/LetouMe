@@ -125,6 +125,31 @@ class ScheduleServiceTestCase(unittest.TestCase):
             progress_callback=progress_callback,
         )
 
+    def test_trigger_task_passes_fetch_limit_for_lottery_fetch(self) -> None:
+        task = {
+            "task_code": "sched-qxc-fetch",
+            "task_name": "七星彩抓取",
+            "task_type": "lottery_fetch",
+            "lottery_code": "qxc",
+            "fetch_limit": 120,
+            "model_codes": [],
+            "generation_mode": "current",
+            "prediction_play_mode": "direct",
+            "overwrite_existing": False,
+            "schedule_mode": "preset",
+            "preset_type": "daily",
+            "time_of_day": "09:00",
+            "weekdays": [],
+            "is_active": True,
+        }
+
+        with patch("backend.app.services.schedule_service.lottery_fetch_task_service.create_task") as create_task:
+            self.service._trigger_task(task)
+
+        create_task.assert_called_once()
+        kwargs = create_task.call_args.kwargs
+        self.assertEqual(kwargs["limit"], 120)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,7 +10,12 @@ import { useAuth } from '../../shared/auth/AuthProvider'
 import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeBeijing, formatDateTimeLocal } from '../../shared/lib/format'
 import { useMotion } from '../../shared/theme/MotionProvider'
-import { loadSettingsTableColumnWidths, saveSettingsTableColumnWidths } from '../../shared/lib/storage'
+import {
+  loadSettingsLotteryFetchLimits,
+  loadSettingsTableColumnWidths,
+  saveSettingsLotteryFetchLimits,
+  saveSettingsTableColumnWidths,
+} from '../../shared/lib/storage'
 import type {
   AuthUser,
   BulkModelActionResult,
@@ -143,6 +148,7 @@ const EMPTY_SCHEDULE_FORM: ScheduleForm = {
   task_name: '',
   task_type: 'lottery_fetch',
   lottery_code: 'dlt',
+  fetch_limit: 30,
   model_codes: [],
   generation_mode: 'current',
   prediction_play_mode: 'direct',
@@ -188,6 +194,8 @@ const GENERATION_RECENT_PERIOD_OPTIONS: Array<{ value: GenerationRecentPeriodCou
   { value: '10', label: '近10期' },
   { value: '20', label: '近20期' },
 ]
+const LOTTERY_FETCH_LIMIT_PRESET_OPTIONS = [10, 30, 50, 100, 200, 500] as const
+const LOTTERY_FETCH_LIMIT_DEFAULT = 30
 
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
@@ -220,6 +228,24 @@ const MAINTENANCE_COLUMN_DEFAULT_WIDTHS: Record<MaintenanceColumnKey, number> = 
   period: 126,
   created: 176,
   actions: 132,
+}
+
+function normalizeFetchLimit(value: unknown, fallback: number = LOTTERY_FETCH_LIMIT_DEFAULT) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return fallback
+  const rounded = Math.round(numeric)
+  return Math.max(1, Math.min(500, rounded))
+}
+
+function parseFetchLimitInput(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (!/^\d+$/.test(trimmed)) return null
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed)) return null
+  const rounded = Math.round(parsed)
+  if (rounded < 1 || rounded > 500) return null
+  return rounded
 }
 
 const PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
@@ -732,6 +758,15 @@ export function SettingsPage() {
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
   const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null, qxc: null })
+  const [lotteryFetchLimitInputs, setLotteryFetchLimitInputs] = useState<Record<LotteryCode, string>>(() => {
+    const persisted = loadSettingsLotteryFetchLimits()
+    return {
+      dlt: String(normalizeFetchLimit(persisted.dlt)),
+      pl3: String(normalizeFetchLimit(persisted.pl3)),
+      pl5: String(normalizeFetchLimit(persisted.pl5)),
+      qxc: String(normalizeFetchLimit(persisted.qxc)),
+    }
+  })
   const [maintenanceLogFilter, setMaintenanceLogFilter] = useState<MaintenanceLogFilter>('all')
   const [maintenanceLogOffset, setMaintenanceLogOffset] = useState(0)
   const [scheduleColumnWidths, setScheduleColumnWidths] = useState<Record<ScheduleColumnKey, number>>(() => (
@@ -885,6 +920,15 @@ export function SettingsPage() {
   useEffect(() => {
     saveSettingsTableColumnWidths('settings:maintenance', maintenanceColumnWidths)
   }, [maintenanceColumnWidths])
+
+  useEffect(() => {
+    saveSettingsLotteryFetchLimits({
+      dlt: normalizeFetchLimit(lotteryFetchLimitInputs.dlt),
+      pl3: normalizeFetchLimit(lotteryFetchLimitInputs.pl3),
+      pl5: normalizeFetchLimit(lotteryFetchLimitInputs.pl5),
+      qxc: normalizeFetchLimit(lotteryFetchLimitInputs.qxc),
+    })
+  }, [lotteryFetchLimitInputs])
 
   useEffect(() => {
     if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu && !scheduleActionMenu) return undefined
@@ -1344,10 +1388,10 @@ export function SettingsPage() {
   })
 
   const fetchDltLotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory('dlt'),
-    onSuccess: (task) => {
+    mutationFn: (limit: number) => apiClient.fetchSettingsLotteryHistory('dlt', limit),
+    onSuccess: (task, limit) => {
       setLotteryFetchTasks((previous) => ({ ...previous, dlt: task }))
-      setMessage('大乐透数据更新任务已创建，正在后台执行。')
+      setMessage(`大乐透近 ${limit} 期数据更新任务已创建，正在后台执行。`)
       setMessageType('success')
       void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
@@ -1358,10 +1402,10 @@ export function SettingsPage() {
   })
 
   const fetchPl3LotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory('pl3'),
-    onSuccess: (task) => {
+    mutationFn: (limit: number) => apiClient.fetchSettingsLotteryHistory('pl3', limit),
+    onSuccess: (task, limit) => {
       setLotteryFetchTasks((previous) => ({ ...previous, pl3: task }))
-      setMessage('排列3数据更新任务已创建，正在后台执行。')
+      setMessage(`排列3近 ${limit} 期数据更新任务已创建，正在后台执行。`)
       setMessageType('success')
       void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
@@ -1372,10 +1416,10 @@ export function SettingsPage() {
   })
 
   const fetchPl5LotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory('pl5'),
-    onSuccess: (task) => {
+    mutationFn: (limit: number) => apiClient.fetchSettingsLotteryHistory('pl5', limit),
+    onSuccess: (task, limit) => {
       setLotteryFetchTasks((previous) => ({ ...previous, pl5: task }))
-      setMessage('排列5数据更新任务已创建，正在后台执行。')
+      setMessage(`排列5近 ${limit} 期数据更新任务已创建，正在后台执行。`)
       setMessageType('success')
       void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
@@ -1386,10 +1430,10 @@ export function SettingsPage() {
   })
 
   const fetchQxcLotteryMutation = useMutation({
-    mutationFn: () => apiClient.fetchSettingsLotteryHistory('qxc'),
-    onSuccess: (task) => {
+    mutationFn: (limit: number) => apiClient.fetchSettingsLotteryHistory('qxc', limit),
+    onSuccess: (task, limit) => {
       setLotteryFetchTasks((previous) => ({ ...previous, qxc: task }))
-      setMessage('七星彩数据更新任务已创建，正在后台执行。')
+      setMessage(`七星彩近 ${limit} 期数据更新任务已创建，正在后台执行。`)
       setMessageType('success')
       void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
@@ -1942,6 +1986,7 @@ export function SettingsPage() {
       task_name: task.task_name,
       task_type: task.task_type,
       lottery_code: task.lottery_code,
+      fetch_limit: normalizeFetchLimit(task.fetch_limit),
       model_codes: task.model_codes,
       generation_mode: 'current',
       prediction_play_mode: task.prediction_play_mode || 'direct',
@@ -2000,6 +2045,7 @@ export function SettingsPage() {
     saveScheduleTaskMutation.mutate({
       ...scheduleForm,
       task_name: scheduleForm.task_name.trim(),
+      fetch_limit: normalizeFetchLimit(scheduleForm.fetch_limit),
       prediction_play_mode:
         scheduleForm.task_type === 'prediction_generate'
           ? normalizePredictionPlayModeForLottery(scheduleForm.lottery_code, scheduleForm.prediction_play_mode)
@@ -2135,6 +2181,11 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
+      <datalist id="lottery-fetch-limit-presets">
+        {LOTTERY_FETCH_LIMIT_PRESET_OPTIONS.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
       <section className="settings-center-layout settings-center-layout--shell">
         <aside className="settings-center-sidebar" aria-label="设置导航">
           {availableTabs.map((tab) => (
@@ -2695,7 +2746,7 @@ export function SettingsPage() {
 
           {activeTab === 'maintenance' ? (
             <div className="page-section">
-              <StatusCard title="数据维护" subtitle="统一维护大乐透、排列3与排列5开奖历史数据，支持手动执行并记录运行日志。">
+              <StatusCard title="数据维护" subtitle="统一维护大乐透、排列3、排列5与七星彩开奖历史数据，支持按期数执行并记录运行日志。">
                 <div className="page-stack">
                   <div className="panel-card settings-schedule-list-card">
                     <div className="panel-card__header">
@@ -2742,6 +2793,9 @@ export function SettingsPage() {
                           {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((lotteryCode) => {
                             const task = lotteryFetchTasks[lotteryCode]
                             const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : lotteryCode === 'qxc' ? fetchQxcLotteryMutation : fetchDltLotteryMutation
+                            const limitInput = lotteryFetchLimitInputs[lotteryCode] || String(LOTTERY_FETCH_LIMIT_DEFAULT)
+                            const parsedLimit = parseFetchLimitInput(limitInput)
+                            const hasInvalidLimit = parsedLimit === null
                             const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
                             return (
                               <tr key={lotteryCode}>
@@ -2756,9 +2810,40 @@ export function SettingsPage() {
                                 <td className="settings-maintenance-table__col-period" style={{ width: maintenanceColumnWidths.period, minWidth: maintenanceColumnWidths.period }}>{task?.progress_summary.latest_period || '-'}</td>
                                 <td className="settings-maintenance-table__col-time" style={{ width: maintenanceColumnWidths.created, minWidth: maintenanceColumnWidths.created }}>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
                                 <td className="settings-maintenance-table__col-actions" style={{ width: maintenanceColumnWidths.actions, minWidth: maintenanceColumnWidths.actions }}>
-                                  <button className="secondary-button" type="button" onClick={() => mutation.mutate()} disabled={running}>
-                                    {running ? '执行中...' : '立即执行'}
-                                  </button>
+                                  <div className="settings-schedule-list-toolbar">
+                                    <label className="field">
+                                      <span>抓取期数</span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={500}
+                                        step={1}
+                                        list="lottery-fetch-limit-presets"
+                                        value={limitInput}
+                                        onChange={(event) =>
+                                          setLotteryFetchLimitInputs((previous) => ({
+                                            ...previous,
+                                            [lotteryCode]: event.target.value,
+                                          }))
+                                        }
+                                      />
+                                    </label>
+                                    <button
+                                      className="secondary-button"
+                                      type="button"
+                                      onClick={() => {
+                                        if (parsedLimit === null) {
+                                          setMessage('抓取期数需为 1-500 的整数')
+                                          setMessageType('error')
+                                          return
+                                        }
+                                        mutation.mutate(parsedLimit)
+                                      }}
+                                      disabled={running || hasInvalidLimit}
+                                    >
+                                      {running ? '执行中...' : '立即执行'}
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             )
@@ -2972,6 +3057,7 @@ export function SettingsPage() {
                               const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
                               const enabledMeta = getScheduleEnabledMeta(task.is_active)
                               const playModeLabel = getSchedulePredictionPlayModeLabel(task)
+                              const fetchLimitLabel = task.task_type === 'lottery_fetch' ? `近${normalizeFetchLimit(task.fetch_limit)}期` : null
                               const modelNames = task.task_type === 'prediction_generate'
                                 ? task.model_codes.map((code) => modelNameMap[code] || code).filter(Boolean)
                                 : []
@@ -3024,7 +3110,13 @@ export function SettingsPage() {
                                     </td>
                                     <td className="settings-schedule-table__rule settings-schedule-table__col-rule" style={{ width: scheduleColumnWidths.rule, minWidth: scheduleColumnWidths.rule }}>
                                       <strong>{task.rule_summary || '-'}</strong>
-                                      <span>{playModeLabel ? `${getScheduleModeLabel(task.schedule_mode, task.preset_type)} · ${playModeLabel}` : getScheduleModeLabel(task.schedule_mode, task.preset_type)}</span>
+                                      <span>
+                                        {[
+                                          getScheduleModeLabel(task.schedule_mode, task.preset_type),
+                                          playModeLabel,
+                                          fetchLimitLabel,
+                                        ].filter(Boolean).join(' · ')}
+                                      </span>
                                     </td>
                                     <td className="settings-schedule-table__col-next-run" style={{ width: scheduleColumnWidths.next_run, minWidth: scheduleColumnWidths.next_run }}>{task.next_run_at ? formatDateTimeBeijing(task.next_run_at) : '-'}</td>
                                     <td className="settings-schedule-table__col-status" style={{ width: scheduleColumnWidths.status, minWidth: scheduleColumnWidths.status }}>
@@ -3143,6 +3235,12 @@ export function SettingsPage() {
                                               <article className="settings-schedule-detail-item">
                                                 <span>预测玩法</span>
                                                 <strong>{playModeLabel}</strong>
+                                              </article>
+                                            ) : null}
+                                            {task.task_type === 'lottery_fetch' ? (
+                                              <article className="settings-schedule-detail-item">
+                                                <span>抓取期数</span>
+                                                <strong>近 {normalizeFetchLimit(task.fetch_limit)} 期</strong>
                                               </article>
                                             ) : null}
                                           </div>
@@ -4010,6 +4108,25 @@ export function SettingsPage() {
                     </div>
                   </div>
                 </>
+              ) : null}
+              {scheduleForm.task_type === 'lottery_fetch' ? (
+                <label className="field">
+                  <span>抓取期数</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    step={1}
+                    list="lottery-fetch-limit-presets"
+                    value={scheduleForm.fetch_limit}
+                    onChange={(event) =>
+                      setScheduleForm((previous) => ({
+                        ...previous,
+                        fetch_limit: normalizeFetchLimit(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
               ) : null}
               {scheduleForm.schedule_mode === 'preset' ? (
                 <>

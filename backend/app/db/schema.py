@@ -490,6 +490,7 @@ SCHEMA_STATEMENTS = [
         task_name VARCHAR(128) NOT NULL,
         task_type VARCHAR(32) NOT NULL,
         lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        fetch_limit INT NOT NULL DEFAULT 30,
         generation_mode VARCHAR(32) NOT NULL DEFAULT 'current',
         prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct',
         overwrite_existing TINYINT(1) NOT NULL DEFAULT 0,
@@ -976,6 +977,10 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         ),
     },
     "scheduled_task": {
+        "fetch_limit": (
+            "ALTER TABLE scheduled_task "
+            "ADD COLUMN fetch_limit INT NOT NULL DEFAULT 30 AFTER lottery_code"
+        ),
         "prediction_play_mode": (
             "ALTER TABLE scheduled_task "
             "ADD COLUMN prediction_play_mode VARCHAR(32) NOT NULL DEFAULT 'direct' AFTER generation_mode"

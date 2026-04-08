@@ -662,7 +662,7 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: '立即执行' })[0])
 
-    expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledWith('dlt')
+    expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledWith('dlt', 30)
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })
     expect(await screen.findByText('2026033')).toBeInTheDocument()
   })

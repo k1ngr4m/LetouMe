@@ -875,6 +875,7 @@ export type ScheduleTask = {
   task_name: string
   task_type: ScheduleTaskType
   lottery_code: LotteryCode
+  fetch_limit?: number
   model_codes: string[]
   generation_mode: 'current'
   prediction_play_mode: PredictionPlayMode
@@ -899,6 +900,7 @@ export type ScheduleTaskPayload = {
   task_name: string
   task_type: ScheduleTaskType
   lottery_code: LotteryCode
+  fetch_limit?: number
   model_codes: string[]
   generation_mode: 'current'
   prediction_play_mode: PredictionPlayMode

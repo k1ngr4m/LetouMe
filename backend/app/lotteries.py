@@ -88,8 +88,10 @@ class LotteryDefinition:
     ball_layout: str
 
     def predict_next_draw(self, latest_period: str, latest_date: str) -> dict[str, Any] | None:
-        if self.code in {"dlt", "qxc"}:
+        if self.code == "dlt":
             return _predict_next_dlt_draw(latest_period, latest_date)
+        if self.code == "qxc":
+            return _predict_next_qxc_draw(latest_period, latest_date)
         return _predict_next_daily_draw(latest_period, latest_date, self.draw_time)
 
 
@@ -110,6 +112,26 @@ def _predict_next_dlt_draw(latest_period: str, latest_date: str) -> dict[str, An
         period_num = int(latest_period)
         last_draw_date = datetime.strptime(latest_date, "%Y-%m-%d")
         draw_weekdays = [0, 2, 5]
+        next_date = last_draw_date + timedelta(days=1)
+        while next_date.weekday() not in draw_weekdays:
+            next_date += timedelta(days=1)
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        return {
+            "next_period": str(period_num + 1).zfill(len(latest_period)),
+            "next_date": next_date.strftime("%Y-%m-%d"),
+            "next_date_display": next_date.strftime("%Y年%m月%d日"),
+            "weekday": weekday_names[next_date.weekday()],
+            "draw_time": "21:25",
+        }
+    except Exception:
+        return None
+
+
+def _predict_next_qxc_draw(latest_period: str, latest_date: str) -> dict[str, Any] | None:
+    try:
+        period_num = int(latest_period)
+        last_draw_date = datetime.strptime(latest_date, "%Y-%m-%d")
+        draw_weekdays = [1, 4, 6]
         next_date = last_draw_date + timedelta(days=1)
         while next_date.weekday() not in draw_weekdays:
             next_date += timedelta(days=1)
