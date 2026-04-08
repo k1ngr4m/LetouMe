@@ -39,6 +39,12 @@ import type {
   SettingsProviderPayload,
   LotteryCode,
 } from '../../shared/types/api'
+import {
+  buildMonthLabel,
+  buildScheduleCalendarMonth,
+  resolveTodayInBeijing,
+  shiftCalendarMonth,
+} from './lib/scheduleCalendar'
 
 type SettingsTab = 'profile' | 'account' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelManagementView = 'list' | 'card'
@@ -49,6 +55,7 @@ type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
+type ScheduleListView = 'list' | 'calendar'
 type MaintenanceLogFilter = 'all' | LotteryCode
 type BulkEditForm = {
   providerEnabled: boolean
@@ -176,6 +183,7 @@ const WEEKDAY_OPTIONS = [
   { value: 5, label: '周六' },
   { value: 6, label: '周日' },
 ]
+const CALENDAR_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> = {
   updated_desc: { label: '最近更新', hint: '按更新时间从新到旧排序' },
@@ -372,6 +380,15 @@ function GridIcon() {
       <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
       <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
       <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
+    </SvgIcon>
+  )
+}
+
+function CalendarIcon() {
+  return (
+    <SvgIcon>
+      <rect x="3.5" y="4.5" width="13" height="12" rx="2" />
+      <path d="M6.7 3v3.3M13.3 3v3.3M3.5 8h13" />
     </SvgIcon>
   )
 }
@@ -777,6 +794,13 @@ export function SettingsPage() {
     ...(loadSettingsTableColumnWidths('settings:maintenance') as Partial<Record<MaintenanceColumnKey, number>>),
   }))
   const [scheduleTaskFilter, setScheduleTaskFilter] = useState<ScheduleTaskFilter>('all')
+  const [scheduleListView, setScheduleListView] = useState<ScheduleListView>('list')
+  const beijingToday = useMemo(() => resolveTodayInBeijing(), [])
+  const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState<{ year: number; month: number }>(() => ({
+    year: beijingToday.year,
+    month: beijingToday.month,
+  }))
+  const [selectedCalendarDateKey, setSelectedCalendarDateKey] = useState<string>(beijingToday.dateKey)
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({ ...EMPTY_SCHEDULE_FORM, lottery_code: DEFAULT_SETTINGS_LOTTERY })
   const [selectedScheduleTaskCode, setSelectedScheduleTaskCode] = useState<string | null>(null)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
@@ -1124,6 +1148,25 @@ export function SettingsPage() {
     () => scheduleTasks.filter((task) => scheduleTaskFilter === 'all' || task.task_type === scheduleTaskFilter),
     [scheduleTaskFilter, scheduleTasks],
   )
+  const scheduleCalendarMonthData = useMemo(
+    () => buildScheduleCalendarMonth(filteredScheduleTasks, scheduleCalendarMonth.year, scheduleCalendarMonth.month),
+    [filteredScheduleTasks, scheduleCalendarMonth.month, scheduleCalendarMonth.year],
+  )
+  const selectedCalendarDayEntries = useMemo(
+    () => scheduleCalendarMonthData.dayEntries[selectedCalendarDateKey] || [],
+    [scheduleCalendarMonthData.dayEntries, selectedCalendarDateKey],
+  )
+  const selectedCalendarDateLabel = useMemo(() => {
+    const [year, month, day] = selectedCalendarDateKey.split('-')
+    if (!year || !month || !day) return selectedCalendarDateKey
+    return `${year}年${month}月${day}日`
+  }, [selectedCalendarDateKey])
+  useEffect(() => {
+    const keys = scheduleCalendarMonthData.cells.filter((item) => item.inCurrentMonth).map((item) => item.dateKey)
+    if (!keys.length) return
+    if (keys.includes(selectedCalendarDateKey)) return
+    setSelectedCalendarDateKey(keys[0])
+  }, [scheduleCalendarMonthData.cells, selectedCalendarDateKey])
   const selectedLotteryModels = useMemo(
     () => models.filter((model) => (
       model.is_active &&
@@ -2063,6 +2106,10 @@ export function SettingsPage() {
     setExpandedScheduleTaskCode((previous) => (previous === taskCode ? null : taskCode))
   }
 
+  function goToScheduleCalendarMonth(delta: number) {
+    setScheduleCalendarMonth((previous) => shiftCalendarMonth(previous.year, previous.month, delta))
+  }
+
   function getPermissionLabel(permissionCode: string) {
     return permissionMap[permissionCode]?.permission_name || permissionCode
   }
@@ -2999,6 +3046,20 @@ export function SettingsPage() {
                             </button>
                           ))}
                         </div>
+                        <div className="view-switch settings-model-toolbar__view-switch settings-schedule-view-switch" role="tablist" aria-label="定时任务视图切换">
+                          <IconButton
+                            label="列表视图"
+                            icon={<ListIcon />}
+                            active={scheduleListView === 'list'}
+                            onClick={() => setScheduleListView('list')}
+                          />
+                          <IconButton
+                            label="日历视图"
+                            icon={<CalendarIcon />}
+                            active={scheduleListView === 'calendar'}
+                            onClick={() => setScheduleListView('calendar')}
+                          />
+                        </div>
                         <button className="primary-button" type="button" onClick={openCreateScheduleTask}>
                           新增任务
                         </button>
@@ -3009,6 +3070,7 @@ export function SettingsPage() {
                       <span>当前筛选 {filteredScheduleTasks.length} 条</span>
                     </div>
                     {filteredScheduleTasks.length ? (
+                      scheduleListView === 'list' ? (
                       <div className="table-shell settings-model-table-shell settings-table-scroll-shell">
                         <table className="history-table settings-model-table settings-schedule-table settings-schedule-table--task-list">
                           <thead>
@@ -3261,6 +3323,143 @@ export function SettingsPage() {
                           </tbody>
                         </table>
                       </div>
+                    ) : (
+                      <div className="settings-schedule-calendar">
+                        <div className="settings-schedule-calendar__main">
+                          <div className="settings-schedule-calendar__month-bar">
+                            <button className="secondary-button" type="button" onClick={() => goToScheduleCalendarMonth(-1)}>
+                              上个月
+                            </button>
+                            <strong>{buildMonthLabel(scheduleCalendarMonth.year, scheduleCalendarMonth.month)}</strong>
+                            <button className="secondary-button" type="button" onClick={() => goToScheduleCalendarMonth(1)}>
+                              下个月
+                            </button>
+                          </div>
+                          <div className="settings-schedule-calendar__weekdays" role="presentation">
+                            {CALENDAR_WEEKDAY_LABELS.map((label) => (
+                              <span key={label}>{label}</span>
+                            ))}
+                          </div>
+                          <div className="settings-schedule-calendar__grid">
+                            {scheduleCalendarMonthData.cells.map((cell) => {
+                              const dayEntries = scheduleCalendarMonthData.dayEntries[cell.dateKey] || []
+                              const isSelected = selectedCalendarDateKey === cell.dateKey
+                              const isToday = beijingToday.dateKey === cell.dateKey
+                              const dayBadgeLabel = dayEntries.length ? `${dayEntries.length} 个触发项` : '无触发'
+                              return (
+                                <button
+                                  key={cell.dateKey}
+                                  type="button"
+                                  className={clsx(
+                                    'settings-schedule-calendar__day',
+                                    !cell.inCurrentMonth && 'is-outside',
+                                    isSelected && 'is-selected',
+                                    isToday && 'is-today',
+                                  )}
+                                  onClick={() => {
+                                    if (!cell.inCurrentMonth) return
+                                    setSelectedCalendarDateKey(cell.dateKey)
+                                  }}
+                                  disabled={!cell.inCurrentMonth}
+                                  aria-label={`${cell.dateKey}，${dayBadgeLabel}`}
+                                >
+                                  <span className="settings-schedule-calendar__day-number">{cell.dayOfMonth}</span>
+                                  <span className="settings-schedule-calendar__day-count">{dayEntries.length || '-'}</span>
+                                  <div className="settings-schedule-calendar__day-items">
+                                    {dayEntries.slice(0, 3).map((entry) => (
+                                      <span key={`${cell.dateKey}-${entry.task.task_code}`} className="settings-schedule-calendar__day-chip" title={`${entry.task.task_name} · ${entry.triggerTimes.join('、')}`}>
+                                        <em>{entry.triggerTimes[0]}</em>
+                                        <span>{entry.task.task_name}</span>
+                                      </span>
+                                    ))}
+                                    {dayEntries.length > 3 ? (
+                                      <span className="settings-schedule-calendar__day-more">+{dayEntries.length - 3}</span>
+                                    ) : null}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <aside className="settings-schedule-calendar__detail">
+                          <div className="settings-schedule-calendar__detail-header">
+                            <h3>{selectedCalendarDateLabel}</h3>
+                            <p>北京时间 · 共 {selectedCalendarDayEntries.length} 个触发任务</p>
+                          </div>
+                          {selectedCalendarDayEntries.length ? (
+                            <div className="settings-schedule-calendar__detail-list">
+                              {selectedCalendarDayEntries.map((entry) => {
+                                const task = entry.task
+                                const runStatusMeta = getScheduleRunStatusMeta(task.last_run_status)
+                                const enabledMeta = getScheduleEnabledMeta(task.is_active)
+                                const playModeLabel = getSchedulePredictionPlayModeLabel(task)
+                                const fetchLimitLabel = task.task_type === 'lottery_fetch' ? `近${normalizeFetchLimit(task.fetch_limit)}期` : null
+                                return (
+                                  <article key={`${selectedCalendarDateKey}-${task.task_code}`} className="settings-schedule-calendar__detail-card">
+                                    <div className="settings-schedule-calendar__detail-title">
+                                      <div>
+                                        <h4>{task.task_name}</h4>
+                                        <p>{task.task_code}</p>
+                                      </div>
+                                      <span className={clsx('schedule-status-pill', `schedule-status-pill--${enabledMeta.tone}`)}>
+                                        <span className="schedule-status-pill__icon" aria-hidden="true">
+                                          <ScheduleStatusIcon tone={enabledMeta.tone} />
+                                        </span>
+                                        <span>{enabledMeta.label}</span>
+                                      </span>
+                                    </div>
+                                    <p className="settings-schedule-calendar__detail-meta">
+                                      {[
+                                        getScheduleTaskTypeLabel(task.task_type),
+                                        getLotteryLabel(task.lottery_code),
+                                        task.rule_summary,
+                                        playModeLabel,
+                                        fetchLimitLabel,
+                                      ].filter(Boolean).join(' · ')}
+                                    </p>
+                                    <div className="settings-schedule-calendar__detail-times">
+                                      {entry.triggerTimes.map((time) => (
+                                        <span key={`${task.task_code}-${time}`}>{time}</span>
+                                      ))}
+                                    </div>
+                                    <div className="settings-schedule-calendar__detail-status">
+                                      <span className={clsx('schedule-status-pill', `schedule-status-pill--${runStatusMeta.tone}`)}>
+                                        <span className="schedule-status-pill__icon" aria-hidden="true">
+                                          <ScheduleStatusIcon tone={runStatusMeta.tone} />
+                                        </span>
+                                        <span>{runStatusMeta.label}</span>
+                                      </span>
+                                      <span>{task.next_run_at ? `下次执行：${formatDateTimeBeijing(task.next_run_at)}` : '下次执行：未安排'}</span>
+                                    </div>
+                                    <div className="settings-schedule-calendar__detail-actions">
+                                      <button className="secondary-button" type="button" onClick={() => openEditScheduleTask(task)}>编辑</button>
+                                      <button className="secondary-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}>执行</button>
+                                      <button className="secondary-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'toggle', task })}>
+                                        {task.is_active ? '停用' : '启用'}
+                                      </button>
+                                      <button
+                                        className="ghost-button"
+                                        type="button"
+                                        onClick={() => {
+                                          const confirmed = window.confirm(`确认删除定时任务“${task.task_name}”吗？`)
+                                          if (confirmed) {
+                                            scheduleTaskActionMutation.mutate({ type: 'delete', task })
+                                          }
+                                        }}
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  </article>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="state-shell">当天没有触发任务，可切换月份或选择其他日期。</div>
+                          )}
+                        </aside>
+                      </div>
+                    )
                     ) : (
                       <div className="state-shell">当前筛选下还没有定时任务。</div>
                     )}

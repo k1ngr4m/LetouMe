@@ -1008,6 +1008,54 @@ describe('SettingsPage model management view switch', () => {
     confirmSpy.mockRestore()
   })
 
+  it('supports schedule calendar view with day detail panel', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listScheduleTasks.mockResolvedValue({
+      tasks: [
+        {
+          task_code: 'sched-qxc-fetch',
+          task_name: '七星彩抓取',
+          task_type: 'lottery_fetch',
+          lottery_code: 'qxc',
+          model_codes: [],
+          generation_mode: 'current',
+          prediction_play_mode: 'direct',
+          overwrite_existing: false,
+          schedule_mode: 'preset',
+          preset_type: 'daily',
+          time_of_day: '21:25',
+          weekdays: [],
+          cron_expression: null,
+          is_active: true,
+          next_run_at: '2026-03-19T13:25:00Z',
+          last_run_at: null,
+          last_run_status: null,
+          last_error_message: null,
+          last_task_id: null,
+          rule_summary: '每日 21:25',
+          created_at: '2026-03-18T01:00:00Z',
+          updated_at: '2026-03-18T01:00:00Z',
+        },
+      ],
+    })
+
+    renderPage('/settings/schedules')
+
+    await screen.findByText('七星彩抓取')
+    await userEvent.click(screen.getByRole('button', { name: '日历视图' }))
+
+    expect(screen.getByRole('button', { name: '日历视图' })).toHaveClass('is-active')
+    expect(screen.getByRole('button', { name: /上个月/ })).toBeInTheDocument()
+    expect(screen.getByText('北京时间 · 共 1 个触发任务')).toBeInTheDocument()
+    expect(screen.getAllByText('七星彩抓取').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('21:25').length).toBeGreaterThan(0)
+  })
+
   it('creates a prediction schedule task', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [
