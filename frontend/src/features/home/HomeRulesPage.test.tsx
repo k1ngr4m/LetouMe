@@ -43,16 +43,18 @@ function renderPage(initialEntry: string | { pathname: string; state?: unknown }
 }
 
 describe('HomeRulesPage', () => {
-  it('renders dlt rules and prize references', () => {
+  it('renders dlt text rules by chapters', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: '大乐透规则' })).toBeInTheDocument()
     expect(document.querySelector('.tab-strip.dashboard-tab-strip')).not.toBeNull()
     expect(screen.getByRole('button', { name: '规则' })).toHaveClass('is-active')
-    expect(screen.getByTitle('中国体育彩票超级大乐透游戏规则')).toBeInTheDocument()
-    expect(screen.getByAltText('大乐透奖金对照表')).toBeInTheDocument()
-    expect(screen.getByText('规则切换说明')).toBeInTheDocument()
-    expect(screen.getByText(/26014期及之后：使用新规则，奖级共七档/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '中国体育彩票超级大乐透游戏规则' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '第一章 总则' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '第三章 设奖' })).toBeInTheDocument()
+    expect(screen.getByAltText('大乐透奖级表')).toBeInTheDocument()
+    expect(screen.getByText(/第二十二条 超级大乐透每周一、三、六开奖/)).toBeInTheDocument()
+    expect(screen.getByText(/第三十条 本规则自批准之日起4个月内执行/)).toBeInTheDocument()
     expect(screen.getByText('当前查看彩种：大乐透')).toBeInTheDocument()
   })
 
