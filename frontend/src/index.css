@@ -3308,15 +3308,15 @@ a {
 .number-ball--dlt-front {
   background:
     radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.28) 22%, rgba(255, 255, 255, 0) 48%),
-    radial-gradient(circle at 72% 76%, rgba(8, 84, 170, 0.5) 0%, rgba(8, 84, 170, 0.14) 46%, rgba(8, 84, 170, 0) 70%),
-    linear-gradient(165deg, #8dd5ff 0%, #44abff 34%, #1788e5 68%, #0a61c6 100%);
+    radial-gradient(circle at 72% 76%, rgba(138, 37, 57, 0.5) 0%, rgba(138, 37, 57, 0.14) 46%, rgba(138, 37, 57, 0) 70%),
+    linear-gradient(165deg, #f0919d 0%, #e95e73 34%, #d7405a 68%, #b32d48 100%);
 }
 
 .number-ball--dlt-back {
   background:
-    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.3) 22%, rgba(255, 255, 255, 0) 48%),
-    radial-gradient(circle at 72% 76%, rgba(168, 120, 0, 0.48) 0%, rgba(168, 120, 0, 0.14) 46%, rgba(168, 120, 0, 0) 70%),
-    linear-gradient(165deg, #ffe85f 0%, #ffd400 36%, #f0be00 70%, #d79f00 100%);
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.28) 22%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 72% 76%, rgba(8, 84, 170, 0.5) 0%, rgba(8, 84, 170, 0.14) 46%, rgba(8, 84, 170, 0) 70%),
+    linear-gradient(165deg, #8dd5ff 0%, #44abff 34%, #1788e5 68%, #0a61c6 100%);
 }
 
 .number-ball--muted {
@@ -7875,13 +7875,13 @@ a {
 }
 
 .simulation-ball.is-dlt-front.is-selected {
-  border-color: rgba(118, 199, 255, 0.6);
+  border-color: rgba(255, 142, 156, 0.52);
   background:
-    linear-gradient(145deg, rgba(58, 165, 252, 0.54), rgba(17, 120, 223, 0.48)),
-    radial-gradient(circle at 50% -28%, rgba(223, 245, 255, 0.42), transparent 72%);
+    linear-gradient(145deg, rgba(220, 78, 119, 0.48), rgba(182, 62, 107, 0.42)),
+    radial-gradient(circle at 50% -30%, rgba(255, 217, 229, 0.4), transparent 68%);
   box-shadow:
-    inset 0 1px 0 rgba(233, 248, 255, 0.24),
-    0 10px 18px rgba(26, 98, 190, 0.32);
+    inset 0 1px 0 rgba(255, 237, 246, 0.26),
+    0 10px 18px rgba(156, 43, 87, 0.34);
 }
 
 .simulation-ball.is-pl3pl5.is-selected {
@@ -7905,13 +7905,13 @@ a {
 }
 
 .simulation-ball.is-dlt-back.is-selected {
-  border-color: rgba(255, 219, 98, 0.62);
+  border-color: rgba(134, 206, 255, 0.58);
   background:
-    linear-gradient(145deg, rgba(255, 221, 45, 0.56), rgba(233, 183, 10, 0.48)),
-    radial-gradient(circle at 50% -28%, rgba(255, 245, 199, 0.42), transparent 72%);
+    linear-gradient(145deg, rgba(55, 149, 255, 0.52), rgba(43, 118, 244, 0.46)),
+    radial-gradient(circle at 50% -28%, rgba(219, 240, 255, 0.4), transparent 72%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 248, 223, 0.24),
-    0 10px 18px rgba(180, 128, 9, 0.32);
+    inset 0 1px 0 rgba(235, 246, 255, 0.24),
+    0 10px 18px rgba(34, 97, 205, 0.3);
 }
 
 .simulation-summary-bar {
@@ -8577,13 +8577,13 @@ a {
 }
 
 .my-bets-picker__ball.is-dlt-front.is-selected {
-  background: rgba(58, 165, 252, 0.24);
-  border-color: rgba(58, 165, 252, 0.68);
+  background: rgba(231, 92, 105, 0.22);
+  border-color: rgba(231, 92, 105, 0.68);
 }
 
 .my-bets-picker__ball.is-dlt-back.is-selected {
-  background: rgba(255, 211, 36, 0.24);
-  border-color: rgba(255, 211, 36, 0.68);
+  background: rgba(87, 154, 233, 0.24);
+  border-color: rgba(87, 154, 233, 0.68);
 }
 
 .my-bets-picker__ball.is-pl3pl5.is-selected {
@@ -8737,11 +8737,11 @@ a {
 }
 
 :root[data-theme='light'] .my-bets-picker__ball.is-dlt-front.is-selected {
-  background: rgba(58, 165, 252, 0.18);
+  background: rgba(231, 92, 105, 0.16);
 }
 
 :root[data-theme='light'] .my-bets-picker__ball.is-dlt-back.is-selected {
-  background: rgba(255, 211, 36, 0.2);
+  background: rgba(87, 154, 233, 0.18);
 }
 
 :root[data-theme='light'] .my-bets-picker__ball.is-pl3pl5.is-selected {
