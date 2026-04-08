@@ -44,6 +44,8 @@ export type PredictionHitResult = {
   digit_hit_count?: number
   position_hits?: string[][]
   is_exact_match?: boolean
+  winning_bet_count?: number
+  best_prize_level?: string | null
   total_hits: number
 }
 
@@ -64,6 +66,7 @@ export type PredictionGroup = {
   position_selections?: string[][]
   blue_ball?: string | null
   hit_result?: PredictionHitResult
+  winning_bet_count?: number
   prize_level?: string | null
   prize_amount?: number
   prize_source?: 'official' | 'fallback' | 'missing' | 'none'

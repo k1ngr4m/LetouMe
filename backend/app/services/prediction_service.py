@@ -1146,7 +1146,10 @@ class PredictionService:
 
             for metric in group_metrics:
                 group_play_type = str(metric.get("play_type") or "").strip().lower()
-                if lottery_code in {"pl3", "pl5"} or (lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}):
+                should_recalculate_hit_result = lottery_code in {"pl3", "pl5", "qxc"} or (
+                    lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}
+                )
+                if should_recalculate_hit_result:
                     hit_result = self.calculate_hit_result(metric, actual_result, lottery_code=lottery_code)
                 else:
                     base_hit_result = {
@@ -1180,6 +1183,13 @@ class PredictionService:
                     )
                     winning_bet_count += group_winning_bet_count
                     prize_amount += group_prize_amount
+                elif lottery_code == "qxc":
+                    prize_level = str(hit_result.get("best_prize_level") or prize_level or "").strip() or None
+                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    group_winning_bet_count = int(hit_result.get("winning_bet_count") or 0)
+                    if group_winning_bet_count > 0:
+                        winning_bet_count += group_winning_bet_count
+                        prize_amount += int(prize_info["amount"] or 0) * group_winning_bet_count
                 else:
                     prize_info = self.resolve_prize_amount(actual_result, prize_level)
                     if prize_info["amount"] > 0:
@@ -1261,7 +1271,10 @@ class PredictionService:
             model_bet_count = 0
             for group in model.get("predictions", []):
                 group_play_type = str(group.get("play_type") or "").strip().lower()
-                if lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}:
+                should_recalculate_hit_result = lottery_code == "qxc" or (
+                    lottery_code == "dlt" and group_play_type in {"dlt_dantuo", "dlt_compound"}
+                )
+                if should_recalculate_hit_result:
                     hit_result = self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
                 else:
                     hit_result = group.get("hit_result") or self.calculate_hit_result(group, actual_result, lottery_code=lottery_code)
@@ -1281,6 +1294,12 @@ class PredictionService:
                         actual_result=actual_result,
                     )
                     prize_level = str(hit_result.get("best_prize_level") or prize_level or "") or None
+                elif lottery_code == "qxc":
+                    prize_level = str(hit_result.get("best_prize_level") or prize_level or "").strip() or None
+                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    group_winning_bet_count = int(hit_result.get("winning_bet_count") or 0)
+                    group_prize_amount = int(prize_info["amount"] or 0) * group_winning_bet_count if group_winning_bet_count > 0 else 0
+                    prize_source = prize_info["source"] if group_winning_bet_count <= 0 or group_prize_amount > 0 else "missing"
                 else:
                     prize_info = self.resolve_prize_amount(actual_result, prize_level)
                     group_winning_bet_count = 1 if prize_info["amount"] > 0 else 0
@@ -1291,6 +1310,7 @@ class PredictionService:
                         **group,
                         "hit_result": hit_result,
                         "cost_amount": group_cost,
+                        "winning_bet_count": group_winning_bet_count,
                         "prize_level": prize_level,
                         "prize_amount": group_prize_amount,
                         "prize_source": prize_source,

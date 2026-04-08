@@ -25,6 +25,7 @@ import {
   resolveHistoryFallbackState,
   resolveModelScore,
 } from './home'
+import type { PredictionModel } from '../../../shared/types/api'
 
 describe('buildHistoryHitTrend', () => {
   it('builds best-hit trend points for selected models', () => {
@@ -862,6 +863,62 @@ describe('compareNumbers for pl3', () => {
 
     expect(hit?.digitHitCount).toBe(1)
     expect(hit?.totalHits).toBe(1)
+  })
+})
+
+describe('qxc treats last digit as blue zone', () => {
+  it('counts last digit hit into blueHits for qxc direct', () => {
+    const hit = compareNumbers(
+      {
+        group_id: 1,
+        play_type: 'direct',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '02', '03', '04', '05', '06', '14'],
+      },
+      {
+        lottery_code: 'qxc',
+        period: '26037',
+        date: '2026-04-05',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['01', '02', '03', '04', '05', '06', '14'],
+      },
+    )
+
+    expect(hit?.redHitCount).toBe(6)
+    expect(hit?.blueHitCount).toBe(1)
+    expect(hit?.blueHits).toEqual(['14'])
+    expect(hit?.digitHitIndexes).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+
+  it('places qxc last position numbers into summary blue bucket', () => {
+    const summary = buildSummary(
+      [
+        {
+          model_id: 'model-qxc',
+          model_name: 'QXC Model',
+          model_provider: 'openai_compatible',
+          predictions: [
+            {
+              group_id: 1,
+              play_type: 'direct',
+              red_balls: [],
+              blue_balls: [],
+              digits: ['01', '02', '03', '04', '05', '06', '14'],
+            },
+          ],
+        },
+      ] as unknown as PredictionModel[],
+      {},
+      ['model-qxc'],
+      false,
+      false,
+    )
+
+    expect(summary.red.map((item) => item.ball)).toContain('01')
+    expect(summary.red.map((item) => item.ball)).toContain('06')
+    expect(summary.blue.map((item) => item.ball)).toEqual(['14'])
   })
 })
 

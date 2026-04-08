@@ -3551,6 +3551,11 @@ export function PredictionGroupCard({
   const inferredLotteryCode: LotteryCode = inferPredictionGroupLotteryCode(group, actualResult)
   const groupCostAmount = showCost || showBetCostSummary ? resolveHistoryPredictionGroupCost(group, inferredLotteryCode) : 0
   const groupBetCount = showBetCostSummary ? resolvePredictionGroupBetCount(groupCostAmount) : 0
+  const groupWinningBetCount = Number(group.winning_bet_count || group.hit_result?.winning_bet_count || 0)
+  const hasPrizeLevel = Boolean(group.prize_level)
+  const hasPrizeAmount = Number(group.prize_amount || 0) > 0
+  const shouldShowPrizeFallback = !hasPrizeLevel && groupWinningBetCount > 0
+  const shouldShowPrizeBlock = hasPrizeLevel || shouldShowPrizeFallback || showCost
   const costSummaryText = showBetCostSummary ? `成本 ${groupBetCount}注/${groupCostAmount}元` : ''
   const showHeaderCostSummary = showBetCostSummary && compact
   const showBlockCostSummary = showBetCostSummary && !compact
@@ -3575,14 +3580,20 @@ export function PredictionGroupCard({
       </div>
       <PredictionNumberRow group={group} actualResult={actualResult} grayMisses={grayMisses} compact={compact} />
       {showBlockCostSummary ? <div className="prediction-group-card__cost-summary">{costSummaryText}</div> : null}
-      {group.prize_level || showCost ? (
+      {shouldShowPrizeBlock ? (
         <div className="prediction-group-card__prize">
-          {group.prize_level ? (
+          {hasPrizeLevel ? (
             <>
               <strong>{group.prize_level}</strong>
               <span>{formatCurrency(group.prize_amount)}</span>
               {group.prize_source === 'fallback' ? <small>固定奖兜底</small> : null}
               {group.prize_source === 'missing' ? <small>浮动奖待补全</small> : null}
+            </>
+          ) : shouldShowPrizeFallback ? (
+            <>
+              <strong>已中奖</strong>
+              <span>{hasPrizeAmount ? formatCurrency(group.prize_amount) : '金额待补全'}</span>
+              <small>奖级待补全</small>
             </>
           ) : null}
           {showCost ? <span>{`成本 ${formatCurrency(groupCostAmount)}`}</span> : null}
@@ -4466,18 +4477,24 @@ function HistoryRecordCard({
     [periodPredictionSummary],
   )
   const periodSummaryHitSets = useMemo(() => {
-    const redHits = new Set((record.actual_result?.red_balls || []).map((ball) => String(ball).padStart(2, '0')))
-    const blueHits = new Set((record.actual_result?.blue_balls || []).map((ball) => String(ball).padStart(2, '0')))
+    const actualCode = record.actual_result?.lottery_code || lotteryCode
     const digitSource = (record.actual_result?.digits?.length
       ? record.actual_result.digits
       : record.actual_result?.red_balls || []
     ).map((ball) => String(ball).padStart(2, '0'))
+    const redHits = new Set(
+      (actualCode === 'qxc' ? digitSource.slice(0, 6) : (record.actual_result?.red_balls || []).map((ball) => String(ball).padStart(2, '0'))),
+    )
+    const blueHits = new Set(
+      (actualCode === 'qxc' ? digitSource.slice(6, 7) : (record.actual_result?.blue_balls || []).map((ball) => String(ball).padStart(2, '0'))),
+    )
     const sumHits = new Set<string>([String(digitSource.slice(0, 3).reduce((total, digit) => total + Number(digit || 0), 0))])
-    const positionHits = Array.from({ length: 5 }, (_, index) =>
+    const positionCount = actualCode === 'qxc' ? 7 : 5
+    const positionHits = Array.from({ length: positionCount }, (_, index) =>
       digitSource[index] ? new Set([digitSource[index]]) : new Set<string>(),
     )
     return { redHits, blueHits, sumHits, positionHits }
-  }, [record.actual_result])
+  }, [lotteryCode, record.actual_result])
 
   useEffect(() => {
     setExpandedModelIds((previous) => {

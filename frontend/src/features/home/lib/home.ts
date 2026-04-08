@@ -468,6 +468,50 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
       totalHits: digitHits.length,
     }
   }
+  if (inferredLotteryCode === 'qxc') {
+    const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || [])
+      .map(padBall)
+      .slice(0, 7)
+    const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
+    if (playType === 'qxc_compound' && (prediction.position_selections || []).length >= 7) {
+      const selections = (prediction.position_selections || [])
+        .slice(0, 7)
+        .map((values) => (values || []).map(padBall))
+      const digitHitIndexes = selections
+        .map((values, index) => (actualDigits[index] && values.includes(actualDigits[index]) ? index : -1))
+        .filter((index) => index >= 0)
+      const redHits = digitHitIndexes.filter((index) => index < 6).map((index) => actualDigits[index]).filter(Boolean)
+      const blueHits = digitHitIndexes.filter((index) => index === 6).map((index) => actualDigits[index]).filter(Boolean)
+      return {
+        redHits,
+        redHitCount: redHits.length,
+        blueHits,
+        blueHitCount: blueHits.length,
+        digitHits: digitHitIndexes.map((index) => actualDigits[index]).filter(Boolean),
+        digitHitCount: digitHitIndexes.length,
+        digitHitIndexes,
+        totalHits: digitHitIndexes.length,
+      }
+    }
+    const predictionDigits = ((prediction.digits && prediction.digits.length ? prediction.digits : prediction.red_balls) || [])
+      .map(padBall)
+      .slice(0, 7)
+    const digitHitIndexes = predictionDigits
+      .map((digit, index) => (digit === actualDigits[index] ? index : -1))
+      .filter((index) => index >= 0)
+    const redHits = digitHitIndexes.filter((index) => index < 6).map((index) => predictionDigits[index]).filter(Boolean)
+    const blueHits = digitHitIndexes.filter((index) => index === 6).map((index) => predictionDigits[index]).filter(Boolean)
+    return {
+      redHits,
+      redHitCount: redHits.length,
+      blueHits,
+      blueHitCount: blueHits.length,
+      digitHits: digitHitIndexes.map((index) => predictionDigits[index]).filter(Boolean),
+      digitHitCount: digitHitIndexes.length,
+      digitHitIndexes,
+      totalHits: digitHitIndexes.length,
+    }
+  }
   const redHits = prediction.red_balls.filter((ball) => actualResult.red_balls.includes(ball))
   const blueHits = prediction.blue_balls.filter((ball) => actualResult.blue_balls.includes(ball))
   return {
@@ -658,9 +702,46 @@ export function buildSummary(
     const backTuoSeen = new Set<string>()
     const sumSeen = new Set<string>()
     const positionSeen = Array.from({ length: 5 }, () => new Set<string>())
+    const accumulateBall = (
+      targetMap: Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>,
+      targetSeen: Set<string>,
+      ball: string,
+    ) => {
+      const current = targetMap.get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+      current.appearanceCount += 1
+      current.weightedScore += weight
+      targetMap.set(ball, current)
+      targetSeen.add(ball)
+    }
     for (const group of activeGroups) {
       const inferredLotteryCode = inferPredictionGroupLotteryCode(group)
       const normalizedPlayType = normalizePredictionPlayType(group.play_type)
+      if (inferredLotteryCode === 'qxc') {
+        if (normalizedPlayType === 'qxc_compound' && (group.position_selections || []).length >= 7) {
+          const positionSelections = (group.position_selections || [])
+            .slice(0, 7)
+            .map((values) => (values || []).map(padBall))
+          positionSelections.forEach((values, index) => {
+            values.forEach((ball) => {
+              if (index === 6) {
+                accumulateBall(blueMap, blueSeen, ball)
+              } else {
+                accumulateBall(redMap, redSeen, ball)
+              }
+            })
+          })
+          continue
+        }
+        const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 7)
+        digits.forEach((digit, index) => {
+          if (index === 6) {
+            accumulateBall(blueMap, blueSeen, digit)
+          } else {
+            accumulateBall(redMap, redSeen, digit)
+          }
+        })
+        continue
+      }
       if (inferredLotteryCode === 'pl5') {
         const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 5)
         digits.forEach((digit, index) => {
