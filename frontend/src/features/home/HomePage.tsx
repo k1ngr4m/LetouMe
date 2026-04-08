@@ -389,8 +389,9 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
-function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' {
-  return lotteryCode === 'qxc' && index === total - 1 ? 'blue' : 'red'
+function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' | 'qxc-front' | 'qxc-back' {
+  if (lotteryCode !== 'qxc') return 'red'
+  return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
 
 function formatJackpotInYiYuan(value: number | undefined) {
@@ -1708,13 +1709,13 @@ export function HomePage() {
                       </>
 	                    ) : selectedLottery === 'qxc' ? (
 	                      <>
-	                        <SummaryList title="第一位统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第二位统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第三位统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第四位统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第五位统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第六位统计" items={summary.positions?.[5] || []} color="red" models={summaryModels} />
-	                        <SummaryList title="第七位统计" items={summary.positions?.[6] || []} color="blue" models={summaryModels} />
+	                        <SummaryList title="第一位统计" items={summary.positions?.[0] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第二位统计" items={summary.positions?.[1] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第三位统计" items={summary.positions?.[2] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第四位统计" items={summary.positions?.[3] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第五位统计" items={summary.positions?.[4] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第六位统计" items={summary.positions?.[5] || []} color="qxc-front" models={summaryModels} />
+	                        <SummaryList title="第七位统计" items={summary.positions?.[6] || []} color="qxc-back" models={summaryModels} />
 	                      </>
 	                    ) : selectedLottery === 'pl3' ? (
 	                      <>
@@ -3761,7 +3762,7 @@ function SummaryList({
 }: {
   title: string
   items: BallStatItem[]
-  color: 'red' | 'blue'
+  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back'
   models: PredictionModel[]
   compact?: boolean
   hitSet?: Set<string>
@@ -4817,13 +4818,13 @@ function HistoryRecordCard({
                 </>
 	              ) : lotteryCode === 'qxc' ? (
 	                <>
-	                  <SummaryList title="第一位统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
-	                  <SummaryList title="第二位统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
-	                  <SummaryList title="第三位统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
-	                  <SummaryList title="第四位统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
-	                  <SummaryList title="第五位统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
-	                  <SummaryList title="第六位统计" items={periodPredictionSummary.positions?.[5] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[5]} />
-	                  <SummaryList title="第七位统计" items={periodPredictionSummary.positions?.[6] || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[6]} />
+	                  <SummaryList title="第一位统计" items={periodPredictionSummary.positions?.[0] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+	                  <SummaryList title="第二位统计" items={periodPredictionSummary.positions?.[1] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+	                  <SummaryList title="第三位统计" items={periodPredictionSummary.positions?.[2] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+	                  <SummaryList title="第四位统计" items={periodPredictionSummary.positions?.[3] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
+	                  <SummaryList title="第五位统计" items={periodPredictionSummary.positions?.[4] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
+	                  <SummaryList title="第六位统计" items={periodPredictionSummary.positions?.[5] || []} color="qxc-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[5]} />
+	                  <SummaryList title="第七位统计" items={periodPredictionSummary.positions?.[6] || []} color="qxc-back" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[6]} />
 	                </>
 	              ) : lotteryCode === 'pl3' ? (
 	                <>

@@ -3284,6 +3284,20 @@ a {
   background: linear-gradient(135deg, #3d8df5, #66b6ff);
 }
 
+.number-ball--qxc-front {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.26) 22%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 72% 76%, rgba(18, 38, 126, 0.48) 0%, rgba(18, 38, 126, 0.12) 45%, rgba(18, 38, 126, 0) 70%),
+    linear-gradient(165deg, #9eabff 0%, #5876ff 36%, #304ecf 72%, #162e9e 100%);
+}
+
+.number-ball--qxc-back {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.28) 22%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 72% 76%, rgba(166, 94, 8, 0.46) 0%, rgba(166, 94, 8, 0.14) 46%, rgba(166, 94, 8, 0) 70%),
+    linear-gradient(165deg, #ffe4a4 0%, #ffc75a 34%, #f0aa25 68%, #cf8500 100%);
+}
+
 .number-ball--muted {
   color: #dbe4f0;
   background: linear-gradient(135deg, #566072, #7a869b);

@@ -473,8 +473,8 @@ function formatPlayType(playType: string) {
   return '大乐透'
 }
 
-function resolveQxcDigitColor(index: number, total: number): 'red' | 'blue' {
-  return index === total - 1 ? 'blue' : 'red'
+function resolveQxcDigitColor(index: number, total: number): 'qxc-front' | 'qxc-back' {
+  return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
 
 function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
