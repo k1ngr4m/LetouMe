@@ -843,6 +843,14 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
     },
+    "prediction_group": {
+        "add": {
+            "idx_prediction_group_model_run_play_type": (
+                "ALTER TABLE prediction_group "
+                "ADD INDEX idx_prediction_group_model_run_play_type (model_run_id, play_type)"
+            ),
+        },
+    },
     "maintenance_run_log": {
         "add": {
             "idx_maintenance_run_log_schedule_created": (
@@ -881,6 +889,14 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
             "uq_prediction_model_run_batch_model_mode": (
                 f"ALTER TABLE {_table_prefix}prediction_model_run "
                 "ADD UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode)"
+            ),
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_group"] = {
+        "add": {
+            "idx_prediction_group_model_run_play_type": (
+                f"ALTER TABLE {_table_prefix}prediction_group "
+                "ADD INDEX idx_prediction_group_model_run_play_type (model_run_id, play_type)"
             ),
         },
     }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import inspect
 from itertools import combinations
 import math
 from statistics import pstdev
@@ -967,19 +968,34 @@ class PredictionService:
         normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
         normalized_strategy_match_mode = str(strategy_match_mode or "all").strip().lower() or "all"
         db_metrics: dict[str, Any] = {}
-        has_post_filters = bool(normalized_strategy_filters or normalized_play_type_filters or (not include_inactive_models))
+        active_model_codes = self._get_active_model_codes() if not include_inactive_models else None
+        has_post_filters = bool(normalized_strategy_filters)
         fetch_limit = None if has_post_filters else limit
         fetch_offset = 0 if has_post_filters else offset
         if hasattr(self.prediction_repository, "list_history_record_summaries_with_metrics"):
+            summary_query_kwargs: dict[str, Any] = {}
+            if active_model_codes:
+                summary_query_kwargs["active_model_codes"] = active_model_codes
+            if normalized_play_type_filters:
+                summary_query_kwargs["play_type_filters"] = normalized_play_type_filters
+            supported_summary_query_kwargs = self._filter_supported_kwargs(
+                self.prediction_repository.list_history_record_summaries_with_metrics,
+                summary_query_kwargs,
+            )
             summary_payload = self.prediction_repository.list_history_record_summaries_with_metrics(
                 limit=fetch_limit,
                 offset=fetch_offset,
                 lottery_code=lottery_code,
+                **supported_summary_query_kwargs,
             )
             summary_records = summary_payload.get("records", [])
             db_metrics = summary_payload.get("metrics", {})
         else:
-            summary_records = self.prediction_repository.list_history_record_summaries(limit=fetch_limit, offset=fetch_offset, lottery_code=lottery_code)
+            summary_records = self.prediction_repository.list_history_record_summaries(
+                limit=fetch_limit,
+                offset=fetch_offset,
+                lottery_code=lottery_code,
+            )
         aggregate_started_at = perf_counter()
         records = [
             self._annotate_history_summary_record(
@@ -990,8 +1006,7 @@ class PredictionService:
             )
             for record in summary_records
         ]
-        if not include_inactive_models:
-            active_model_codes = self._get_active_model_codes()
+        if active_model_codes is not None:
             records = [
                 {
                     **record,
@@ -1007,7 +1022,19 @@ class PredictionService:
             if limit is not None:
                 records = records[:limit]
         else:
-            filtered_total_count = self.prediction_repository.count_history_records(lottery_code=lottery_code)
+            count_query_kwargs: dict[str, Any] = {}
+            if active_model_codes:
+                count_query_kwargs["active_model_codes"] = active_model_codes
+            if normalized_play_type_filters:
+                count_query_kwargs["play_type_filters"] = normalized_play_type_filters
+            supported_count_query_kwargs = self._filter_supported_kwargs(
+                self.prediction_repository.count_history_records,
+                count_query_kwargs,
+            )
+            filtered_total_count = self.prediction_repository.count_history_records(
+                lottery_code=lottery_code,
+                **supported_count_query_kwargs,
+            )
         score_profiles = self._build_score_profiles(records)
         model_stats = self._build_model_stats(records, score_profiles)
         if not include_inactive_models:
@@ -1769,6 +1796,20 @@ class PredictionService:
     @staticmethod
     def _filter_models_by_active_status(models: list[dict[str, Any]], active_model_codes: set[str]) -> list[dict[str, Any]]:
         return [model for model in models if str(model.get("model_id") or "") in active_model_codes]
+
+    @staticmethod
+    def _filter_supported_kwargs(callable_obj: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+        if not kwargs:
+            return {}
+        try:
+            signature = inspect.signature(callable_obj)
+        except (TypeError, ValueError):
+            return kwargs
+        parameters = signature.parameters.values()
+        if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
+            return kwargs
+        supported_names = set(signature.parameters.keys())
+        return {key: value for key, value in kwargs.items() if key in supported_names}
 
     def _list_active_model_refs_for_lottery(self, lottery_code: str) -> list[dict[str, str]]:
         normalized_code = normalize_lottery_code(lottery_code)

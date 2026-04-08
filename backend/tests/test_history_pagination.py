@@ -55,6 +55,28 @@ class PredictionHistoryPaginationTests(unittest.TestCase):
         self.assertEqual(payload["predictions_history"], [])
         self.assertEqual(payload["total_count"], 64)
 
+    def test_get_history_list_payload_pushes_play_type_filters_to_repository(self) -> None:
+        repository = Mock()
+        repository.list_history_record_summaries_with_metrics.return_value = {
+            "records": [{"target_period": "26025", "models": []}],
+            "metrics": {"db_query_ms": 1.23, "batch_count": 1, "model_run_count": 0, "group_metric_count": 0},
+        }
+        repository.list_history_strategy_options.return_value = []
+        repository.count_history_records.return_value = 64
+
+        service = PredictionService(prediction_repository=repository)
+        payload = service.get_history_list_payload(limit=20, offset=0, play_type_filters=["direct"])
+
+        repository.list_history_record_summaries_with_metrics.assert_called_once_with(
+            limit=20,
+            offset=0,
+            lottery_code="dlt",
+            play_type_filters=["direct"],
+        )
+        repository.count_history_records.assert_called_once_with(lottery_code="dlt", play_type_filters=["direct"])
+        self.assertEqual(payload["predictions_history"], [])
+        self.assertEqual(payload["total_count"], 64)
+
 
 if __name__ == "__main__":
     unittest.main()

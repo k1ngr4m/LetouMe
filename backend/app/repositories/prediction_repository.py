@@ -282,8 +282,12 @@ class PredictionRepository:
         lottery_code: str = "dlt",
         *,
         compact_for_scoring: bool = False,
+        active_model_codes: set[str] | list[str] | None = None,
+        play_type_filters: list[str] | None = None,
     ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_active_model_codes = sorted({str(code or "").strip() for code in (active_model_codes or []) if str(code or "").strip()})
+        normalized_play_type_filters = sorted({str(play_type or "").strip().lower() for play_type in (play_type_filters or []) if str(play_type or "").strip()})
         sql = """
             SELECT
                 pb.id,
@@ -296,6 +300,61 @@ class PredictionRepository:
             ORDER BY di.issue_no DESC
         """
         params: list[Any] = []
+        if normalized_play_type_filters:
+            play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
+            if normalized_active_model_codes:
+                active_code_placeholders = ", ".join("?" for _ in normalized_active_model_codes)
+                sql = sql.replace(
+                    "WHERE pb.status = 'archived'",
+                    (
+                        "WHERE pb.status = 'archived' "
+                        "AND EXISTS ("
+                        "SELECT 1 "
+                        "FROM prediction_model_run pmr "
+                        "INNER JOIN ai_model am ON am.id = pmr.model_id "
+                        "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
+                        "WHERE pmr.prediction_batch_id = pb.id "
+                        "AND am.is_active = 1 "
+                        "AND am.is_deleted = 0 "
+                        f"AND am.model_code IN ({active_code_placeholders}) "
+                        f"AND pg.play_type IN ({play_type_placeholders})"
+                        ")"
+                    ),
+                )
+                params.extend(normalized_active_model_codes)
+            else:
+                sql = sql.replace(
+                    "WHERE pb.status = 'archived'",
+                    (
+                        "WHERE pb.status = 'archived' "
+                        "AND EXISTS ("
+                        "SELECT 1 "
+                        "FROM prediction_model_run pmr "
+                        "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
+                        "WHERE pmr.prediction_batch_id = pb.id "
+                        f"AND pg.play_type IN ({play_type_placeholders})"
+                        ")"
+                    ),
+                )
+            params.extend(normalized_play_type_filters)
+        elif normalized_active_model_codes:
+            active_code_placeholders = ", ".join("?" for _ in normalized_active_model_codes)
+            sql = sql.replace(
+                "WHERE pb.status = 'archived'",
+                (
+                    "WHERE pb.status = 'archived' "
+                    "AND EXISTS ("
+                    "SELECT 1 "
+                    "FROM prediction_model_run pmr "
+                    "INNER JOIN ai_model am ON am.id = pmr.model_id "
+                    "WHERE pmr.prediction_batch_id = pb.id "
+                    "AND am.is_active = 1 "
+                    "AND am.is_deleted = 0 "
+                    f"AND am.model_code IN ({active_code_placeholders})"
+                    ")"
+                ),
+            )
+            params.extend(normalized_active_model_codes)
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -312,11 +371,22 @@ class PredictionRepository:
                     batch_ids = [int(row["id"]) for row in batch_rows]
                     issue_ids = [int(row["target_issue_id"]) for row in batch_rows]
                     actual_results_by_issue = self._fetch_actual_results(cursor, issue_ids, lottery_code=normalized_code)
-                    model_rows = self._fetch_model_runs_by_batch(cursor, batch_ids, include_extended_meta=not compact_for_scoring)
+                    model_rows = self._fetch_model_runs_by_batch(
+                        cursor,
+                        batch_ids,
+                        include_extended_meta=not compact_for_scoring,
+                        active_model_codes=normalized_active_model_codes,
+                        active_only=bool(normalized_active_model_codes),
+                    )
                     model_run_ids = [int(row["id"]) for row in model_rows]
                     summaries_by_run = {} if compact_for_scoring else self._fetch_model_summaries(cursor, model_run_ids)
-                    groups_by_run = self._fetch_groups(cursor, model_run_ids, compact_for_scoring=compact_for_scoring)
-                    group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids)
+                    groups_by_run = self._fetch_groups(
+                        cursor,
+                        model_run_ids,
+                        compact_for_scoring=compact_for_scoring,
+                        play_type_filters=normalized_play_type_filters,
+                    )
+                    group_metrics_by_run = self._fetch_group_metrics_by_run(cursor, model_run_ids, play_type_filters=normalized_play_type_filters)
         duration_ms = round((perf_counter() - started_at) * 1000, 2)
         self.logger.debug(
             "Loaded prediction history summary batches",
@@ -337,10 +407,13 @@ class PredictionRepository:
             summary = summaries_by_run.get(int(row["id"]), {})
             group_metrics = group_metrics_by_run.get(int(row["id"]), [])
             groups = groups_by_run.get(int(row["id"]), [])
+            metrics_by_group_id = {int(item.get("group_id") or 0): item for item in group_metrics}
             merged_metrics: list[dict[str, Any]] = []
             for group in groups:
-                metric = next((item for item in group_metrics if int(item.get("group_id") or 0) == int(group.get("group_id") or 0)), {})
+                metric = metrics_by_group_id.get(int(group.get("group_id") or 0), {})
                 merged_metrics.append({**group, **metric})
+            if not merged_metrics:
+                continue
             models_by_batch.setdefault(batch_id, []).append(
                 {
                     "model_id": row["model_id"],
@@ -399,18 +472,69 @@ class PredictionRepository:
                         return None
                     return self._build_batch_payload(cursor, row, lottery_code=normalized_code, include_actual_result=True)
 
-    def count_history_records(self, lottery_code: str = "dlt") -> int:
+    def count_history_records(
+        self,
+        lottery_code: str = "dlt",
+        *,
+        active_model_codes: set[str] | list[str] | None = None,
+        play_type_filters: list[str] | None = None,
+    ) -> int:
         normalized_code = normalize_lottery_code(lottery_code)
+        normalized_active_model_codes = sorted({str(code or "").strip() for code in (active_model_codes or []) if str(code or "").strip()})
+        normalized_play_type_filters = sorted({str(play_type or "").strip().lower() for play_type in (play_type_filters or []) if str(play_type or "").strip()})
         with use_lottery_table_scope(normalized_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
+                    sql = """
                         SELECT COUNT(*) AS total
-                        FROM prediction_batch
-                        WHERE status = 'archived'
-                        """,
-                    )
+                        FROM prediction_batch pb
+                        WHERE pb.status = 'archived'
+                    """
+                    params: list[Any] = []
+                    if normalized_play_type_filters:
+                        play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
+                        if normalized_active_model_codes:
+                            active_code_placeholders = ", ".join("?" for _ in normalized_active_model_codes)
+                            sql += (
+                                " AND EXISTS ("
+                                "SELECT 1 "
+                                "FROM prediction_model_run pmr "
+                                "INNER JOIN ai_model am ON am.id = pmr.model_id "
+                                "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
+                                "WHERE pmr.prediction_batch_id = pb.id "
+                                "AND am.is_active = 1 "
+                                "AND am.is_deleted = 0 "
+                                f"AND am.model_code IN ({active_code_placeholders}) "
+                                f"AND pg.play_type IN ({play_type_placeholders})"
+                                ")"
+                            )
+                            params.extend(normalized_active_model_codes)
+                        else:
+                            sql += (
+                                " AND EXISTS ("
+                                "SELECT 1 "
+                                "FROM prediction_model_run pmr "
+                                "INNER JOIN prediction_group pg ON pg.model_run_id = pmr.id "
+                                "WHERE pmr.prediction_batch_id = pb.id "
+                                f"AND pg.play_type IN ({play_type_placeholders})"
+                                ")"
+                            )
+                        params.extend(normalized_play_type_filters)
+                    elif normalized_active_model_codes:
+                        active_code_placeholders = ", ".join("?" for _ in normalized_active_model_codes)
+                        sql += (
+                            " AND EXISTS ("
+                            "SELECT 1 "
+                            "FROM prediction_model_run pmr "
+                            "INNER JOIN ai_model am ON am.id = pmr.model_id "
+                            "WHERE pmr.prediction_batch_id = pb.id "
+                            "AND am.is_active = 1 "
+                            "AND am.is_deleted = 0 "
+                            f"AND am.model_code IN ({active_code_placeholders})"
+                            ")"
+                        )
+                        params.extend(normalized_active_model_codes)
+                    cursor.execute(sql, tuple(params))
                     row = cursor.fetchone() or {}
         return int(row.get("total") or 0)
 
@@ -1017,11 +1141,19 @@ class PredictionRepository:
         return payload
 
     @staticmethod
-    def _fetch_model_runs_by_batch(cursor, batch_ids: list[int], *, include_extended_meta: bool = True) -> list[dict[str, Any]]:
+    def _fetch_model_runs_by_batch(
+        cursor,
+        batch_ids: list[int],
+        *,
+        include_extended_meta: bool = True,
+        active_model_codes: list[str] | None = None,
+        active_only: bool = False,
+    ) -> list[dict[str, Any]]:
         if not batch_ids:
             return []
+        normalized_active_model_codes = sorted({str(code or "").strip() for code in (active_model_codes or []) if str(code or "").strip()})
         placeholders = ", ".join("?" for _ in batch_ids)
-        if not include_extended_meta:
+        if not include_extended_meta and not normalized_active_model_codes and not active_only:
             normalized_batch_ids = tuple(sorted({int(batch_id) for batch_id in batch_ids}))
             cache_key = PredictionRepository._build_id_set_cache_key(
                 "prediction-repo:model-runs:compact",
@@ -1053,6 +1185,14 @@ class PredictionRepository:
                 ttl_seconds=PredictionRepository._MODEL_RUNS_COMPACT_CACHE_TTL_SECONDS,
             )
             return rows
+        model_filters = ""
+        params: list[Any] = list(tuple(batch_ids))
+        if active_only:
+            model_filters += " AND am.is_active = 1 AND am.is_deleted = 0"
+        if normalized_active_model_codes:
+            active_code_placeholders = ", ".join("?" for _ in normalized_active_model_codes)
+            model_filters += f" AND am.model_code IN ({active_code_placeholders})"
+            params.extend(normalized_active_model_codes)
         cursor.execute(
             f"""
             SELECT
@@ -1070,9 +1210,10 @@ class PredictionRepository:
             INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
             INNER JOIN model_provider mp ON mp.id = pmc.provider_id
             WHERE pmr.prediction_batch_id IN ({placeholders})
+            {model_filters}
             ORDER BY pmr.prediction_batch_id ASC, pmr.display_order ASC, pmr.id ASC
             """,
-            tuple(batch_ids),
+            tuple(params),
         )
         return cursor.fetchall()
 
@@ -1103,19 +1244,28 @@ class PredictionRepository:
         model_run_ids: list[int],
         *,
         compact_for_scoring: bool = False,
+        play_type_filters: list[str] | None = None,
     ) -> dict[int, list[dict[str, Any]]]:
         if not model_run_ids:
             return {}
+        normalized_play_type_filters = sorted({str(play_type or "").strip().lower() for play_type in (play_type_filters or []) if str(play_type or "").strip()})
         placeholders = ", ".join("?" for _ in model_run_ids)
+        filter_sql = ""
+        params: list[Any] = list(tuple(model_run_ids))
+        if normalized_play_type_filters:
+            play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
+            filter_sql = f" AND play_type IN ({play_type_placeholders})"
+            params.extend(normalized_play_type_filters)
         if compact_for_scoring:
             cursor.execute(
                 f"""
                 SELECT id, model_run_id, group_no, play_type, sum_value
                 FROM prediction_group
                 WHERE model_run_id IN ({placeholders})
+                {filter_sql}
                 ORDER BY model_run_id ASC, group_no ASC
                 """,
-                tuple(model_run_ids),
+                tuple(params),
             )
         else:
             cursor.execute(
@@ -1123,9 +1273,10 @@ class PredictionRepository:
                 SELECT id, model_run_id, group_no, play_type, sum_value, strategy_text, description_text
                 FROM prediction_group
                 WHERE model_run_id IN ({placeholders})
+                {filter_sql}
                 ORDER BY model_run_id ASC, group_no ASC
                 """,
-                tuple(model_run_ids),
+                tuple(params),
             )
         group_rows = cursor.fetchall()
         group_ids = [int(row["id"]) for row in group_rows]
@@ -1183,10 +1334,22 @@ class PredictionRepository:
         return groups_by_run
 
     @staticmethod
-    def _fetch_group_metrics_by_run(cursor, model_run_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    def _fetch_group_metrics_by_run(
+        cursor,
+        model_run_ids: list[int],
+        *,
+        play_type_filters: list[str] | None = None,
+    ) -> dict[int, list[dict[str, Any]]]:
         if not model_run_ids:
             return {}
+        normalized_play_type_filters = sorted({str(play_type or "").strip().lower() for play_type in (play_type_filters or []) if str(play_type or "").strip()})
         placeholders = ", ".join("?" for _ in model_run_ids)
+        params: list[Any] = list(tuple(model_run_ids))
+        filter_sql = ""
+        if normalized_play_type_filters:
+            play_type_placeholders = ", ".join("?" for _ in normalized_play_type_filters)
+            filter_sql = f" AND pg.play_type IN ({play_type_placeholders})"
+            params.extend(normalized_play_type_filters)
         cursor.execute(
             f"""
             SELECT
@@ -1199,10 +1362,11 @@ class PredictionRepository:
             LEFT JOIN prediction_hit_summary phs ON phs.prediction_group_id = pg.id
             LEFT JOIN prediction_hit_number phn ON phn.hit_summary_id = phs.id
             WHERE pg.model_run_id IN ({placeholders})
+            {filter_sql}
             GROUP BY pg.model_run_id, pg.group_no, phs.red_hit_count, phs.blue_hit_count
             ORDER BY pg.model_run_id ASC, pg.group_no ASC
             """,
-            tuple(model_run_ids),
+            tuple(params),
         )
         result: dict[int, list[dict[str, Any]]] = {}
         for row in cursor.fetchall():
