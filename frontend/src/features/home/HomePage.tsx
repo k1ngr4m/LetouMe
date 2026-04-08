@@ -389,7 +389,8 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
-function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' | 'qxc-front' | 'qxc-back' {
+function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5' {
+  if (lotteryCode === 'pl3' || lotteryCode === 'pl5') return 'pl3pl5'
   if (lotteryCode !== 'qxc') return 'red'
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
@@ -1701,11 +1702,11 @@ export function HomePage() {
 	                  <div className="summary-columns">
 	                    {selectedLottery === 'pl5' ? (
                       <>
-                        <SummaryList title="第一位（万位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第二位（千位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第三位（百位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
-                        <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
+                        <SummaryList title="第一位（万位）统计" items={summary.positions?.[0] || []} color="pl3pl5" models={summaryModels} />
+                        <SummaryList title="第二位（千位）统计" items={summary.positions?.[1] || []} color="pl3pl5" models={summaryModels} />
+                        <SummaryList title="第三位（百位）统计" items={summary.positions?.[2] || []} color="pl3pl5" models={summaryModels} />
+                        <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="pl3pl5" models={summaryModels} />
+                        <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="pl3pl5" models={summaryModels} />
                       </>
 	                    ) : selectedLottery === 'qxc' ? (
 	                      <>
@@ -1720,12 +1721,12 @@ export function HomePage() {
 	                    ) : selectedLottery === 'pl3' ? (
 	                      <>
 	                        {pl3PredictionMode === 'direct_sum' ? (
-	                          <SummaryList title="和值统计" items={summary.sums || []} color="red" models={summaryModels} />
+	                          <SummaryList title="和值统计" items={summary.sums || []} color="pl3pl5" models={summaryModels} />
 	                        ) : (
 	                          <>
-	                            <SummaryList title="第一位（百位）统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
-	                            <SummaryList title="第二位（十位）统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
-	                            <SummaryList title="第三位（个位）统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
+	                            <SummaryList title="第一位（百位）统计" items={summary.positions?.[0] || []} color="pl3pl5" models={summaryModels} />
+	                            <SummaryList title="第二位（十位）统计" items={summary.positions?.[1] || []} color="pl3pl5" models={summaryModels} />
+	                            <SummaryList title="第三位（个位）统计" items={summary.positions?.[2] || []} color="pl3pl5" models={summaryModels} />
 	                          </>
 	                        )}
 	                      </>
@@ -2670,7 +2671,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`hundreds-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedHundreds.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-pl3pl5', selectedHundreds.includes(ball) && 'is-selected')}
                           onClick={() => togglePositionSelection(ball, 'hundreds')}
                           aria-label={`百位 ${ball}`}
                         >
@@ -2692,7 +2693,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`tens-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedTens.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-pl3pl5', selectedTens.includes(ball) && 'is-selected')}
                           onClick={() => togglePositionSelection(ball, 'tens')}
                           aria-label={`十位 ${ball}`}
                         >
@@ -2714,7 +2715,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`units-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedUnits.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-pl3pl5', selectedUnits.includes(ball) && 'is-selected')}
                           onClick={() => togglePositionSelection(ball, 'units')}
                           aria-label={`个位 ${ball}`}
                         >
@@ -2738,7 +2739,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                       <button
                         key={`sum-${ball}`}
                         type="button"
-                        className={clsx('simulation-ball', 'is-front', selectedSumValues.includes(ball) && 'is-selected')}
+                        className={clsx('simulation-ball', 'is-pl3pl5', selectedSumValues.includes(ball) && 'is-selected')}
                         onClick={() => toggleSumSelection(ball)}
                         aria-label={`和值 ${ball}`}
                       >
@@ -2761,7 +2762,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                       <button
                         key={`group-${ball}`}
                         type="button"
-                        className={clsx('simulation-ball', 'is-front', selectedGroupNumbers.includes(ball) && 'is-selected')}
+                        className={clsx('simulation-ball', 'is-pl3pl5', selectedGroupNumbers.includes(ball) && 'is-selected')}
                         onClick={() => toggleGroupSelection(ball)}
                         aria-label={`组选 ${ball}`}
                       >
@@ -2787,7 +2788,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <button
                       key={`ten-thousands-${ball}`}
                       type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedTenThousands.includes(ball) && 'is-selected')}
+                      className={clsx('simulation-ball', 'is-pl3pl5', selectedTenThousands.includes(ball) && 'is-selected')}
                       onClick={() => togglePositionSelection(ball, 'ten_thousands')}
                       aria-label={`万位 ${ball}`}
                     >
@@ -2809,7 +2810,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <button
                       key={`thousands-${ball}`}
                       type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedThousands.includes(ball) && 'is-selected')}
+                      className={clsx('simulation-ball', 'is-pl3pl5', selectedThousands.includes(ball) && 'is-selected')}
                       onClick={() => togglePositionSelection(ball, 'thousands')}
                       aria-label={`千位 ${ball}`}
                     >
@@ -2831,7 +2832,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <button
                       key={`hundreds-pl5-${ball}`}
                       type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedHundreds.includes(ball) && 'is-selected')}
+                      className={clsx('simulation-ball', 'is-pl3pl5', selectedHundreds.includes(ball) && 'is-selected')}
                       onClick={() => togglePositionSelection(ball, 'hundreds')}
                       aria-label={`百位 ${ball}`}
                     >
@@ -2853,7 +2854,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <button
                       key={`tens-pl5-${ball}`}
                       type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedTens.includes(ball) && 'is-selected')}
+                      className={clsx('simulation-ball', 'is-pl3pl5', selectedTens.includes(ball) && 'is-selected')}
                       onClick={() => togglePositionSelection(ball, 'tens')}
                       aria-label={`十位 ${ball}`}
                     >
@@ -2875,7 +2876,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <button
                       key={`units-pl5-${ball}`}
                       type="button"
-                      className={clsx('simulation-ball', 'is-front', selectedUnits.includes(ball) && 'is-selected')}
+                      className={clsx('simulation-ball', 'is-pl3pl5', selectedUnits.includes(ball) && 'is-selected')}
                       onClick={() => togglePositionSelection(ball, 'units')}
                       aria-label={`个位 ${ball}`}
                     >
@@ -2933,24 +2934,24 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 <span>{isPl3 ? `当前玩法：${playTypeLabel}` : '当前玩法：直选'}</span>
                 <div className="number-row number-row--tight">
                   {(isPl3 ? (pl3PlayType === 'direct' ? selectedHundreds : pl3PlayType === 'direct_sum' ? selectedSumValues : selectedGroupNumbers) : selectedTenThousands).map((ball) => (
-                    <NumberBall key={`selected-a-${ball}`} value={ball} color="red" size="sm" />
+                    <NumberBall key={`selected-a-${ball}`} value={ball} color="pl3pl5" size="sm" />
                   ))}
                   {(isPl3 ? pl3PlayType === 'direct' : true) ? <span className="number-row__divider" /> : null}
                   {isPl3
                     ? pl3PlayType === 'direct'
-                      ? selectedTens.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="red" size="sm" />)
+                      ? selectedTens.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="pl3pl5" size="sm" />)
                       : null
-                    : selectedThousands.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="red" size="sm" />)}
+                    : selectedThousands.map((ball) => <NumberBall key={`selected-b-${ball}`} value={ball} color="pl3pl5" size="sm" />)}
                   {(isPl3 ? pl3PlayType === 'direct' : true) ? <span className="number-row__divider" /> : null}
                   {isPl3
                     ? pl3PlayType === 'direct'
-                      ? selectedUnits.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="red" size="sm" />)
+                      ? selectedUnits.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="pl3pl5" size="sm" />)
                       : null
-                    : selectedHundreds.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="red" size="sm" />)}
+                    : selectedHundreds.map((ball) => <NumberBall key={`selected-c-${ball}`} value={ball} color="pl3pl5" size="sm" />)}
                   {!isPl3 ? <span className="number-row__divider" /> : null}
-                  {!isPl3 ? selectedTens.map((ball) => <NumberBall key={`selected-d-${ball}`} value={ball} color="red" size="sm" />) : null}
+                  {!isPl3 ? selectedTens.map((ball) => <NumberBall key={`selected-d-${ball}`} value={ball} color="pl3pl5" size="sm" />) : null}
                   {!isPl3 ? <span className="number-row__divider" /> : null}
-                  {!isPl3 ? selectedUnits.map((ball) => <NumberBall key={`selected-e-${ball}`} value={ball} color="red" size="sm" />) : null}
+                  {!isPl3 ? selectedUnits.map((ball) => <NumberBall key={`selected-e-${ball}`} value={ball} color="pl3pl5" size="sm" />) : null}
                 </div>
               </>
             )}
@@ -3036,7 +3037,15 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                       <NumberBall
                         key={`${match.period}-actual-main-${index}-${ball}`}
                         value={ball}
-                        color="red"
+                        color={
+                          lotteryCode === 'dlt'
+                            ? 'red'
+                            : resolveDigitBallColor(
+                                lotteryCode,
+                                index,
+                                (match.actualResult.digits || match.actualResult.red_balls || []).length,
+                              )
+                        }
                         size="sm"
                         isHit={lotteryCode === 'dlt' ? match.redHits.includes(ball) : match.digitHits.includes(ball)}
                       />
@@ -3146,23 +3155,23 @@ function SavedSimulationTicketCard({
         ) : lotteryCode === 'pl5' ? (
           <div className="number-row number-row--tight">
             {(ticket.direct_ten_thousands || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-tt-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-tt-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_thousands || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-th-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-th-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_hundreds || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_tens || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_units || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
           </div>
         ) : lotteryCode === 'qxc' && (ticket.position_selections || []).length === 7 ? (
@@ -3184,27 +3193,27 @@ function SavedSimulationTicketCard({
         ) : ticket.play_type === 'direct' ? (
           <div className="number-row number-row--tight">
             {(ticket.direct_hundreds || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_tens || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.direct_units || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
           </div>
         ) : ticket.play_type === 'direct_sum' ? (
           <div className="number-row number-row--tight">
             {(ticket.sum_values || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-sum-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-sum-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
           </div>
         ) : (
           <div className="number-row number-row--tight">
             {(ticket.group_numbers || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-g-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-g-${ball}`} value={ball} color="pl3pl5" size="sm" />
             ))}
           </div>
         )}
@@ -3694,7 +3703,7 @@ function PredictionNumberRow({
         <NumberBall
           key={`s-${group.group_id}-${sumValue}`}
           value={sumValue}
-          color="red"
+          color="pl3pl5"
           isHit={isHit}
           tone={grayMisses && !isHit ? 'muted' : 'default'}
         />
@@ -3762,7 +3771,7 @@ function SummaryList({
 }: {
   title: string
   items: BallStatItem[]
-  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back'
+  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5'
   models: PredictionModel[]
   compact?: boolean
   hitSet?: Set<string>
@@ -4810,11 +4819,11 @@ function HistoryRecordCard({
             <div className="summary-columns">
               {lotteryCode === 'pl5' ? (
                 <>
-                  <SummaryList title="第一位（万位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
-                  <SummaryList title="第二位（千位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
-                  <SummaryList title="第三位（百位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
-                  <SummaryList title="第四位（十位）统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
-                  <SummaryList title="第五位（个位）统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
+                  <SummaryList title="第一位（万位）统计" items={periodPredictionSummary.positions?.[0] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+                  <SummaryList title="第二位（千位）统计" items={periodPredictionSummary.positions?.[1] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+                  <SummaryList title="第三位（百位）统计" items={periodPredictionSummary.positions?.[2] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+                  <SummaryList title="第四位（十位）统计" items={periodPredictionSummary.positions?.[3] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
+                  <SummaryList title="第五位（个位）统计" items={periodPredictionSummary.positions?.[4] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
                 </>
 	              ) : lotteryCode === 'qxc' ? (
 	                <>
@@ -4829,12 +4838,12 @@ function HistoryRecordCard({
 	              ) : lotteryCode === 'pl3' ? (
 	                <>
 	                  {isPl3SumMode ? (
-	                    <SummaryList title="和值统计" items={periodPredictionSummary.sums || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.sumHits} />
+	                    <SummaryList title="和值统计" items={periodPredictionSummary.sums || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.sumHits} />
 	                  ) : (
 	                    <>
-	                      <SummaryList title="第一位（百位）统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
-	                      <SummaryList title="第二位（十位）统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
-	                      <SummaryList title="第三位（个位）统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+	                      <SummaryList title="第一位（百位）统计" items={periodPredictionSummary.positions?.[0] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+	                      <SummaryList title="第二位（十位）统计" items={periodPredictionSummary.positions?.[1] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+	                      <SummaryList title="第三位（个位）统计" items={periodPredictionSummary.positions?.[2] || []} color="pl3pl5" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
 	                    </>
 	                  )}
 	                </>
