@@ -116,6 +116,7 @@ class ScheduleService:
 
     def _trigger_task(self, task: dict[str, Any], manual: bool = False) -> None:
         now = self._utc_now()
+        trigger_type = "manual" if manual else "schedule"
         next_run_at = self._compute_next_run(task, base_time=now + timedelta(minutes=1)) if task.get("is_active") and not manual else (
             self._compute_next_run(task, base_time=now + timedelta(minutes=1)) if task.get("is_active") else None
         )
@@ -148,7 +149,7 @@ class ScheduleService:
                 task["lottery_code"],
                 limit=int(task.get("fetch_limit") or 30),
                 schedule_task_code=task["task_code"],
-                trigger_type="schedule",
+                trigger_type=trigger_type,
                 on_update=handle_update,
             )
             return
@@ -182,7 +183,7 @@ class ScheduleService:
             mode=task.get("generation_mode") or "current",
             model_code="__bulk__",
             schedule_task_code=task["task_code"],
-            trigger_type="schedule",
+            trigger_type=trigger_type,
             on_update=handle_update,
             worker=lambda progress_callback: self.prediction_generation_service.generate_for_models(
                 lottery_code=task["lottery_code"],

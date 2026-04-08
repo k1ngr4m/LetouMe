@@ -6240,6 +6240,68 @@ a {
   gap: 0.38rem;
 }
 
+.settings-schedule-calendar__timeline {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.settings-schedule-calendar__timeline-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.4rem 0.45rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.settings-schedule-calendar__timeline-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.settings-schedule-calendar__timeline-time {
+  color: var(--text-2);
+  font-size: 0.73rem;
+}
+
+.settings-schedule-calendar__timeline-trigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.32rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.08rem 0.4rem;
+  color: var(--text-2);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.settings-schedule-calendar__timeline-trigger.is-schedule {
+  border-color: rgba(95, 171, 255, 0.42);
+  color: #b8d6ff;
+  background: rgba(84, 141, 255, 0.16);
+}
+
+.settings-schedule-calendar__timeline-trigger.is-manual {
+  border-color: rgba(246, 188, 94, 0.42);
+  color: #ffe2ad;
+  background: rgba(244, 177, 72, 0.18);
+}
+
+.settings-schedule-calendar__timeline-error {
+  margin: 0;
+  color: #ffc2cc;
+  font-size: 0.72rem;
+  line-height: 1.38;
+}
+
+.settings-schedule-calendar__timeline-empty {
+  color: var(--text-2);
+  font-size: 0.75rem;
+}
+
 .settings-schedule-calendar__detail-actions .secondary-button,
 .settings-schedule-calendar__detail-actions .ghost-button {
   min-height: 1.86rem;

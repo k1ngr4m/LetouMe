@@ -1011,12 +1011,52 @@ describe('SettingsPage model management view switch', () => {
   })
 
   it('supports schedule calendar view with day detail panel', async () => {
+    const nowTs = Math.floor(Date.now() / 1000)
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
     apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.listScheduleRunLogs.mockResolvedValue({
+      logs: [
+        {
+          id: 11,
+          task_id: 'task-11',
+          schedule_task_code: 'sched-qxc-fetch',
+          lottery_code: 'qxc',
+          trigger_type: 'schedule',
+          task_type: 'lottery_fetch',
+          status: 'failed',
+          started_at: nowTs - 200,
+          finished_at: nowTs - 180,
+          fetched_count: 0,
+          saved_count: 0,
+          duration_ms: 1300,
+          error_message: '503',
+          created_at: nowTs - 210,
+          updated_at: nowTs - 180,
+        },
+        {
+          id: 12,
+          task_id: 'task-12',
+          schedule_task_code: 'sched-qxc-fetch',
+          lottery_code: 'qxc',
+          trigger_type: 'manual',
+          task_type: 'lottery_fetch',
+          status: 'succeeded',
+          started_at: nowTs - 80,
+          finished_at: nowTs - 60,
+          fetched_count: 30,
+          saved_count: 10,
+          duration_ms: 1200,
+          error_message: null,
+          created_at: nowTs - 90,
+          updated_at: nowTs - 60,
+        },
+      ],
+      total_count: 2,
+    })
     apiClientMock.listScheduleTasks.mockResolvedValue({
       tasks: [
         {
@@ -1056,6 +1096,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByText('北京时间 · 共 1 个触发任务')).toBeInTheDocument()
     expect(screen.getAllByText('七星彩抓取').length).toBeGreaterThan(0)
     expect(screen.getAllByText('21:25').length).toBeGreaterThan(0)
+    expect(screen.getByText('定时')).toBeInTheDocument()
+    expect(screen.getByText('手动')).toBeInTheDocument()
   })
 
   it('creates a prediction schedule task', async () => {

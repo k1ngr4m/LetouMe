@@ -664,6 +664,10 @@ function getMaintenanceTriggerLabel(triggerType: string) {
   return triggerType === 'schedule' ? '定时任务' : '手动执行'
 }
 
+function getScheduleRunTriggerLabel(triggerType: string | null | undefined) {
+  return triggerType === 'schedule' ? '定时' : '手动'
+}
+
 function getMaintenanceTaskType(log: MaintenanceRunLog): 'lottery_fetch' | 'prediction_generate' {
   if (log.task_type === 'prediction_generate') return 'prediction_generate'
   if (log.task_type === 'lottery_fetch') return 'lottery_fetch'
@@ -1197,28 +1201,35 @@ export function SettingsPage() {
     if (!year || !month || !day) return selectedCalendarDateKey
     return `${year}年${month}月${day}日`
   }, [selectedCalendarDateKey])
-  const scheduleRunLogMapByDateAndTask = useMemo(() => {
+  const scheduleRunLogTimelineByDateAndTask = useMemo(() => {
     const logs = scheduleRunLogsQuery.data?.logs ?? []
-    const byDate = new Map<string, Map<string, MaintenanceRunLog>>()
+    const byDate = new Map<string, Map<string, MaintenanceRunLog[]>>()
     for (const item of logs) {
       const taskCode = item.schedule_task_code || null
       if (!taskCode) continue
       const dateKey = formatBeijingDateKey(item.started_at || item.created_at)
       if (!dateKey) continue
-      const byTask = byDate.get(dateKey) || new Map<string, MaintenanceRunLog>()
-      const current = byTask.get(taskCode)
-      const currentTime = current ? (current.started_at || current.created_at || 0) : 0
-      const nextTime = item.started_at || item.created_at || 0
-      if (!current || nextTime >= currentTime) {
-        byTask.set(taskCode, item)
-      }
+      const byTask = byDate.get(dateKey) || new Map<string, MaintenanceRunLog[]>()
+      const taskLogs = byTask.get(taskCode) || []
+      taskLogs.push(item)
+      byTask.set(taskCode, taskLogs)
       byDate.set(dateKey, byTask)
+    }
+    for (const byTask of byDate.values()) {
+      for (const [taskCode, taskLogs] of byTask.entries()) {
+        taskLogs.sort((left, right) => {
+          const leftTime = left.finished_at || left.started_at || left.created_at || 0
+          const rightTime = right.finished_at || right.started_at || right.created_at || 0
+          return rightTime - leftTime
+        })
+        byTask.set(taskCode, taskLogs)
+      }
     }
     return byDate
   }, [scheduleRunLogsQuery.data?.logs])
-  const selectedCalendarDayRunLogMap = useMemo(
-    () => scheduleRunLogMapByDateAndTask.get(selectedCalendarDateKey) || new Map<string, MaintenanceRunLog>(),
-    [scheduleRunLogMapByDateAndTask, selectedCalendarDateKey],
+  const selectedCalendarDayRunTimelineMap = useMemo(
+    () => scheduleRunLogTimelineByDateAndTask.get(selectedCalendarDateKey) || new Map<string, MaintenanceRunLog[]>(),
+    [scheduleRunLogTimelineByDateAndTask, selectedCalendarDateKey],
   )
   useEffect(() => {
     const keys = scheduleCalendarMonthData.cells.filter((item) => item.inCurrentMonth).map((item) => item.dateKey)
@@ -3449,12 +3460,12 @@ export function SettingsPage() {
                             <div className="settings-schedule-calendar__detail-list">
                               {selectedCalendarDayEntries.map((entry) => {
                                 const task = entry.task
-                                const dayRunLog = selectedCalendarDayRunLogMap.get(task.task_code)
-                                const runStatusMeta = getScheduleRunStatusMeta(dayRunLog?.status || null)
+                                const dayRunLogs = selectedCalendarDayRunTimelineMap.get(task.task_code) || []
+                                const latestDayRunLog = dayRunLogs[0]
+                                const runStatusMeta = getScheduleRunStatusMeta(latestDayRunLog?.status || null)
                                 const enabledMeta = getScheduleEnabledMeta(task.is_active)
                                 const playModeLabel = getSchedulePredictionPlayModeLabel(task)
                                 const fetchLimitLabel = task.task_type === 'lottery_fetch' ? `近${normalizeFetchLimit(task.fetch_limit)}期` : null
-                                const dayRunAt = dayRunLog?.finished_at || dayRunLog?.started_at || dayRunLog?.created_at || null
                                 return (
                                   <article key={`${selectedCalendarDateKey}-${task.task_code}`} className="settings-schedule-calendar__detail-card">
                                     <div className="settings-schedule-calendar__detail-title">
@@ -3490,10 +3501,38 @@ export function SettingsPage() {
                                         </span>
                                         <span>{runStatusMeta.label}</span>
                                       </span>
-                                      <span>{dayRunAt ? `当日执行：${formatDateTimeBeijing(dayRunAt)}` : '当日执行：未执行'}</span>
-                                      {dayRunLog?.error_message ? <span>错误：{dayRunLog.error_message}</span> : null}
+                                      <span>当日执行次数：{dayRunLogs.length}</span>
                                       <span>{task.next_run_at ? `下次执行：${formatDateTimeBeijing(task.next_run_at)}` : '下次执行：未安排'}</span>
                                     </div>
+                                    {dayRunLogs.length ? (
+                                      <div className="settings-schedule-calendar__timeline">
+                                        {dayRunLogs.map((item) => {
+                                          const runStatus = getScheduleRunStatusMeta(item.status)
+                                          const runAt = item.finished_at || item.started_at || item.created_at || null
+                                          return (
+                                            <article key={`${task.task_code}-${item.id}`} className="settings-schedule-calendar__timeline-item">
+                                              <div className="settings-schedule-calendar__timeline-top">
+                                                <span className="settings-schedule-calendar__timeline-time">{runAt ? formatDateTimeBeijing(runAt) : '-'}</span>
+                                                <span className={clsx('settings-schedule-calendar__timeline-trigger', item.trigger_type === 'schedule' ? 'is-schedule' : 'is-manual')}>
+                                                  {getScheduleRunTriggerLabel(item.trigger_type)}
+                                                </span>
+                                                <span className={clsx('schedule-status-pill', `schedule-status-pill--${runStatus.tone}`)}>
+                                                  <span className="schedule-status-pill__icon" aria-hidden="true">
+                                                    <ScheduleStatusIcon tone={runStatus.tone} />
+                                                  </span>
+                                                  <span>{runStatus.label}</span>
+                                                </span>
+                                              </div>
+                                              {item.error_message ? (
+                                                <p className="settings-schedule-calendar__timeline-error">错误：{item.error_message}</p>
+                                              ) : null}
+                                            </article>
+                                          )
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <div className="settings-schedule-calendar__timeline-empty">当日未执行</div>
+                                    )}
                                     <div className="settings-schedule-calendar__detail-actions">
                                       <button className="secondary-button" type="button" onClick={() => openEditScheduleTask(task)}>编辑</button>
                                       <button className="secondary-button" type="button" onClick={() => scheduleTaskActionMutation.mutate({ type: 'run', task })}>执行</button>
