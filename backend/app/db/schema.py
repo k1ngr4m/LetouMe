@@ -843,6 +843,14 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
     },
+    "maintenance_run_log": {
+        "add": {
+            "idx_maintenance_run_log_schedule_created": (
+                "ALTER TABLE maintenance_run_log "
+                "ADD INDEX idx_maintenance_run_log_schedule_created (schedule_task_code, created_at)"
+            ),
+        },
+    },
 }
 
 for _lottery_code in SUPPORTED_LOTTERY_CODES:
@@ -956,10 +964,6 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
         "schedule_task_code": (
             "ALTER TABLE maintenance_run_log "
             "ADD COLUMN schedule_task_code VARCHAR(64) NULL AFTER task_id"
-        ),
-        "schedule_task_code_index": (
-            "ALTER TABLE maintenance_run_log "
-            "ADD INDEX idx_maintenance_run_log_schedule_created (schedule_task_code, created_at)"
         ),
         "task_type": (
             "ALTER TABLE maintenance_run_log "
