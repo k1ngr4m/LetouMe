@@ -396,6 +396,56 @@ function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: n
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
 
+function buildQxcPositionSelectionsFromTicket(ticket: SimulationTicketRecord) {
+  const normalized = normalizeSimulationTicket(ticket)
+  const explicitPositions = (normalized.position_selections || []).slice(0, 7)
+  if (explicitPositions.length === 7 && explicitPositions.every((values) => values.length)) {
+    return explicitPositions
+  }
+  const fallback = [
+    normalized.direct_ten_thousands || [],
+    normalized.direct_thousands || [],
+    normalized.direct_hundreds || [],
+    normalized.direct_tens || [],
+    normalized.direct_units || [],
+    normalized.front_numbers || [],
+    normalized.back_numbers || [],
+  ].map((values) => [...values].sort((left, right) => Number(left) - Number(right)))
+  return fallback.length === 7 ? fallback : []
+}
+
+function buildSimulationSelectionFromTicket(ticket: SimulationTicketRecord, fallbackLotteryCode: LotteryCode): SimulationSelection {
+  const normalized = normalizeSimulationTicket(ticket)
+  const lotteryCode = normalized.lottery_code || fallbackLotteryCode
+  const playType: SimulationPlayType = lotteryCode === 'dlt'
+    ? ((normalized.play_type === 'dlt_dantuo' ? 'dlt_dantuo' : 'dlt') as SimulationPlayType)
+    : lotteryCode === 'pl5'
+      ? 'direct'
+      : lotteryCode === 'qxc'
+        ? 'qxc_compound'
+        : ((normalized.play_type === 'group3' || normalized.play_type === 'group6' || normalized.play_type === 'direct_sum')
+          ? normalized.play_type
+          : 'direct')
+  return {
+    lotteryCode,
+    playType,
+    frontNumbers: [...(normalized.front_numbers || [])],
+    backNumbers: [...(normalized.back_numbers || [])],
+    frontDan: [...(normalized.front_dan || [])],
+    frontTuo: [...(normalized.front_tuo || [])],
+    backDan: [...(normalized.back_dan || [])],
+    backTuo: [...(normalized.back_tuo || [])],
+    directTenThousands: [...(normalized.direct_ten_thousands || [])],
+    directThousands: [...(normalized.direct_thousands || [])],
+    directHundreds: [...(normalized.direct_hundreds || [])],
+    directTens: [...(normalized.direct_tens || [])],
+    directUnits: [...(normalized.direct_units || [])],
+    groupNumbers: [...(normalized.group_numbers || [])],
+    sumValues: [...(normalized.sum_values || [])],
+    positionSelections: lotteryCode === 'qxc' ? buildQxcPositionSelectionsFromTicket(normalized) : [],
+  }
+}
+
 function formatJackpotInYiYuan(value: number | undefined) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return '—'
@@ -2213,6 +2263,8 @@ export function HomePage() {
 
 function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCode: LotteryCode; draws: LotteryDraw[]; targetPeriod: string }) {
   const queryClient = useQueryClient()
+  const [matchSource, setMatchSource] = useState<'current' | 'saved'>('current')
+  const [activeSavedTicketId, setActiveSavedTicketId] = useState<number | null>(null)
   const [dltPlayType, setDltPlayType] = useState<'dlt' | 'dlt_dantuo'>('dlt')
   const [selectedFront, setSelectedFront] = useState<string[]>([])
   const [selectedBack, setSelectedBack] = useState<string[]>([])
@@ -2293,9 +2345,19 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const betCount = ticketQuoteQuery.data?.bet_count || 0
   const amount = ticketQuoteQuery.data?.amount || 0
   const canSubmit = betCount > 0
+  const activeSavedTicket = useMemo(
+    () => ticketsQuery.data?.find((item) => item.id === activeSavedTicketId) || null,
+    [activeSavedTicketId, ticketsQuery.data],
+  )
+  const activeMatchSelection = useMemo(
+    () => (matchSource === 'saved' && activeSavedTicket ? buildSimulationSelectionFromTicket(activeSavedTicket, lotteryCode) : selection),
+    [activeSavedTicket, lotteryCode, matchSource, selection],
+  )
+  const canCompareActiveSelection = matchSource === 'saved' ? Boolean(activeSavedTicket && Number(activeSavedTicket.bet_count || 0) > 0) : canSubmit
+  const matchSourceLabel = matchSource === 'saved' && activeSavedTicket ? `方案 #${activeSavedTicket.id}` : '当前选号'
   const matches = useMemo(
-    () => (showMatches && canSubmit ? buildSimulationMatches(selection, draws, matchWindow) : []),
-    [canSubmit, draws, matchWindow, selection, showMatches],
+    () => (showMatches && canCompareActiveSelection ? buildSimulationMatches(activeMatchSelection, draws, matchWindow) : []),
+    [activeMatchSelection, canCompareActiveSelection, draws, matchWindow, showMatches],
   )
   const visibleMatches = useMemo(
     () => (showWinningOnly ? matches.filter((match) => match.totalWinningBets > 0) : matches),
@@ -2328,19 +2390,30 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   })
   const deleteMutation = useMutation({
     mutationFn: async (ticketId: number) => apiClient.deleteSimulationTicket(ticketId, lotteryCode),
-    onSuccess: async () => {
+    onSuccess: async (_result, ticketId) => {
+      if (matchSource === 'saved' && activeSavedTicketId === ticketId) {
+        setMatchSource('current')
+        setActiveSavedTicketId(null)
+        setShowMatches(false)
+      }
       setMessage('已删除保存方案。')
       await queryClient.invalidateQueries({ queryKey: ['simulation-tickets', lotteryCode] })
     },
   })
 
   useEffect(() => {
-    setShowMatches(false)
-    setShowWinningOnly(false)
+    if (matchSource === 'current') {
+      setShowMatches(false)
+      setShowWinningOnly(false)
+    }
     setMessage(null)
-  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
+  }, [matchSource, lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
 
   useEffect(() => {
+    setMatchSource('current')
+    setActiveSavedTicketId(null)
+    setShowMatches(false)
+    setShowWinningOnly(false)
     if (lotteryCode === 'dlt') {
       setDltPlayType('dlt')
       setSelectedFront([])
@@ -2366,6 +2439,15 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedGroupNumbers([])
     setSelectedSumValues([])
   }, [lotteryCode])
+
+  useEffect(() => {
+    if (matchSource !== 'saved') return
+    if (!activeSavedTicket) {
+      setMatchSource('current')
+      setActiveSavedTicketId(null)
+      setShowMatches(false)
+    }
+  }, [activeSavedTicket, matchSource])
 
   function toggleSelection(value: string, zone: 'front' | 'back') {
     const updater = zone === 'front' ? setSelectedFront : setSelectedBack
@@ -2447,8 +2529,18 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
   function handleCompare() {
     if (!canSubmit) return
+    setMatchSource('current')
+    setActiveSavedTicketId(null)
     setShowMatches(true)
     setMessage(`已按近 ${matchWindow} 期历史开奖完成匹配。`)
+  }
+
+  function handleSavedTicketCompare(ticket: SimulationTicketRecord) {
+    if (Number(ticket.bet_count || 0) <= 0) return
+    setMatchSource('saved')
+    setActiveSavedTicketId(ticket.id)
+    setShowMatches(true)
+    setMessage(`已按近 ${matchWindow} 期历史开奖完成方案 #${ticket.id} 匹配。`)
   }
 
   function handleSave() {
@@ -3017,7 +3109,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 
       <StatusCard
         title="历史匹配结果"
-        subtitle={`将当前选号与近 ${matchWindow} 期开奖数据进行对比，展示命中号码和最高奖级。`}
+        subtitle={`将${matchSourceLabel}与近 ${matchWindow} 期开奖数据进行对比，展示命中号码和最高奖级。`}
         actions={
           showMatches ? (
             <label className="toggle-chip">
@@ -3028,10 +3120,11 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
         }
       >
         {!showMatches ? (
-          <div className="state-shell">点击“历史中奖匹配”后展示对比结果。</div>
+          <div className="state-shell">点击“历史中奖匹配”或已保存方案里的“历史匹配”后展示对比结果。</div>
         ) : visibleMatches.length ? (
           <>
             <div className="simulation-match-finance-summary">
+              <span>{`来源 ${matchSourceLabel}`}</span>
               <span>总成本 {formatCurrency(visibleMatchFinanceSummary.costAmount)}</span>
               <span>总奖金 {formatCurrency(visibleMatchFinanceSummary.prizeAmount)}</span>
               <span>总盈亏 {formatCurrency(visibleMatchFinanceSummary.netProfit)}</span>
@@ -3118,6 +3211,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 key={ticket.id}
                 lotteryCode={lotteryCode}
                 ticket={ticket}
+                onMatch={handleSavedTicketCompare}
+                isMatching={matchSource === 'saved' && activeSavedTicketId === ticket.id}
                 onDelete={(ticketId) => deleteMutation.mutate(ticketId)}
                 isDeleting={deleteMutation.isPending}
               />
@@ -3134,24 +3229,33 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
 function SavedSimulationTicketCard({
   lotteryCode,
   ticket,
+  onMatch,
+  isMatching,
   onDelete,
   isDeleting,
 }: {
   lotteryCode: LotteryCode
   ticket: SimulationTicketRecord
+  onMatch: (ticket: SimulationTicketRecord) => void
+  isMatching: boolean
   onDelete: (ticketId: number) => void
   isDeleting: boolean
 }) {
   return (
-    <article className="simulation-saved-card">
+    <article className={clsx('simulation-saved-card', isMatching && 'is-active-match')}>
       <div className="simulation-saved-card__header">
         <div>
           <strong>{`方案 #${ticket.id}`}</strong>
           <span>{formatDateTimeLocal(ticket.created_at)}</span>
         </div>
-        <button className="ghost-button" type="button" disabled={isDeleting} onClick={() => onDelete(ticket.id)}>
-          删除
-        </button>
+        <div className="simulation-saved-card__actions">
+          <button className={clsx('ghost-button', isMatching && 'is-active')} type="button" onClick={() => onMatch(ticket)}>
+            {isMatching ? '匹配中' : '历史匹配'}
+          </button>
+          <button className="ghost-button" type="button" disabled={isDeleting} onClick={() => onDelete(ticket.id)}>
+            删除
+          </button>
+        </div>
       </div>
       <div className="simulation-saved-card__numbers">
         {lotteryCode === 'dlt' && ticket.play_type === 'dlt_dantuo' ? (

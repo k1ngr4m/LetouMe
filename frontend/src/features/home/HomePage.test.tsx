@@ -1871,6 +1871,32 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('第 2026030 期')).not.toBeInTheDocument()
   })
 
+  it('supports historical matching from saved simulation ticket card', async () => {
+    getSimulationTickets.mockResolvedValueOnce({
+      tickets: [
+        {
+          id: 31,
+          lottery_code: 'dlt',
+          play_type: 'dlt',
+          front_numbers: ['01', '02', '03', '04', '05'],
+          back_numbers: ['06', '07'],
+          bet_count: 1,
+          amount: 2,
+          created_at: '2026-03-18T00:00:00Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    await userEvent.click(screen.getByRole('button', { name: '历史匹配' }))
+
+    expect(await screen.findByText('来源 方案 #31')).toBeInTheDocument()
+    expect(screen.getByText('将方案 #31与近 30 期开奖数据进行对比，展示命中号码和最高奖级。')).toBeInTheDocument()
+    expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+  })
+
   it('shows empty state when winning-only filter hides all simulation matches and resets on reselection', async () => {
     renderPage()
 

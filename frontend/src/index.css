@@ -8001,11 +8001,25 @@ a {
     0 16px 30px rgba(4, 24, 28, 0.28);
 }
 
+.simulation-saved-card.is-active-match {
+  border-color: rgba(120, 186, 255, 0.48);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(124, 186, 255, 0.2), transparent 54%),
+    linear-gradient(145deg, rgba(18, 41, 68, 0.8), rgba(11, 27, 45, 0.84));
+}
+
 .simulation-match-card__meta,
 .simulation-saved-card__header div {
   display: grid;
   gap: 0.2rem;
   justify-items: end;
+}
+
+.simulation-saved-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .simulation-match-card__section {
@@ -8078,6 +8092,13 @@ a {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.84),
     0 14px 24px rgba(89, 149, 119, 0.18);
+}
+
+:root[data-theme='light'] .simulation-saved-card.is-active-match {
+  border-color: rgba(118, 167, 235, 0.46);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(150, 198, 255, 0.26), transparent 56%),
+    linear-gradient(145deg, rgba(240, 248, 255, 0.96), rgba(226, 239, 255, 0.9));
 }
 
 :root[data-theme='light'] .simulation-section::before,
@@ -9933,6 +9954,10 @@ a {
   .simulation-match-card__meta,
   .simulation-saved-card__header div {
     justify-items: start;
+  }
+
+  .simulation-saved-card__actions {
+    justify-content: flex-start;
   }
 
   .landing-panel--auth {
