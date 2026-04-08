@@ -2,7 +2,7 @@ import clsx from 'clsx'
 
 type NumberBallProps = {
   value: string
-  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5'
+  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5' | 'dlt-front' | 'dlt-back'
   isHit?: boolean
   size?: 'sm' | 'md'
   tone?: 'default' | 'muted'

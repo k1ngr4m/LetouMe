@@ -389,7 +389,8 @@ function formatPercent(value: number | undefined) {
   return `${Math.round((value || 0) * 100)}%`
 }
 
-function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5' {
+function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: number): 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5' | 'dlt-front' {
+  if (lotteryCode === 'dlt') return 'dlt-front'
   if (lotteryCode === 'pl3' || lotteryCode === 'pl5') return 'pl3pl5'
   if (lotteryCode !== 'qxc') return 'red'
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
@@ -1732,15 +1733,15 @@ export function HomePage() {
 	                      </>
 	                    ) : dltPredictionMode === 'dantuo' ? (
                         <>
-                          <SummaryList title="前区胆统计" items={summary.frontDan || []} color="red" models={summaryModels} />
-                          <SummaryList title="前区拖统计" items={summary.frontTuo || []} color="red" models={summaryModels} />
-                          <SummaryList title="后区胆统计" items={summary.backDan || []} color="blue" models={summaryModels} />
-                          <SummaryList title="后区拖统计" items={summary.backTuo || []} color="blue" models={summaryModels} />
+                          <SummaryList title="前区胆统计" items={summary.frontDan || []} color="dlt-front" models={summaryModels} />
+                          <SummaryList title="前区拖统计" items={summary.frontTuo || []} color="dlt-front" models={summaryModels} />
+                          <SummaryList title="后区胆统计" items={summary.backDan || []} color="dlt-back" models={summaryModels} />
+                          <SummaryList title="后区拖统计" items={summary.backTuo || []} color="dlt-back" models={summaryModels} />
                         </>
                       ) : (
                         <>
-                          <SummaryList title="前区统计" items={summary.red} color="red" models={summaryModels} />
-                          <SummaryList title="后区统计" items={summary.blue} color="blue" models={summaryModels} />
+                          <SummaryList title="前区统计" items={summary.red} color="dlt-front" models={summaryModels} />
+                          <SummaryList title="后区统计" items={summary.blue} color="dlt-back" models={summaryModels} />
                         </>
                       )}
                     </div>
@@ -2501,7 +2502,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`front-dan-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedFrontDan.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-front', selectedFrontDan.includes(ball) && 'is-selected')}
                           onClick={() => toggleDantuoSelection(ball, 'front_dan')}
                           aria-label={`前胆 ${ball}`}
                         >
@@ -2524,7 +2525,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`front-tuo-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedFrontTuo.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-front', selectedFrontTuo.includes(ball) && 'is-selected')}
                           onClick={() => toggleDantuoSelection(ball, 'front_tuo')}
                           aria-label={`前拖 ${ball}`}
                         >
@@ -2547,7 +2548,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`back-dan-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-back', selectedBackDan.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-back', selectedBackDan.includes(ball) && 'is-selected')}
                           onClick={() => toggleDantuoSelection(ball, 'back_dan')}
                           aria-label={`后胆 ${ball}`}
                         >
@@ -2570,7 +2571,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`back-tuo-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-back', selectedBackTuo.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-back', selectedBackTuo.includes(ball) && 'is-selected')}
                           onClick={() => toggleDantuoSelection(ball, 'back_tuo')}
                           aria-label={`后拖 ${ball}`}
                         >
@@ -2595,7 +2596,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`front-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-front', selectedFront.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-front', selectedFront.includes(ball) && 'is-selected')}
                           onClick={() => toggleSelection(ball, 'front')}
                           aria-label={`前区 ${ball}`}
                         >
@@ -2618,7 +2619,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         <button
                           key={`back-${ball}`}
                           type="button"
-                          className={clsx('simulation-ball', 'is-back', selectedBack.includes(ball) && 'is-selected')}
+                          className={clsx('simulation-ball', 'is-dlt-back', selectedBack.includes(ball) && 'is-selected')}
                           onClick={() => toggleSelection(ball, 'back')}
                           aria-label={`后区 ${ball}`}
                         >
@@ -2902,29 +2903,29 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 {isDltDantuo ? (
                   <div className="number-row number-row--tight">
                     {selectedFrontDan.map((ball) => (
-                      <NumberBall key={`selected-front-dan-${ball}`} value={ball} color="red" size="sm" />
+                      <NumberBall key={`selected-front-dan-${ball}`} value={ball} color="dlt-front" size="sm" />
                     ))}
                     {selectedFrontTuo.length ? <span className="number-row__divider" /> : null}
                     {selectedFrontTuo.map((ball) => (
-                      <NumberBall key={`selected-front-tuo-${ball}`} value={ball} color="red" size="sm" />
+                      <NumberBall key={`selected-front-tuo-${ball}`} value={ball} color="dlt-front" size="sm" />
                     ))}
                     {(selectedBackDan.length || selectedBackTuo.length) ? <span className="number-row__divider" /> : null}
                     {selectedBackDan.map((ball) => (
-                      <NumberBall key={`selected-back-dan-${ball}`} value={ball} color="blue" size="sm" />
+                      <NumberBall key={`selected-back-dan-${ball}`} value={ball} color="dlt-back" size="sm" />
                     ))}
                     {selectedBackTuo.length ? <span className="number-row__divider" /> : null}
                     {selectedBackTuo.map((ball) => (
-                      <NumberBall key={`selected-back-tuo-${ball}`} value={ball} color="blue" size="sm" />
+                      <NumberBall key={`selected-back-tuo-${ball}`} value={ball} color="dlt-back" size="sm" />
                     ))}
                   </div>
                 ) : (
                   <div className="number-row number-row--tight">
                     {selectedFront.map((ball) => (
-                      <NumberBall key={`selected-front-${ball}`} value={ball} color="red" size="sm" />
+                      <NumberBall key={`selected-front-${ball}`} value={ball} color="dlt-front" size="sm" />
                     ))}
                     {selectedBack.length ? <span className="number-row__divider" /> : null}
                     {selectedBack.map((ball) => (
-                      <NumberBall key={`selected-back-${ball}`} value={ball} color="blue" size="sm" />
+                      <NumberBall key={`selected-back-${ball}`} value={ball} color="dlt-back" size="sm" />
                     ))}
                   </div>
                 )}
@@ -3039,7 +3040,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                         value={ball}
                         color={
                           lotteryCode === 'dlt'
-                            ? 'red'
+                            ? 'dlt-front'
                             : resolveDigitBallColor(
                                 lotteryCode,
                                 index,
@@ -3053,7 +3054,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     {lotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
                     {lotteryCode === 'dlt'
                       ? match.actualResult.blue_balls.map((ball, index) => (
-                          <NumberBall key={`${match.period}-actual-blue-${index}-${ball}`} value={ball} color="blue" size="sm" isHit={match.blueHits.includes(ball)} />
+                          <NumberBall key={`${match.period}-actual-blue-${index}-${ball}`} value={ball} color="dlt-back" size="sm" isHit={match.blueHits.includes(ball)} />
                         ))
                       : null}
                   </div>
@@ -3127,29 +3128,29 @@ function SavedSimulationTicketCard({
         {lotteryCode === 'dlt' && ticket.play_type === 'dlt_dantuo' ? (
           <div className="number-row number-row--tight">
             {(ticket.front_dan || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-front-dan-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-front-dan-${ball}`} value={ball} color="dlt-front" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.front_tuo || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-front-tuo-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-front-tuo-${ball}`} value={ball} color="dlt-front" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.back_dan || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-back-dan-${ball}`} value={ball} color="blue" size="sm" />
+              <NumberBall key={`${ticket.id}-back-dan-${ball}`} value={ball} color="dlt-back" size="sm" />
             ))}
             <span className="number-row__divider" />
             {(ticket.back_tuo || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-back-tuo-${ball}`} value={ball} color="blue" size="sm" />
+              <NumberBall key={`${ticket.id}-back-tuo-${ball}`} value={ball} color="dlt-back" size="sm" />
             ))}
           </div>
         ) : lotteryCode === 'dlt' ? (
           <div className="number-row number-row--tight">
             {ticket.front_numbers.map((ball) => (
-              <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="red" size="sm" />
+              <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="dlt-front" size="sm" />
             ))}
             <span className="number-row__divider" />
             {ticket.back_numbers.map((ball) => (
-              <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="blue" size="sm" />
+              <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="dlt-back" size="sm" />
             ))}
           </div>
         ) : lotteryCode === 'pl5' ? (
@@ -3662,19 +3663,19 @@ function PredictionNumberRow({
     const frontTuoValues = frontTuo.length ? frontTuo : frontDan.length ? [] : group.red_balls
     const backDanValues = backDan
     const backTuoValues = backTuo.length ? backTuo : backDan.length ? [] : group.blue_balls
-    const frontSegments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }> = []
-    const backSegments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }> = []
-    if (frontDanValues.length) frontSegments.push({ key: 'front-dan', label: '前胆', color: 'red', values: frontDanValues })
-    if (frontTuoValues.length) frontSegments.push({ key: 'front-tuo', label: '前拖', color: 'red', values: frontTuoValues })
-    if (backDanValues.length) backSegments.push({ key: 'back-dan', label: '后胆', color: 'blue', values: backDanValues })
-    if (backTuoValues.length) backSegments.push({ key: 'back-tuo', label: '后拖', color: 'blue', values: backTuoValues })
-    const renderSegments = (segments: Array<{ key: string; label: string; color: 'red' | 'blue'; values: string[] }>) =>
+    const frontSegments: Array<{ key: string; label: string; color: 'dlt-front' | 'dlt-back'; values: string[] }> = []
+    const backSegments: Array<{ key: string; label: string; color: 'dlt-front' | 'dlt-back'; values: string[] }> = []
+    if (frontDanValues.length) frontSegments.push({ key: 'front-dan', label: '前胆', color: 'dlt-front', values: frontDanValues })
+    if (frontTuoValues.length) frontSegments.push({ key: 'front-tuo', label: '前拖', color: 'dlt-front', values: frontTuoValues })
+    if (backDanValues.length) backSegments.push({ key: 'back-dan', label: '后胆', color: 'dlt-back', values: backDanValues })
+    if (backTuoValues.length) backSegments.push({ key: 'back-tuo', label: '后拖', color: 'dlt-back', values: backTuoValues })
+    const renderSegments = (segments: Array<{ key: string; label: string; color: 'dlt-front' | 'dlt-back'; values: string[] }>) =>
       segments.map((segment, segmentIndex) => (
         <span key={`${group.group_id}-${segment.key}`} className="number-row__segment">
           {segmentIndex > 0 ? <span className="number-row__divider" /> : null}
           <span className="number-row__segment-label">{segment.label}</span>
           {segment.values.map((ball, index) => {
-            const hitValues = segment.color === 'red' ? hit?.redHits || [] : hit?.blueHits || []
+            const hitValues = segment.color === 'dlt-front' ? hit?.redHits || [] : hit?.blueHits || []
             const isHit = Boolean(hitValues.includes(ball))
             return (
               <NumberBall
@@ -3738,7 +3739,7 @@ function PredictionNumberRow({
           <NumberBall
             key={`r-${group.group_id}-${index}-${ball}`}
             value={ball}
-            color="red"
+            color={inferredLotteryCode === 'dlt' ? 'dlt-front' : 'red'}
             isHit={isHit}
             tone={grayMisses && !isHit ? 'muted' : 'default'}
           />
@@ -3751,7 +3752,7 @@ function PredictionNumberRow({
           <NumberBall
             key={`b-${group.group_id}-${index}-${ball}`}
             value={ball}
-            color="blue"
+            color={inferredLotteryCode === 'dlt' ? 'dlt-back' : 'blue'}
             isHit={isHit}
             tone={grayMisses && !isHit ? 'muted' : 'default'}
           />
@@ -3771,7 +3772,7 @@ function SummaryList({
 }: {
   title: string
   items: BallStatItem[]
-  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5'
+  color: 'red' | 'blue' | 'qxc-front' | 'qxc-back' | 'pl3pl5' | 'dlt-front' | 'dlt-back'
   models: PredictionModel[]
   compact?: boolean
   hitSet?: Set<string>
@@ -4634,7 +4635,7 @@ function HistoryRecordCard({
           {actualLotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
           {actualLotteryCode === 'dlt'
             ? record.actual_result.blue_balls.map((ball, index) => (
-                <NumberBall key={`${record.target_period}-blue-${index}-${ball}`} value={ball} color="blue" />
+                <NumberBall key={`${record.target_period}-blue-${index}-${ball}`} value={ball} color="dlt-back" />
               ))
             : null}
         </div>
@@ -4849,15 +4850,15 @@ function HistoryRecordCard({
 	                </>
 	              ) : isDltDantuoHistorySummary ? (
                   <>
-                    <SummaryList title="前区胆统计" items={periodPredictionSummary.frontDan || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
-                    <SummaryList title="前区拖统计" items={periodPredictionSummary.frontTuo || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
-                    <SummaryList title="后区胆统计" items={periodPredictionSummary.backDan || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
-                    <SummaryList title="后区拖统计" items={periodPredictionSummary.backTuo || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                    <SummaryList title="前区胆统计" items={periodPredictionSummary.frontDan || []} color="dlt-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="前区拖统计" items={periodPredictionSummary.frontTuo || []} color="dlt-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="后区胆统计" items={periodPredictionSummary.backDan || []} color="dlt-back" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                    <SummaryList title="后区拖统计" items={periodPredictionSummary.backTuo || []} color="dlt-back" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
                   </>
                 ) : (
                   <>
-                    <SummaryList title="前区统计" items={periodPredictionSummary.red} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
-                    <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
+                    <SummaryList title="前区统计" items={periodPredictionSummary.red} color="dlt-front" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.redHits} />
+                    <SummaryList title="后区统计" items={periodPredictionSummary.blue} color="dlt-back" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.blueHits} />
                   </>
                 )}
             </div>

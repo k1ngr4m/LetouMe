@@ -481,6 +481,10 @@ function resolveDigitColorForLottery(lotteryCode: LotteryCode): 'red' | 'pl3pl5'
   return lotteryCode === 'pl3' || lotteryCode === 'pl5' ? 'pl3pl5' : 'red'
 }
 
+function resolveDltBallColor(zone: 'front' | 'back'): 'dlt-front' | 'dlt-back' {
+  return zone === 'front' ? 'dlt-front' : 'dlt-back'
+}
+
 function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
   if (!record.actual_result) {
     return <span className="my-bets-card__meta">待开奖，暂无开奖号码</span>
@@ -489,11 +493,11 @@ function renderActualResult(record: MyBetRecord, lotteryCode: LotteryCode) {
     return (
       <div className="number-row number-row--tight">
         {(record.actual_result.red_balls || []).map((ball) => (
-          <NumberBall key={`${record.id}-actual-front-${ball}`} value={ball} color="red" size="sm" />
+          <NumberBall key={`${record.id}-actual-front-${ball}`} value={ball} color={resolveDltBallColor('front')} size="sm" />
         ))}
         <span className="number-row__divider" />
         {(record.actual_result.blue_balls || []).map((ball) => (
-          <NumberBall key={`${record.id}-actual-back-${ball}`} value={ball} color="blue" size="sm" />
+          <NumberBall key={`${record.id}-actual-back-${ball}`} value={ball} color={resolveDltBallColor('back')} size="sm" />
         ))}
       </div>
     )
@@ -532,19 +536,19 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
       return (
         <div className="number-row number-row--tight">
           {(line.front_dan || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-front-dan-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-dan-${ball}`} value={ball} color={resolveDltBallColor('front')} size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
           ))}
           <span className="number-row__divider" />
           {(line.front_tuo || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-front-tuo-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+            <NumberBall key={`${recordId}-line-${line.line_no}-front-tuo-${ball}`} value={ball} color={resolveDltBallColor('front')} size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
           ))}
           <span className="number-row__divider" />
           {(line.back_dan || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-back-dan-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-dan-${ball}`} value={ball} color={resolveDltBallColor('back')} size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
           ))}
           <span className="number-row__divider" />
           {(line.back_tuo || []).map((ball) => (
-            <NumberBall key={`${recordId}-line-${line.line_no}-back-tuo-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+            <NumberBall key={`${recordId}-line-${line.line_no}-back-tuo-${ball}`} value={ball} color={resolveDltBallColor('back')} size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
           ))}
         </div>
       )
@@ -552,11 +556,11 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
     return (
       <div className="number-row number-row--tight">
         {(line.front_numbers || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-front-${ball}`} value={ball} color="red" size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
+          <NumberBall key={`${recordId}-line-${line.line_no}-front-${ball}`} value={ball} color={resolveDltBallColor('front')} size="sm" isHit={hitFront.has(ball)} tone={resolveTone(hitFront.has(ball))} />
         ))}
         <span className="number-row__divider" />
         {(line.back_numbers || []).map((ball) => (
-          <NumberBall key={`${recordId}-line-${line.line_no}-back-${ball}`} value={ball} color="blue" size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
+          <NumberBall key={`${recordId}-line-${line.line_no}-back-${ball}`} value={ball} color={resolveDltBallColor('back')} size="sm" isHit={hitBack.has(ball)} tone={resolveTone(hitBack.has(ball))} />
         ))}
       </div>
     )
@@ -658,7 +662,7 @@ function BallPicker({
   numbers: string[]
   selectedInput: string
   onToggle: (value: string) => void
-  color: 'red' | 'blue' | 'pl3pl5'
+  color: 'red' | 'blue' | 'pl3pl5' | 'dlt-front' | 'dlt-back'
 }) {
   const selected = new Set(splitNumbers(selectedInput))
   return (
@@ -1344,7 +1348,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, frontDanInput: togglePickFromInput(current.frontDanInput, value, dltFrontPool.length) }))
                                 }
-                                color="red"
+                                color="dlt-front"
                               />
                               <BallPicker
                                 label="前区拖码点击选号"
@@ -1353,7 +1357,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, frontTuoInput: togglePickFromInput(current.frontTuoInput, value, dltFrontPool.length) }))
                                 }
-                                color="red"
+                                color="dlt-front"
                               />
                               <BallPicker
                                 label="后区胆码点击选号"
@@ -1362,7 +1366,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, backDanInput: togglePickFromInput(current.backDanInput, value, dltBackPool.length) }))
                                 }
-                                color="blue"
+                                color="dlt-back"
                               />
                               <BallPicker
                                 label="后区拖码点击选号"
@@ -1371,7 +1375,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, backTuoInput: togglePickFromInput(current.backTuoInput, value, dltBackPool.length) }))
                                 }
-                                color="blue"
+                                color="dlt-back"
                               />
                               <div className="settings-form-grid my-bets-modal__grid">
                                 <label>
@@ -1431,7 +1435,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, frontNumbersInput: togglePickFromInput(current.frontNumbersInput, value, dltFrontPool.length) }))
                                 }
-                                color="red"
+                                color="dlt-front"
                               />
                               <BallPicker
                                 label="后区点击选号"
@@ -1440,7 +1444,7 @@ export function MyBetsPanel({
                                 onToggle={(value) =>
                                   updateLine(index, (current) => ({ ...current, backNumbersInput: togglePickFromInput(current.backNumbersInput, value, dltBackPool.length) }))
                                 }
-                                color="blue"
+                                color="dlt-back"
                               />
                               <div className="settings-form-grid my-bets-modal__grid">
                                 <label>
