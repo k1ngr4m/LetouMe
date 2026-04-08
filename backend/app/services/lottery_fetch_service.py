@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import requests
@@ -318,18 +319,25 @@ class LotteryFetchService:
         numeric_periods = [int(period) for period in deduplicated if period.isdigit()]
         if not numeric_periods:
             return sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
-        next_period = min(numeric_periods) - 1
+        seed_period = min(numeric_periods)
+        period_width = len(str(seed_period))
+        current_period = str(seed_period).zfill(period_width)
+        current_draw_date = self._parse_date_text(str(deduplicated.get(current_period, {}).get("date") or ""))
         consecutive_misses = 0
-        while len(deduplicated) < target_count and next_period > 0 and consecutive_misses < 12:
-            period = str(next_period)
-            next_period -= 1
-            if period in deduplicated:
+        while len(deduplicated) < target_count and consecutive_misses < 12:
+            previous_period, previous_draw_date = self._resolve_previous_qxc_period(current_period, current_draw_date)
+            if not previous_period:
+                break
+            current_period = previous_period
+            current_draw_date = previous_draw_date
+            if previous_period in deduplicated:
                 continue
-            draw = self.fetch_qxc_draw_by_period(period)
+            draw = self.fetch_qxc_draw_by_period(previous_period)
             if not draw:
                 consecutive_misses += 1
                 continue
-            deduplicated[period] = draw
+            deduplicated[previous_period] = draw
+            current_draw_date = self._parse_date_text(str(draw.get("date") or "")) or current_draw_date
             consecutive_misses = 0
         result = sorted(deduplicated.values(), key=lambda item: str(item.get("period") or ""), reverse=True)
         self.logger.info(
@@ -342,6 +350,65 @@ class LotteryFetchService:
             },
         )
         return result
+
+    def _resolve_previous_qxc_period(self, period: str, draw_date: date | None) -> tuple[str | None, date | None]:
+        normalized_period = str(period or "").strip()
+        if normalized_period.isdigit() and len(normalized_period) >= 5 and draw_date is not None:
+            year_width = len(normalized_period) - 3
+            seq = int(normalized_period[-3:])
+            full_year = draw_date.year
+            if seq > 1:
+                previous_seq = seq - 1
+                previous_year_token = normalized_period[:year_width]
+            else:
+                previous_full_year = full_year - 1
+                previous_seq = self._count_qxc_draws_in_year(previous_full_year)
+                previous_year_token = (
+                    str(previous_full_year % 100).zfill(year_width)
+                    if year_width == 2
+                    else str(previous_full_year).zfill(year_width)
+                )
+            previous_period = f"{previous_year_token}{previous_seq:03d}"
+            return previous_period, self._previous_qxc_draw_date(draw_date)
+        if not normalized_period.isdigit():
+            return None, draw_date
+        fallback = int(normalized_period) - 1
+        if fallback <= 0:
+            return None, draw_date
+        if fallback % 1000 == 0:
+            fallback -= 1
+        return str(fallback).zfill(len(normalized_period)), draw_date
+
+    @staticmethod
+    def _previous_qxc_draw_date(value: date) -> date:
+        probe = value - timedelta(days=1)
+        while probe.weekday() not in {1, 4, 6}:
+            probe -= timedelta(days=1)
+        return probe
+
+    @staticmethod
+    def _count_qxc_draws_in_year(year: int) -> int:
+        start = date(year, 1, 1)
+        end = date(year, 12, 31)
+        count = 0
+        probe = start
+        while probe <= end:
+            if probe.weekday() in {1, 4, 6}:
+                count += 1
+            probe += timedelta(days=1)
+        return count
+
+    @staticmethod
+    def _parse_date_text(value: str) -> date | None:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return None
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+            try:
+                return datetime.strptime(normalized[:10], fmt).date()
+            except ValueError:
+                continue
+        return None
 
     def fetch_qxc_draw_by_period(self, period: str) -> dict[str, Any] | None:
         if self.lottery_code != "qxc":

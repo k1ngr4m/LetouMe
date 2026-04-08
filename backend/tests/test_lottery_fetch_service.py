@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date
 from unittest.mock import Mock
 
 from bs4 import BeautifulSoup
@@ -346,6 +347,15 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(result["fetched_count"], 30)
         self.assertEqual(result["saved_count"], 30)
         self.assertEqual(service.fetch_qxc_draw_by_period.call_count, 20)
+
+    def test_resolve_previous_qxc_period_rolls_year_by_draw_count_not_999(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+
+        previous_period, previous_draw_date = service._resolve_previous_qxc_period("26001", date(2026, 1, 2))
+
+        self.assertEqual(previous_period, "25156")
+        self.assertEqual(previous_draw_date, date(2025, 12, 30))
 
     def test_fetch_and_save_uses_default_limit_30(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
