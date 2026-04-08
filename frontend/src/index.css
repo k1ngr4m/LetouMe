@@ -7950,6 +7950,22 @@ a {
   gap: 0.85rem;
 }
 
+.simulation-match-finance-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.simulation-match-finance-summary span,
+.simulation-match-card__finance span {
+  padding: 0.36rem 0.68rem;
+  border-radius: 999px;
+  border: 1px solid rgba(160, 197, 250, 0.22);
+  background: rgba(131, 173, 241, 0.14);
+  color: var(--text-1);
+}
+
 @media (min-width: 1760px) {
   .simulation-match-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -7995,6 +8011,18 @@ a {
 .simulation-match-card__section {
   display: grid;
   gap: 0.45rem;
+}
+
+.simulation-match-card__finance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.simulation-match-card__prize-pending {
+  margin: -0.22rem 0 0;
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--amber-500) 62%, var(--text-2) 38%);
 }
 
 .simulation-prize-list {
@@ -8064,6 +8092,13 @@ a {
   border-color: rgba(127, 162, 214, 0.34);
   background: linear-gradient(140deg, rgba(128, 182, 248, 0.2), rgba(96, 145, 220, 0.08));
   color: rgba(72, 98, 136, 0.9);
+}
+
+:root[data-theme='light'] .simulation-match-finance-summary span,
+:root[data-theme='light'] .simulation-match-card__finance span {
+  border-color: rgba(127, 162, 214, 0.3);
+  background: rgba(125, 168, 228, 0.14);
+  color: rgba(57, 81, 116, 0.95);
 }
 
 :root[data-theme='light'] .simulation-ball {

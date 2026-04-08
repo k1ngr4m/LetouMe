@@ -223,6 +223,35 @@ describe('simulation helpers', () => {
     expect(matches[0].digitHits).toEqual(['01', '02', '03', '04', '05'])
   })
 
+  it('computes cost/prize/profit and marks pending amount when prize breakdown is missing', () => {
+    const withAmount = buildSimulationMatches(
+      makeDltSelection(['01', '02', '03', '04', '05'], ['01', '02']),
+      [
+        {
+          period: '26020',
+          date: '2026-02-01',
+          red_balls: ['01', '02', '03', '04', '05'],
+          blue_balls: ['01', '02'],
+          prize_breakdown: [{ prize_level: '一等奖', prize_type: 'basic', winner_count: 1, prize_amount: 5000000, total_amount: 5000000 }],
+        },
+      ],
+      30,
+    )
+    expect(withAmount[0].costAmount).toBe(2)
+    expect(withAmount[0].prizeAmount).toBe(5000000)
+    expect(withAmount[0].netProfit).toBe(4999998)
+    expect(withAmount[0].prizeAmountReady).toBe(true)
+
+    const pendingAmount = buildSimulationMatches(
+      makeDltSelection(['01', '02', '03', '04', '05'], ['01', '02']),
+      [{ period: '26021', date: '2026-02-02', red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['01', '02'] }],
+      30,
+    )
+    expect(pendingAmount[0].prizeAmount).toBe(0)
+    expect(pendingAmount[0].prizeAmountReady).toBe(false)
+    expect(pendingAmount[0].netProfit).toBe(-2)
+  })
+
   it('calculates and matches pl3 direct_sum bets', () => {
     const selection: SimulationSelection = {
       lotteryCode: 'pl3',

@@ -2301,6 +2301,21 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     () => (showWinningOnly ? matches.filter((match) => match.totalWinningBets > 0) : matches),
     [matches, showWinningOnly],
   )
+  const visibleMatchFinanceSummary = useMemo(
+    () =>
+      visibleMatches.reduce(
+        (accumulator, match) => ({
+          costAmount: accumulator.costAmount + Number(match.costAmount || 0),
+          prizeAmount: accumulator.prizeAmount + Number(match.prizeAmount || 0),
+          netProfit: accumulator.netProfit + Number(match.netProfit || 0),
+          pendingPrizeCount:
+            accumulator.pendingPrizeCount +
+            (match.totalWinningBets > 0 && !match.prizeAmountReady ? 1 : 0),
+        }),
+        { costAmount: 0, prizeAmount: 0, netProfit: 0, pendingPrizeCount: 0 },
+      ),
+    [visibleMatches],
+  )
   const saveMutation = useMutation({
     mutationFn: async () => {
       const response = await apiClient.createSimulationTicket(simulationPayload)
@@ -3015,63 +3030,77 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
         {!showMatches ? (
           <div className="state-shell">点击“历史中奖匹配”后展示对比结果。</div>
         ) : visibleMatches.length ? (
-          <div className="simulation-match-list">
-            {visibleMatches.map((match) => (
-              <article key={match.period} className={clsx('simulation-match-card', match.totalWinningBets > 0 && 'is-winning')}>
-                <div className="simulation-match-card__header">
-                  <div>
-                    <p className="history-record-card__eyebrow">第 {match.period} 期</p>
-                    <strong>{match.topPrizeLevel}</strong>
+          <>
+            <div className="simulation-match-finance-summary">
+              <span>总成本 {formatCurrency(visibleMatchFinanceSummary.costAmount)}</span>
+              <span>总奖金 {formatCurrency(visibleMatchFinanceSummary.prizeAmount)}</span>
+              <span>总盈亏 {formatCurrency(visibleMatchFinanceSummary.netProfit)}</span>
+              {visibleMatchFinanceSummary.pendingPrizeCount > 0 ? <span>{`待补全 ${visibleMatchFinanceSummary.pendingPrizeCount} 期`}</span> : null}
+            </div>
+            <div className="simulation-match-list">
+              {visibleMatches.map((match) => (
+                <article key={match.period} className={clsx('simulation-match-card', match.totalWinningBets > 0 && 'is-winning')}>
+                  <div className="simulation-match-card__header">
+                    <div>
+                      <p className="history-record-card__eyebrow">第 {match.period} 期</p>
+                      <strong>{match.topPrizeLevel}</strong>
+                    </div>
+                    <div className="simulation-match-card__meta">
+                      <span>{match.date}</span>
+                      <span>{match.totalWinningBets ? `中奖 ${match.totalWinningBets} 注` : '未中奖'}</span>
+                    </div>
                   </div>
-                  <div className="simulation-match-card__meta">
-                    <span>{match.date}</span>
-                    <span>{match.totalWinningBets ? `中奖 ${match.totalWinningBets} 注` : '未中奖'}</span>
+                  <div className="simulation-match-card__section">
+                    <span>开奖号码</span>
+                    <div className="number-row number-row--tight">
+                      {(lotteryCode === 'dlt'
+                        ? match.actualResult.red_balls
+                        : (match.actualResult.digits || match.actualResult.red_balls)
+                      ).map((ball, index) => (
+                        <NumberBall
+                          key={`${match.period}-actual-main-${index}-${ball}`}
+                          value={ball}
+                          color={
+                            lotteryCode === 'dlt'
+                              ? 'dlt-front'
+                              : resolveDigitBallColor(
+                                  lotteryCode,
+                                  index,
+                                  (match.actualResult.digits || match.actualResult.red_balls || []).length,
+                                )
+                          }
+                          size="sm"
+                          isHit={lotteryCode === 'dlt' ? match.redHits.includes(ball) : match.digitHits.includes(ball)}
+                        />
+                      ))}
+                      {lotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
+                      {lotteryCode === 'dlt'
+                        ? match.actualResult.blue_balls.map((ball, index) => (
+                            <NumberBall key={`${match.period}-actual-blue-${index}-${ball}`} value={ball} color="dlt-back" size="sm" isHit={match.blueHits.includes(ball)} />
+                          ))
+                        : null}
+                    </div>
                   </div>
-                </div>
-                <div className="simulation-match-card__section">
-                  <span>开奖号码</span>
-                  <div className="number-row number-row--tight">
-                    {(lotteryCode === 'dlt'
-                      ? match.actualResult.red_balls
-                      : (match.actualResult.digits || match.actualResult.red_balls)
-                    ).map((ball, index) => (
-                      <NumberBall
-                        key={`${match.period}-actual-main-${index}-${ball}`}
-                        value={ball}
-                        color={
-                          lotteryCode === 'dlt'
-                            ? 'dlt-front'
-                            : resolveDigitBallColor(
-                                lotteryCode,
-                                index,
-                                (match.actualResult.digits || match.actualResult.red_balls || []).length,
-                              )
-                        }
-                        size="sm"
-                        isHit={lotteryCode === 'dlt' ? match.redHits.includes(ball) : match.digitHits.includes(ball)}
-                      />
-                    ))}
-                    {lotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
-                    {lotteryCode === 'dlt'
-                      ? match.actualResult.blue_balls.map((ball, index) => (
-                          <NumberBall key={`${match.period}-actual-blue-${index}-${ball}`} value={ball} color="dlt-back" size="sm" isHit={match.blueHits.includes(ball)} />
-                        ))
-                      : null}
+                  <div className="simulation-match-card__section">
+                    <span>
+                      {lotteryCode === 'dlt'
+                        ? `命中前区 ${match.redHits.length} 个 / 后区 ${match.blueHits.length} 个`
+                        : `命中位置 ${match.digitHits.length} 个`}
+                    </span>
+                    <div className="simulation-prize-list">
+                      {match.prizes.length ? match.prizes.map((prize) => <span key={`${match.period}-${prize.level}`}>{`${prize.level} × ${prize.count}`}</span>) : <span>未形成中奖注数</span>}
+                    </div>
                   </div>
-                </div>
-                <div className="simulation-match-card__section">
-                  <span>
-                    {lotteryCode === 'dlt'
-                      ? `命中前区 ${match.redHits.length} 个 / 后区 ${match.blueHits.length} 个`
-                      : `命中位置 ${match.digitHits.length} 个`}
-                  </span>
-                  <div className="simulation-prize-list">
-                    {match.prizes.length ? match.prizes.map((prize) => <span key={`${match.period}-${prize.level}`}>{`${prize.level} × ${prize.count}`}</span>) : <span>未形成中奖注数</span>}
+                  <div className="simulation-match-card__finance">
+                    <span>成本 {formatCurrency(match.costAmount)}</span>
+                    <span>奖金 {formatCurrency(match.prizeAmount)}</span>
+                    <span>盈亏 {formatCurrency(match.netProfit)}</span>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                  {match.totalWinningBets > 0 && !match.prizeAmountReady ? <p className="simulation-match-card__prize-pending">奖金待补全</p> : null}
+                </article>
+              ))}
+            </div>
+          </>
         ) : showWinningOnly && matches.length ? (
           <div className="state-shell">当前筛选条件下没有中奖期数。</div>
         ) : (

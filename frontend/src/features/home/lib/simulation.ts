@@ -1,4 +1,4 @@
-import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
+import type { LotteryCode, LotteryDraw, PrizeBreakdownItem, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
 export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'qxc_compound'
@@ -50,6 +50,10 @@ export type SimulationMatchRecord = {
   totalWinningBets: number
   topPrizeLevel: PrizeLevel
   prizes: SimulationMatchPrize[]
+  costAmount: number
+  prizeAmount: number
+  netProfit: number
+  prizeAmountReady: boolean
   actualResult: LotteryDraw
 }
 
@@ -324,6 +328,7 @@ export function buildSimulationMatches(selection: SimulationSelection, draws: Lo
 }
 
 function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
+  const costAmount = calculateAmount(selection)
   if (selection.playType === 'dlt_dantuo') {
     const frontDan = selection.frontDan.map(padBall).sort()
     const frontTuo = selection.frontTuo.map(padBall).sort()
@@ -353,6 +358,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
       const winningPrizes = dltPrizeLevelOrder(draw.period)
         .filter((level) => (prizeMap.get(level) || 0) > 0)
         .map((level) => ({ level, count: prizeMap.get(level) || 0 }))
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown)
       return {
         period: draw.period,
         date: draw.date,
@@ -362,6 +368,10 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
+        costAmount,
+        prizeAmount: prizeSettlement.amount,
+        netProfit: prizeSettlement.amount - costAmount,
+        prizeAmountReady: prizeSettlement.isReady,
         actualResult: draw,
       }
     })
@@ -381,6 +391,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         draw.period,
       )
       const winningPrizes = prizes.filter((item) => item.count > 0)
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown)
       return {
         period: draw.period,
         date: draw.date,
@@ -390,12 +401,17 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
+        costAmount,
+        prizeAmount: prizeSettlement.amount,
+        netProfit: prizeSettlement.amount - costAmount,
+        prizeAmountReady: prizeSettlement.isReady,
         actualResult: draw,
       }
     })
 }
 
 function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[], limit: 30 | 50): SimulationMatchRecord[] {
+  const costAmount = calculateAmount(selection)
   return draws
     .slice(0, limit)
     .map((draw) => {
@@ -416,6 +432,7 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         : selection.lotteryCode === 'qxc'
           ? calculateQxcPrizeBreakdown(selection, actualDigits)
         : calculatePl3PrizeBreakdown(selection, actualDigits)
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown)
 
       return {
         period: draw.period,
@@ -426,6 +443,10 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
+        costAmount,
+        prizeAmount: prizeSettlement.amount,
+        netProfit: prizeSettlement.amount - costAmount,
+        prizeAmountReady: prizeSettlement.isReady,
         actualResult: {
           ...draw,
           digits: actualDigits,
@@ -434,6 +455,27 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         },
       }
     })
+}
+
+function resolveMatchPrizeAmount(prizes: SimulationMatchPrize[], prizeBreakdown: PrizeBreakdownItem[] | undefined) {
+  if (!prizes.length) {
+    return { amount: 0, isReady: true }
+  }
+  const basicAmountMap = new Map<string, number>()
+  for (const item of prizeBreakdown || []) {
+    if (String(item.prize_type || 'basic') !== 'basic') continue
+    const level = String(item.prize_level || '').trim()
+    if (!level) continue
+    basicAmountMap.set(level, Number(item.prize_amount || 0))
+  }
+  let amount = 0
+  for (const prize of prizes) {
+    if (!basicAmountMap.has(prize.level)) {
+      return { amount: 0, isReady: false }
+    }
+    amount += Number(prize.count || 0) * Number(basicAmountMap.get(prize.level) || 0)
+  }
+  return { amount, isReady: true }
 }
 
 function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHitCount: number, blueHitCount: number, period: string) {
