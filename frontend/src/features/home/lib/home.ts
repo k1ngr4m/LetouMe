@@ -675,7 +675,7 @@ export function buildSummary(
   const backDanMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const backTuoMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
   const sumMap = new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>()
-  const positionMaps = Array.from({ length: 5 }, () => new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>())
+  const positionMaps = Array.from({ length: 7 }, () => new Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>())
   let totalGroupCount = 0
   let selectedModelCount = 0
 
@@ -701,7 +701,7 @@ export function buildSummary(
     const backDanSeen = new Set<string>()
     const backTuoSeen = new Set<string>()
     const sumSeen = new Set<string>()
-    const positionSeen = Array.from({ length: 5 }, () => new Set<string>())
+    const positionSeen = Array.from({ length: 7 }, () => new Set<string>())
     const accumulateBall = (
       targetMap: Map<string, { appearanceCount: number; weightedScore: number; models: Set<string> }>,
       targetSeen: Set<string>,
@@ -723,6 +723,11 @@ export function buildSummary(
             .map((values) => (values || []).map(padBall))
           positionSelections.forEach((values, index) => {
             values.forEach((ball) => {
+              const positionCurrent = positionMaps[index].get(ball) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+              positionCurrent.appearanceCount += 1
+              positionCurrent.weightedScore += weight
+              positionMaps[index].set(ball, positionCurrent)
+              positionSeen[index].add(ball)
               if (index === 6) {
                 accumulateBall(blueMap, blueSeen, ball)
               } else {
@@ -734,6 +739,11 @@ export function buildSummary(
         }
         const digits = ((group.digits && group.digits.length ? group.digits : group.red_balls) || []).map(padBall).slice(0, 7)
         digits.forEach((digit, index) => {
+          const positionCurrent = positionMaps[index].get(digit) || { appearanceCount: 0, weightedScore: 0, models: new Set<string>() }
+          positionCurrent.appearanceCount += 1
+          positionCurrent.weightedScore += weight
+          positionMaps[index].set(digit, positionCurrent)
+          positionSeen[index].add(digit)
           if (index === 6) {
             accumulateBall(blueMap, blueSeen, digit)
           } else {

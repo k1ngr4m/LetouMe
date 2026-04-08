@@ -1489,6 +1489,24 @@ describe('HomePage dashboard sidebar', () => {
     expect(within(summarySection as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
   })
 
+  it('shows seven position summary columns for qxc', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '七星彩' }))
+
+    const summarySection = screen.getByRole('heading', { name: '预测统计' }).closest('section')
+    expect(summarySection).not.toBeNull()
+    expect(within(summarySection as HTMLElement).getByText('第一位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第二位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第三位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第四位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第五位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第六位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).getByText('第七位统计')).toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(summarySection as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
+  })
+
   it('shows matched and unmatched models in summary tooltip', async () => {
     renderPage()
 
@@ -2324,6 +2342,27 @@ describe('HomePage dashboard sidebar', () => {
     expect(tenBalls.every((node) => node.classList.contains('number-ball--muted'))).toBe(true)
 
     await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '隐藏该期预测统计：第 2026031 期' }))
+    expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
+  })
+
+  it('shows seven position period summary columns for qxc', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '七星彩' }))
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
+    const firstHistoryCard = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(firstHistoryCard).not.toBeNull()
+
+    await userEvent.click(within(firstHistoryCard as HTMLElement).getByRole('button', { name: '显示该期预测统计：第 2026031 期' }))
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'qxc'))
+    expect(within(firstHistoryCard as HTMLElement).getByText('第一位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第二位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第三位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第四位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第五位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第六位统计')).toBeInTheDocument()
+    expect(within(firstHistoryCard as HTMLElement).getByText('第七位统计')).toBeInTheDocument()
     expect(within(firstHistoryCard as HTMLElement).queryByText('前区统计')).not.toBeInTheDocument()
     expect(within(firstHistoryCard as HTMLElement).queryByText('后区统计')).not.toBeInTheDocument()
   })

@@ -95,7 +95,7 @@ function SidebarCollapseIcon() {
 function getLotteryLogoSrc(code: LotteryCode) {
   if (code === 'pl3') return '/lottery/pl3.png'
   if (code === 'pl5') return '/lottery/pl5.png'
-  if (code === 'qxc') return '/lottery/pl5.png'
+  if (code === 'qxc') return '/lottery/qxc.png'
   return '/lottery/dlt.png'
 }
 

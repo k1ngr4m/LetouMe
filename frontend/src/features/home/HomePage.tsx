@@ -100,6 +100,14 @@ const SCORE_SORT_KEY_OPTIONS: ScoreViewSortKey[] = [
   'ceiling',
   'floor',
 ]
+
+function getLotteryDisplayName(lotteryCode: LotteryCode) {
+  if (lotteryCode === 'dlt') return '大乐透'
+  if (lotteryCode === 'pl3') return '排列3'
+  if (lotteryCode === 'pl5') return '排列5'
+  return '七星彩'
+}
+
 const AnalysisHotChartsPanel = lazy(() =>
   import('./HomeChartPanels').then((module) => ({ default: module.AnalysisHotChartsPanel })),
 )
@@ -611,7 +619,7 @@ export function HomePage() {
       enablePagedLotteryHistory: false,
     },
   )
-  const lotteryLabel = selectedLottery === 'dlt' ? '大乐透' : selectedLottery === 'pl3' ? '排列3' : '排列5'
+  const lotteryLabel = getLotteryDisplayName(selectedLottery)
 
   const allModels = currentPredictions.data?.models || []
   const models = useMemo(
@@ -1411,16 +1419,16 @@ export function HomePage() {
         <>
           {!isGlobalSelection ? (
             <div className="hero-switch prediction-lottery-switch-fallback" role="tablist" aria-label="彩种切换">
-              {(['dlt', 'pl3', 'pl5'] as LotteryCode[]).map((code) => (
+              {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((code) => (
                 <button
                   key={code}
                   type="button"
                   className={clsx('hero-switch__item', selectedLottery === code && 'is-active')}
                   onClick={() => setSelectedLottery(code)}
-                  aria-label={code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                  aria-label={getLotteryDisplayName(code)}
                   aria-pressed={selectedLottery === code}
                 >
-                  {code === 'pl3' ? '排列3' : code === 'pl5' ? '排列5' : '大乐透'}
+                  {getLotteryDisplayName(code)}
                 </button>
               ))}
             </div>
@@ -1698,6 +1706,16 @@ export function HomePage() {
                         <SummaryList title="第四位（十位）统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
                         <SummaryList title="第五位（个位）统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
                       </>
+	                    ) : selectedLottery === 'qxc' ? (
+	                      <>
+	                        <SummaryList title="第一位统计" items={summary.positions?.[0] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第二位统计" items={summary.positions?.[1] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第三位统计" items={summary.positions?.[2] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第四位统计" items={summary.positions?.[3] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第五位统计" items={summary.positions?.[4] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第六位统计" items={summary.positions?.[5] || []} color="red" models={summaryModels} />
+	                        <SummaryList title="第七位统计" items={summary.positions?.[6] || []} color="blue" models={summaryModels} />
+	                      </>
 	                    ) : selectedLottery === 'pl3' ? (
 	                      <>
 	                        {pl3PredictionMode === 'direct_sum' ? (
@@ -2215,7 +2233,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const backOptions = useMemo(() => buildBallRange(12), [])
   const digitOptions = useMemo(() => buildBallRange(10, 0), [])
   const sumOptions = useMemo(() => pl3SumOptions, [])
-  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+  const lotteryLabel = getLotteryDisplayName(lotteryCode)
   const isPl3 = lotteryCode === 'pl3'
   const isPl5 = lotteryCode === 'pl5'
   const isDlt = lotteryCode === 'dlt'
@@ -3444,7 +3462,7 @@ function ModelDetailExportSheet({
   targetPeriod: string
   predictionDate: string
 }) {
-  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+  const lotteryLabel = getLotteryDisplayName(lotteryCode)
 
   return (
     <div className="model-export-sheet">
@@ -3894,7 +3912,7 @@ function PagerControls({
 
 export function ModelScoreShowcase({ score, compact = false, lotteryCode = 'dlt' }: { score?: ModelScore; compact?: boolean; lotteryCode?: LotteryCode }) {
   if (!score) return null
-  const lotteryLabel = lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : '排列5'
+  const lotteryLabel = getLotteryDisplayName(lotteryCode)
 
   const components = [
     { label: '收益', value: score.componentScores.profit || 0 },
@@ -4797,6 +4815,16 @@ function HistoryRecordCard({
                   <SummaryList title="第四位（十位）统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
                   <SummaryList title="第五位（个位）统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
                 </>
+	              ) : lotteryCode === 'qxc' ? (
+	                <>
+	                  <SummaryList title="第一位统计" items={periodPredictionSummary.positions?.[0] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[0]} />
+	                  <SummaryList title="第二位统计" items={periodPredictionSummary.positions?.[1] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[1]} />
+	                  <SummaryList title="第三位统计" items={periodPredictionSummary.positions?.[2] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[2]} />
+	                  <SummaryList title="第四位统计" items={periodPredictionSummary.positions?.[3] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[3]} />
+	                  <SummaryList title="第五位统计" items={periodPredictionSummary.positions?.[4] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[4]} />
+	                  <SummaryList title="第六位统计" items={periodPredictionSummary.positions?.[5] || []} color="red" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[5]} />
+	                  <SummaryList title="第七位统计" items={periodPredictionSummary.positions?.[6] || []} color="blue" models={periodSummaryModels} compact hitSet={periodSummaryHitSets.positionHits[6]} />
+	                </>
 	              ) : lotteryCode === 'pl3' ? (
 	                <>
 	                  {isPl3SumMode ? (
