@@ -5,7 +5,13 @@ from typing import Any
 
 from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
-from backend.app.lotteries import get_lottery_definition, normalize_digit_balls, normalize_lottery_code
+from backend.app.lotteries import (
+    build_pl3_prize_breakdown,
+    build_pl5_prize_breakdown,
+    get_lottery_definition,
+    normalize_digit_balls,
+    normalize_lottery_code,
+)
 from backend.app.repositories.lottery_repository import LotteryRepository
 from backend.app.time_utils import ensure_timestamp, now_ts
 
@@ -45,9 +51,22 @@ class LotteryService:
             return False
         return any(int(item.get("prize_amount") or 0) > 0 for item in basic_prizes)
 
+    @staticmethod
+    def resolve_prize_breakdown(draw: dict[str, Any], lottery_code: str = "dlt") -> list[dict[str, Any]]:
+        normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
+        prize_breakdown = list(draw.get("prize_breakdown") or [])
+        if prize_breakdown:
+            return prize_breakdown
+        if normalized_code == "pl3":
+            return build_pl3_prize_breakdown()
+        if normalized_code == "pl5":
+            return build_pl5_prize_breakdown()
+        return prize_breakdown
+
     def normalize_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
         blue_balls = self.normalize_blue_balls(draw.get("blue_balls", draw.get("blue_ball")))
+        prize_breakdown = self.resolve_prize_breakdown(draw, normalized_code)
         payload = {
             "lottery_code": normalized_code,
             "period": str(draw.get("period", "")),
@@ -57,8 +76,8 @@ class LotteryService:
             "digits": normalize_digit_balls(draw.get("digits", [])),
             "date": self.serialize_draw_date(draw.get("date")),
             "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
-            "prize_breakdown": list(draw.get("prize_breakdown") or []),
-            "prize_breakdown_ready": self.is_prize_breakdown_ready(draw, normalized_code),
+            "prize_breakdown": prize_breakdown,
+            "prize_breakdown_ready": self.is_prize_breakdown_ready({**draw, "prize_breakdown": prize_breakdown}, normalized_code),
         }
         return payload
 

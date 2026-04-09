@@ -36,6 +36,42 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         self.assertEqual(payload["next_draw"]["next_period"], "26026")
         self.assertEqual(payload["next_draw"]["next_date_display"], "2026年03月11日")
 
+    def test_normalize_draw_backfills_pl3_fixed_prize_breakdown_when_missing(self) -> None:
+        service = LotteryService(repository=Mock())
+
+        payload = service.normalize_draw(
+            {
+                "lottery_code": "pl3",
+                "period": "26042",
+                "date": date(2026, 2, 11),
+                "digits": ["07", "09", "05"],
+                "prize_breakdown": [],
+            },
+            lottery_code="pl3",
+        )
+
+        self.assertEqual([item["prize_level"] for item in payload["prize_breakdown"]], ["直选", "组选3", "组选6"])
+        self.assertEqual(payload["prize_breakdown"][0]["prize_amount"], 1040)
+        self.assertTrue(payload["prize_breakdown_ready"])
+
+    def test_normalize_draw_backfills_pl5_fixed_prize_breakdown_when_missing(self) -> None:
+        service = LotteryService(repository=Mock())
+
+        payload = service.normalize_draw(
+            {
+                "lottery_code": "pl5",
+                "period": "26042",
+                "date": date(2026, 2, 11),
+                "digits": ["01", "02", "03", "04", "05"],
+                "prize_breakdown": [],
+            },
+            lottery_code="pl5",
+        )
+
+        self.assertEqual([item["prize_level"] for item in payload["prize_breakdown"]], ["直选"])
+        self.assertEqual(payload["prize_breakdown"][0]["prize_amount"], 100000)
+        self.assertTrue(payload["prize_breakdown_ready"])
+
 
 class PredictionHistoryPaginationTests(unittest.TestCase):
     def test_get_history_list_payload_returns_total_count_and_uses_limit_offset(self) -> None:
