@@ -172,6 +172,7 @@ describe('simulation helpers', () => {
     )
     expect(directMatches[0].topPrizeLevel).toBe('直选')
     expect(directMatches[0].digitHits).toEqual(['04', '05', '06'])
+    expect(directMatches[0].digitHitIndexes).toEqual([0, 1, 2])
 
     const groupMatches = buildSimulationMatches(
       {
@@ -221,6 +222,61 @@ describe('simulation helpers', () => {
     )
     expect(matches[0].topPrizeLevel).toBe('直选')
     expect(matches[0].digitHits).toEqual(['01', '02', '03', '04', '05'])
+    expect(matches[0].digitHitIndexes).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('tracks pl3 direct hits by position when duplicate digits exist', () => {
+    const matches = buildSimulationMatches(
+      {
+        lotteryCode: 'pl3',
+        playType: 'direct',
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
+        directTenThousands: [],
+        directThousands: [],
+        directHundreds: ['00'],
+        directTens: ['02'],
+        directUnits: ['04'],
+        groupNumbers: [],
+        sumValues: [],
+      },
+      [{ period: '26005', date: '2026-01-05', red_balls: ['00', '04', '00'], blue_balls: [] }],
+      30,
+    )
+
+    expect(matches[0].digitHits).toEqual(['00'])
+    expect(matches[0].digitHitIndexes).toEqual([0])
+  })
+
+  it('tracks pl5 direct hits by position when duplicate digits exist', () => {
+    const matches = buildSimulationMatches(
+      {
+        lotteryCode: 'pl5',
+        playType: 'direct',
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
+        directTenThousands: ['00'],
+        directThousands: ['02'],
+        directHundreds: ['04'],
+        directTens: ['07'],
+        directUnits: ['08'],
+        groupNumbers: [],
+        sumValues: [],
+      },
+      [{ period: '26006', date: '2026-01-06', red_balls: ['00', '02', '00', '07', '07'], blue_balls: [] }],
+      30,
+    )
+
+    expect(matches[0].digitHits).toEqual(['00', '02', '07'])
+    expect(matches[0].digitHitIndexes).toEqual([0, 1, 3])
   })
 
   it('computes cost/prize/profit and marks pending amount when prize breakdown is missing', () => {

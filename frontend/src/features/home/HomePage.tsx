@@ -3163,7 +3163,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                                 )
                           }
                           size="sm"
-                          isHit={lotteryCode === 'dlt' ? match.redHits.includes(ball) : match.digitHits.includes(ball)}
+                          isHit={lotteryCode === 'dlt' ? match.redHits.includes(ball) : match.digitHitIndexes.includes(index)}
                         />
                       ))}
                       {lotteryCode === 'dlt' ? <span className="number-row__divider" /> : null}
@@ -3178,7 +3178,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                     <span>
                       {lotteryCode === 'dlt'
                         ? `命中前区 ${match.redHits.length} 个 / 后区 ${match.blueHits.length} 个`
-                        : `命中位置 ${match.digitHits.length} 个`}
+                        : `命中位置 ${match.digitHitIndexes.length} 个`}
                     </span>
                     <div className="simulation-prize-list">
                       {match.prizes.length ? match.prizes.map((prize) => <span key={`${match.period}-${prize.level}`}>{`${prize.level} × ${prize.count}`}</span>) : <span>未形成中奖注数</span>}

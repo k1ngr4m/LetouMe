@@ -47,6 +47,7 @@ export type SimulationMatchRecord = {
   redHits: string[]
   blueHits: string[]
   digitHits: string[]
+  digitHitIndexes: number[]
   totalWinningBets: number
   topPrizeLevel: PrizeLevel
   prizes: SimulationMatchPrize[]
@@ -366,6 +367,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         redHits,
         blueHits,
         digitHits: [],
+        digitHitIndexes: [],
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
@@ -400,6 +402,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         redHits,
         blueHits,
         digitHits: [],
+        digitHitIndexes: [],
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
@@ -426,9 +429,15 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
           ? [selection.directTenThousands, selection.directThousands, selection.directHundreds, selection.directTens, selection.directUnits]
           : [selection.directHundreds, selection.directTens, selection.directUnits]
       ).map((values) => values.map(padBall))
-      const digitHits = selection.playType === 'direct'
-        ? actualDigits.filter((digit, index) => directDigits[index]?.includes(digit))
+      const digitHitIndexes = selection.playType === 'direct'
+        ? actualDigits.reduce<number[]>((indexes, digit, index) => {
+            if (directDigits[index]?.includes(digit)) {
+              indexes.push(index)
+            }
+            return indexes
+          }, [])
         : []
+      const digitHits = digitHitIndexes.map((index) => actualDigits[index]).filter(Boolean)
       const winningPrizes = selection.lotteryCode === 'pl5'
         ? calculatePl5PrizeBreakdown(selection, actualDigits)
         : selection.lotteryCode === 'qxc'
@@ -443,6 +452,7 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         redHits: [],
         blueHits: [],
         digitHits,
+        digitHitIndexes,
         totalWinningBets: winningPrizes.reduce((sum, item) => sum + item.count, 0),
         topPrizeLevel: winningPrizes[0]?.level || '未中奖',
         prizes: winningPrizes,
