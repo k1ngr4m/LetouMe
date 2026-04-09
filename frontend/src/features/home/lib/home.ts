@@ -197,6 +197,10 @@ export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
       draw.previous_jackpot_pool === undefined || draw.previous_jackpot_pool === null
         ? undefined
         : Number(draw.previous_jackpot_pool),
+    prize_breakdown_ready:
+      draw.prize_breakdown_ready === undefined || draw.prize_breakdown_ready === null
+        ? undefined
+        : Boolean(draw.prize_breakdown_ready),
     prize_breakdown: (draw.prize_breakdown || []).map((item) => ({
       ...item,
       prize_amount: Number(item.prize_amount || 0),

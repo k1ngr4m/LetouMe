@@ -3186,8 +3186,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   </div>
                   <div className="simulation-match-card__finance">
                     <span>成本 {formatCurrency(match.costAmount)}</span>
-                    <span>奖金 {formatCurrency(match.prizeAmount)}</span>
-                    <span>盈亏 {formatCurrency(match.netProfit)}</span>
+                    <span>{match.totalWinningBets > 0 && !match.prizeAmountReady ? '奖金 待补全' : `奖金 ${formatCurrency(match.prizeAmount)}`}</span>
+                    <span>{match.totalWinningBets > 0 && !match.prizeAmountReady ? '盈亏 待补全' : `盈亏 ${formatCurrency(match.netProfit)}`}</span>
                   </div>
                   {match.totalWinningBets > 0 && !match.prizeAmountReady ? <p className="simulation-match-card__prize-pending">奖金待补全</p> : null}
                 </article>

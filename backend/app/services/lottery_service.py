@@ -31,6 +31,20 @@ class LotteryService:
             return value.isoformat()
         return str(value or "")
 
+    @staticmethod
+    def is_prize_breakdown_ready(draw: dict[str, Any], lottery_code: str = "dlt") -> bool:
+        normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
+        if normalized_code != "dlt":
+            return True
+        basic_prizes = [
+            item
+            for item in list(draw.get("prize_breakdown") or [])
+            if str(item.get("prize_type") or "basic") == "basic" and str(item.get("prize_level") or "").strip()
+        ]
+        if not basic_prizes:
+            return False
+        return any(int(item.get("prize_amount") or 0) > 0 for item in basic_prizes)
+
     def normalize_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
         blue_balls = self.normalize_blue_balls(draw.get("blue_balls", draw.get("blue_ball")))
@@ -44,6 +58,7 @@ class LotteryService:
             "date": self.serialize_draw_date(draw.get("date")),
             "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
             "prize_breakdown": list(draw.get("prize_breakdown") or []),
+            "prize_breakdown_ready": self.is_prize_breakdown_ready(draw, normalized_code),
         }
         return payload
 

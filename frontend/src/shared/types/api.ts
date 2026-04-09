@@ -11,6 +11,7 @@ export type LotteryDraw = {
   jackpot_pool_balance?: number
   previous_jackpot_pool?: number
   prize_breakdown?: PrizeBreakdownItem[]
+  prize_breakdown_ready?: boolean
 }
 
 export type PrizeBreakdownItem = {

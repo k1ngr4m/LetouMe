@@ -7,6 +7,7 @@ from unittest.mock import Mock
 from bs4 import BeautifulSoup
 
 from backend.app.lotteries import build_qxc_prize_breakdown
+from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_service import LotteryFetchService
 
 
@@ -375,6 +376,89 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
         fetch_page_call_args = service.fetch_page.call_args
         self.assertEqual(fetch_page_call_args.args[0], "https://example.com?limit=30")
+
+    def test_backfill_draw_detail_overwrites_existing_draw_with_latest_detail(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        service.logger = Mock()
+        service.lottery_service = Mock()
+        service.lottery_service.get_draw_by_period.return_value = {
+            "period": "26037",
+            "date": "2026-04-08",
+            "red_balls": ["07", "12", "13", "28", "32"],
+            "blue_balls": ["06", "08"],
+            "digits": [],
+            "jackpot_pool_balance": 744000000,
+            "prize_breakdown": [{"prize_level": "六等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 0, "total_amount": 0}],
+        }
+        service.fetch_draw_detail = Mock(
+            return_value={
+                "draw_date": "2026-04-08",
+                "jackpot_pool_balance": 757000000,
+                "prize_breakdown": [
+                    {"prize_level": "六等奖", "prize_type": "basic", "winner_count": 791056, "prize_amount": 15, "total_amount": 11865840},
+                    {"prize_level": "七等奖", "prize_type": "basic", "winner_count": 8080274, "prize_amount": 5, "total_amount": 40401370},
+                ],
+            }
+        )
+        service.lottery_service.save_draws.return_value = [
+            {
+                "period": "26037",
+                "date": "2026-04-08",
+                "jackpot_pool_balance": 757000000,
+                "prize_breakdown": [
+                    {"prize_level": "六等奖", "prize_type": "basic", "winner_count": 791056, "prize_amount": 15, "total_amount": 11865840},
+                    {"prize_level": "七等奖", "prize_type": "basic", "winner_count": 8080274, "prize_amount": 5, "total_amount": 40401370},
+                ],
+            }
+        ]
+
+        result = service.backfill_draw_detail("26037")
+
+        save_call_args = service.lottery_service.save_draws.call_args
+        self.assertEqual(save_call_args.kwargs["lottery_code"], "dlt")
+        self.assertEqual(save_call_args.args[0][0]["period"], "26037")
+        self.assertEqual(save_call_args.args[0][0]["jackpot_pool_balance"], 757000000)
+        self.assertEqual(save_call_args.args[0][0]["prize_breakdown"][0]["prize_amount"], 15)
+        self.assertEqual(result["prize_breakdown_count"], 2)
+
+    def test_backfill_draw_detail_requires_existing_draw(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        service.logger = Mock()
+        service.lottery_service = Mock()
+        service.lottery_service.get_draw_by_period.return_value = None
+
+        with self.assertRaisesRegex(ValueError, "基础开奖记录"):
+            service.backfill_draw_detail("26037")
+
+    def test_is_prize_breakdown_ready_marks_dlt_all_zero_prizes_as_incomplete(self) -> None:
+        self.assertFalse(
+            LotteryService.is_prize_breakdown_ready(
+                {
+                    "lottery_code": "dlt",
+                    "prize_breakdown": [
+                        {"prize_level": "六等奖", "prize_type": "basic", "prize_amount": 0},
+                        {"prize_level": "七等奖", "prize_type": "basic", "prize_amount": 0},
+                    ],
+                },
+                "dlt",
+            )
+        )
+
+    def test_is_prize_breakdown_ready_accepts_dlt_non_zero_basic_prize(self) -> None:
+        self.assertTrue(
+            LotteryService.is_prize_breakdown_ready(
+                {
+                    "lottery_code": "dlt",
+                    "prize_breakdown": [
+                        {"prize_level": "六等奖", "prize_type": "basic", "prize_amount": 15},
+                        {"prize_level": "七等奖", "prize_type": "basic", "prize_amount": 5},
+                    ],
+                },
+                "dlt",
+            )
+        )
 
     def test_parse_lottery_data_for_dlt_contains_jackpot_pool_balance(self) -> None:
         html = """

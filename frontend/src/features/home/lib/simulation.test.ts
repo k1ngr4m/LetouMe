@@ -252,6 +252,30 @@ describe('simulation helpers', () => {
     expect(pendingAmount[0].netProfit).toBe(-2)
   })
 
+  it('marks dlt all-zero prize breakdown as pending when backend flags it incomplete', () => {
+    const pendingAmount = buildSimulationMatches(
+      makeDltSelection(['07', '12', '13', '28', '32', '33'], ['06', '08', '09']),
+      [
+        {
+          period: '26037',
+          date: '2026-04-08',
+          red_balls: ['07', '12', '13', '28', '32'],
+          blue_balls: ['06', '08'],
+          prize_breakdown_ready: false,
+          prize_breakdown: [
+            { prize_level: '六等奖', prize_type: 'basic', winner_count: 0, prize_amount: 0, total_amount: 0 },
+            { prize_level: '七等奖', prize_type: 'basic', winner_count: 0, prize_amount: 0, total_amount: 0 },
+          ],
+        },
+      ],
+      30,
+    )
+
+    expect(pendingAmount[0].totalWinningBets).toBeGreaterThan(0)
+    expect(pendingAmount[0].prizeAmount).toBe(0)
+    expect(pendingAmount[0].prizeAmountReady).toBe(false)
+  })
+
   it('calculates and matches pl3 direct_sum bets', () => {
     const selection: SimulationSelection = {
       lotteryCode: 'pl3',

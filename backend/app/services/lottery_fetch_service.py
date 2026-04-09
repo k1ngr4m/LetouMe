@@ -438,6 +438,47 @@ class LotteryFetchService:
     def fetch_prize_breakdown(self, period: str) -> list[dict[str, Any]]:
         return self.fetch_draw_detail(period)["prize_breakdown"]
 
+    def backfill_draw_detail(self, period: str) -> dict[str, Any]:
+        normalized_period = str(period or "").strip()
+        if not normalized_period:
+            raise ValueError("期号不能为空")
+        existing_draw = self.lottery_service.get_draw_by_period(normalized_period, lottery_code=self.lottery_code)
+        if not existing_draw:
+            raise ValueError(f"未找到 {self.lottery_code} 第 {normalized_period} 期的基础开奖记录")
+        detail_payload = self.fetch_draw_detail(normalized_period)
+        prize_breakdown = list(detail_payload.get("prize_breakdown") or [])
+        if not prize_breakdown:
+            raise ValueError(f"未抓取到 {self.lottery_code} 第 {normalized_period} 期的奖金明细")
+        refreshed_draw = {
+            "period": normalized_period,
+            "red_balls": list(existing_draw.get("red_balls") or []),
+            "blue_balls": list(existing_draw.get("blue_balls") or []),
+            "digits": list(existing_draw.get("digits") or []),
+            "date": str(detail_payload.get("draw_date") or existing_draw.get("date") or ""),
+            "jackpot_pool_balance": int(detail_payload.get("jackpot_pool_balance") or existing_draw.get("jackpot_pool_balance") or 0),
+            "prize_breakdown": prize_breakdown,
+        }
+        saved_draws = self.lottery_service.save_draws([refreshed_draw], lottery_code=self.lottery_code)
+        saved_draw = saved_draws[0] if saved_draws else refreshed_draw
+        self.logger.info(
+            "Backfilled single draw detail",
+            extra={
+                "context": {
+                    "lottery_code": self.lottery_code,
+                    "period": normalized_period,
+                    "prize_breakdown_count": len(prize_breakdown),
+                    "jackpot_pool_balance": saved_draw.get("jackpot_pool_balance"),
+                }
+            },
+        )
+        return {
+            "lottery_code": self.lottery_code,
+            "period": normalized_period,
+            "date": saved_draw.get("date"),
+            "jackpot_pool_balance": saved_draw.get("jackpot_pool_balance"),
+            "prize_breakdown_count": len(prize_breakdown),
+        }
+
     def fetch_draw_detail(self, period: str) -> dict[str, Any]:
         detail_url = self.build_detail_url(period)
         if not detail_url:
