@@ -430,6 +430,98 @@ describe('simulation helpers', () => {
     expect(matches[0].digitHitIndexes).toEqual([0, 1, 2, 3, 4, 5, 6])
   })
 
+  it('marks qxc floating prizes as pending when first or second prize amount is zero', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['00'], ['07'], ['01'], ['03'], ['00'], ['02'], ['13']],
+    }
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{
+        period: '26038',
+        date: '2026-04-07',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['00', '07', '01', '03', '00', '02', '13'],
+        prize_breakdown_ready: false,
+        prize_breakdown: [
+          { prize_level: '一等奖', prize_type: 'basic', winner_count: 0, prize_amount: 0, total_amount: 0 },
+          { prize_level: '二等奖', prize_type: 'basic', winner_count: 23, prize_amount: 24089, total_amount: 554047 },
+          { prize_level: '三等奖', prize_type: 'basic', winner_count: 12, prize_amount: 3000, total_amount: 36000 },
+          { prize_level: '四等奖', prize_type: 'basic', winner_count: 857, prize_amount: 500, total_amount: 428500 },
+          { prize_level: '五等奖', prize_type: 'basic', winner_count: 15951, prize_amount: 30, total_amount: 478530 },
+          { prize_level: '六等奖', prize_type: 'basic', winner_count: 441009, prize_amount: 5, total_amount: 2205045 },
+        ],
+      }],
+      30,
+    )
+
+    expect(matches[0].topPrizeLevel).toBe('一等奖')
+    expect(matches[0].prizeAmount).toBe(0)
+    expect(matches[0].prizeAmountReady).toBe(false)
+  })
+
+  it('keeps qxc fixed prizes ready even when floating prizes are incomplete', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['00'], ['07'], ['01'], ['03'], ['00'], ['09'], ['13']],
+    }
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{
+        period: '26038',
+        date: '2026-04-07',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['00', '07', '01', '03', '00', '02', '13'],
+        prize_breakdown_ready: false,
+        prize_breakdown: [
+          { prize_level: '一等奖', prize_type: 'basic', winner_count: 0, prize_amount: 0, total_amount: 0 },
+          { prize_level: '二等奖', prize_type: 'basic', winner_count: 23, prize_amount: 24089, total_amount: 554047 },
+          { prize_level: '三等奖', prize_type: 'basic', winner_count: 12, prize_amount: 3000, total_amount: 36000 },
+          { prize_level: '四等奖', prize_type: 'basic', winner_count: 857, prize_amount: 500, total_amount: 428500 },
+          { prize_level: '五等奖', prize_type: 'basic', winner_count: 15951, prize_amount: 30, total_amount: 478530 },
+          { prize_level: '六等奖', prize_type: 'basic', winner_count: 441009, prize_amount: 5, total_amount: 2205045 },
+        ],
+      }],
+      30,
+    )
+
+    expect(matches[0].topPrizeLevel).toBe('三等奖')
+    expect(matches[0].prizeAmount).toBe(3000)
+    expect(matches[0].prizeAmountReady).toBe(true)
+  })
+
   it('tracks qxc compound hits only for the matched positions', () => {
     const selection: SimulationSelection = {
       lotteryCode: 'qxc',

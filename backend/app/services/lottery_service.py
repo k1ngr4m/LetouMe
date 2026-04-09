@@ -6,6 +6,7 @@ from typing import Any
 from backend.app.cache import runtime_cache
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import (
+    build_qxc_prize_breakdown,
     build_pl3_prize_breakdown,
     build_pl5_prize_breakdown,
     get_lottery_definition,
@@ -40,6 +41,19 @@ class LotteryService:
     @staticmethod
     def is_prize_breakdown_ready(draw: dict[str, Any], lottery_code: str = "dlt") -> bool:
         normalized_code = normalize_lottery_code(lottery_code or draw.get("lottery_code"))
+        if normalized_code == "qxc":
+            basic_prizes = [
+                item
+                for item in list(draw.get("prize_breakdown") or [])
+                if str(item.get("prize_type") or "basic") == "basic" and str(item.get("prize_level") or "").strip()
+            ]
+            if not basic_prizes:
+                return False
+            prize_amount_map = {
+                str(item.get("prize_level") or "").strip(): int(item.get("prize_amount") or 0)
+                for item in basic_prizes
+            }
+            return prize_amount_map.get("一等奖", 0) > 0 and prize_amount_map.get("二等奖", 0) > 0
         if normalized_code != "dlt":
             return True
         basic_prizes = [
@@ -61,6 +75,8 @@ class LotteryService:
             return build_pl3_prize_breakdown()
         if normalized_code == "pl5":
             return build_pl5_prize_breakdown()
+        if normalized_code == "qxc":
+            return build_qxc_prize_breakdown()
         return prize_breakdown
 
     def normalize_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> dict[str, Any]:

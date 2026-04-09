@@ -460,6 +460,36 @@ class LotteryFetchServiceTests(unittest.TestCase):
             )
         )
 
+    def test_is_prize_breakdown_ready_marks_qxc_zero_floating_prizes_as_incomplete(self) -> None:
+        self.assertFalse(
+            LotteryService.is_prize_breakdown_ready(
+                {
+                    "lottery_code": "qxc",
+                    "prize_breakdown": [
+                        {"prize_level": "一等奖", "prize_type": "basic", "prize_amount": 0},
+                        {"prize_level": "二等奖", "prize_type": "basic", "prize_amount": 24089},
+                        {"prize_level": "三等奖", "prize_type": "basic", "prize_amount": 3000},
+                    ],
+                },
+                "qxc",
+            )
+        )
+
+    def test_is_prize_breakdown_ready_accepts_qxc_non_zero_floating_prizes(self) -> None:
+        self.assertTrue(
+            LotteryService.is_prize_breakdown_ready(
+                {
+                    "lottery_code": "qxc",
+                    "prize_breakdown": [
+                        {"prize_level": "一等奖", "prize_type": "basic", "prize_amount": 5000000},
+                        {"prize_level": "二等奖", "prize_type": "basic", "prize_amount": 24089},
+                        {"prize_level": "三等奖", "prize_type": "basic", "prize_amount": 3000},
+                    ],
+                },
+                "qxc",
+            )
+        )
+
     def test_parse_lottery_data_for_dlt_contains_jackpot_pool_balance(self) -> None:
         html = """
         <table>

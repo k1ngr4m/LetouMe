@@ -71,7 +71,7 @@ def build_pl5_prize_breakdown() -> list[dict[str, Any]]:
 
 def build_qxc_prize_breakdown() -> list[dict[str, Any]]:
     return [
-        {"prize_level": "一等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 0, "total_amount": 0},
+        {"prize_level": "一等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 5000000, "total_amount": 0},
         {"prize_level": "二等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 0, "total_amount": 0},
         {"prize_level": "三等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 3000, "total_amount": 0},
         {"prize_level": "四等奖", "prize_type": "basic", "winner_count": 0, "prize_amount": 500, "total_amount": 0},

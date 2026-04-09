@@ -72,6 +72,25 @@ class LotteryHistoryPaginationTests(unittest.TestCase):
         self.assertEqual(payload["prize_breakdown"][0]["prize_amount"], 100000)
         self.assertTrue(payload["prize_breakdown_ready"])
 
+    def test_normalize_draw_backfills_qxc_breakdown_and_marks_zero_floating_prizes_incomplete(self) -> None:
+        service = LotteryService(repository=Mock())
+
+        payload = service.normalize_draw(
+            {
+                "lottery_code": "qxc",
+                "period": "26038",
+                "date": date(2026, 4, 7),
+                "digits": ["00", "07", "01", "03", "00", "02", "13"],
+                "prize_breakdown": [],
+            },
+            lottery_code="qxc",
+        )
+
+        self.assertEqual([item["prize_level"] for item in payload["prize_breakdown"]], ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖"])
+        self.assertEqual(payload["prize_breakdown"][0]["prize_amount"], 5000000)
+        self.assertEqual(payload["prize_breakdown"][2]["prize_amount"], 3000)
+        self.assertFalse(payload["prize_breakdown_ready"])
+
 
 class PredictionHistoryPaginationTests(unittest.TestCase):
     def test_get_history_list_payload_returns_total_count_and_uses_limit_offset(self) -> None:
