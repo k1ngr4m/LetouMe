@@ -396,6 +396,20 @@ function resolveDigitBallColor(lotteryCode: LotteryCode, index: number, total: n
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
 
+const QXC_POSITION_CONFIGS = [
+  { key: 'pos-1', title: '第一位选号', eyebrow: 'Position 1', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-2', title: '第二位选号', eyebrow: 'Position 2', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-3', title: '第三位选号', eyebrow: 'Position 3', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-4', title: '第四位选号', eyebrow: 'Position 4', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-5', title: '第五位选号', eyebrow: 'Position 5', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-6', title: '第六位选号', eyebrow: 'Position 6', badge: '00-09', color: 'qxc-front' as const },
+  { key: 'pos-7', title: '第七位选号', eyebrow: 'Position 7', badge: '00-14', color: 'qxc-back' as const },
+] as const
+
+function createEmptyQxcSelections() {
+  return Array.from({ length: 7 }, () => [] as string[])
+}
+
 function buildQxcPositionSelectionsFromTicket(ticket: SimulationTicketRecord) {
   const normalized = normalizeSimulationTicket(ticket)
   const explicitPositions = (normalized.position_selections || []).slice(0, 7)
@@ -2278,6 +2292,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const [selectedHundreds, setSelectedHundreds] = useState<string[]>([])
   const [selectedTens, setSelectedTens] = useState<string[]>([])
   const [selectedUnits, setSelectedUnits] = useState<string[]>([])
+  const [selectedQxcPositions, setSelectedQxcPositions] = useState<string[][]>(() => createEmptyQxcSelections())
   const [selectedGroupNumbers, setSelectedGroupNumbers] = useState<string[]>([])
   const [selectedSumValues, setSelectedSumValues] = useState<string[]>([])
   const [matchWindow, setMatchWindow] = useState<30 | 50>(30)
@@ -2287,15 +2302,21 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   const frontOptions = useMemo(() => buildBallRange(35), [])
   const backOptions = useMemo(() => buildBallRange(12), [])
   const digitOptions = useMemo(() => buildBallRange(10, 0), [])
+  const qxcLastDigitOptions = useMemo(() => buildBallRange(15, 0), [])
   const sumOptions = useMemo(() => pl3SumOptions, [])
   const lotteryLabel = getLotteryDisplayName(lotteryCode)
   const isPl3 = lotteryCode === 'pl3'
   const isPl5 = lotteryCode === 'pl5'
+  const isQxc = lotteryCode === 'qxc'
   const isDlt = lotteryCode === 'dlt'
   const isDltDantuo = isDlt && dltPlayType === 'dlt_dantuo'
+  const qxcPositionSelections = useMemo(
+    () => QXC_POSITION_CONFIGS.map((_, index) => [...(selectedQxcPositions[index] || [])]),
+    [selectedQxcPositions],
+  )
   const playTypeLabel = pl3PlayType === 'direct' ? '直选' : pl3PlayType === 'group3' ? '组选3' : pl3PlayType === 'group6' ? '组选6' : '和值'
   const selection = useMemo<SimulationSelection>(() => {
-    const playType: SimulationPlayType = lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType
+    const playType: SimulationPlayType = lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : lotteryCode === 'qxc' ? 'qxc_compound' : pl3PlayType
     return {
       lotteryCode,
       playType,
@@ -2312,12 +2333,13 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       directUnits: selectedUnits,
       groupNumbers: selectedGroupNumbers,
       sumValues: selectedSumValues,
+      positionSelections: qxcPositionSelections,
     }
-  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
+  }, [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues, qxcPositionSelections])
   const simulationPayload = useMemo<SimulationTicketPayload>(
     () => ({
       lottery_code: lotteryCode,
-      play_type: lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType,
+      play_type: lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : lotteryCode === 'qxc' ? 'qxc_compound' : pl3PlayType,
       front_numbers: selectedFront,
       back_numbers: selectedBack,
       front_dan: selectedFrontDan,
@@ -2331,8 +2353,9 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       direct_units: selectedUnits,
       group_numbers: selectedGroupNumbers,
       sum_values: selectedSumValues,
+      position_selections: qxcPositionSelections,
     }),
-    [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues],
+    [lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues, qxcPositionSelections],
   )
   const ticketsQuery = useQuery({
     queryKey: ['simulation-tickets', lotteryCode],
@@ -2407,7 +2430,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
       setShowWinningOnly(false)
     }
     setMessage(null)
-  }, [matchSource, lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedGroupNumbers, selectedSumValues])
+  }, [matchSource, lotteryCode, dltPlayType, pl3PlayType, selectedFront, selectedBack, selectedFrontDan, selectedFrontTuo, selectedBackDan, selectedBackTuo, selectedTenThousands, selectedThousands, selectedHundreds, selectedTens, selectedUnits, selectedQxcPositions, selectedGroupNumbers, selectedSumValues])
 
   useEffect(() => {
     setMatchSource('current')
@@ -2436,6 +2459,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedHundreds([])
     setSelectedTens([])
     setSelectedUnits([])
+    setSelectedQxcPositions(createEmptyQxcSelections())
     setSelectedGroupNumbers([])
     setSelectedSumValues([])
   }, [lotteryCode])
@@ -2480,6 +2504,17 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     updater((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
 
+  function toggleQxcPositionSelection(value: string, positionIndex: number) {
+    setSelectedQxcPositions((previous) => previous.map((values, index) => {
+      if (index !== positionIndex) return values
+      return values.includes(value) ? values.filter((item) => item !== value) : [...values, value].sort((left, right) => Number(left) - Number(right))
+    }))
+  }
+
+  function clearQxcPosition(positionIndex: number) {
+    setSelectedQxcPositions((previous) => previous.map((values, index) => (index === positionIndex ? [] : values)))
+  }
+
   function toggleGroupSelection(value: string) {
     setSelectedGroupNumbers((previous) => (previous.includes(value) ? previous.filter((item) => item !== value) : [...previous, value].sort()))
   }
@@ -2493,7 +2528,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
   }
 
   function handleRandomPick() {
-    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : pl3PlayType)
+    const randomSelection = createRandomSelection(lotteryCode, lotteryCode === 'dlt' ? dltPlayType : lotteryCode === 'pl5' ? 'direct' : lotteryCode === 'qxc' ? 'direct' : pl3PlayType)
     setSelectedFront(randomSelection.frontNumbers)
     setSelectedBack(randomSelection.backNumbers)
     setSelectedFrontDan(randomSelection.frontDan)
@@ -2505,6 +2540,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedHundreds(randomSelection.directHundreds)
     setSelectedTens(randomSelection.directTens)
     setSelectedUnits(randomSelection.directUnits)
+    setSelectedQxcPositions(QXC_POSITION_CONFIGS.map((_, index) => [...(randomSelection.positionSelections?.[index] || [])]))
     setSelectedGroupNumbers(randomSelection.groupNumbers)
     setSelectedSumValues(randomSelection.sumValues)
     setMessage('已为你生成一组随机机选号码。')
@@ -2522,6 +2558,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
     setSelectedHundreds([])
     setSelectedTens([])
     setSelectedUnits([])
+    setSelectedQxcPositions(createEmptyQxcSelections())
     setSelectedGroupNumbers([])
     setSelectedSumValues([])
     setMessage('已清空当前选号。')
@@ -2881,6 +2918,74 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                 </section>
               )}
             </>
+          ) : isQxc ? (
+            <>
+              <section className="simulation-section simulation-section--mode">
+                <div className="simulation-section__header">
+                  <div>
+                    <p className="hero-panel__eyebrow">Play Type</p>
+                    <h3>七星彩复式选号</h3>
+                  </div>
+                  <span className="simulation-section__badge">7 位定位 · 第七位 00-14</span>
+                </div>
+                <div className="simulation-qxc-toolbar" aria-label="七星彩快捷操作">
+                  <span className="simulation-qxc-toolbar__hint">前六位支持 00-09，第七位支持 00-14；每位至少选择 1 个号码。</span>
+                  <div className="simulation-qxc-toolbar__actions">
+                    <button className="ghost-button" type="button" onClick={handleRandomPick}>
+                      随机一注
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      disabled={qxcPositionSelections.every((values) => values.length === 0)}
+                      onClick={handleClear}
+                    >
+                      清空全部
+                    </button>
+                  </div>
+                </div>
+              </section>
+              {QXC_POSITION_CONFIGS.map((config, positionIndex) => {
+                const values = qxcPositionSelections[positionIndex] || []
+                const options = positionIndex === 6 ? qxcLastDigitOptions : digitOptions
+                return (
+                  <section key={config.key} className={clsx('simulation-section', 'simulation-section--picker', 'simulation-section--qxc-position', positionIndex === 6 && 'is-qxc-last')}>
+                    <div className="simulation-section__header">
+                      <div>
+                        <p className="hero-panel__eyebrow">{config.eyebrow}</p>
+                        <h3>{config.title}</h3>
+                      </div>
+                      <div className="simulation-qxc-position__meta">
+                        <span>{`已选 ${values.length} 个 · ${config.badge}`}</span>
+                        <button
+                          className="ghost-button ghost-button--compact"
+                          type="button"
+                          disabled={!values.length}
+                          onClick={() => clearQxcPosition(positionIndex)}
+                          aria-label={`清空${config.title}`}
+                        >
+                          清空本位
+                        </button>
+                      </div>
+                    </div>
+                    {positionIndex === 6 ? <p className="simulation-qxc-position__hint">第七位为特别号，可选择 00-14。</p> : null}
+                    <div className="simulation-ball-grid" aria-label={config.title}>
+                      {options.map((ball) => (
+                        <button
+                          key={`${config.key}-${ball}`}
+                          type="button"
+                          className={clsx('simulation-ball', config.color === 'qxc-back' ? 'is-dlt-back' : 'is-dlt-front', values.includes(ball) && 'is-selected')}
+                          onClick={() => toggleQxcPositionSelection(ball, positionIndex)}
+                          aria-label={`${config.title} ${ball}`}
+                        >
+                          {ball}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </>
           ) : (
             <>
               <section className="simulation-section simulation-section--picker">
@@ -3039,7 +3144,21 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
               </>
             ) : (
               <>
-                <span>{isPl3 ? `当前玩法：${playTypeLabel}` : '当前玩法：直选'}</span>
+                <span>{isQxc ? '当前玩法：七星彩 7 位复式' : isPl3 ? `当前玩法：${playTypeLabel}` : '当前玩法：直选'}</span>
+                {isQxc ? (
+                  <div className="simulation-qxc-summary">
+                    {QXC_POSITION_CONFIGS.map((config, positionIndex) => (
+                      <span key={`qxc-summary-${config.key}`} className="number-row__segment simulation-qxc-summary__segment">
+                        <span className="number-row__segment-label">{config.title.replace('选号', '')}</span>
+                        <div className="number-row number-row--tight">
+                          {(qxcPositionSelections[positionIndex] || []).map((ball) => (
+                            <NumberBall key={`selected-qxc-${positionIndex}-${ball}`} value={ball} color={config.color} size="sm" />
+                          ))}
+                        </div>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
                 <div className="number-row number-row--tight">
                   {(isPl3 ? (pl3PlayType === 'direct' ? selectedHundreds : pl3PlayType === 'direct_sum' ? selectedSumValues : selectedGroupNumbers) : selectedTenThousands).map((ball) => (
                     <NumberBall key={`selected-a-${ball}`} value={ball} color="pl3pl5" size="sm" />
@@ -3061,6 +3180,7 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   {!isPl3 ? <span className="number-row__divider" /> : null}
                   {!isPl3 ? selectedUnits.map((ball) => <NumberBall key={`selected-e-${ball}`} value={ball} color="pl3pl5" size="sm" />) : null}
                 </div>
+                )}
               </>
             )}
           </div>
@@ -3072,6 +3192,8 @@ function SimulationPlayground({ lotteryCode, draws, targetPeriod }: { lotteryCod
                   ? isDltDantuo
                     ? '胆拖需前胆1-4、前拖至少2（前区合计至少6）；后胆0-1、后拖至少2（后区合计至少3），且胆拖不可重复。'
                     : '前区至少 5 个号码，后区至少 2 个号码后可投注。'
+                  : isQxc
+                    ? '七星彩需 7 个位置都至少选择 1 个号码，其中第七位支持 00-14。'
                   : isPl5
                     ? '直选需万位、千位、百位、十位、个位各至少 1 个号码。'
                     : pl3PlayType === 'direct'
@@ -3309,18 +3431,20 @@ function SavedSimulationTicketCard({
             ))}
           </div>
         ) : lotteryCode === 'qxc' && (ticket.position_selections || []).length === 7 ? (
-          <div className="number-row number-row--tight">
+          <div className="simulation-qxc-summary simulation-qxc-saved">
             {(ticket.position_selections || []).slice(0, 7).map((values, positionIndex) => (
-              <span key={`${ticket.id}-position-${positionIndex}`} className="number-row__segment">
-                {positionIndex > 0 ? <span className="number-row__divider" /> : null}
-                {(values || []).map((ball) => (
-                  <NumberBall
-                    key={`${ticket.id}-position-${positionIndex}-${ball}`}
-                    value={ball}
-                    color={resolveDigitBallColor('qxc', positionIndex, 7)}
-                    size="sm"
-                  />
-                ))}
+              <span key={`${ticket.id}-position-${positionIndex}`} className="number-row__segment simulation-qxc-summary__segment">
+                <span className="number-row__segment-label">{QXC_POSITION_CONFIGS[positionIndex]?.title.replace('选号', '') || `第${positionIndex + 1}位`}</span>
+                <div className="number-row number-row--tight">
+                  {(values || []).map((ball) => (
+                    <NumberBall
+                      key={`${ticket.id}-position-${positionIndex}-${ball}`}
+                      value={ball}
+                      color={resolveDigitBallColor('qxc', positionIndex, 7)}
+                      size="sm"
+                    />
+                  ))}
+                </div>
               </span>
             ))}
           </div>
@@ -3353,7 +3477,7 @@ function SavedSimulationTicketCard({
         )}
       </div>
       <div className="simulation-saved-card__footer">
-        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : ticket.play_type === 'direct_sum' ? '和值' : '直选'} · ${ticket.bet_count} 注`}</span>
+        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : lotteryCode === 'qxc' ? '复式' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : ticket.play_type === 'direct_sum' ? '和值' : '直选'} · ${ticket.bet_count} 注`}</span>
         <span>{formatCurrency(ticket.amount)}</span>
       </div>
     </article>

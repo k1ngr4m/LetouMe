@@ -394,5 +394,69 @@ describe('simulation helpers', () => {
     )
     expect(matches[0].topPrizeLevel).toBe('二等奖')
     expect(matches[0].totalWinningBets).toBe(2)
+    expect(matches[0].digitHits).toEqual(['09', '09', '06', '09', '04', '00'])
+    expect(matches[0].digitHitIndexes).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
+  it('tracks qxc compound hits across all seven positions for first prize', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['00'], ['07'], ['01'], ['03'], ['00'], ['02'], ['13']],
+    }
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{ period: '26038', date: '2026-04-07', red_balls: [], blue_balls: [], digits: ['00', '07', '01', '03', '00', '02', '13'] }],
+      30,
+    )
+
+    expect(matches[0].topPrizeLevel).toBe('一等奖')
+    expect(matches[0].totalWinningBets).toBe(1)
+    expect(matches[0].digitHits).toEqual(['00', '07', '01', '03', '00', '02', '13'])
+    expect(matches[0].digitHitIndexes).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+
+  it('tracks qxc compound hits only for the matched positions', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['00'], ['07'], ['09'], ['03'], ['08'], ['02'], ['13']],
+    }
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{ period: '26039', date: '2026-04-08', red_balls: [], blue_balls: [], digits: ['00', '07', '01', '03', '00', '02', '13'] }],
+      30,
+    )
+
+    expect(matches[0].digitHits).toEqual(['00', '07', '03', '02', '13'])
+    expect(matches[0].digitHitIndexes).toEqual([0, 1, 3, 5, 6])
   })
 })

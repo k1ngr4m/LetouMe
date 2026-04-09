@@ -149,6 +149,7 @@ vi.mock('./hooks/useHomeData', () => ({
   ) => {
     const isPl3 = _lotteryCode === 'pl3'
     const isPl5 = _lotteryCode === 'pl5'
+    const isQxc = _lotteryCode === 'qxc'
     const [effectiveHistoryStrategyFilters, setEffectiveHistoryStrategyFilters] = useState(historyStrategyFilters)
     const [isHistoryFetching, setIsHistoryFetching] = useState(false)
 
@@ -713,7 +714,26 @@ vi.mock('./hooks/useHomeData', () => ({
               lottery_code: 'pl5',
             },
           ]
-        : [
+        : isQxc
+          ? [
+              {
+                period: '26037',
+                date: '2026-04-05',
+                red_balls: [],
+                blue_balls: [],
+                digits: ['09', '09', '06', '09', '04', '00', '01'],
+                lottery_code: 'qxc',
+              },
+              {
+                period: '26036',
+                date: '2026-04-03',
+                red_balls: [],
+                blue_balls: [],
+                digits: ['01', '02', '03', '04', '05', '06', '07'],
+                lottery_code: 'qxc',
+              },
+            ]
+          : [
           {
             period: '2026031',
             date: '2026-03-10',
@@ -954,7 +974,7 @@ beforeEach(() => {
   getSimulationTickets.mockResolvedValue({ tickets: [] })
   quoteSimulationTicket.mockReset()
   quoteSimulationTicket.mockImplementation(async (payload: Record<string, unknown>) => {
-    const lotteryCode = payload.lottery_code === 'pl3' ? 'pl3' : 'dlt'
+    const lotteryCode = payload.lottery_code === 'pl3' ? 'pl3' : payload.lottery_code === 'qxc' ? 'qxc' : 'dlt'
     if (lotteryCode === 'pl3') {
       const playType = String(payload.play_type || 'direct')
       const pl3DirectSumBetCounts: Record<string, number> = {
@@ -979,6 +999,16 @@ beforeEach(() => {
         ? (groupCount >= 2 ? groupCount * (groupCount - 1) : 0)
         : (groupCount >= 3 ? (groupCount * (groupCount - 1) * (groupCount - 2)) / 6 : 0)
       return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
+    }
+    if (lotteryCode === 'qxc') {
+      const positions = Array.isArray(payload.position_selections) ? payload.position_selections : []
+      const betCount = positions.length === 7
+        ? positions.reduce((product, values) => {
+            const count = Array.isArray(values) ? values.length : 0
+            return count > 0 ? product * count : 0
+          }, 1)
+        : 0
+      return { lottery_code: 'qxc', play_type: 'qxc_compound', bet_count: betCount, amount: betCount * 2 }
     }
     if (String(payload.play_type || 'dlt') === 'dlt_dantuo') {
       const frontDanValues = Array.isArray(payload.front_dan) ? payload.front_dan.map(String) : []
@@ -2012,6 +2042,62 @@ describe('HomePage dashboard sidebar', () => {
 
     expect(await screen.findByText('方案 #21')).toBeInTheDocument()
     expect(screen.getByText('和值 · 132 注')).toBeInTheDocument()
+  })
+
+  it('shows dedicated qxc simulation picker, summary and saved ticket layout', async () => {
+    getSimulationTickets.mockResolvedValueOnce({
+      tickets: [
+        {
+          id: 41,
+          lottery_code: 'qxc',
+          play_type: 'qxc_compound',
+          position_selections: [['09'], ['09'], ['06'], ['09'], ['04'], ['00'], ['01', '02']],
+          bet_count: 2,
+          amount: 4,
+          created_at: '2026-03-18T00:00:00Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '七星彩' }))
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+
+    expect(screen.getByText('七星彩复式选号')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '第七位选号 14' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '随机一注' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空全部' })).toBeDisabled()
+    expect(screen.getByText('方案 #41')).toBeInTheDocument()
+    expect(screen.getAllByText('第七位').length).toBeGreaterThan(0)
+    expect(screen.getByText('复式 · 2 注')).toBeInTheDocument()
+  })
+
+  it('supports qxc random pick, per-position clear and global clear', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '七星彩' }))
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+
+    await userEvent.click(screen.getByRole('button', { name: '随机一注' }))
+    expect(screen.getByText('已选 1 注，共 2 元')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空全部' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: '清空第一位选号' }))
+    expect(screen.getByText('已选 0 注，共 0 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '第一位选号 00' }))
+    await userEvent.click(screen.getByRole('button', { name: '第二位选号 01' }))
+    await userEvent.click(screen.getByRole('button', { name: '第三位选号 02' }))
+    await userEvent.click(screen.getByRole('button', { name: '第四位选号 03' }))
+    await userEvent.click(screen.getByRole('button', { name: '第五位选号 04' }))
+    await userEvent.click(screen.getByRole('button', { name: '第六位选号 05' }))
+    await userEvent.click(screen.getByRole('button', { name: '第七位选号 14' }))
+    expect(screen.getByText('已选 1 注，共 2 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '清空全部' }))
+    expect(screen.getByText('已选 0 注，共 0 元')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空全部' })).toBeDisabled()
   })
 
   it('loads history detail on expand and highlights hit numbers', async () => {

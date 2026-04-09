@@ -429,7 +429,7 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
           ? [selection.directTenThousands, selection.directThousands, selection.directHundreds, selection.directTens, selection.directUnits]
           : [selection.directHundreds, selection.directTens, selection.directUnits]
       ).map((values) => values.map(padBall))
-      const digitHitIndexes = selection.playType === 'direct'
+      const digitHitIndexes = selection.playType === 'direct' || (selection.lotteryCode === 'qxc' && selection.playType === 'qxc_compound')
         ? actualDigits.reduce<number[]>((indexes, digit, index) => {
             if (directDigits[index]?.includes(digit)) {
               indexes.push(index)
