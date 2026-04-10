@@ -796,6 +796,41 @@ class PredictionService:
         digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
         return sum(1 for digit, actual in zip(digits, actual_digits) if digit == actual)
 
+    @staticmethod
+    def _calculate_qxc_prize_breakdown(position_selections: list[list[str]], actual_digits: list[str]) -> dict[str, int]:
+        if len(position_selections) != 7 or len(actual_digits) != 7:
+            return {}
+
+        front_hit_ways = [1, 0, 0, 0, 0, 0, 0]
+        for index in range(6):
+            values = list(position_selections[index] or [])
+            hit_choices = 1 if actual_digits[index] in values else 0
+            miss_choices = max(0, len(values) - hit_choices)
+            next_ways = [0, 0, 0, 0, 0, 0, 0]
+            for hit_count in range(index + 1):
+                base_ways = int(front_hit_ways[hit_count] or 0)
+                if not base_ways:
+                    continue
+                if miss_choices > 0:
+                    next_ways[hit_count] += base_ways * miss_choices
+                if hit_choices > 0:
+                    next_ways[hit_count + 1] += base_ways * hit_choices
+            front_hit_ways = next_ways
+
+        last_values = list(position_selections[6] or [])
+        last_hit_choices = 1 if actual_digits[6] in last_values else 0
+        last_miss_choices = max(0, len(last_values) - last_hit_choices)
+
+        prize_breakdown = {
+            "一等奖": front_hit_ways[6] * last_hit_choices,
+            "二等奖": front_hit_ways[6] * last_miss_choices,
+            "三等奖": front_hit_ways[5] * last_hit_choices,
+            "四等奖": front_hit_ways[5] * last_miss_choices + front_hit_ways[4] * last_hit_choices,
+            "五等奖": front_hit_ways[4] * last_miss_choices + front_hit_ways[3] * last_hit_choices,
+            "六等奖": front_hit_ways[3] * last_miss_choices + front_hit_ways[2] * last_hit_choices + front_hit_ways[1] * last_hit_choices + front_hit_ways[0] * last_hit_choices,
+        }
+        return {level: count for level, count in prize_breakdown.items() if count > 0}
+
     @classmethod
     def _calculate_qxc_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
         actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))[:7]
@@ -810,29 +845,10 @@ class PredictionService:
             for index in range(7)
         ]
         digit_hits = [values[0] for values in position_hits if values]
-        front_hit_count = sum(1 for values in position_hits[:6] if values)
-        last_hit = bool(position_hits[6]) if len(position_hits) >= 7 else False
         total_hit_count = len(digit_hits)
-        winning_bet_count = 0
-        best_prize_level = None
-        if total_hit_count == 7:
-            winning_bet_count = 1
-            best_prize_level = "一等奖"
-        elif front_hit_count == 6:
-            winning_bet_count = max(1, len(position_selections[6]) - (1 if last_hit else 0))
-            best_prize_level = "二等奖"
-        elif front_hit_count == 5 and last_hit:
-            winning_bet_count = 1
-            best_prize_level = "三等奖"
-        elif total_hit_count == 5:
-            winning_bet_count = 1
-            best_prize_level = "四等奖"
-        elif total_hit_count == 4:
-            winning_bet_count = 1
-            best_prize_level = "五等奖"
-        elif total_hit_count == 3 or (front_hit_count == 1 and last_hit) or (front_hit_count == 0 and last_hit):
-            winning_bet_count = 1
-            best_prize_level = "六等奖"
+        prize_breakdown = cls._calculate_qxc_prize_breakdown(position_selections, actual_digits)
+        best_prize_level = next((level for level in ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖"] if prize_breakdown.get(level, 0) > 0), None)
+        winning_bet_count = int(prize_breakdown.get(best_prize_level or "", 0))
         return {
             "digit_hits": digit_hits,
             "digit_hit_count": total_hit_count,

@@ -150,6 +150,34 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["winning_bet_count"], 2)
         self.assertEqual(result["prize_amount"], 259646)
 
+    def test_qxc_settlement_multiplies_sixth_prize_by_all_compound_wins(self) -> None:
+        result = self.service._calculate_qxc_line_settlement(
+            line={
+                "play_type": "qxc_compound",
+                "position_selections": [
+                    ["01"],
+                    ["08", "09"],
+                    ["02", "09"],
+                    ["01", "04"],
+                    ["02"],
+                    ["02"],
+                    ["13"],
+                ],
+                "multiplier": 1,
+            },
+            draw={
+                "digits": ["06", "04", "03", "07", "03", "04", "13"],
+                "prize_breakdown": [
+                    {"prize_level": "一等奖", "prize_type": "basic", "prize_amount": 5000000},
+                    {"prize_level": "二等奖", "prize_type": "basic", "prize_amount": 0},
+                ],
+            },
+        )
+
+        self.assertEqual(result["prize_level"], "六等奖")
+        self.assertEqual(result["winning_bet_count"], 8)
+        self.assertEqual(result["prize_amount"], 40)
+
     def test_build_payload_accepts_discount_amount_within_total(self) -> None:
         payload = self.service._build_payload(
             {

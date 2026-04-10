@@ -814,31 +814,9 @@ class MyBetService:
         position_selections = [list(item) for item in list(line.get("position_selections") or [])]
         if len(position_selections) != 7:
             position_selections = [[] for _ in range(7)]
-        exact_match = len(digits) == 7 and all(digits[index] in position_selections[index] for index in range(7))
-        match_counts = [1 if len(digits) == 7 and digits[index] in position_selections[index] else 0 for index in range(7)]
-        front_hit_count = sum(match_counts[:6])
-        last_hit = bool(match_counts[6])
-        total_hit_count = sum(match_counts)
-        winning_count = 0
-        level = None
-        if exact_match:
-            winning_count = 1
-            level = "一等奖"
-        elif front_hit_count == 6:
-            winning_count = max(1, len(position_selections[6]) - (1 if last_hit else 0))
-            level = "二等奖"
-        elif front_hit_count == 5 and last_hit:
-            winning_count = 1
-            level = "三等奖"
-        elif total_hit_count == 5:
-            winning_count = 1
-            level = "四等奖"
-        elif total_hit_count == 4:
-            winning_count = 1
-            level = "五等奖"
-        elif total_hit_count == 3 or (front_hit_count == 1 and last_hit) or (front_hit_count == 0 and last_hit):
-            winning_count = 1
-            level = "六等奖"
+        prize_breakdown = PredictionService._calculate_qxc_prize_breakdown(position_selections, digits)
+        level = next((item for item in self.QXC_PRIZE_LEVEL_ORDER if prize_breakdown.get(item, 0) > 0), None)
+        winning_count = int(prize_breakdown.get(level or "", 0))
         prize_map = {
             "三等奖": 3000,
             "四等奖": 500,
