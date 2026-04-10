@@ -638,17 +638,48 @@ function calculatePl5PrizeBreakdown(selection: SimulationSelection, actualDigits
 function calculateQxcPrizeBreakdown(selection: SimulationSelection, actualDigits: string[]): SimulationMatchPrize[] {
   const positions = (selection.positionSelections || []).map((values) => values.map(padBall))
   if (positions.length !== 7 || actualDigits.length !== 7) return []
-  const matchFlags = positions.map((values, index) => values.includes(actualDigits[index]))
-  const frontHits = matchFlags.slice(0, 6).filter(Boolean).length
-  const totalHits = matchFlags.filter(Boolean).length
-  const lastHit = Boolean(matchFlags[6])
-  if (totalHits === 7) return [{ level: '一等奖', count: 1 }]
-  if (frontHits === 6) return [{ level: '二等奖', count: Math.max(1, positions[6].length - (lastHit ? 1 : 0)) }]
-  if (frontHits === 5 && lastHit) return [{ level: '三等奖', count: 1 }]
-  if (totalHits === 5) return [{ level: '四等奖', count: 1 }]
-  if (totalHits === 4) return [{ level: '五等奖', count: 1 }]
-  if (totalHits === 3 || (frontHits === 1 && lastHit) || (!frontHits && lastHit)) return [{ level: '六等奖', count: 1 }]
-  return []
+  let frontHitWays = [1, 0, 0, 0, 0, 0, 0]
+  for (let index = 0; index < 6; index += 1) {
+    const values = positions[index] || []
+    const hitChoices = values.includes(actualDigits[index]) ? 1 : 0
+    const missChoices = Math.max(0, values.length - hitChoices)
+    const nextWays = [0, 0, 0, 0, 0, 0, 0]
+    for (let hitCount = 0; hitCount <= index; hitCount += 1) {
+      const baseWays = frontHitWays[hitCount] || 0
+      if (!baseWays) continue
+      if (missChoices > 0) {
+        nextWays[hitCount] += baseWays * missChoices
+      }
+      if (hitChoices > 0) {
+        nextWays[hitCount + 1] += baseWays * hitChoices
+      }
+    }
+    frontHitWays = nextWays
+  }
+
+  const lastValues = positions[6] || []
+  const lastHitChoices = lastValues.includes(actualDigits[6]) ? 1 : 0
+  const lastMissChoices = Math.max(0, lastValues.length - lastHitChoices)
+
+  const prizeCounts: Array<SimulationMatchPrize | null> = [
+    frontHitWays[6] && lastHitChoices ? { level: '一等奖', count: frontHitWays[6] * lastHitChoices } : null,
+    frontHitWays[6] && lastMissChoices ? { level: '二等奖', count: frontHitWays[6] * lastMissChoices } : null,
+    frontHitWays[5] && lastHitChoices ? { level: '三等奖', count: frontHitWays[5] * lastHitChoices } : null,
+    frontHitWays[5] * lastMissChoices + frontHitWays[4] * lastHitChoices
+      ? { level: '四等奖', count: frontHitWays[5] * lastMissChoices + frontHitWays[4] * lastHitChoices }
+      : null,
+    frontHitWays[4] * lastMissChoices + frontHitWays[3] * lastHitChoices
+      ? { level: '五等奖', count: frontHitWays[4] * lastMissChoices + frontHitWays[3] * lastHitChoices }
+      : null,
+    frontHitWays[3] * lastMissChoices + frontHitWays[2] * lastHitChoices + frontHitWays[1] * lastHitChoices + frontHitWays[0] * lastHitChoices
+      ? {
+          level: '六等奖',
+          count: frontHitWays[3] * lastMissChoices + frontHitWays[2] * lastHitChoices + frontHitWays[1] * lastHitChoices + frontHitWays[0] * lastHitChoices,
+        }
+      : null,
+  ]
+
+  return prizeCounts.filter((item): item is SimulationMatchPrize => Boolean(item && item.count > 0))
 }
 
 function resolveDigits(draw: LotteryDraw, expectedLength: number): string[] {

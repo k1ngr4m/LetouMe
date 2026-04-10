@@ -551,4 +551,56 @@ describe('simulation helpers', () => {
     expect(matches[0].digitHits).toEqual(['00', '07', '03', '02', '13'])
     expect(matches[0].digitHitIndexes).toEqual([0, 1, 3, 5, 6])
   })
+
+  it('calculates qxc sixth-prize winnings across all compound combinations', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'qxc',
+      playType: 'qxc_compound',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [['01'], ['08', '09'], ['02', '09'], ['01', '04'], ['02'], ['02'], ['13']],
+    }
+
+    expect(calculateBetCount(selection)).toBe(8)
+    expect(calculateAmount(selection)).toBe(16)
+
+    const matches = buildSimulationMatches(
+      selection,
+      [{
+        period: '26016',
+        date: '2026-02-06',
+        red_balls: [],
+        blue_balls: [],
+        digits: ['06', '04', '03', '07', '03', '04', '13'],
+        prize_breakdown_ready: false,
+        prize_breakdown: [
+          { prize_level: '一等奖', prize_type: 'basic', winner_count: 0, prize_amount: 5000000, total_amount: 0 },
+          { prize_level: '二等奖', prize_type: 'basic', winner_count: 0, prize_amount: 0, total_amount: 0 },
+          { prize_level: '三等奖', prize_type: 'basic', winner_count: 0, prize_amount: 3000, total_amount: 0 },
+          { prize_level: '四等奖', prize_type: 'basic', winner_count: 0, prize_amount: 500, total_amount: 0 },
+          { prize_level: '五等奖', prize_type: 'basic', winner_count: 0, prize_amount: 30, total_amount: 0 },
+          { prize_level: '六等奖', prize_type: 'basic', winner_count: 0, prize_amount: 5, total_amount: 0 },
+        ],
+      }],
+      30,
+    )
+
+    expect(matches[0].topPrizeLevel).toBe('六等奖')
+    expect(matches[0].totalWinningBets).toBe(8)
+    expect(matches[0].prizes).toEqual([{ level: '六等奖', count: 8 }])
+    expect(matches[0].prizeAmount).toBe(40)
+    expect(matches[0].netProfit).toBe(24)
+    expect(matches[0].prizeAmountReady).toBe(true)
+  })
 })
