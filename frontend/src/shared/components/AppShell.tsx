@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
+  BarChart3,
   Bell,
   BookOpen,
   ChevronDown,
@@ -679,7 +680,8 @@ export function AppShell({ children }: PropsWithChildren) {
               aria-label="工作台"
               title="工作台"
             >
-              工作台
+              <Gauge size={15} aria-hidden="true" className="crm-topbar__workspace-icon" />
+              <span className="crm-topbar__workspace-label">工作台</span>
             </button>
             <button
               className={clsx('crm-topbar__workspace-btn crm-topbar__workspace-btn--secondary', location.pathname === HOME_TAB_PATHS.charts && 'is-active')}
@@ -688,7 +690,8 @@ export function AppShell({ children }: PropsWithChildren) {
               aria-label="图表中心"
               title="图表中心"
             >
-              图表中心
+              <BarChart3 size={15} aria-hidden="true" className="crm-topbar__workspace-icon" />
+              <span className="crm-topbar__workspace-label">图表中心</span>
             </button>
           </div>
 

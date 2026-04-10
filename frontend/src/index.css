@@ -12322,6 +12322,16 @@ a {
     transform 140ms var(--motion-ease-standard);
 }
 
+.crm-topbar__workspace-icon {
+  display: none;
+  flex-shrink: 0;
+}
+
+.crm-topbar__workspace-label {
+  display: inline-flex;
+  align-items: center;
+}
+
 .crm-topbar__workspace-btn:hover,
 .crm-topbar__workspace-btn.is-active {
   background: color-mix(in srgb, var(--crm-topbar-bg) 66%, #f27f36 34%);
@@ -13519,18 +13529,29 @@ a {
   }
 
   .crm-topbar__workspace-actions {
-    display: none;
+    display: inline-flex;
+    gap: 0.32rem;
   }
 
   .crm-topbar__workspace-btn {
-    min-width: 4.2rem;
-    min-height: 1.9rem;
-    padding: 0.32rem 0.68rem;
-    font-size: 0.76rem;
+    min-width: 2.05rem;
+    width: 2.05rem;
+    min-height: 2.05rem;
+    height: 2.05rem;
+    padding: 0;
+    border-radius: 0.82rem;
   }
 
   .crm-topbar__icon-btn.crm-topbar__menu-btn {
     display: grid;
+  }
+
+  .crm-topbar__workspace-icon {
+    display: inline-flex;
+  }
+
+  .crm-topbar__workspace-label {
+    display: none;
   }
 
   .crm-topbar__title {
