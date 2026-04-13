@@ -230,6 +230,13 @@ class MessageService:
                 snapshot = None
         elif not isinstance(snapshot, dict):
             snapshot = None
+        read_at_ts = ensure_timestamp(message.get("read_at"))
+        created_at_ts = ensure_timestamp(message.get("created_at"))
+        # Legacy rows may contain invalid zero-like datetime values; fallback to
+        # meaningful business time to avoid showing Unix epoch in UI.
+        if not created_at_ts or created_at_ts <= 0:
+            settled_at_ts = ensure_timestamp((snapshot or {}).get("settled_at")) if isinstance(snapshot, dict) else None
+            created_at_ts = settled_at_ts or read_at_ts or 0
         return {
             "id": int(message.get("id") or 0),
             "lottery_code": str(message.get("lottery_code") or "dlt"),
@@ -240,8 +247,8 @@ class MessageService:
             "content": str(message.get("content") or ""),
             "snapshot": snapshot,
             "is_read": bool(message.get("read_at")),
-            "read_at": ensure_timestamp(message.get("read_at")),
-            "created_at": int(ensure_timestamp(message.get("created_at")) or 0),
+            "read_at": read_at_ts,
+            "created_at": int(created_at_ts or 0),
         }
 
     @staticmethod

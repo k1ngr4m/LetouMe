@@ -145,6 +145,24 @@ class MessageServiceTests(unittest.TestCase):
         self.assertEqual(unread_payload["unread_count"], 7)
         self.assertEqual((self.repository.last_list_kwargs or {}).get("result_filter"), "won")
 
+    def test_serialize_message_falls_back_when_created_at_invalid(self) -> None:
+        payload = self.service._serialize_message(
+            {
+                "id": 1,
+                "lottery_code": "dlt",
+                "target_period": "26040",
+                "my_bet_record_id": 12,
+                "message_type": "bet_settlement",
+                "title": "开奖通知",
+                "content": "示例",
+                "snapshot_json": '{"settled_at":"2026-04-03T10:00:00Z"}',
+                "read_at": None,
+                "created_at": "0000-00-00 00:00:00",
+            }
+        )
+        self.assertGreater(payload["created_at"], 0)
+        self.assertEqual(payload["created_at"], 1775210400)
+
     def test_parse_draw_date_supports_datetime_text(self) -> None:
         parsed = self.service._parse_draw_date("2026-04-07 21:46:12")
         self.assertIsNotNone(parsed)

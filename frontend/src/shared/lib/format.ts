@@ -13,6 +13,8 @@ export function formatDateTimeLocal(value?: string | number | null) {
 
 export function formatDateTimeInTimeZone(value: string | number | null | undefined, timeZone: string) {
   if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'number' && value <= 0) return '-'
+  if (typeof value === 'string' && String(value).trim() && Number.isFinite(Number(value)) && Number(value) <= 0) return '-'
   const timestampMs = typeof value === 'number' ? value * 1000 : Number(value)
   const date = Number.isFinite(timestampMs) ? new Date(timestampMs) : new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
