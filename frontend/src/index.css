@@ -8690,6 +8690,16 @@ a {
   border-color: rgba(87, 154, 233, 0.68);
 }
 
+.my-bets-picker__ball.is-qxc-front.is-selected {
+  background: rgba(88, 118, 255, 0.28);
+  border-color: rgba(136, 159, 255, 0.74);
+}
+
+.my-bets-picker__ball.is-qxc-back.is-selected {
+  background: rgba(240, 170, 37, 0.24);
+  border-color: rgba(255, 199, 90, 0.76);
+}
+
 .my-bets-picker__ball.is-pl3pl5.is-selected {
   background: rgba(201, 103, 188, 0.24);
   border-color: rgba(201, 103, 188, 0.68);
@@ -8846,6 +8856,14 @@ a {
 
 :root[data-theme='light'] .my-bets-picker__ball.is-dlt-back.is-selected {
   background: rgba(87, 154, 233, 0.18);
+}
+
+:root[data-theme='light'] .my-bets-picker__ball.is-qxc-front.is-selected {
+  background: rgba(88, 118, 255, 0.16);
+}
+
+:root[data-theme='light'] .my-bets-picker__ball.is-qxc-back.is-selected {
+  background: rgba(240, 170, 37, 0.16);
 }
 
 :root[data-theme='light'] .my-bets-picker__ball.is-pl3pl5.is-selected {

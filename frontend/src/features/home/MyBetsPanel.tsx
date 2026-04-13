@@ -14,7 +14,8 @@ import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, M
 
 type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo'
 type DltPlayType = 'dlt' | 'dlt_dantuo'
-type LinePlayType = DltPlayType | Pl3PlayType
+type QxcPlayType = 'qxc_compound'
+type LinePlayType = DltPlayType | Pl3PlayType | QxcPlayType
 
 type EditableLine = {
   playType: LinePlayType
@@ -37,6 +38,7 @@ type EditableLine = {
   directUnitsTuoInput: string
   groupNumbersInput: string
   sumValuesInput: string
+  qxcPositionInputs: string[]
   multiplier: number
   isAppend: boolean
 }
@@ -76,6 +78,17 @@ const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).
 const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
 const pl3Pool = Array.from({ length: 10 }, (_, index) => String(index).padStart(2, '0'))
 const pl3SumPool = Array.from({ length: 28 }, (_, index) => String(index).padStart(2, '0'))
+const qxcFrontPool = Array.from({ length: 10 }, (_, index) => String(index).padStart(2, '0'))
+const qxcBackPool = Array.from({ length: 15 }, (_, index) => String(index).padStart(2, '0'))
+const QXC_POSITION_CONFIGS = [
+  { key: 'qxc-1', label: '第一位', inputLabel: '第一位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 00,01,02' },
+  { key: 'qxc-2', label: '第二位', inputLabel: '第二位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 03,04,05' },
+  { key: 'qxc-3', label: '第三位', inputLabel: '第三位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 06,07' },
+  { key: 'qxc-4', label: '第四位', inputLabel: '第四位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 08,09' },
+  { key: 'qxc-5', label: '第五位', inputLabel: '第五位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 00,08' },
+  { key: 'qxc-6', label: '第六位', inputLabel: '第六位号码（逗号分隔）', color: 'qxc-front' as const, numbers: qxcFrontPool, placeholder: '如 01,09' },
+  { key: 'qxc-7', label: '第七位', inputLabel: '第七位号码（逗号分隔）', color: 'qxc-back' as const, numbers: qxcBackPool, placeholder: '如 10,11,14' },
+]
 const PL3_DIRECT_SUM_BET_COUNTS: Record<number, number> = {
   0: 1,
   1: 3,
@@ -171,7 +184,7 @@ function quotePl3DantuoPosition(danInput: string, tuoInput: string, label: strin
 
 function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
   return {
-    playType: lotteryCode === 'dlt' ? 'dlt' : 'direct',
+    playType: lotteryCode === 'dlt' ? 'dlt' : lotteryCode === 'qxc' ? 'qxc_compound' : 'direct',
     frontNumbersInput: '',
     backNumbersInput: '',
     frontDanInput: '',
@@ -191,6 +204,7 @@ function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
     directUnitsTuoInput: '',
     groupNumbersInput: '',
     sumValuesInput: '',
+    qxcPositionInputs: Array.from({ length: 7 }, () => ''),
     multiplier: 1,
     isAppend: false,
   }
@@ -262,6 +276,7 @@ function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableL
     directUnitsTuoInput: (line.direct_units_tuo || []).join(','),
     groupNumbersInput: (line.group_numbers || []).join(','),
     sumValuesInput: (line.sum_values || []).join(','),
+    qxcPositionInputs: QXC_POSITION_CONFIGS.map((_, index) => (line.position_selections?.[index] || []).join(',')),
     multiplier: line.multiplier || 1,
     isAppend: Boolean(line.is_append),
   }
@@ -336,6 +351,25 @@ function buildFormSnapshot(form: BetFormState) {
 
 function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
   const multiplier = Math.max(1, Math.min(99, Number(line.multiplier) || 1))
+  if (lotteryCode === 'qxc') {
+    const positionSelections = QXC_POSITION_CONFIGS.map((_, index) => splitNumbers(line.qxcPositionInputs[index] || ''))
+    for (const [index, values] of positionSelections.entries()) {
+      if (!values.length) {
+        return { betCount: 0, amount: 0, valid: false, reason: `${QXC_POSITION_CONFIGS[index].label}至少选择 1 个号码。` }
+      }
+      const maxValue = index === QXC_POSITION_CONFIGS.length - 1 ? 14 : 9
+      if (values.some((value) => !/^\d{2}$/.test(value) || Number(value) < 0 || Number(value) > maxValue)) {
+        return {
+          betCount: 0,
+          amount: 0,
+          valid: false,
+          reason: index === QXC_POSITION_CONFIGS.length - 1 ? '第七位号码范围需为 00-14。' : `${QXC_POSITION_CONFIGS[index].label}号码范围需为 00-09。`,
+        }
+      }
+    }
+    const betCount = positionSelections.reduce((product, values) => product * values.length, 1)
+    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '七星彩号码无效，请检查输入。' }
+  }
   if (lotteryCode === 'dlt') {
     if (line.playType === 'dlt_dantuo') {
       const frontDan = splitNumbers(line.frontDanInput)
@@ -448,6 +482,14 @@ function parseDiscountAmount(value: string): number {
 
 function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLinePayload {
   const normalizedMultiplier = Math.max(1, Math.min(99, Number(line.multiplier) || 1))
+  if (lotteryCode === 'qxc') {
+    return {
+      play_type: 'qxc_compound',
+      position_selections: QXC_POSITION_CONFIGS.map((_, index) => splitNumbers(line.qxcPositionInputs[index] || '')),
+      multiplier: normalizedMultiplier,
+      is_append: false,
+    }
+  }
   if (lotteryCode === 'dlt') {
     if (line.playType === 'dlt_dantuo') {
       return {
@@ -520,6 +562,7 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
 }
 
 function formatPlayType(playType: string) {
+  if (playType === 'qxc_compound') return '七星彩复式'
   if (playType === 'dlt_dantuo') return '胆拖'
   if (playType === 'pl3_dantuo') return '直选组合胆拖'
   if (playType === 'group3') return '组选3'
@@ -743,7 +786,7 @@ function BallPicker({
   numbers: string[]
   selectedInput: string
   onToggle: (value: string) => void
-  color: 'red' | 'blue' | 'pl3pl5' | 'dlt-front' | 'dlt-back'
+  color: 'red' | 'blue' | 'pl3pl5' | 'dlt-front' | 'dlt-back' | 'qxc-front' | 'qxc-back'
 }) {
   const selected = new Set(splitNumbers(selectedInput))
   return (
@@ -1561,6 +1604,53 @@ export function MyBetsPanel({
                               </div>
                             </>
                           )}
+                        </>
+                      ) : lotteryCode === 'qxc' ? (
+                        <>
+                          <div className="simulation-qxc-toolbar" aria-label="七星彩录入提示">
+                            <span className="simulation-qxc-toolbar__hint">前六位支持 00-09，第七位支持 00-14；每位至少选择 1 个号码。</span>
+                          </div>
+                          {QXC_POSITION_CONFIGS.map((config, positionIndex) => (
+                            <div key={`${config.key}-${index}`}>
+                              <BallPicker
+                                label={`${config.label}点击选号`}
+                                numbers={config.numbers}
+                                selectedInput={line.qxcPositionInputs[positionIndex] || ''}
+                                onToggle={(value) =>
+                                  updateLine(index, (current) => ({
+                                    ...current,
+                                    qxcPositionInputs: current.qxcPositionInputs.map((item, currentIndex) =>
+                                      currentIndex === positionIndex ? togglePickFromInput(item || '', value, config.numbers.length) : item,
+                                    ),
+                                  }))
+                                }
+                                color={config.color}
+                              />
+                            </div>
+                          ))}
+                          <div className="settings-form-grid my-bets-modal__grid">
+                            {QXC_POSITION_CONFIGS.map((config, positionIndex) => (
+                              <label key={`${config.key}-input`}>
+                                {config.inputLabel}
+                                <input
+                                  value={line.qxcPositionInputs[positionIndex] || ''}
+                                  onChange={(event) =>
+                                    updateLine(index, (current) => ({
+                                      ...current,
+                                      qxcPositionInputs: current.qxcPositionInputs.map((item, currentIndex) =>
+                                        currentIndex === positionIndex ? normalizeDigitsInput(event.target.value) : item,
+                                      ),
+                                    }))
+                                  }
+                                  placeholder={config.placeholder}
+                                />
+                              </label>
+                            ))}
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
+                            </label>
+                          </div>
                         </>
                       ) : lotteryCode === 'pl5' ? (
                         <>

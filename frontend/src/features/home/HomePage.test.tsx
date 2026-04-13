@@ -3238,6 +3238,207 @@ describe('HomePage dashboard sidebar', () => {
     )
   })
 
+  it('supports qxc create on my-bets tab', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    getMyBets.mockResolvedValueOnce({
+      records: [],
+      summary: {
+        total_count: 0,
+        total_amount: 0,
+        total_prize_amount: 0,
+        total_net_profit: 0,
+        settled_count: 0,
+        pending_count: 0,
+      },
+    })
+    createMyBet.mockResolvedValueOnce({
+      record: {
+        id: 3,
+        lottery_code: 'qxc',
+        target_period: '2026032',
+        play_type: 'qxc_compound',
+        position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+        lines: [
+          {
+            line_no: 1,
+            play_type: 'qxc_compound',
+            position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+            multiplier: 1,
+            is_append: false,
+            bet_count: 4,
+            amount: 8,
+          },
+        ],
+        amount: 8,
+        prize_amount: 0,
+        net_profit: -8,
+        winning_bet_count: 0,
+        settlement_status: 'pending',
+        created_at: '2026-03-18T00:00:00Z',
+        updated_at: '2026-03-18T00:00:00Z',
+      },
+    })
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+
+    await userEvent.type(within(formView).getByLabelText('第一位号码（逗号分隔）'), '00,01')
+    await userEvent.type(within(formView).getByLabelText('第二位号码（逗号分隔）'), '02')
+    await userEvent.type(within(formView).getByLabelText('第三位号码（逗号分隔）'), '03')
+    await userEvent.type(within(formView).getByLabelText('第四位号码（逗号分隔）'), '04')
+    await userEvent.type(within(formView).getByLabelText('第五位号码（逗号分隔）'), '05')
+    await userEvent.type(within(formView).getByLabelText('第六位号码（逗号分隔）'), '06')
+    await userEvent.type(within(formView).getByLabelText('第七位号码（逗号分隔）'), '07,14')
+
+    expect(within(formView).getByText('共 1 条子注单 · 预计 4 注 / 8 元（实付 8 元）')).toBeInTheDocument()
+
+    await userEvent.click(within(formView).getByRole('button', { name: '添加投注' }))
+
+    await waitFor(() =>
+      expect(createMyBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'qxc',
+          target_period: '2026032',
+          lines: [
+            expect.objectContaining({
+              play_type: 'qxc_compound',
+              position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+            }),
+          ],
+        }),
+      ),
+    )
+  })
+
+  it('supports qxc edit on my-bets tab', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    getMyBets.mockResolvedValueOnce({
+      records: [
+        {
+          id: 9,
+          lottery_code: 'qxc',
+          target_period: '2026032',
+          play_type: 'qxc_compound',
+          position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07']],
+          lines: [
+            {
+              line_no: 1,
+              play_type: 'qxc_compound',
+              position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07']],
+              multiplier: 1,
+              is_append: false,
+              bet_count: 2,
+              amount: 4,
+            },
+          ],
+          amount: 4,
+          prize_amount: 0,
+          net_profit: -4,
+          winning_bet_count: 0,
+          settlement_status: 'pending',
+          created_at: '2026-03-18T00:00:00Z',
+          updated_at: '2026-03-18T00:00:00Z',
+        },
+      ],
+      summary: {
+        total_count: 1,
+        total_amount: 4,
+        total_prize_amount: 0,
+        total_net_profit: -4,
+        settled_count: 0,
+        pending_count: 1,
+      },
+    })
+    updateMyBet.mockResolvedValueOnce({
+      record: {
+        id: 9,
+        lottery_code: 'qxc',
+        target_period: '2026032',
+        play_type: 'qxc_compound',
+        position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+        lines: [
+          {
+            line_no: 1,
+            play_type: 'qxc_compound',
+            position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+            multiplier: 1,
+            is_append: false,
+            bet_count: 4,
+            amount: 8,
+          },
+        ],
+        amount: 8,
+        prize_amount: 0,
+        net_profit: -8,
+        winning_bet_count: 0,
+        settlement_status: 'pending',
+        created_at: '2026-03-18T00:00:00Z',
+        updated_at: '2026-03-18T00:00:00Z',
+      },
+    })
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await screen.findByText('七星彩复式')
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+
+    expect(within(formView).getByLabelText('第一位号码（逗号分隔）')).toHaveValue('00,01')
+    expect(within(formView).getByLabelText('第七位号码（逗号分隔）')).toHaveValue('07')
+
+    await userEvent.type(within(formView).getByLabelText('第七位号码（逗号分隔）'), ',14')
+    await userEvent.click(within(formView).getByRole('button', { name: '保存修改' }))
+
+    await waitFor(() =>
+      expect(updateMyBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          record_id: 9,
+          lottery_code: 'qxc',
+          lines: [
+            expect.objectContaining({
+              play_type: 'qxc_compound',
+              position_selections: [['00', '01'], ['02'], ['03'], ['04'], ['05'], ['06'], ['07', '14']],
+            }),
+          ],
+        }),
+      ),
+    )
+  })
+
+  it('shows qxc validation reason when a position is empty or out of range', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    getMyBets.mockResolvedValueOnce({
+      records: [],
+      summary: {
+        total_count: 0,
+        total_amount: 0,
+        total_prize_amount: 0,
+        total_net_profit: 0,
+        settled_count: 0,
+        pending_count: 0,
+      },
+    })
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+
+    await userEvent.type(within(formView).getByLabelText('第一位号码（逗号分隔）'), '00')
+    await userEvent.type(within(formView).getByLabelText('第二位号码（逗号分隔）'), '10')
+
+    expect(within(formView).getByText('子注单 #1：第二位号码范围需为 00-09。')).toBeInTheDocument()
+    expect(within(formView).getByRole('button', { name: '添加投注' })).toBeDisabled()
+
+    await userEvent.clear(within(formView).getByLabelText('第二位号码（逗号分隔）'))
+    await userEvent.type(within(formView).getByLabelText('第二位号码（逗号分隔）'), '02')
+
+    expect(within(formView).getByText('子注单 #1：第三位至少选择 1 个号码。')).toBeInTheDocument()
+  })
+
   it('shows explicit dlt dantuo validation reason when back dan exceeds limit', async () => {
     renderPage('/dashboard/my-bets')
     await screen.findByRole('heading', { name: '我的投注' })
