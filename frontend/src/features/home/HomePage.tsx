@@ -34,6 +34,9 @@ import {
   buildPl5OddEvenStructureChart,
   buildPl5PositionHotChart,
   buildPl5SumTrendChart,
+  buildQxcOddEvenStructureChart,
+  buildQxcPositionHotChart,
+  buildQxcSumTrendChart,
   buildSpanTrendChart,
   filterPredictionGroupsByPlayType,
   getPredictionPlayTypeLabel,
@@ -1179,21 +1182,29 @@ export function HomePage() {
   }, [historyHitTrend, historyModelStats, topHistoryModel])
   const isPl3Lottery = selectedLottery === 'pl3'
   const isPl5Lottery = selectedLottery === 'pl5'
+  const isQxcLottery = selectedLottery === 'qxc'
   const redChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 0) : buildRedFrequencyChart(chartDraws)
   const blueChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 1) : buildBlueFrequencyChart(chartDraws)
   const pl3UnitChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 2) : []
   const pl5PositionCharts = isPl5Lottery
     ? ([0, 1, 2, 3, 4] as const).map((index) => buildPl5PositionHotChart(chartDraws, index))
     : []
+  const qxcPositionCharts = isQxcLottery
+    ? ([0, 1, 2, 3, 4, 5, 6] as const).map((index) => buildQxcPositionHotChart(chartDraws, index))
+    : []
   const oddEvenChart = isPl3Lottery
     ? buildPl3OddEvenStructureChart(chartDraws)
     : isPl5Lottery
       ? buildPl5OddEvenStructureChart(chartDraws)
+      : isQxcLottery
+        ? buildQxcOddEvenStructureChart(chartDraws)
       : buildOddEvenChart(chartDraws)
   const sumTrendChart = isPl3Lottery
     ? buildPl3SumTrendChart(chartDraws)
     : isPl5Lottery
       ? buildPl5SumTrendChart(chartDraws)
+      : isQxcLottery
+        ? buildQxcSumTrendChart(chartDraws)
       : buildSumTrendChart(chartDraws)
   const sumDistributionChart = useMemo(
     () => buildSumDistributionChart(chartDraws, selectedLottery),
@@ -1920,6 +1931,7 @@ export function HomePage() {
                       blueChart={blueChart}
                       pl3UnitChart={pl3UnitChart}
                       pl5PositionCharts={pl5PositionCharts}
+                      qxcPositionCharts={qxcPositionCharts}
                     />
                     <AnalysisSumTrendChartCard lotteryCode={selectedLottery} sumTrendChart={sumTrendChart} />
                     <AnalysisOddEvenTrendChartCard lotteryCode={selectedLottery} oddEvenChart={oddEvenChart} />

@@ -3,8 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { HomePage } from './HomePage'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '../../shared/feedback/ToastProvider'
 
 const {
@@ -192,115 +191,131 @@ vi.mock('./hooks/useHomeData', () => ({
       },
     ]
 
-    const historyRecords = [
-      buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
-      SECOND_HISTORY_RECORD,
-      buildHistoryRecord('2026029', '2026-03-06', 'model-a'),
-      buildHistoryRecord('2026028', '2026-03-04', 'model-b'),
-      buildHistoryRecord('2026027', '2026-03-02', 'model-a'),
-      buildHistoryRecord('2026026', '2026-02-28', 'model-b'),
-      buildHistoryRecord('2026025', '2026-02-26', 'model-a'),
-      buildHistoryRecord('2026024', '2026-02-24', 'model-b'),
-      buildHistoryRecord('2026023', '2026-02-22', 'model-a'),
-      buildHistoryRecord('2026022', '2026-02-20', 'model-b'),
-      buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
-      buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
-    ].map((record) => {
-      if (!isPl3 && simulateDltDantuoCurrentPredictions.current) {
-        return {
-          ...record,
-          models: [
-            {
-              model_id: 'model-a',
-              model_name: '模型A',
-              model_provider: 'openai_compatible',
-              prediction_play_mode: 'dantuo',
-              best_hit_count: 3,
-              bet_count: 5,
-              cost_amount: 10,
-              winning_bet_count: 1,
-              prize_amount: 300,
-              hit_period_win: true,
-            },
-          ],
-        }
-      }
-      if (!isPl3 && simulateDltCompoundCurrentPredictions.current) {
-        return {
-          ...record,
-          models: [
-            {
-              model_id: 'model-a',
-              model_name: '模型A',
-              model_provider: 'openai_compatible',
-              prediction_play_mode: 'compound',
-              best_hit_count: 3,
-              bet_count: 51,
-              cost_amount: 102,
-              winning_bet_count: 2,
-              prize_amount: 300,
-              hit_period_win: true,
-            },
-          ],
-        }
-      }
-      if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return record
-      return {
-        ...record,
-        models: (record.models || []).map((model, index) =>
-          index === 0
-            ? {
-                ...model,
-                prediction_play_mode: 'direct',
-                play_type: 'direct_sum',
-              }
-            : model,
-        ),
-      }
-    })
-    const filteredHistoryRecords = historyRecords
-      .map((record) => {
-        const models = (record.models || []).filter((model) => {
-          if (!matchesHistoryStrategies(model.model_id)) return false
-          if (!historyPlayTypeFilters.length) return true
-          if (!isPl3) {
-            const modelPlayMode = String((model as { prediction_play_mode?: string }).prediction_play_mode || 'direct').trim().toLowerCase()
-            if (historyPlayTypeFilters.includes('dlt_dantuo')) return modelPlayMode === 'dantuo'
-            if (historyPlayTypeFilters.includes('dlt_compound')) return modelPlayMode === 'compound'
-            return modelPlayMode === 'direct'
+    const historyRecords = useMemo(
+      () =>
+        [
+          buildHistoryRecord('2026031', '2026-03-10', 'model-a'),
+          SECOND_HISTORY_RECORD,
+          buildHistoryRecord('2026029', '2026-03-06', 'model-a'),
+          buildHistoryRecord('2026028', '2026-03-04', 'model-b'),
+          buildHistoryRecord('2026027', '2026-03-02', 'model-a'),
+          buildHistoryRecord('2026026', '2026-02-28', 'model-b'),
+          buildHistoryRecord('2026025', '2026-02-26', 'model-a'),
+          buildHistoryRecord('2026024', '2026-02-24', 'model-b'),
+          buildHistoryRecord('2026023', '2026-02-22', 'model-a'),
+          buildHistoryRecord('2026022', '2026-02-20', 'model-b'),
+          buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
+          buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
+        ].map((record) => {
+          if (!isPl3 && simulateDltDantuoCurrentPredictions.current) {
+            return {
+              ...record,
+              models: [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  prediction_play_mode: 'dantuo',
+                  best_hit_count: 3,
+                  bet_count: 5,
+                  cost_amount: 10,
+                  winning_bet_count: 1,
+                  prize_amount: 300,
+                  hit_period_win: true,
+                },
+              ],
+            }
           }
-          const modelPlayType = String((model as { play_type?: string }).play_type || 'direct').trim().toLowerCase()
-          return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6')
-        })
-        const periodSummary = models.reduce(
-          (accumulator, model) => ({
-            total_bet_count: accumulator.total_bet_count + Number(model.bet_count || 0),
-            total_cost_amount: accumulator.total_cost_amount + Number(model.cost_amount || 0),
-            total_prize_amount: accumulator.total_prize_amount + Number(model.prize_amount || 0),
-          }),
-          {
-            total_bet_count: 0,
-            total_cost_amount: 0,
-            total_prize_amount: 0,
-          },
-        )
-        return {
-          ...record,
-          models,
-          period_summary: periodSummary,
-        }
-      })
-      .filter((record) => record.models.length > 0)
-    const offset = (historyPage - 1) * historyPageSize
-    const pagedHistoryRecords = filteredHistoryRecords.slice(offset, offset + historyPageSize)
-    const lotteryRecords = Array.from({ length: 12 }, (_, index) => ({
-      period: `${2026031 - index}`,
-      date: `2026-03-${String(10 - index).padStart(2, '0')}`,
-      red_balls: ['01', '02', '03', '04', '05'],
-      blue_balls: ['06', '07'],
-    }))
-    const lotteryOffset = (lotteryPage - 1) * lotteryPageSize
-    const pagedLotteryRecords = lotteryRecords.slice(lotteryOffset, lotteryOffset + lotteryPageSize)
+          if (!isPl3 && simulateDltCompoundCurrentPredictions.current) {
+            return {
+              ...record,
+              models: [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  prediction_play_mode: 'compound',
+                  best_hit_count: 3,
+                  bet_count: 51,
+                  cost_amount: 102,
+                  winning_bet_count: 2,
+                  prize_amount: 300,
+                  hit_period_win: true,
+                },
+              ],
+            }
+          }
+          if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return record
+          return {
+            ...record,
+            models: (record.models || []).map((model, index) =>
+              index === 0
+                ? {
+                    ...model,
+                    prediction_play_mode: 'direct',
+                    play_type: 'direct_sum',
+                  }
+                : model,
+            ),
+          }
+        }),
+      [isPl3],
+    )
+    const filteredHistoryRecords = useMemo(
+      () =>
+        historyRecords
+          .map((record) => {
+            const models = (record.models || []).filter((model) => {
+              if (!matchesHistoryStrategies(model.model_id)) return false
+              if (!historyPlayTypeFilters.length) return true
+              if (!isPl3) {
+                const modelPlayMode = String((model as { prediction_play_mode?: string }).prediction_play_mode || 'direct').trim().toLowerCase()
+                if (historyPlayTypeFilters.includes('dlt_dantuo')) return modelPlayMode === 'dantuo'
+                if (historyPlayTypeFilters.includes('dlt_compound')) return modelPlayMode === 'compound'
+                return modelPlayMode === 'direct'
+              }
+              const modelPlayType = String((model as { play_type?: string }).play_type || 'direct').trim().toLowerCase()
+              return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6')
+            })
+            const periodSummary = models.reduce(
+              (accumulator, model) => ({
+                total_bet_count: accumulator.total_bet_count + Number(model.bet_count || 0),
+                total_cost_amount: accumulator.total_cost_amount + Number(model.cost_amount || 0),
+                total_prize_amount: accumulator.total_prize_amount + Number(model.prize_amount || 0),
+              }),
+              {
+                total_bet_count: 0,
+                total_cost_amount: 0,
+                total_prize_amount: 0,
+              },
+            )
+            return {
+              ...record,
+              models,
+              period_summary: periodSummary,
+            }
+          })
+          .filter((record) => record.models.length > 0),
+      [historyPlayTypeFilters, historyRecords, isPl3, normalizedHistoryStrategyFilters.join('|')],
+    )
+    const pagedHistoryRecords = useMemo(() => {
+      const offset = (historyPage - 1) * historyPageSize
+      return filteredHistoryRecords.slice(offset, offset + historyPageSize)
+    }, [filteredHistoryRecords, historyPage, historyPageSize])
+    const lotteryRecords = useMemo(
+      () =>
+        Array.from({ length: 12 }, (_, index) => ({
+          period: `${2026031 - index}`,
+          date: `2026-03-${String(10 - index).padStart(2, '0')}`,
+          red_balls: ['01', '02', '03', '04', '05'],
+          blue_balls: ['06', '07'],
+        })),
+      [],
+    )
+    const pagedLotteryRecords = useMemo(() => {
+      const lotteryOffset = (lotteryPage - 1) * lotteryPageSize
+      return lotteryRecords.slice(lotteryOffset, lotteryOffset + lotteryPageSize)
+    }, [lotteryPage, lotteryPageSize, lotteryRecords])
     const currentHistoryPayload = useMemo(
       () => ({
         model_stats: !isPl3 && simulateDltModeCoexistCurrentPredictions.current
@@ -454,7 +469,7 @@ vi.mock('./hooks/useHomeData', () => ({
       }),
       [filteredHistoryRecords.length, isPl3, pagedHistoryRecords],
     )
-    const currentModels = isPl3
+    const currentModels = useMemo(() => (isPl3
       ? [
           ...(simulatePl3SumCurrentPredictions.current
             ? [
@@ -675,8 +690,8 @@ vi.mock('./hooks/useHomeData', () => ({
                 blue_balls: ['01', '02'],
               })),
             },
-          ]
-    const lotteryHistoryData = isPl3
+          ]), [isPl3, isPl5, isQxc])
+    const lotteryHistoryData = useMemo(() => (isPl3
       ? [
           {
             period: '2026031',
@@ -747,7 +762,7 @@ vi.mock('./hooks/useHomeData', () => ({
             red_balls: ['08', '09', '10', '11', '12'],
             blue_balls: ['01', '02'],
           },
-        ]
+        ]), [isPl3, isPl5, isQxc])
     useEffect(() => {
       if (!simulateHistoryFilterLoading.current) {
         setEffectiveHistoryStrategyFilters(historyStrategyFilters)
@@ -764,47 +779,91 @@ vi.mock('./hooks/useHomeData', () => ({
       return () => window.clearTimeout(timer)
     }, [historyStrategyFilters])
 
-    return {
-      currentPredictions: {
-        data: {
-          prediction_date: '2026-03-12',
-          target_period: '2026032',
-          models: currentModels,
-        },
-        isLoading: false,
-        error: null,
-      },
-      lotteryCharts: {
-        data: {
-          data: lotteryHistoryData,
-          next_draw: {
-            next_date_display: '2026-03-15',
+    return useMemo(
+      () => ({
+        currentPredictions: {
+          data: {
+            prediction_date: '2026-03-12',
+            target_period: '2026032',
+            models: currentModels,
           },
+          isLoading: false,
+          error: null,
         },
-        isLoading: false,
-        error: null,
-      },
-      predictionsHistory: {
-        data: currentHistoryPayload,
-        isFetching: isHistoryFetching,
-        isLoading: isHistoryFetching,
-        error: null,
-      },
-      pagedLotteryHistory: {
-        data: {
-          data: pagedLotteryRecords,
-          total_count: lotteryRecords.length,
+        lotteryCharts: {
+          data: {
+            data: lotteryHistoryData,
+            next_draw: {
+              next_date_display: '2026-03-15',
+            },
+          },
+          isLoading: false,
+          error: null,
         },
-        isLoading: false,
-        error: null,
-      },
-    }
+        predictionsHistory: {
+          data: currentHistoryPayload,
+          isFetching: isHistoryFetching,
+          isLoading: isHistoryFetching,
+          error: null,
+        },
+        pagedLotteryHistory: {
+          data: {
+            data: pagedLotteryRecords,
+            total_count: lotteryRecords.length,
+          },
+          isLoading: false,
+          error: null,
+        },
+      }),
+      [currentHistoryPayload, currentModels, isHistoryFetching, lotteryHistoryData, lotteryRecords.length, pagedLotteryRecords],
+    )
   },
 }))
 
 vi.mock('html-to-image', () => ({
   toPng,
 }))
+
+vi.mock('recharts', async () => {
+  const React = await import('react')
+
+  function makeWrapper(tag: string) {
+    return ({ children }: React.PropsWithChildren<Record<string, unknown>>) =>
+      React.createElement(tag, null, children)
+  }
+
+  return {
+    ResponsiveContainer: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
+    AreaChart: makeWrapper('div'),
+    BarChart: makeWrapper('div'),
+    LineChart: makeWrapper('div'),
+    CartesianGrid: makeWrapper('div'),
+    Legend: makeWrapper('div'),
+    Line: makeWrapper('div'),
+    ReferenceLine: makeWrapper('div'),
+    Tooltip: makeWrapper('div'),
+    XAxis: makeWrapper('div'),
+    YAxis: makeWrapper('div'),
+    Area: makeWrapper('div'),
+    Bar: makeWrapper('div'),
+  }
+})
+
+vi.mock('framer-motion', async () => {
+  const React = await import('react')
+  const MotionDiv = ({ children }: React.PropsWithChildren<Record<string, unknown>>) =>
+    React.createElement('div', null, children)
+
+  return {
+    AnimatePresence: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
+    motion: new Proxy(
+      {},
+      {
+        get: () => MotionDiv,
+      },
+    ),
+  }
+})
 
 vi.mock('../../shared/theme/MotionProvider', () => ({
   useMotion: () => ({
@@ -814,14 +873,18 @@ vi.mock('../../shared/theme/MotionProvider', () => ({
   }),
 }))
 
+const { HomePage } = await import('./HomePage')
+
 function renderPage(initialEntry = '/dashboard/prediction') {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
+        gcTime: Number.POSITIVE_INFINITY,
         retry: false,
       },
     },
   })
+  activeQueryClients.push(client)
 
   function LocationDisplay() {
     const location = useLocation()
@@ -850,6 +913,16 @@ function renderPage(initialEntry = '/dashboard/prediction') {
     </QueryClientProvider>,
   )
 }
+
+const activeQueryClients: QueryClient[] = []
+
+afterEach(() => {
+  while (activeQueryClients.length > 0) {
+    const client = activeQueryClients.pop()
+    client?.unmount()
+    client?.clear()
+  }
+})
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -1748,6 +1821,17 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByRole('heading', { name: '后区热号 Top 12' })).not.toBeInTheDocument()
   })
 
+  it('shows grouped number analysis charts on chart center by default for qxc', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    renderPage('/dashboard/charts#number-base')
+
+    expect(await screen.findByRole('heading', { name: '第一位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '第六位热号 Top 10' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '第七位热号 Top 15' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '和值趋势' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '奇偶结构走势' })).toBeInTheDocument()
+  })
+
   it('shows base backtest dashboard with filters on backtest base tab', async () => {
     renderPage('/dashboard/charts#backtest-base')
 
@@ -1805,6 +1889,15 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })
 
+  it('shows qxc number distribution dashboard charts together', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    renderPage('/dashboard/charts#number-distribution')
+
+    expect(await screen.findByRole('heading', { name: '和值分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '奇偶比分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '区间占比分布' })).toBeInTheDocument()
+  })
+
   it('shows number pattern dashboard charts together', async () => {
     renderPage('/dashboard/charts#number-pattern')
 
@@ -1813,6 +1906,15 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByRole('heading', { name: '012路走势' })).toBeInTheDocument()
     expect(screen.queryByText('模型')).not.toBeInTheDocument()
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
+  })
+
+  it('shows qxc number pattern dashboard charts together', async () => {
+    window.localStorage.setItem('letoumeSelectedLottery', 'qxc')
+    renderPage('/dashboard/charts#number-pattern')
+
+    expect(await screen.findByRole('heading', { name: '跨度趋势' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '区段结构分布' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '012路走势' })).toBeInTheDocument()
   })
 
   it('supports simulation pick, matching, save and delete flows', async () => {

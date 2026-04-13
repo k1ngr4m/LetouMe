@@ -291,12 +291,14 @@ export function AnalysisHotChartsPanel({
   blueChart,
   pl3UnitChart,
   pl5PositionCharts,
+  qxcPositionCharts,
 }: {
   lotteryCode: LotteryCode
   redChart: FrequencyChartItem[]
   blueChart: FrequencyChartItem[]
   pl3UnitChart: FrequencyChartItem[]
   pl5PositionCharts: FrequencyChartItem[][]
+  qxcPositionCharts: FrequencyChartItem[][]
 }) {
   if (lotteryCode === 'pl3') {
     return (
@@ -401,6 +403,91 @@ export function AnalysisHotChartsPanel({
     )
   }
 
+  if (lotteryCode === 'qxc') {
+    const [first = [], second = [], third = [], fourth = [], fifth = [], sixth = [], seventh = []] = qxcPositionCharts
+    return (
+      <div className="page-section chart-grid">
+        <ChartCard title="第一位热号 Top 10" description="统计最近样本中第一位号码的出现次数，帮助判断首位近期更活跃的数字。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={first}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="var(--red-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第二位热号 Top 10" description="统计最近样本中第二位号码的出现次数，适合与相邻位置交叉观察热度轮动。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={second}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="var(--amber-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第三位热号 Top 10" description="统计最近样本中第三位号码的出现次数，用来识别第三位近期集中区域。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={third}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="var(--blue-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第四位热号 Top 10" description="统计最近样本中第四位号码的出现次数，帮助查看中部位置是否存在明显热号。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={fourth}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="#8b5cf6" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第五位热号 Top 10" description="统计最近样本中第五位号码的出现次数，观察该位置的热度集中和切换节奏。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={fifth}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="#22c55e" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第六位热号 Top 10" description="统计最近样本中第六位号码的出现次数，适合与前五位一起观察整体定位分布。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={sixth}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="#06b6d4" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="第七位热号 Top 15" description="统计最近样本中第七位号码的出现次数。第七位范围为 00-14，和前六位的 00-09 规则不同，需要单独观察。">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={seventh}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="ball" />
+              <YAxis allowDecimals={false} />
+              <Tooltip {...commonChartTooltipProps} />
+              <Bar dataKey="count" fill="var(--violet-500)" radius={[12, 12, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+
   return (
     <div className="page-section chart-grid">
       <ChartCard title="前区热号 Top 12" description="统计最近样本中前区号码的出现次数，帮助判断当前更热的前区号码。它回答的是“哪些号更常出现”，不表示命中概率保证。">
@@ -444,7 +531,9 @@ export function AnalysisSumTrendChartCard({
         title={title}
         description={lotteryCode === 'dlt'
           ? '展示前区号码和值随期数变化的趋势，用来判断和值是否处于高位、低位或中枢附近震荡。适合观察节奏变化，不适合单独做号码判断。'
-          : '展示当期开奖号码和值随期数变化的趋势，用来判断和值是否集中在某个区间，或是否出现明显波动。'}
+          : lotteryCode === 'qxc'
+            ? '展示七星彩当期 7 位号码和值随期数变化的趋势，用来判断和值是否集中在某个区间，或是否出现明显波动。'
+            : '展示当期开奖号码和值随期数变化的趋势，用来判断和值是否集中在某个区间，或是否出现明显波动。'}
         className="chart-card--focus"
       >
         <ResponsiveContainer width="100%" height={320}>
@@ -506,6 +595,25 @@ export function AnalysisOddEvenTrendChartCard({
     )
   }
 
+  if (lotteryCode === 'qxc') {
+    const structureTrend = oddEvenChart as Pl5OddEvenStructureChartItem[]
+    return (
+      <div className="page-section chart-grid chart-grid--single">
+        <ChartCard title="奇偶结构走势" description="展示七星彩每期 7 位号码中的奇偶数量结构，帮助判断近期更偏奇数还是偶数，以及结构是否稳定。" className="chart-card--focus">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={structureTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="period" />
+              <YAxis allowDecimals={false} ticks={[0, 1, 2, 3, 4, 5, 6, 7]} tickFormatter={(value) => `${Number(value)}:${7 - Number(value)}`} />
+              <Tooltip {...commonChartTooltipProps} formatter={(value) => `${Number(value)}:${7 - Number(value)}`} />
+              <Line type="monotone" dataKey="oddCount" stroke="var(--red-500)" strokeWidth={3} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+
   const oddEvenTrend = oddEvenChart as OddEvenChartItem[]
   return (
     <div className="page-section chart-grid chart-grid--single">
@@ -532,6 +640,7 @@ export function AnalysisChartsPanel({
   blueChart,
   pl3UnitChart,
   pl5PositionCharts,
+  qxcPositionCharts,
   oddEvenChart,
   sumTrendChart,
 }: {
@@ -540,6 +649,7 @@ export function AnalysisChartsPanel({
   blueChart: FrequencyChartItem[]
   pl3UnitChart: FrequencyChartItem[]
   pl5PositionCharts: FrequencyChartItem[][]
+  qxcPositionCharts: FrequencyChartItem[][]
   oddEvenChart: Array<OddEvenChartItem | Pl3OddEvenStructureChartItem | Pl5OddEvenStructureChartItem>
   sumTrendChart: SumTrendChartItem[]
 }) {
@@ -551,6 +661,7 @@ export function AnalysisChartsPanel({
         blueChart={blueChart}
         pl3UnitChart={pl3UnitChart}
         pl5PositionCharts={pl5PositionCharts}
+        qxcPositionCharts={qxcPositionCharts}
       />
       <AnalysisSumTrendChartCard lotteryCode={lotteryCode} sumTrendChart={sumTrendChart} />
       <AnalysisOddEvenTrendChartCard lotteryCode={lotteryCode} oddEvenChart={oddEvenChart} />
@@ -573,7 +684,9 @@ export function AnalysisDistributionChartsPanel({
     <div className="page-section chart-grid">
       <ChartCard
         title={lotteryCode === 'dlt' ? '前区和值分布' : '和值分布'}
-        description="统计最近样本里不同和值区间出现了多少次，用来判断和值更常落在哪些位置。它强调的是整体分布，而不是逐期走势。"
+        description={lotteryCode === 'qxc'
+          ? '统计最近样本里 7 位号码和值的出现次数，用来判断七星彩和值更常集中在哪些区间。它强调的是整体分布，而不是逐期波动。'
+          : '统计最近样本里不同和值区间出现了多少次，用来判断和值更常落在哪些位置。它强调的是整体分布，而不是逐期走势。'}
       >
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={sumDistribution}>
@@ -585,7 +698,9 @@ export function AnalysisDistributionChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="奇偶比分布" description="统计最近样本里不同奇偶配比出现的次数，帮助识别当前更常见的奇偶结构。适合用来验证结构是否偏向某一类组合。">
+      <ChartCard title="奇偶比分布" description={lotteryCode === 'qxc'
+        ? '统计最近样本里 7 位号码不同奇偶配比出现的次数，帮助识别七星彩近期更常见的奇偶结构。'
+        : '统计最近样本里不同奇偶配比出现的次数，帮助识别当前更常见的奇偶结构。适合用来验证结构是否偏向某一类组合。'}>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={oddEvenDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -596,7 +711,9 @@ export function AnalysisDistributionChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="区间占比分布" description="统计最近样本中全部号码落入各区间的总体占比，帮助判断号码更集中在哪个区段。它看的是整体落点占比，不是每期结构模式。">
+      <ChartCard title="区间占比分布" description={lotteryCode === 'qxc'
+        ? '统计最近样本中七星彩号码落入各区间的总体占比。前六位按 0-9 分区，第七位按 00-14 单独分区，用来观察整体落点分布。'
+        : '统计最近样本中全部号码落入各区间的总体占比，帮助判断号码更集中在哪个区段。它看的是整体落点占比，不是每期结构模式。'}>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={zoneShareDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -630,7 +747,9 @@ export function AnalysisPatternChartsPanel({
 }) {
   return (
     <div className="page-section chart-grid">
-      <ChartCard title="跨度趋势" description="展示每期号码最大值与最小值的差距变化，用来观察号码分散程度是放大还是收缩。跨度越大，说明号码分布越开。">
+      <ChartCard title="跨度趋势" description={lotteryCode === 'qxc'
+        ? '展示七星彩每期 7 位号码最大值与最小值的差距变化，用来观察号码分散程度是放大还是收缩。'
+        : '展示每期号码最大值与最小值的差距变化，用来观察号码分散程度是放大还是收缩。跨度越大，说明号码分布越开。'}>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={spanTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -641,7 +760,9 @@ export function AnalysisPatternChartsPanel({
           </LineChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title={lotteryCode === 'dlt' ? '区间分布' : '区段分布'} description="统计每期开奖结果在各区间结构组合上的出现次数，用来观察近期更常见的结构模式。它和区间占比分布不同，这里强调的是“每期结构组合”。">
+      <ChartCard title={lotteryCode === 'dlt' ? '区间分布' : lotteryCode === 'qxc' ? '区段结构分布' : '区段分布'} description={lotteryCode === 'qxc'
+        ? '统计七星彩每期前六位区段结构与第七位区段的组合出现次数，用来观察近期更常见的结构模式。'
+        : '统计每期开奖结果在各区间结构组合上的出现次数，用来观察近期更常见的结构模式。它和区间占比分布不同，这里强调的是“每期结构组合”。'}>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={zoneDistribution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -652,7 +773,9 @@ export function AnalysisPatternChartsPanel({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="012路走势" description="按号码除以 3 后的余数结构展示每期变化，用来观察 0 路、1 路、2 路的组合是否存在明显偏态或轮动。">
+      <ChartCard title="012路走势" description={lotteryCode === 'qxc'
+        ? '按七星彩 7 位号码除以 3 后的余数结构展示每期变化，用来观察 0 路、1 路、2 路的组合是否存在明显偏态或轮动。'
+        : '按号码除以 3 后的余数结构展示每期变化，用来观察 0 路、1 路、2 路的组合是否存在明显偏态或轮动。'}>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={moduloTrend}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />

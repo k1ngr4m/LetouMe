@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildModuloTrendChart,
+  buildOddEvenDistributionChart,
   buildZoneShareDistributionChart,
   buildHistoryCumulativeProfitTrend,
   buildHistoryCumulativeRoiTrend,
@@ -17,6 +19,11 @@ import {
   buildPl5OddEvenStructureChart,
   buildPl5PositionHotChart,
   buildPl5SumTrendChart,
+  buildQxcOddEvenStructureChart,
+  buildQxcPositionHotChart,
+  buildQxcSumTrendChart,
+  buildSpanTrendChart,
+  buildSumDistributionChart,
   buildSummary,
   compareNumbers,
   filterModels,
@@ -24,6 +31,7 @@ import {
   normalizePredictionModelPlayMode,
   resolveHistoryFallbackState,
   resolveModelScore,
+  buildZoneDistributionChart,
 } from './home'
 import type { PredictionModel } from '../../../shared/types/api'
 
@@ -431,6 +439,94 @@ describe('pl5 analysis chart builders', () => {
     expect(chart).toEqual([
       { period: '2026031', oddCount: 1, structure: '1:4' },
       { period: '2026032', oddCount: 5, structure: '5:0' },
+    ])
+  })
+})
+
+describe('qxc analysis chart builders', () => {
+  const draws = [
+    {
+      period: '2026033',
+      date: '2026-03-12',
+      lottery_code: 'qxc' as const,
+      red_balls: [],
+      blue_balls: [],
+      digits: ['01', '02', '03', '04', '05', '06', '14'],
+    },
+    {
+      period: '2026032',
+      date: '2026-03-11',
+      lottery_code: 'qxc' as const,
+      red_balls: [],
+      blue_balls: [],
+      digits: ['01', '04', '05', '06', '07', '08', '10'],
+    },
+    {
+      period: '2026031',
+      date: '2026-03-10',
+      lottery_code: 'qxc' as const,
+      red_balls: [],
+      blue_balls: [],
+      digits: ['09', '02', '03', '00', '05', '06', '14'],
+    },
+  ]
+
+  it('builds hot numbers by qxc position and supports 00-14 on last position', () => {
+    const firstChart = buildQxcPositionHotChart(draws, 0)
+    const lastChart = buildQxcPositionHotChart(draws, 6)
+
+    expect(firstChart).toHaveLength(10)
+    expect(firstChart[0]).toMatchObject({ ball: '01', count: 2 })
+    expect(lastChart).toHaveLength(15)
+    expect(lastChart[0]).toMatchObject({ ball: '14', count: 2 })
+    expect(lastChart.find((item) => item.ball === '00')).toMatchObject({ count: 0 })
+  })
+
+  it('builds qxc sum and odd-even trends', () => {
+    expect(buildQxcSumTrendChart(draws)).toEqual([
+      { period: '2026031', sum: 39 },
+      { period: '2026032', sum: 41 },
+      { period: '2026033', sum: 35 },
+    ])
+
+    expect(buildQxcOddEvenStructureChart(draws)).toEqual([
+      { period: '2026031', oddCount: 3, structure: '3:4' },
+      { period: '2026032', oddCount: 3, structure: '3:4' },
+      { period: '2026033', oddCount: 3, structure: '3:4' },
+    ])
+  })
+
+  it('builds qxc distribution and pattern charts with dedicated last-position buckets', () => {
+    expect(buildZoneShareDistributionChart(draws, 'qxc')).toEqual([
+      { label: '低位区（0-3）', count: 7, ratio: 7 / 21 },
+      { label: '中位区（4-6）', count: 8, ratio: 8 / 21 },
+      { label: '高位区（7-9）', count: 3, ratio: 3 / 21 },
+      { label: '第七位低位区（00-04）', count: 0, ratio: 0 },
+      { label: '第七位中位区（05-09）', count: 0, ratio: 0 },
+      { label: '第七位高位区（10-14）', count: 3, ratio: 3 / 21 },
+    ])
+    expect(buildSumDistributionChart(draws, 'qxc')).toEqual([
+      { label: '35', count: 1 },
+      { label: '39', count: 1 },
+      { label: '41', count: 1 },
+    ])
+    expect(buildOddEvenDistributionChart(draws, 'qxc')).toEqual([
+      { label: '3:4', count: 3 },
+    ])
+    expect(buildSpanTrendChart(draws, 'qxc')).toEqual([
+      { period: '2026031', value: 14 },
+      { period: '2026032', value: 9 },
+      { period: '2026033', value: 13 },
+    ])
+    expect(buildZoneDistributionChart(draws, 'qxc')).toEqual([
+      { label: '1-3-2 / 第七位高', count: 1 },
+      { label: '3-2-1 / 第七位高', count: 1 },
+      { label: '3-3-0 / 第七位高', count: 1 },
+    ])
+    expect(buildModuloTrendChart(draws, 'qxc')).toEqual([
+      { period: '2026031', value: 403, pattern: '4-0-3' },
+      { period: '2026032', value: 142, pattern: '1-4-2' },
+      { period: '2026033', value: 223, pattern: '2-2-3' },
     ])
   })
 })

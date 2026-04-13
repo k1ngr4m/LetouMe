@@ -878,7 +878,9 @@ export function buildSummary(
     backDan: normalize(backDanMap),
     backTuo: normalize(backTuoMap),
     sums: normalize(sumMap),
-    positions: positionMaps.map((positionMap) => normalize(positionMap)),
+    positions: positionMaps
+      .map((positionMap) => normalize(positionMap))
+      .filter((items, index, source) => items.length > 0 || source.slice(index + 1).some((nextItems) => nextItems.length > 0)),
   }
 }
 
@@ -900,6 +902,8 @@ export function buildBlueFrequencyChart(draws: LotteryDraw[]) {
 
 const PL3_DIGITS = Array.from({ length: 10 }, (_, index) => padBall(String(index)))
 const PL5_DIGITS = Array.from({ length: 10 }, (_, index) => padBall(String(index)))
+const QXC_FRONT_DIGITS = Array.from({ length: 10 }, (_, index) => padBall(String(index)))
+const QXC_BACK_DIGITS = Array.from({ length: 15 }, (_, index) => padBall(String(index)))
 
 function resolvePl3Digits(draw: LotteryDraw) {
   const sourceDigits = draw.digits?.length ? draw.digits : draw.red_balls
@@ -909,6 +913,11 @@ function resolvePl3Digits(draw: LotteryDraw) {
 function resolvePl5Digits(draw: LotteryDraw) {
   const sourceDigits = draw.digits?.length ? draw.digits : draw.red_balls
   return sourceDigits.map(padBall).slice(0, 5)
+}
+
+function resolveQxcDigits(draw: LotteryDraw) {
+  const sourceDigits = draw.digits?.length ? draw.digits : [...draw.red_balls, ...draw.blue_balls]
+  return sourceDigits.map(padBall).slice(0, 7)
 }
 
 export function buildPl3PositionHotChart(draws: LotteryDraw[], positionIndex: 0 | 1 | 2) {
@@ -954,6 +963,18 @@ export function buildPl5PositionHotChart(draws: LotteryDraw[], positionIndex: 0 
   return byFrequencyDescending(Object.entries(counter).map(([ball, count]) => ({ ball, count }))).slice(0, 10)
 }
 
+export function buildQxcPositionHotChart(draws: LotteryDraw[], positionIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6) {
+  const digitPool = positionIndex === 6 ? QXC_BACK_DIGITS : QXC_FRONT_DIGITS
+  const counter: Record<string, number> = Object.fromEntries(digitPool.map((digit) => [digit, 0]))
+  for (const draw of draws.slice(0, 120)) {
+    const digits = resolveQxcDigits(draw)
+    const digit = digits[positionIndex]
+    if (!digit) continue
+    counter[digit] = (counter[digit] || 0) + 1
+  }
+  return byFrequencyDescending(Object.entries(counter).map(([ball, count]) => ({ ball, count }))).slice(0, digitPool.length)
+}
+
 export function buildPl5SumTrendChart(draws: LotteryDraw[]) {
   return draws.slice(0, 20).reverse().map((draw) => {
     const sum = resolvePl5Digits(draw).reduce((total, digit) => total + Number(digit), 0)
@@ -971,6 +992,24 @@ export function buildPl5OddEvenStructureChart(draws: LotteryDraw[]) {
       period: draw.period,
       oddCount,
       structure: `${oddCount}:${5 - oddCount}`,
+    }
+  })
+}
+
+export function buildQxcSumTrendChart(draws: LotteryDraw[]) {
+  return draws.slice(0, 20).reverse().map((draw) => ({
+    period: draw.period,
+    sum: resolveQxcDigits(draw).reduce((total, digit) => total + Number(digit), 0),
+  }))
+}
+
+export function buildQxcOddEvenStructureChart(draws: LotteryDraw[]) {
+  return draws.slice(0, 20).reverse().map((draw) => {
+    const oddCount = resolveQxcDigits(draw).filter((digit) => Number(digit) % 2 === 1).length
+    return {
+      period: draw.period,
+      oddCount,
+      structure: `${oddCount}:${7 - oddCount}`,
     }
   })
 }
@@ -1024,6 +1063,8 @@ export function buildSumDistributionChart(draws: LotteryDraw[], lotteryCode: Lot
         ? resolvePl3Digits(draw).reduce((total, digit) => total + Number(digit), 0)
         : lotteryCode === 'pl5'
           ? resolvePl5Digits(draw).reduce((total, digit) => total + Number(digit), 0)
+          : lotteryCode === 'qxc'
+            ? resolveQxcDigits(draw).reduce((total, digit) => total + Number(digit), 0)
           : draw.red_balls.reduce((total, ball) => total + Number(ball), 0)
     const label = String(sum)
     counter[label] = (counter[label] || 0) + 1
@@ -1040,8 +1081,10 @@ export function buildOddEvenDistributionChart(draws: LotteryDraw[], lotteryCode:
         ? resolvePl3Digits(draw).filter((digit) => Number(digit) % 2 === 1).length
         : lotteryCode === 'pl5'
           ? resolvePl5Digits(draw).filter((digit) => Number(digit) % 2 === 1).length
+          : lotteryCode === 'qxc'
+            ? resolveQxcDigits(draw).filter((digit) => Number(digit) % 2 === 1).length
           : draw.red_balls.filter((ball) => Number(ball) % 2 === 1).length
-    const totalCount = lotteryCode === 'pl3' ? 3 : lotteryCode === 'pl5' ? 5 : 5
+    const totalCount = lotteryCode === 'pl3' ? 3 : lotteryCode === 'pl5' ? 5 : lotteryCode === 'qxc' ? 7 : 5
     const label = `${oddCount}:${totalCount - oddCount}`
     counter[label] = (counter[label] || 0) + 1
   }
@@ -1056,24 +1099,32 @@ export function buildZoneShareDistributionChart(draws: LotteryDraw[], lotteryCod
   for (const draw of sourceDraws) {
     const values =
       lotteryCode === 'pl3'
-        ? resolvePl3Digits(draw).map(Number)
+        ? resolvePl3Digits(draw).map((value) => ({ value: Number(value), isQxcBack: false }))
         : lotteryCode === 'pl5'
-          ? resolvePl5Digits(draw).map(Number)
-          : draw.red_balls.map(Number)
+          ? resolvePl5Digits(draw).map((value) => ({ value: Number(value), isQxcBack: false }))
+          : lotteryCode === 'qxc'
+            ? resolveQxcDigits(draw).map((value, index) => ({ value: Number(value), isQxcBack: index === 6 }))
+            : draw.red_balls.map((value) => ({ value: Number(value), isQxcBack: false }))
 
-    for (const value of values) {
+    for (const item of values) {
       const label =
         lotteryCode === 'dlt'
-          ? value <= 12
+          ? item.value <= 12
             ? '一区（01-12）'
-            : value <= 24
+            : item.value <= 24
               ? '二区（13-24）'
               : '三区（25-35）'
-          : value <= 3
-            ? '低位区（0-3）'
-            : value <= 6
-              ? '中位区（4-6）'
-              : '高位区（7-9）'
+          : lotteryCode === 'qxc' && item.isQxcBack
+            ? item.value <= 4
+              ? '第七位低位区（00-04）'
+              : item.value <= 9
+                ? '第七位中位区（05-09）'
+                : '第七位高位区（10-14）'
+            : item.value <= 3
+              ? '低位区（0-3）'
+              : item.value <= 6
+                ? '中位区（4-6）'
+                : '高位区（7-9）'
       counter[label] = (counter[label] || 0) + 1
       total += 1
     }
@@ -1082,6 +1133,8 @@ export function buildZoneShareDistributionChart(draws: LotteryDraw[], lotteryCod
   const orderedLabels =
     lotteryCode === 'dlt'
       ? ['一区（01-12）', '二区（13-24）', '三区（25-35）']
+      : lotteryCode === 'qxc'
+        ? ['低位区（0-3）', '中位区（4-6）', '高位区（7-9）', '第七位低位区（00-04）', '第七位中位区（05-09）', '第七位高位区（10-14）']
       : ['低位区（0-3）', '中位区（4-6）', '高位区（7-9）']
 
   return orderedLabels.map((label) => {
@@ -1101,6 +1154,8 @@ export function buildSpanTrendChart(draws: LotteryDraw[], lotteryCode: LotteryCo
         ? resolvePl3Digits(draw).map(Number)
         : lotteryCode === 'pl5'
           ? resolvePl5Digits(draw).map(Number)
+          : lotteryCode === 'qxc'
+            ? resolveQxcDigits(draw).map(Number)
           : draw.red_balls.map(Number)
     return {
       period: draw.period,
@@ -1126,6 +1181,15 @@ export function buildZoneDistributionChart(draws: LotteryDraw[], lotteryCode: Lo
       const mid = digits.filter((digit) => digit >= 4 && digit <= 6).length
       const high = digits.filter((digit) => digit >= 7).length
       label = `${low}-${mid}-${high}`
+    } else if (lotteryCode === 'qxc') {
+      const digits = resolveQxcDigits(draw).map(Number)
+      const frontDigits = digits.slice(0, 6)
+      const backDigit = digits[6]
+      const low = frontDigits.filter((digit) => digit <= 3).length
+      const mid = frontDigits.filter((digit) => digit >= 4 && digit <= 6).length
+      const high = frontDigits.filter((digit) => digit >= 7).length
+      const backZone = backDigit === undefined ? '—' : backDigit <= 4 ? '低' : backDigit <= 9 ? '中' : '高'
+      label = `${low}-${mid}-${high} / 第七位${backZone}`
     } else {
       label = resolveDltFrontAreas(draw).join('-')
     }
@@ -1141,6 +1205,8 @@ export function buildModuloTrendChart(draws: LotteryDraw[], lotteryCode: Lottery
         ? resolvePl3Digits(draw)
         : lotteryCode === 'pl5'
           ? resolvePl5Digits(draw)
+          : lotteryCode === 'qxc'
+            ? resolveQxcDigits(draw)
           : draw.red_balls
     const pattern = resolveModuloPattern(values)
     const [mod0, mod1, mod2] = pattern.split('-').map(Number)

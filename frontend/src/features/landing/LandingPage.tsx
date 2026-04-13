@@ -38,7 +38,7 @@ export function LandingPage() {
         <section className="landing-panel">
         <div className="landing-panel__copy">
           <p className="landing-panel__eyebrow">AI DLT Forecast System</p>
-          <h1 className="landing-panel__title">AI 大乐透预测系统</h1>
+          <h1 className="landing-panel__title">LETOUME</h1>
         </div>
         <div className="landing-panel__actions">
           <button className="landing-panel__button" onClick={() => void handleStart()} disabled={isLoading}>
