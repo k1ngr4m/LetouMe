@@ -311,11 +311,90 @@ class TicketOCRServiceTests(unittest.TestCase):
 
     def test_extract_ticket_purchased_at_supports_compact_yy_datetime(self) -> None:
         purchased_at = self.service._extract_ticket_purchased_at(ocr_text="01-408168-1010000226/03/1314:04:47")
-        self.assertEqual(purchased_at, "2026-03-13T14:04:47+08:00")
+        self.assertEqual(purchased_at, 1773381887)
 
     def test_extract_ticket_purchased_at_returns_none_when_missing(self) -> None:
         purchased_at = self.service._extract_ticket_purchased_at(ocr_text="2026年03月14日开奖")
         self.assertIsNone(purchased_at)
+
+    def test_parse_qxc_lines_supports_multiline_single_ticket_blocks(self) -> None:
+        lines = self.service._parse_qxc_lines(
+            text_lines=[
+                "体彩",
+                "7星彩",
+                "Seven Stars",
+                "第26040期",
+                "2026年04月12日开奖",
+                "单式票",
+                "1倍",
+                "合计10元",
+                "①",
+                "1",
+                "5",
+                "4",
+                "2",
+                "6",
+                "0",
+                "8",
+                "②",
+                "0",
+                "9",
+                "6",
+                "9",
+                "6",
+                "2",
+                "13",
+                "③",
+                "9",
+                "7",
+                "7",
+                "5",
+                "2",
+                "5",
+                "10",
+                "④",
+                "1",
+                "4",
+                "3",
+                "2",
+                "8",
+                "7",
+                "8",
+                "⑤",
+                "0",
+                "8",
+                "6",
+                "6",
+                "3",
+                "2",
+                "6",
+            ]
+        )
+
+        self.assertEqual(len(lines), 5)
+        self.assertEqual(lines[0]["play_type"], "qxc_compound")
+        self.assertEqual(lines[0]["position_selections"], [["01"], ["05"], ["04"], ["02"], ["06"], ["00"], ["08"]])
+        self.assertEqual(lines[1]["position_selections"], [["00"], ["09"], ["06"], ["09"], ["06"], ["02"], ["13"]])
+        self.assertEqual(lines[2]["position_selections"], [["09"], ["07"], ["07"], ["05"], ["02"], ["05"], ["10"]])
+        self.assertEqual(lines[3]["position_selections"], [["01"], ["04"], ["03"], ["02"], ["08"], ["07"], ["08"]])
+        self.assertEqual(lines[4]["position_selections"], [["00"], ["08"], ["06"], ["06"], ["03"], ["02"], ["06"]])
+        self.assertTrue(all(line["multiplier"] == 1 for line in lines))
+
+    def test_parse_ticket_text_supports_qxc_ocr_sample(self) -> None:
+        parsed = self.service._parse_ticket_text(
+            ocr_text=(
+                "体彩\n7星彩\nSeven Stars\n第26040期\n2026年04月12日开奖\n六中国体育彩票\n"
+                "110330-250061-124192-825120023892\nMRzsxQ\n单式票\n1倍\n合计10元\n①\n1\n5\n4\n2\n6\n0\n8\n"
+                "②\n0\n9\n6\n9\n6\n2\n13\n③\n9\n7\n7\n5\n2\n5\n10\n④\n1\n4\n3\n2\n8\n7\n8\n⑤\n0\n8\n6\n6\n3\n2\n6\n"
+                "中国体育彩票\n感谢您为公益事业贡献3.70元\n仓兴街658号\n01-008725-101\n00105\n26/04/1219:55:19\n中国体育彩票"
+            ),
+            lottery_code="qxc",
+        )
+
+        self.assertEqual(parsed["target_period"], "26040")
+        self.assertEqual(parsed["ticket_purchased_at"], 1775994919)
+        self.assertEqual(len(parsed["lines"]), 5)
+        self.assertTrue(all(line["play_type"] == "qxc_compound" for line in parsed["lines"]))
 
     def test_resolve_baidu_ocr_url_prefers_high_accuracy_endpoint(self) -> None:
         self.assertEqual(

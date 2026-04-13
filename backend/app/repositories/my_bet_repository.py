@@ -5,7 +5,7 @@ from typing import Any
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.number_codec import EMPTY_NUMBER_FIELDS, build_number_rows, with_number_fields, merge_number_rows
-from backend.app.time_utils import ensure_timestamp
+from backend.app.time_utils import ensure_timestamp, format_beijing_datetime
 
 
 class MyBetRepository:
@@ -358,5 +358,8 @@ class MyBetRepository:
         return {line_id: merge_number_rows(rows) for line_id, rows in grouped.items()}
 
     @staticmethod
-    def _normalize_datetime_value(value: Any) -> int | None:
-        return ensure_timestamp(value, assume_beijing=True)
+    def _normalize_datetime_value(value: Any) -> str | None:
+        timestamp = ensure_timestamp(value, assume_beijing=True)
+        if timestamp is None:
+            return None
+        return format_beijing_datetime(timestamp, with_seconds=True)

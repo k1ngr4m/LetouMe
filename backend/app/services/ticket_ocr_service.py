@@ -466,41 +466,98 @@ class TicketOCRService:
 
     def _parse_qxc_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
         parsed_lines: list[dict[str, Any]] = []
+        current_digits: list[str] = []
+        global_multiplier = 1
         for line in text_lines:
-            multiplier = self._extract_multiplier(line)
+            global_multiplier = max(global_multiplier, self._extract_multiplier(line))
+
+        def flush_current_digits() -> None:
+            nonlocal current_digits
+            if len(current_digits) != 7:
+                current_digits = []
+                return
+            built_line = self._build_qxc_position_line(position_digits=current_digits, multiplier=global_multiplier)
+            if built_line:
+                parsed_lines.append(built_line)
+            current_digits = []
+
+        for line in text_lines:
+            stripped = line.strip()
+            if self._is_qxc_sequence_marker(stripped):
+                flush_current_digits()
+                continue
+            exact_digit = self._extract_qxc_exact_digit(stripped)
+            if exact_digit is not None:
+                current_digits.append(exact_digit)
+                if len(current_digits) == 7:
+                    flush_current_digits()
+                continue
+            flush_current_digits()
+            multiplier = self._extract_multiplier(line) or global_multiplier
             number_tokens = re.findall(r"(?<!\d)(\d{7,14})(?!\d)", line.replace(" ", ""))
             if not number_tokens:
                 continue
             for number_token in number_tokens:
-                if len(number_token) < 7:
-                    continue
-                digits = [f"{int(ch):02d}" for ch in number_token[:6]]
-                last_raw = number_token[6:]
-                if not last_raw:
-                    continue
-                last_value = f"{int(last_raw):02d}"
-                parsed_lines.append(
-                    {
-                        "play_type": "direct",
-                        "front_numbers": [],
-                        "back_numbers": [],
-                        "group_numbers": [],
-                        "position_selections": [
-                            [digits[0]],
-                            [digits[1]],
-                            [digits[2]],
-                            [digits[3]],
-                            [digits[4]],
-                            [digits[5]],
-                            [last_value],
-                        ],
-                        "multiplier": multiplier,
-                        "is_append": False,
-                        "bet_count": 1,
-                        "amount": 2 * multiplier,
-                    }
-                )
+                built_line = self._build_qxc_compact_line(number_token=number_token, multiplier=multiplier)
+                if built_line:
+                    parsed_lines.append(built_line)
+        flush_current_digits()
         return parsed_lines
+
+    @staticmethod
+    def _is_qxc_sequence_marker(value: str) -> bool:
+        return bool(re.fullmatch(r"[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]", value))
+
+    @staticmethod
+    def _extract_qxc_exact_digit(value: str) -> str | None:
+        if not re.fullmatch(r"\d{1,2}", value):
+            return None
+        number = int(value)
+        if number < 0 or number > 14:
+            return None
+        return f"{number:02d}"
+
+    def _build_qxc_compact_line(self, *, number_token: str, multiplier: int) -> dict[str, Any] | None:
+        if len(number_token) < 7:
+            return None
+        front_digits = [f"{int(ch):02d}" for ch in number_token[:6]]
+        if any(int(digit) > 9 for digit in front_digits):
+            return None
+        last_raw = number_token[6:]
+        if not last_raw:
+            return None
+        last_value = int(last_raw)
+        if last_value < 0 or last_value > 14:
+            return None
+        return self._build_qxc_position_line(
+            position_digits=[*front_digits, f"{last_value:02d}"],
+            multiplier=multiplier,
+        )
+
+    @staticmethod
+    def _build_qxc_position_line(*, position_digits: list[str], multiplier: int) -> dict[str, Any] | None:
+        if len(position_digits) != 7:
+            return None
+        try:
+            front_values = [int(value) for value in position_digits[:6]]
+            last_value = int(position_digits[6])
+        except (TypeError, ValueError):
+            return None
+        if any(value < 0 or value > 9 for value in front_values):
+            return None
+        if last_value < 0 or last_value > 14:
+            return None
+        return {
+            "play_type": "qxc_compound",
+            "front_numbers": [],
+            "back_numbers": [],
+            "group_numbers": [],
+            "position_selections": [[value] for value in position_digits],
+            "multiplier": max(1, int(multiplier or 1)),
+            "is_append": False,
+            "bet_count": 1,
+            "amount": 2 * max(1, int(multiplier or 1)),
+        }
 
     def _parse_dlt_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
         parsed_lines: list[dict[str, Any]] = []
