@@ -45,7 +45,7 @@ export type BallStatItem = {
 }
 
 export type ModelListScoreRange = 'all' | '0-30' | '31-60' | '61-80' | '81-100'
-export type PredictionPlayType = 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
+export type PredictionPlayType = 'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_dantuo' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
 
 export type ModelListFilters = {
   nameQuery: string
@@ -116,6 +116,7 @@ export function normalizeStrategyLabel(value?: string | null): string {
 }
 
 export function normalizePredictionPlayType(value?: string | null): PredictionPlayType {
+  if (value === 'pl3_dantuo') return 'pl3_dantuo'
   if (value === 'dlt_dantuo') return 'dlt_dantuo'
   if (value === 'dlt_compound') return 'dlt_compound'
   if (value === 'qxc_compound') return 'qxc_compound'
@@ -135,7 +136,7 @@ export function normalizePredictionModelPlayMode(
   if (explicitMode === 'direct') return 'direct'
   const hasCompoundGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'dlt_compound')
   if (hasCompoundGroup) return 'compound'
-  const hasDantuoGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'dlt_dantuo')
+  const hasDantuoGroup = (model.predictions || []).some((group) => ['dlt_dantuo', 'pl3_dantuo'].includes(normalizePredictionPlayType(group.play_type)))
   if (hasDantuoGroup) return 'dantuo'
   const hasDirectSumGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'direct_sum')
   const hasQxcCompoundGroup = (model.predictions || []).some((group) => normalizePredictionPlayType(group.play_type) === 'qxc_compound')
@@ -172,6 +173,7 @@ export function inferPredictionGroupLotteryCode(group: PredictionGroup, actualRe
   if (digitCount >= 5) return 'pl5'
   if (normalizedPlayType === 'dlt_dantuo') return 'dlt'
   if (normalizedPlayType === 'dlt_compound') return 'dlt'
+  if (normalizedPlayType === 'pl3_dantuo') return 'pl3'
   if (normalizedPlayType === 'direct' && digitCount === 3) return 'pl3'
   if (normalizedPlayType === 'direct_sum' || normalizedPlayType === 'group3' || normalizedPlayType === 'group6') {
     return 'pl3'
@@ -381,6 +383,28 @@ export function compareNumbers(prediction: PredictionGroup, actualResult: Lotter
   const inferredLotteryCode = inferPredictionGroupLotteryCode(prediction, actualResult)
   if (inferredLotteryCode === 'pl3') {
     const playType = String(prediction.play_type || 'direct').trim().toLowerCase()
+    if (playType === 'pl3_dantuo') {
+      const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
+      const positionSelections = [
+        [...(prediction.direct_hundreds_dan || []), ...(prediction.direct_hundreds_tuo || [])].map(padBall),
+        [...(prediction.direct_tens_dan || []), ...(prediction.direct_tens_tuo || [])].map(padBall),
+        [...(prediction.direct_units_dan || []), ...(prediction.direct_units_tuo || [])].map(padBall),
+      ]
+      const digitHitIndexes = positionSelections
+        .map((values, index) => (values.includes(actualDigits[index]) ? index : -1))
+        .filter((index) => index >= 0)
+      const digitHits = digitHitIndexes.map((index) => actualDigits[index]).filter(Boolean)
+      return {
+        redHits: [],
+        redHitCount: 0,
+        blueHits: [],
+        blueHitCount: 0,
+        digitHits,
+        digitHitCount: digitHits.length,
+        digitHitIndexes,
+        totalHits: digitHits.length,
+      }
+    }
     if (playType === 'direct_sum') {
       const sumValue = Number(String(prediction.sum_value || '').trim())
       const actualDigits = ((actualResult.digits && actualResult.digits.length ? actualResult.digits : actualResult.red_balls) || []).map(padBall).slice(0, 3)
@@ -549,6 +573,9 @@ export function getPredictionPlayTypeLabel(group: PredictionGroup, actualResult:
   }
   if (normalizePredictionPlayType(group.play_type) === 'group6') {
     return '组选6'
+  }
+  if (normalizePredictionPlayType(group.play_type) === 'pl3_dantuo') {
+    return '直选胆拖'
   }
   if (normalizePredictionPlayType(group.play_type) === 'direct_sum') {
     return '和值'

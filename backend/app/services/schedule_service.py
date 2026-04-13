@@ -292,8 +292,8 @@ class ScheduleService:
             if normalized_mode != "direct":
                 raise ValueError("当前彩种预测模式仅支持 direct")
             return "direct"
-        if normalized_mode not in {"direct", "direct_sum"}:
-            raise ValueError("排列3预测模式仅支持 direct 或 direct_sum")
+        if normalized_mode not in {"direct", "direct_sum", "dantuo"}:
+            raise ValueError("排列3预测模式仅支持 direct / direct_sum / dantuo")
         return normalized_mode
 
     def _compute_next_run(self, task: dict[str, Any], *, base_time: datetime) -> datetime | None:
@@ -414,7 +414,7 @@ class ScheduleService:
         lottery_code = str(task.get("lottery_code") or "dlt").strip().lower()
         play_mode = str(task.get("prediction_play_mode") or "direct").strip().lower()
         if lottery_code == "pl3":
-            play_mode_label = "和值" if play_mode == "direct_sum" else "直选"
+            play_mode_label = "和值" if play_mode == "direct_sum" else "胆拖" if play_mode == "dantuo" else "直选"
         elif lottery_code == "dlt":
             play_mode_label = "胆拖" if play_mode == "dantuo" else "普通"
         else:

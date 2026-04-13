@@ -1022,6 +1022,7 @@ describe('getPredictionPlayTypeLabel', () => {
   it('returns labels for pl3 and dlt play types', () => {
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] })).toBe('直选')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] })).toBe('和值')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'pl3_dantuo', red_balls: [], blue_balls: [], digits: [] })).toBe('直选胆拖')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
     expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('普通')
     expect(
@@ -1090,6 +1091,17 @@ describe('normalizePredictionModelPlayMode', () => {
         predictions: [{ group_id: 1, play_type: 'dlt_compound', red_balls: ['01', '02', '03', '04', '05', '06'], blue_balls: ['01', '02'] }],
       }),
     ).toBe('compound')
+  })
+
+  it('infers dantuo from pl3 dantuo groups when mode missing', () => {
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm5',
+        model_name: 'Model 5',
+        model_provider: 'openai',
+        predictions: [{ group_id: 1, play_type: 'pl3_dantuo', red_balls: [], blue_balls: [] }],
+      }),
+    ).toBe('dantuo')
   })
 })
 

@@ -343,8 +343,8 @@ class MyBetService:
 
     def _build_pl3_line_payload(self, payload: dict[str, Any], *, multiplier: int) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum")
+        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum", "pl3_dantuo"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum / pl3_dantuo")
         if play_type == "direct":
             hundreds = self._normalize_numbers(payload.get("direct_hundreds"), valid_range=self.DIGIT_RANGE)
             tens = self._normalize_numbers(payload.get("direct_tens"), valid_range=self.DIGIT_RANGE)
@@ -365,6 +365,37 @@ class MyBetService:
                 "direct_hundreds": ",".join(hundreds),
                 "direct_tens": ",".join(tens),
                 "direct_units": ",".join(units),
+                "group_numbers": None,
+                "sum_values": None,
+                "multiplier": multiplier,
+                "is_append": False,
+                "bet_count": bet_count,
+                "amount": bet_count * 2 * multiplier,
+            }
+        if play_type == "pl3_dantuo":
+            hundreds_dan, hundreds_tuo, hundreds = self._normalize_pl3_dantuo_position(payload, position="百位", dan_field="direct_hundreds_dan", tuo_field="direct_hundreds_tuo")
+            tens_dan, tens_tuo, tens = self._normalize_pl3_dantuo_position(payload, position="十位", dan_field="direct_tens_dan", tuo_field="direct_tens_tuo")
+            units_dan, units_tuo, units = self._normalize_pl3_dantuo_position(payload, position="个位", dan_field="direct_units_dan", tuo_field="direct_units_tuo")
+            bet_count = len(hundreds) * len(tens) * len(units)
+            return {
+                "play_type": "pl3_dantuo",
+                "front_numbers": "",
+                "back_numbers": "",
+                "front_dan": None,
+                "front_tuo": None,
+                "back_dan": None,
+                "back_tuo": None,
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
+                "direct_hundreds": ",".join(hundreds),
+                "direct_tens": ",".join(tens),
+                "direct_units": ",".join(units),
+                "direct_hundreds_dan": ",".join(hundreds_dan),
+                "direct_hundreds_tuo": ",".join(hundreds_tuo),
+                "direct_tens_dan": ",".join(tens_dan),
+                "direct_tens_tuo": ",".join(tens_tuo),
+                "direct_units_dan": ",".join(units_dan),
+                "direct_units_tuo": ",".join(units_tuo),
                 "group_numbers": None,
                 "sum_values": None,
                 "multiplier": multiplier,
@@ -526,6 +557,24 @@ class MyBetService:
                 )
             )
         return normalized_positions
+
+    def _normalize_pl3_dantuo_position(
+        self,
+        payload: dict[str, Any],
+        *,
+        position: str,
+        dan_field: str,
+        tuo_field: str,
+    ) -> tuple[list[str], list[str], list[str]]:
+        dan_numbers = self._normalize_numbers(payload.get(dan_field, []), valid_range=self.DIGIT_RANGE)
+        tuo_numbers = self._normalize_numbers(payload.get(tuo_field), valid_range=self.DIGIT_RANGE)
+        if len(dan_numbers) > 1:
+            raise ValueError(f"{position}胆码最多选择 1 个号码")
+        if len(tuo_numbers) < 1:
+            raise ValueError(f"{position}拖码至少选择 1 个号码")
+        if set(dan_numbers) & set(tuo_numbers):
+            raise ValueError(f"{position}胆码与拖码不可重复")
+        return dan_numbers, tuo_numbers, sorted({*dan_numbers, *tuo_numbers})
 
     def _serialize_with_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         serialized = self._serialize_record(record)
@@ -722,6 +771,14 @@ class MyBetService:
         level = None
         winning_count = 0
         if play_type == "direct":
+            hundreds = list(line.get("direct_hundreds") or [])
+            tens = list(line.get("direct_tens") or [])
+            units = list(line.get("direct_units") or [])
+            matched = len(digits) == 3 and digits[0] in hundreds and digits[1] in tens and digits[2] in units
+            if matched:
+                level = "直选"
+                winning_count = 1
+        elif play_type == "pl3_dantuo":
             hundreds = list(line.get("direct_hundreds") or [])
             tens = list(line.get("direct_tens") or [])
             units = list(line.get("direct_units") or [])
@@ -971,6 +1028,12 @@ class MyBetService:
                     "direct_hundreds": normalize_numbers(record.get("direct_hundreds")),
                     "direct_tens": normalize_numbers(record.get("direct_tens")),
                     "direct_units": normalize_numbers(record.get("direct_units")),
+                    "direct_hundreds_dan": normalize_numbers(record.get("direct_hundreds_dan")),
+                    "direct_hundreds_tuo": normalize_numbers(record.get("direct_hundreds_tuo")),
+                    "direct_tens_dan": normalize_numbers(record.get("direct_tens_dan")),
+                    "direct_tens_tuo": normalize_numbers(record.get("direct_tens_tuo")),
+                    "direct_units_dan": normalize_numbers(record.get("direct_units_dan")),
+                    "direct_units_tuo": normalize_numbers(record.get("direct_units_tuo")),
                     "group_numbers": normalize_numbers(record.get("group_numbers")),
                     "sum_values": normalize_numbers(record.get("sum_values")),
                     "position_selections": list(record.get("position_selections") or []),
@@ -1002,6 +1065,12 @@ class MyBetService:
             "direct_hundreds": list(first_line.get("direct_hundreds") or []),
             "direct_tens": list(first_line.get("direct_tens") or []),
             "direct_units": list(first_line.get("direct_units") or []),
+            "direct_hundreds_dan": list(first_line.get("direct_hundreds_dan") or []),
+            "direct_hundreds_tuo": list(first_line.get("direct_hundreds_tuo") or []),
+            "direct_tens_dan": list(first_line.get("direct_tens_dan") or []),
+            "direct_tens_tuo": list(first_line.get("direct_tens_tuo") or []),
+            "direct_units_dan": list(first_line.get("direct_units_dan") or []),
+            "direct_units_tuo": list(first_line.get("direct_units_tuo") or []),
             "group_numbers": list(first_line.get("group_numbers") or []),
             "sum_values": list(first_line.get("sum_values") or []),
             "position_selections": [list(item) for item in list(first_line.get("position_selections") or [])],
@@ -1048,6 +1117,12 @@ class MyBetService:
             "direct_hundreds": normalize_numbers(line.get("direct_hundreds")),
             "direct_tens": normalize_numbers(line.get("direct_tens")),
             "direct_units": normalize_numbers(line.get("direct_units")),
+            "direct_hundreds_dan": normalize_numbers(line.get("direct_hundreds_dan")),
+            "direct_hundreds_tuo": normalize_numbers(line.get("direct_hundreds_tuo")),
+            "direct_tens_dan": normalize_numbers(line.get("direct_tens_dan")),
+            "direct_tens_tuo": normalize_numbers(line.get("direct_tens_tuo")),
+            "direct_units_dan": normalize_numbers(line.get("direct_units_dan")),
+            "direct_units_tuo": normalize_numbers(line.get("direct_units_tuo")),
             "group_numbers": normalize_numbers(line.get("group_numbers")),
             "sum_values": normalize_numbers(line.get("sum_values")),
             "position_selections": [

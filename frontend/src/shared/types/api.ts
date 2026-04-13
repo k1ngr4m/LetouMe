@@ -52,7 +52,7 @@ export type PredictionHitResult = {
 
 export type PredictionGroup = {
   group_id: number
-  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
+  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_dantuo' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
   sum_value?: string
   cost_amount?: number
   strategy?: string
@@ -64,6 +64,12 @@ export type PredictionGroup = {
   back_dan?: string[]
   back_tuo?: string[]
   digits?: string[]
+  direct_hundreds_dan?: string[]
+  direct_hundreds_tuo?: string[]
+  direct_tens_dan?: string[]
+  direct_tens_tuo?: string[]
+  direct_units_dan?: string[]
+  direct_units_tuo?: string[]
   position_selections?: string[][]
   blue_ball?: string | null
   hit_result?: PredictionHitResult
@@ -225,7 +231,7 @@ export type PredictionsHistoryResponse = {
 
 export type SimulationTicketPayload = {
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -237,6 +243,12 @@ export type SimulationTicketPayload = {
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
+  direct_hundreds_dan?: string[]
+  direct_hundreds_tuo?: string[]
+  direct_tens_dan?: string[]
+  direct_tens_tuo?: string[]
+  direct_units_dan?: string[]
+  direct_units_tuo?: string[]
   group_numbers?: string[]
   sum_values?: string[]
   position_selections?: string[][]
@@ -245,7 +257,7 @@ export type SimulationTicketPayload = {
 export type SimulationTicketRecord = {
   id: number
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -257,6 +269,12 @@ export type SimulationTicketRecord = {
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
+  direct_hundreds_dan?: string[]
+  direct_hundreds_tuo?: string[]
+  direct_tens_dan?: string[]
+  direct_tens_tuo?: string[]
+  direct_units_dan?: string[]
+  direct_units_tuo?: string[]
   group_numbers?: string[]
   sum_values?: string[]
   position_selections?: string[][]
@@ -275,7 +293,7 @@ export type SimulationTicketCreateResponse = {
 
 export type SimulationTicketQuoteResponse = {
   lottery_code: LotteryCode
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'qxc_compound'
   bet_count: number
   amount: number
 }
@@ -283,7 +301,7 @@ export type SimulationTicketQuoteResponse = {
 export type MyBetRecordPayload = {
   lottery_code?: LotteryCode
   target_period: string
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
   front_numbers?: string[]
   back_numbers?: string[]
   front_dan?: string[]
@@ -295,6 +313,12 @@ export type MyBetRecordPayload = {
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
+  direct_hundreds_dan?: string[]
+  direct_hundreds_tuo?: string[]
+  direct_tens_dan?: string[]
+  direct_tens_tuo?: string[]
+  direct_units_dan?: string[]
+  direct_units_tuo?: string[]
   group_numbers?: string[]
   sum_values?: string[]
   position_selections?: string[][]
@@ -315,7 +339,7 @@ export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
 }
 
 export type MyBetLinePayload = {
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
   front_numbers?: string[]
   back_numbers?: string[]
   front_dan?: string[]
@@ -327,6 +351,12 @@ export type MyBetLinePayload = {
   direct_hundreds?: string[]
   direct_tens?: string[]
   direct_units?: string[]
+  direct_hundreds_dan?: string[]
+  direct_hundreds_tuo?: string[]
+  direct_tens_dan?: string[]
+  direct_tens_tuo?: string[]
+  direct_units_dan?: string[]
+  direct_units_tuo?: string[]
   group_numbers?: string[]
   sum_values?: string[]
   position_selections?: string[][]
@@ -336,7 +366,7 @@ export type MyBetLinePayload = {
 
 export type MyBetLine = {
   line_no: number
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -348,6 +378,12 @@ export type MyBetLine = {
   direct_hundreds: string[]
   direct_tens: string[]
   direct_units: string[]
+  direct_hundreds_dan: string[]
+  direct_hundreds_tuo: string[]
+  direct_tens_dan: string[]
+  direct_tens_tuo: string[]
+  direct_units_dan: string[]
+  direct_units_tuo: string[]
   group_numbers: string[]
   sum_values?: string[]
   position_selections?: string[][]
@@ -371,7 +407,7 @@ export type MyBetRecord = {
   id: number
   lottery_code: LotteryCode
   target_period: string
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -383,6 +419,12 @@ export type MyBetRecord = {
   direct_hundreds: string[]
   direct_tens: string[]
   direct_units: string[]
+  direct_hundreds_dan: string[]
+  direct_hundreds_tuo: string[]
+  direct_tens_dan: string[]
+  direct_tens_tuo: string[]
+  direct_units_dan: string[]
+  direct_units_tuo: string[]
   group_numbers: string[]
   sum_values?: string[]
   position_selections?: string[][]

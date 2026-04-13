@@ -185,6 +185,13 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 prediction_play_mode="direct_sum",
             )
         )
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "pl3_dantuo"}]},
+                lottery_code="pl3",
+                prediction_play_mode="dantuo",
+            )
+        )
 
     def test_prediction_matches_play_mode_for_dlt(self) -> None:
         self.assertTrue(
@@ -194,6 +201,24 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 prediction_play_mode="direct",
             )
         )
+
+    def test_validate_prediction_accepts_pl3_dantuo_groups(self) -> None:
+        service = PredictionGenerationService()
+        prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "pl3_dantuo",
+                    "direct_hundreds_dan": ["01"],
+                    "direct_hundreds_tuo": ["02"],
+                    "direct_tens_dan": [],
+                    "direct_tens_tuo": ["03", "04"],
+                    "direct_units_dan": ["05"],
+                    "direct_units_tuo": ["06"],
+                }
+            ] * 3
+        }
+        self.assertTrue(service._validate_prediction(prediction, lottery_code="pl3", prediction_play_mode="dantuo"))
         self.assertFalse(
             PredictionGenerationService._prediction_matches_play_mode(
                 {"predictions": [{"play_type": "dlt_dantuo"}]},

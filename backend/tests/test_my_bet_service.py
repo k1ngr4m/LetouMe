@@ -29,6 +29,39 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertGreater(int(payload["bet_count"]), 0)
         self.assertEqual(payload["amount"], int(payload["bet_count"]) * 2)
 
+    def test_build_pl3_dantuo_line_payload_uses_position_union_counts(self) -> None:
+        payload = self.service._build_pl3_line_payload(
+            {
+                "play_type": "pl3_dantuo",
+                "direct_hundreds_dan": ["01"],
+                "direct_hundreds_tuo": ["02", "03"],
+                "direct_tens_dan": [],
+                "direct_tens_tuo": ["04", "05"],
+                "direct_units_dan": ["06"],
+                "direct_units_tuo": ["07"],
+                "multiplier": 2,
+            },
+            multiplier=2,
+        )
+        self.assertEqual(payload["play_type"], "pl3_dantuo")
+        self.assertEqual(payload["bet_count"], 12)
+        self.assertEqual(payload["amount"], 48)
+
+    def test_pl3_dantuo_settlement_hits_on_exact_position_match(self) -> None:
+        result = self.service._calculate_pl3_line_settlement(
+            line={
+                "play_type": "pl3_dantuo",
+                "direct_hundreds": ["01", "02"],
+                "direct_tens": ["03", "04"],
+                "direct_units": ["05", "06"],
+                "multiplier": 1,
+            },
+            draw={"digits": ["02", "03", "06"]},
+        )
+        self.assertEqual(result["prize_level"], "直选")
+        self.assertEqual(result["winning_bet_count"], 1)
+        self.assertEqual(result["hit_direct_hundreds"], ["02"])
+
     def test_build_pl3_sum_line_payload_rejects_invalid_sum(self) -> None:
         with self.assertRaises(ValueError):
             self.service._build_pl3_line_payload(

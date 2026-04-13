@@ -15,6 +15,8 @@ class NumberCodecTests(unittest.TestCase):
                 "front_numbers": "01,02,03",
                 "back_numbers": "09,10",
                 "direct_hundreds": "04,05",
+                "direct_hundreds_dan": "01",
+                "direct_hundreds_tuo": "02,03",
                 "group_numbers": "07,08",
                 "sum_values": "10,11",
             }
@@ -29,6 +31,9 @@ class NumberCodecTests(unittest.TestCase):
                 ("back", 2, "10"),
                 ("direct_hundreds", 1, "04"),
                 ("direct_hundreds", 2, "05"),
+                ("direct_hundreds_dan", 1, "01"),
+                ("direct_hundreds_tuo", 1, "02"),
+                ("direct_hundreds_tuo", 2, "03"),
                 ("group", 1, "07"),
                 ("group", 2, "08"),
                 ("sum", 1, "10"),
@@ -45,11 +50,13 @@ class NumberCodecTests(unittest.TestCase):
                 {"number_role": "group", "number_position": 1, "number_value": "07"},
                 {"number_role": "sum", "number_position": 2, "number_value": "11"},
                 {"number_role": "sum", "number_position": 1, "number_value": "10"},
+                {"number_role": "direct_units_dan", "number_position": 1, "number_value": "08"},
             ]
         )
         self.assertEqual(payload["front_numbers"], "01,02")
         self.assertEqual(payload["group_numbers"], "07,08")
         self.assertEqual(payload["sum_values"], "10,11")
+        self.assertEqual(payload["direct_units_dan"], "08")
         self.assertEqual(payload["back_numbers"], "")
 
 

@@ -173,8 +173,8 @@ class SimulationTicketService:
 
     def _build_pl3_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6", "direct_sum"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum")
+        if play_type not in {"direct", "group3", "group6", "direct_sum", "pl3_dantuo"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / pl3_dantuo")
 
         if play_type == "direct":
             hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
@@ -192,6 +192,32 @@ class SimulationTicketService:
                 "direct_hundreds": ",".join(hundreds),
                 "direct_tens": ",".join(tens),
                 "direct_units": ",".join(units),
+                "group_numbers": None,
+                "sum_values": None,
+                "bet_count": bet_count,
+                "amount": bet_count * 2,
+            }
+
+        if play_type == "pl3_dantuo":
+            hundreds_dan, hundreds_tuo, hundreds = self._normalize_pl3_dantuo_position(payload, position="百位", dan_field="direct_hundreds_dan", tuo_field="direct_hundreds_tuo")
+            tens_dan, tens_tuo, tens = self._normalize_pl3_dantuo_position(payload, position="十位", dan_field="direct_tens_dan", tuo_field="direct_tens_tuo")
+            units_dan, units_tuo, units = self._normalize_pl3_dantuo_position(payload, position="个位", dan_field="direct_units_dan", tuo_field="direct_units_tuo")
+            bet_count = len(hundreds) * len(tens) * len(units)
+            return {
+                "play_type": "pl3_dantuo",
+                "front_numbers": "",
+                "back_numbers": "",
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
+                "direct_hundreds": ",".join(hundreds),
+                "direct_tens": ",".join(tens),
+                "direct_units": ",".join(units),
+                "direct_hundreds_dan": ",".join(hundreds_dan),
+                "direct_hundreds_tuo": ",".join(hundreds_tuo),
+                "direct_tens_dan": ",".join(tens_dan),
+                "direct_tens_tuo": ",".join(tens_tuo),
+                "direct_units_dan": ",".join(units_dan),
+                "direct_units_tuo": ",".join(units_tuo),
                 "group_numbers": None,
                 "sum_values": None,
                 "bet_count": bet_count,
@@ -247,6 +273,24 @@ class SimulationTicketService:
         if any((not value.isdigit()) or int(value) < 0 or int(value) > 27 for value in normalized):
             raise ValueError("和值超出可选范围")
         return normalized
+
+    def _normalize_pl3_dantuo_position(
+        self,
+        payload: dict[str, Any],
+        *,
+        position: str,
+        dan_field: str,
+        tuo_field: str,
+    ) -> tuple[list[str], list[str], list[str]]:
+        dan_numbers = self._normalize_pl3_numbers(payload.get(dan_field, []))
+        tuo_numbers = self._normalize_pl3_numbers(payload.get(tuo_field))
+        if len(dan_numbers) > 1:
+            raise ValueError(f"{position}胆码最多选择 1 个号码")
+        if len(tuo_numbers) < 1:
+            raise ValueError(f"{position}拖码至少选择 1 个号码")
+        if set(dan_numbers) & set(tuo_numbers):
+            raise ValueError(f"{position}胆码与拖码不可重复")
+        return dan_numbers, tuo_numbers, sorted({*dan_numbers, *tuo_numbers})
 
     def _build_pl5_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
@@ -328,6 +372,12 @@ class SimulationTicketService:
             "direct_hundreds": [item for item in str(ticket.get("direct_hundreds") or "").split(",") if item],
             "direct_tens": [item for item in str(ticket.get("direct_tens") or "").split(",") if item],
             "direct_units": [item for item in str(ticket.get("direct_units") or "").split(",") if item],
+            "direct_hundreds_dan": [item for item in str(ticket.get("direct_hundreds_dan") or "").split(",") if item],
+            "direct_hundreds_tuo": [item for item in str(ticket.get("direct_hundreds_tuo") or "").split(",") if item],
+            "direct_tens_dan": [item for item in str(ticket.get("direct_tens_dan") or "").split(",") if item],
+            "direct_tens_tuo": [item for item in str(ticket.get("direct_tens_tuo") or "").split(",") if item],
+            "direct_units_dan": [item for item in str(ticket.get("direct_units_dan") or "").split(",") if item],
+            "direct_units_tuo": [item for item in str(ticket.get("direct_units_tuo") or "").split(",") if item],
             "group_numbers": [item for item in str(ticket.get("group_numbers") or "").split(",") if item],
             "sum_values": [item for item in str(ticket.get("sum_values") or "").split(",") if item],
             "position_selections": [

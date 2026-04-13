@@ -20,6 +20,7 @@ class MessageService:
         "dlt": "普通投注",
         "dlt_dantuo": "胆拖投注",
         "direct": "直选",
+        "pl3_dantuo": "直选组合胆拖",
         "group3": "组选3",
         "group6": "组选6",
         "direct_sum": "直选和值",

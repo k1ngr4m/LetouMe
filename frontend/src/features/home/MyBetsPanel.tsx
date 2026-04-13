@@ -12,7 +12,7 @@ import { useMotion } from '../../shared/theme/MotionProvider'
 import { IMGLOC_CONTENT_BLOCKED_MESSAGE, isImglocContentBlockedError } from './lib/myBetUploadFallback'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
-type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum'
+type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo'
 type DltPlayType = 'dlt' | 'dlt_dantuo'
 type LinePlayType = DltPlayType | Pl3PlayType
 
@@ -29,6 +29,12 @@ type EditableLine = {
   directHundredsInput: string
   directTensInput: string
   directUnitsInput: string
+  directHundredsDanInput: string
+  directHundredsTuoInput: string
+  directTensDanInput: string
+  directTensTuoInput: string
+  directUnitsDanInput: string
+  directUnitsTuoInput: string
   groupNumbersInput: string
   sumValuesInput: string
   multiplier: number
@@ -63,6 +69,7 @@ const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
   { value: 'group3', label: '组选3' },
   { value: 'group6', label: '组选6' },
   { value: 'direct_sum', label: '直选和值' },
+  { value: 'pl3_dantuo', label: '直选组合胆拖' },
   { value: 'group_sum', label: '组选和值' },
 ]
 const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
@@ -147,6 +154,21 @@ function combination(total: number, choose: number) {
   return Math.round(result)
 }
 
+function quotePl3DantuoPosition(danInput: string, tuoInput: string, label: string) {
+  const dan = splitNumbers(danInput)
+  const tuo = splitNumbers(tuoInput)
+  if (dan.length > 1) {
+    return { valid: false, reason: `${label}胆码最多选择 1 个号码。`, count: 0 }
+  }
+  if (tuo.length < 1) {
+    return { valid: false, reason: `${label}拖码至少选择 1 个号码。`, count: 0 }
+  }
+  if (hasIntersection(dan, tuo)) {
+    return { valid: false, reason: `${label}胆码与拖码不可重复。`, count: 0 }
+  }
+  return { valid: true, reason: undefined, count: new Set([...dan, ...tuo]).size }
+}
+
 function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
   return {
     playType: lotteryCode === 'dlt' ? 'dlt' : 'direct',
@@ -161,6 +183,12 @@ function createEmptyLine(lotteryCode: LotteryCode): EditableLine {
     directHundredsInput: '',
     directTensInput: '',
     directUnitsInput: '',
+    directHundredsDanInput: '',
+    directHundredsTuoInput: '',
+    directTensDanInput: '',
+    directTensTuoInput: '',
+    directUnitsDanInput: '',
+    directUnitsTuoInput: '',
     groupNumbersInput: '',
     sumValuesInput: '',
     multiplier: 1,
@@ -226,6 +254,12 @@ function mapLineToEditable(lotteryCode: LotteryCode, line: MyBetLine): EditableL
     directHundredsInput: (line.direct_hundreds || []).join(','),
     directTensInput: (line.direct_tens || []).join(','),
     directUnitsInput: (line.direct_units || []).join(','),
+    directHundredsDanInput: (line.direct_hundreds_dan || []).join(','),
+    directHundredsTuoInput: (line.direct_hundreds_tuo || []).join(','),
+    directTensDanInput: (line.direct_tens_dan || []).join(','),
+    directTensTuoInput: (line.direct_tens_tuo || []).join(','),
+    directUnitsDanInput: (line.direct_units_dan || []).join(','),
+    directUnitsTuoInput: (line.direct_units_tuo || []).join(','),
     groupNumbersInput: (line.group_numbers || []).join(','),
     sumValuesInput: (line.sum_values || []).join(','),
     multiplier: line.multiplier || 1,
@@ -377,6 +411,16 @@ function quoteLine(lotteryCode: LotteryCode, line: EditableLine): LineQuote {
     const betCount = hundreds.length && tens.length && units.length ? hundreds.length * tens.length * units.length : 0
     return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '直选号码无效，请检查输入。' }
   }
+  if (line.playType === 'pl3_dantuo') {
+    const hundreds = quotePl3DantuoPosition(line.directHundredsDanInput, line.directHundredsTuoInput, '百位')
+    if (!hundreds.valid) return { betCount: 0, amount: 0, valid: false, reason: hundreds.reason }
+    const tens = quotePl3DantuoPosition(line.directTensDanInput, line.directTensTuoInput, '十位')
+    if (!tens.valid) return { betCount: 0, amount: 0, valid: false, reason: tens.reason }
+    const units = quotePl3DantuoPosition(line.directUnitsDanInput, line.directUnitsTuoInput, '个位')
+    if (!units.valid) return { betCount: 0, amount: 0, valid: false, reason: units.reason }
+    const betCount = hundreds.count * tens.count * units.count
+    return { betCount, amount: betCount * 2 * multiplier, valid: betCount > 0, reason: betCount > 0 ? undefined : '直选胆拖号码无效，请检查输入。' }
+  }
   if (line.playType === 'direct_sum' || line.playType === 'group_sum') {
     const sumValues = splitNumbers(line.sumValuesInput)
     if (!sumValues.length) {
@@ -446,6 +490,19 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
       is_append: false,
     }
   }
+  if (line.playType === 'pl3_dantuo') {
+    return {
+      play_type: 'pl3_dantuo',
+      direct_hundreds_dan: splitNumbers(line.directHundredsDanInput),
+      direct_hundreds_tuo: splitNumbers(line.directHundredsTuoInput),
+      direct_tens_dan: splitNumbers(line.directTensDanInput),
+      direct_tens_tuo: splitNumbers(line.directTensTuoInput),
+      direct_units_dan: splitNumbers(line.directUnitsDanInput),
+      direct_units_tuo: splitNumbers(line.directUnitsTuoInput),
+      multiplier: normalizedMultiplier,
+      is_append: false,
+    }
+  }
   if (line.playType === 'direct_sum' || line.playType === 'group_sum') {
     return {
       play_type: line.playType,
@@ -464,6 +521,7 @@ function buildLinePayload(lotteryCode: LotteryCode, line: EditableLine): MyBetLi
 
 function formatPlayType(playType: string) {
   if (playType === 'dlt_dantuo') return '胆拖'
+  if (playType === 'pl3_dantuo') return '直选组合胆拖'
   if (playType === 'group3') return '组选3'
   if (playType === 'group6') return '组选6'
   if (playType === 'direct_sum') return '直选和值'
@@ -629,6 +687,29 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
         <span className="number-row__divider" />
         {(line.direct_units || []).map((ball) => (
           <NumberBall key={`${recordId}-line-${line.line_no}-u-${ball}`} value={ball} color={digitColor} size="sm" isHit={hitUnits.has(ball)} tone={resolveTone(hitUnits.has(ball))} />
+        ))}
+      </div>
+    )
+  }
+  if (line.play_type === 'pl3_dantuo') {
+    return (
+      <div className="number-row number-row--tight">
+        {([
+          { label: '百胆', values: line.direct_hundreds_dan || [] },
+          { label: '百拖', values: line.direct_hundreds_tuo || [] },
+          { label: '十胆', values: line.direct_tens_dan || [] },
+          { label: '十拖', values: line.direct_tens_tuo || [] },
+          { label: '个胆', values: line.direct_units_dan || [] },
+          { label: '个拖', values: line.direct_units_tuo || [] },
+        ]).map((segment, index) => (
+          <span key={`${recordId}-line-${line.line_no}-dt-${segment.label}`} className="number-row__segment">
+            {index > 0 ? <span className="number-row__divider" /> : null}
+            <span className="number-row__segment-label">{segment.label}</span>
+            {segment.values.map((ball) => {
+              const hitSet = segment.label.startsWith('百') ? hitHundreds : segment.label.startsWith('十') ? hitTens : hitUnits
+              return <NumberBall key={`${recordId}-${line.line_no}-${segment.label}-${ball}`} value={ball} color={digitColor} size="sm" isHit={hitSet.has(ball)} tone={resolveTone(hitSet.has(ball))} />
+            })}
+          </span>
         ))}
       </div>
     )
@@ -1543,6 +1624,63 @@ export function MyBetsPanel({
                               个位号码（逗号分隔）
                               <input value={line.directUnitsInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 08,09" />
                             </label>
+                            <label>
+                              倍数
+                              <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />
+                            </label>
+                          </div>
+                        </>
+                      ) : line.playType === 'pl3_dantuo' ? (
+                        <>
+                          <BallPicker
+                            label="百位胆码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directHundredsDanInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directHundredsDanInput: togglePickFromInput(current.directHundredsDanInput, value, 1) }))}
+                            color="pl3pl5"
+                          />
+                          <BallPicker
+                            label="百位拖码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directHundredsTuoInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directHundredsTuoInput: togglePickFromInput(current.directHundredsTuoInput, value, pl3Pool.length) }))}
+                            color="pl3pl5"
+                          />
+                          <BallPicker
+                            label="十位胆码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directTensDanInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directTensDanInput: togglePickFromInput(current.directTensDanInput, value, 1) }))}
+                            color="pl3pl5"
+                          />
+                          <BallPicker
+                            label="十位拖码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directTensTuoInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directTensTuoInput: togglePickFromInput(current.directTensTuoInput, value, pl3Pool.length) }))}
+                            color="pl3pl5"
+                          />
+                          <BallPicker
+                            label="个位胆码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directUnitsDanInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsDanInput: togglePickFromInput(current.directUnitsDanInput, value, 1) }))}
+                            color="pl3pl5"
+                          />
+                          <BallPicker
+                            label="个位拖码点击选号"
+                            numbers={pl3Pool}
+                            selectedInput={line.directUnitsTuoInput}
+                            onToggle={(value) => updateLine(index, (current) => ({ ...current, directUnitsTuoInput: togglePickFromInput(current.directUnitsTuoInput, value, pl3Pool.length) }))}
+                            color="pl3pl5"
+                          />
+                          <div className="settings-form-grid my-bets-modal__grid">
+                            <label><span>百位胆码（最多 1 个）</span><input value={line.directHundredsDanInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsDanInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 01" /></label>
+                            <label><span>百位拖码（至少 1 个）</span><input value={line.directHundredsTuoInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directHundredsTuoInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 02,03" /></label>
+                            <label><span>十位胆码（最多 1 个）</span><input value={line.directTensDanInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTensDanInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 04" /></label>
+                            <label><span>十位拖码（至少 1 个）</span><input value={line.directTensTuoInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directTensTuoInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 05,06" /></label>
+                            <label><span>个位胆码（最多 1 个）</span><input value={line.directUnitsDanInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsDanInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 07" /></label>
+                            <label><span>个位拖码（至少 1 个）</span><input value={line.directUnitsTuoInput} onChange={(event) => updateLine(index, (current) => ({ ...current, directUnitsTuoInput: normalizeDigitsInput(event.target.value) }))} placeholder="如 08,09" /></label>
                             <label>
                               倍数
                               <input type="number" min={1} max={99} value={line.multiplier} onChange={(event) => updateLine(index, (current) => ({ ...current, multiplier: Math.max(1, Math.min(99, Number(event.target.value) || 1)) }))} />

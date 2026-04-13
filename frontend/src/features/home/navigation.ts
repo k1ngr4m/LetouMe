@@ -29,7 +29,7 @@ export type HomePredictionReturnState = {
   summarySelectedModelIds?: string[] | null
   commonOnly?: boolean
   historyPeriodQuery?: string
-  pl3PredictionMode?: 'direct' | 'direct_sum'
+  pl3PredictionMode?: 'direct' | 'direct_sum' | 'dantuo'
   dltPredictionMode?: 'direct' | 'compound' | 'dantuo'
 }
 

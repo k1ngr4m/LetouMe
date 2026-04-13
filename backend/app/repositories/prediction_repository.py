@@ -818,6 +818,15 @@ class PredictionRepository:
                             }
                             if str(group.get("play_type") or "").strip().lower() == "dlt_dantuo"
                             else {
+                                "direct_hundreds_dan": group.get("direct_hundreds_dan", []),
+                                "direct_hundreds_tuo": group.get("direct_hundreds_tuo", []),
+                                "direct_tens_dan": group.get("direct_tens_dan", []),
+                                "direct_tens_tuo": group.get("direct_tens_tuo", []),
+                                "direct_units_dan": group.get("direct_units_dan", []),
+                                "direct_units_tuo": group.get("direct_units_tuo", []),
+                            }
+                            if str(group.get("play_type") or "").strip().lower() == "pl3_dantuo"
+                            else {
                                 f"position_{index + 1}": values
                                 for index, values in enumerate(list(group.get("position_selections") or []))
                                 if isinstance(values, list) and values
@@ -1284,7 +1293,7 @@ class PredictionRepository:
             number_group_ids = [
                 int(row["id"])
                 for row in group_rows
-                if str(row.get("play_type") or "").strip().lower() in {"dlt_dantuo", "dlt_compound"}
+                if str(row.get("play_type") or "").strip().lower() in {"dlt_dantuo", "dlt_compound", "pl3_dantuo"}
             ]
             numbers_by_group = self._fetch_group_numbers(cursor, number_group_ids)
             hit_by_group: dict[int, dict[str, Any]] = {}
@@ -1307,6 +1316,12 @@ class PredictionRepository:
             front_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "front_tuo"]
             back_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "back_dan"]
             back_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "back_tuo"]
+            direct_hundreds_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_hundreds_dan"]
+            direct_hundreds_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_hundreds_tuo"]
+            direct_tens_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_tens_dan"]
+            direct_tens_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_tens_tuo"]
+            direct_units_dan = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_units_dan"]
+            direct_units_tuo = [item["ball_value"] for item in numbers if item["ball_color"] == "direct_units_tuo"]
             hit_result = hit_by_group.get(group_id)
             play_type = str(row.get("play_type") or "").strip().lower()
             if play_type == "dlt_dantuo":
@@ -1328,6 +1343,12 @@ class PredictionRepository:
                     "front_tuo": front_tuo,
                     "back_dan": back_dan,
                     "back_tuo": back_tuo,
+                    "direct_hundreds_dan": direct_hundreds_dan,
+                    "direct_hundreds_tuo": direct_hundreds_tuo,
+                    "direct_tens_dan": direct_tens_dan,
+                    "direct_tens_tuo": direct_tens_tuo,
+                    "direct_units_dan": direct_units_dan,
+                    "direct_units_tuo": direct_units_tuo,
                     **({"hit_result": hit_result} if hit_result else {}),
                 }
             )

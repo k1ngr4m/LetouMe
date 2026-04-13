@@ -111,11 +111,18 @@ class PredictionService:
             front_tuo = self._normalize_dlt_zone_numbers(group.get("front_tuo"), zone="front") or []
             back_dan = self._normalize_dlt_zone_numbers(group.get("back_dan"), zone="back") or []
             back_tuo = self._normalize_dlt_zone_numbers(group.get("back_tuo"), zone="back") or []
+            hundreds_dan = self._normalize_pl3_dantuo_position(group.get("direct_hundreds_dan")) or []
+            hundreds_tuo = self._normalize_pl3_dantuo_position(group.get("direct_hundreds_tuo")) or []
+            tens_dan = self._normalize_pl3_dantuo_position(group.get("direct_tens_dan")) or []
+            tens_tuo = self._normalize_pl3_dantuo_position(group.get("direct_tens_tuo")) or []
+            units_dan = self._normalize_pl3_dantuo_position(group.get("direct_units_dan")) or []
+            units_tuo = self._normalize_pl3_dantuo_position(group.get("direct_units_tuo")) or []
             red_balls = sorted(str(item).zfill(2) for item in group.get("red_balls", []))
             position_selections = self._normalize_qxc_position_selections(group.get("position_selections")) if normalized_code == "qxc" else []
             if normalized_code == "dlt" and play_type == "dlt_dantuo":
                 red_balls = sorted({*front_dan, *front_tuo})
                 blue_balls = sorted({*back_dan, *back_tuo})
+            digits = normalize_digit_balls(group.get("digits", []))
             normalized_predictions.append(
                 {
                     **group,
@@ -123,12 +130,18 @@ class PredictionService:
                     "red_balls": red_balls,
                     "blue_balls": blue_balls,
                     "blue_ball": blue_balls[0] if blue_balls else None,
-                    "digits": normalize_digit_balls(group.get("digits", [])),
+                    "digits": digits,
                     "position_selections": position_selections,
                     "front_dan": front_dan,
                     "front_tuo": front_tuo,
                     "back_dan": back_dan,
                     "back_tuo": back_tuo,
+                    "direct_hundreds_dan": hundreds_dan,
+                    "direct_hundreds_tuo": hundreds_tuo,
+                    "direct_tens_dan": tens_dan,
+                    "direct_tens_tuo": tens_tuo,
+                    "direct_units_dan": units_dan,
+                    "direct_units_tuo": units_tuo,
                 }
             )
 
@@ -553,6 +566,8 @@ class PredictionService:
             return cls._calculate_dlt_dantuo_hit_result(prediction_group, actual_result)
         if play_type == "dlt_compound":
             return cls._calculate_dlt_compound_hit_result(prediction_group, actual_result)
+        if play_type == "pl3_dantuo":
+            return cls._calculate_pl3_dantuo_hit_result(prediction_group, actual_result)
         red_hits = [b for b in prediction_group["red_balls"] if b in actual_result["red_balls"]]
         blue_hits = [b for b in prediction_group["blue_balls"] if b in actual_result["blue_balls"]]
         return {
@@ -757,6 +772,54 @@ class PredictionService:
                 for level in dlt_prize_level_order(actual_result.get("period"))
                 if prize_counter.get(level)
             ],
+        }
+
+    @classmethod
+    def _calculate_pl3_dantuo_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+        actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))
+        position_values = [
+            sorted({
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_hundreds_dan")) or []),
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_hundreds_tuo")) or []),
+            }),
+            sorted({
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_tens_dan")) or []),
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_tens_tuo")) or []),
+            }),
+            sorted({
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_units_dan")) or []),
+                *(cls._normalize_pl3_dantuo_position(prediction_group.get("direct_units_tuo")) or []),
+            }),
+        ]
+        if len(actual_digits) != 3 or any(not values for values in position_values):
+            return {
+                "digit_hits": [],
+                "digit_hit_count": 0,
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0,
+                "is_exact_match": False,
+                "winning_bet_count": 0,
+            }
+        digit_hits = [
+            actual_digit
+            for actual_digit, values in zip(actual_digits, position_values)
+            if actual_digit in values
+        ]
+        exact_match = len(digit_hits) == 3
+        return {
+            "digit_hits": digit_hits,
+            "digit_hit_count": len(digit_hits),
+            "red_hits": [],
+            "red_hit_count": 0,
+            "blue_hits": [],
+            "blue_hit_count": 0,
+            "total_hits": len(digit_hits),
+            "is_exact_match": exact_match,
+            "winning_bet_count": 1 if exact_match else 0,
+            "best_prize_level": "直选" if exact_match else None,
         }
 
     @staticmethod
@@ -1445,6 +1508,8 @@ class PredictionService:
                     play_types.add(play_type)
         if "dlt_dantuo" in play_types:
             return "dantuo"
+        if "pl3_dantuo" in play_types:
+            return "dantuo"
         if "dlt_compound" in play_types:
             return "compound"
         if "direct_sum" in play_types:
@@ -1460,6 +1525,15 @@ class PredictionService:
             return ""
         play_mode = cls._infer_prediction_play_mode(model)
         return f"{model_id}::{play_mode}"
+
+    @staticmethod
+    def _normalize_pl3_dantuo_position(value: Any) -> list[str] | None:
+        if not isinstance(value, list):
+            return None
+        normalized = sorted({str(item).zfill(2) for item in value})
+        if any((not number.isdigit()) or int(number) not in range(0, 10) for number in normalized):
+            return None
+        return normalized
 
     def _get_model_score_profile(self, score_profiles: dict[str, dict[str, Any]], model: dict[str, Any]) -> dict[str, Any]:
         model_key = self._build_model_identity_key(model)
@@ -1784,7 +1858,7 @@ class PredictionService:
     def _normalize_play_type_filters(values: list[str] | None) -> list[str]:
         if not values:
             return []
-        allowed_play_types = {"direct", "direct_sum", "group3", "group6", "dlt_dantuo", "dlt_compound"}
+        allowed_play_types = {"direct", "direct_sum", "group3", "group6", "pl3_dantuo", "dlt_dantuo", "dlt_compound"}
         normalized = [str(value or "").strip().lower() for value in values]
         return [play_type for play_type in dict.fromkeys(normalized) if play_type in allowed_play_types]
 

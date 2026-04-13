@@ -15,6 +15,12 @@ NUMBER_FIELD_SPECS: tuple[tuple[str, str], ...] = (
     ("direct_hundreds", "direct_hundreds"),
     ("direct_tens", "direct_tens"),
     ("direct_units", "direct_units"),
+    ("direct_hundreds_dan", "direct_hundreds_dan"),
+    ("direct_hundreds_tuo", "direct_hundreds_tuo"),
+    ("direct_tens_dan", "direct_tens_dan"),
+    ("direct_tens_tuo", "direct_tens_tuo"),
+    ("direct_units_dan", "direct_units_dan"),
+    ("direct_units_tuo", "direct_units_tuo"),
     ("group_numbers", "group"),
     ("sum_values", "sum"),
 )
