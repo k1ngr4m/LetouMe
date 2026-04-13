@@ -1095,6 +1095,8 @@ class MyBetService:
     @staticmethod
     def _serialize_line(line: dict[str, Any]) -> dict[str, Any]:
         def parse_numbers(value: Any) -> list[str]:
+            if isinstance(value, list):
+                return [str(item).strip() for item in value if str(item).strip()]
             text = str(value or "").strip()
             if not text:
                 return []

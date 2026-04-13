@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from backend.app.services.my_bet_service import MyBetService
 
@@ -210,6 +211,39 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["prize_level"], "六等奖")
         self.assertEqual(result["winning_bet_count"], 8)
         self.assertEqual(result["prize_amount"], 40)
+
+    def test_recognize_ticket_image_serializes_qxc_position_selections_without_python_list_strings(self) -> None:
+        fake_ocr_service = SimpleNamespace(
+            recognize=lambda **_: {
+                "lottery_code": "qxc",
+                "ticket_image_url": "",
+                "ocr_text": "qxc text",
+                "ocr_provider": "baidu",
+                "ocr_recognized_at": 1776074095,
+                "ticket_purchased_at": 1775994919,
+                "target_period": "26040",
+                "lines": [
+                    {
+                        "play_type": "qxc_compound",
+                        "position_selections": [["01"], ["05"], ["04"], ["02"], ["06"], ["00"], ["08"]],
+                        "multiplier": 1,
+                        "is_append": False,
+                        "bet_count": 1,
+                        "amount": 2,
+                    }
+                ],
+                "warnings": [],
+            }
+        )
+        service = MyBetService(ticket_ocr_service=fake_ocr_service)
+
+        draft = service.recognize_ticket_image(lottery_code="qxc", image_bytes=b"img", filename="x.jpg")
+
+        self.assertEqual(len(draft["lines"]), 1)
+        self.assertEqual(
+            draft["lines"][0]["position_selections"],
+            [["01"], ["05"], ["04"], ["02"], ["06"], ["00"], ["08"]],
+        )
 
     def test_build_payload_accepts_discount_amount_within_total(self) -> None:
         payload = self.service._build_payload(

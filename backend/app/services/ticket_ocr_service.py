@@ -381,60 +381,203 @@ class TicketOCRService:
 
     def _parse_pl3_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
         parsed_lines: list[dict[str, Any]] = []
+        has_sequence_markers = any(self._is_pl3_sequence_marker(str(line).strip()) or re.match(r"^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]\s*\d{0,3}$", str(line).strip()) for line in text_lines)
+        if not has_sequence_markers:
+            active_play_type = "direct"
+            for line in text_lines:
+                if "组选6" in line or "组六" in line:
+                    active_play_type = "group6"
+                elif "组选3" in line or "组三" in line:
+                    active_play_type = "group3"
+                elif "组选单式票" in line or "组选" in line:
+                    active_play_type = "group"
+                elif "直选单式票" in line or "直选" in line:
+                    active_play_type = "direct"
+
+                multiplier = self._extract_multiplier(line)
+                number_tokens = re.findall(r"(?<!\d)(\d{3})(?!\d)", line)
+                if not number_tokens:
+                    continue
+                for number_token in number_tokens:
+                    if active_play_type in {"group", "group3", "group6"}:
+                        recovered_group = self._build_pl3_group_line_from_tokens([number_token], multiplier=multiplier)
+                        if recovered_group:
+                            parsed_lines.append(recovered_group)
+                        continue
+                    recovered_direct = self._build_pl3_direct_line_from_tokens([number_token], multiplier=multiplier)
+                    if recovered_direct:
+                        parsed_lines.append(recovered_direct)
+            return parsed_lines
+
         active_play_type = "direct"
         for line in text_lines:
-            lower_line = line.lower()
-            if "组选6" in line or "组六" in line:
-                active_play_type = "group6"
-            elif "组选3" in line or "组三" in line:
-                active_play_type = "group3"
-            elif "直选" in line:
+            if "组选单式票" in line or "组选" in line:
+                active_play_type = "group"
+                break
+            if "直选单式票" in line or "直选" in line:
                 active_play_type = "direct"
+                break
 
-            multiplier = self._extract_multiplier(line)
-            number_tokens = re.findall(r"(?<!\d)(\d{3})(?!\d)", line)
-            if not number_tokens:
+        blocks = self._split_pl3_marked_blocks(text_lines=text_lines)
+        global_multiplier = 1
+        for line in text_lines:
+            global_multiplier = max(global_multiplier, self._extract_multiplier(line))
+
+        if active_play_type == "group":
+            recovered_direct = self._build_pl3_direct_line_from_tokens(
+                [token for block in blocks for token in block],
+                multiplier=global_multiplier,
+                strict_positions=True,
+            )
+            if recovered_direct:
+                return [recovered_direct]
+
+        for block in blocks:
+            multiplier = global_multiplier
+            if active_play_type == "group":
+                recovered_group = self._build_pl3_group_line_from_tokens(block, multiplier=multiplier)
+                if recovered_group:
+                    parsed_lines.append(recovered_group)
                 continue
-            for number_token in number_tokens:
-                digits = [f"{int(ch):02d}" for ch in number_token]
-                if active_play_type == "direct":
-                    parsed_lines.append(
-                        {
-                            "play_type": "direct",
-                            "front_numbers": [],
-                            "back_numbers": [],
-                            "direct_hundreds": [digits[0]],
-                            "direct_tens": [digits[1]],
-                            "direct_units": [digits[2]],
-                            "group_numbers": [],
-                            "multiplier": multiplier,
-                            "is_append": False,
-                            "bet_count": 1,
-                            "amount": 2 * multiplier,
-                        }
-                    )
-                else:
-                    group_numbers = sorted(set(digits))
-                    if active_play_type == "group3" and len(group_numbers) != 2:
-                        continue
-                    if active_play_type == "group6" and len(group_numbers) != 3:
-                        continue
-                    parsed_lines.append(
-                        {
-                            "play_type": active_play_type,
-                            "front_numbers": [],
-                            "back_numbers": [],
-                            "direct_hundreds": [],
-                            "direct_tens": [],
-                            "direct_units": [],
-                            "group_numbers": group_numbers,
-                            "multiplier": multiplier,
-                            "is_append": False,
-                            "bet_count": 1,
-                            "amount": 2 * multiplier,
-                        }
-                    )
+            recovered_direct = self._build_pl3_direct_line_from_tokens(block, multiplier=multiplier)
+            if recovered_direct:
+                parsed_lines.append(recovered_direct)
         return parsed_lines
+
+    @staticmethod
+    def _is_pl3_sequence_marker(value: str) -> bool:
+        return bool(re.fullmatch(r"[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]", value))
+
+    @classmethod
+    def _split_pl3_marked_blocks(cls, *, text_lines: list[str]) -> list[list[str]]:
+        blocks: list[list[str]] = []
+        current_block: list[str] = []
+        marker_pattern = re.compile(r"^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*(\d{0,3})$")
+
+        def flush_current_block() -> None:
+            nonlocal current_block
+            normalized = [item for item in current_block if item]
+            if normalized:
+                blocks.append(normalized)
+            current_block = []
+
+        for raw_line in text_lines:
+            line = str(raw_line or "").strip()
+            if not line:
+                flush_current_block()
+                continue
+            matched = marker_pattern.fullmatch(line)
+            if matched:
+                flush_current_block()
+                inline_digits = str(matched.group(2) or "").strip()
+                if inline_digits:
+                    current_block.append(inline_digits)
+                continue
+            if cls._is_pl3_sequence_marker(line):
+                flush_current_block()
+                continue
+            if re.fullmatch(r"\d{1,3}", line):
+                current_block.append(line)
+                continue
+            flush_current_block()
+        flush_current_block()
+        return blocks
+
+    def _build_pl3_direct_line_from_tokens(
+        self,
+        tokens: list[str],
+        *,
+        multiplier: int,
+        strict_positions: bool = False,
+    ) -> dict[str, Any] | None:
+        normalized_tokens = [str(token).strip() for token in tokens if str(token).strip()]
+        if not normalized_tokens:
+            return None
+        if len(normalized_tokens) == 1 and len(normalized_tokens[0]) == 3:
+            digits = [f"{int(ch):02d}" for ch in normalized_tokens[0]]
+            return self._build_pl3_direct_line(
+                hundreds=[digits[0]],
+                tens=[digits[1]],
+                units=[digits[2]],
+                multiplier=multiplier,
+            )
+
+        positions: list[list[str]] = []
+        for token in normalized_tokens:
+            if not token.isdigit():
+                continue
+            if strict_positions and len(positions) == 2 and 1 <= len(token) <= 3:
+                positions.append([f"{int(char):02d}" for char in token])
+                continue
+            if len(token) == 1:
+                positions.append([f"{int(token):02d}"])
+                continue
+            if len(token) == 2:
+                positions.append([f"{int(char):02d}" for char in token])
+                continue
+            if len(token) == 3:
+                if strict_positions:
+                    positions.append([f"{int(char):02d}" for char in token])
+                else:
+                    positions.extend([[f"{int(char):02d}"] for char in token])
+            if len(positions) >= 3:
+                break
+        if len(positions) != 3:
+            return None
+        return self._build_pl3_direct_line(
+            hundreds=positions[0],
+            tens=positions[1],
+            units=positions[2],
+            multiplier=multiplier,
+        )
+
+    def _build_pl3_group_line_from_tokens(self, tokens: list[str], *, multiplier: int) -> dict[str, Any] | None:
+        normalized_tokens = [str(token).strip() for token in tokens if str(token).strip()]
+        if not normalized_tokens:
+            return None
+        if len(normalized_tokens) == 1 and len(normalized_tokens[0]) == 3:
+            digits = normalized_tokens[0]
+        elif len(normalized_tokens) >= 3 and all(len(token) == 1 for token in normalized_tokens[:3]):
+            digits = "".join(normalized_tokens[:3])
+        else:
+            return None
+        group_numbers = sorted({f"{int(char):02d}" for char in digits})
+        if len(group_numbers) == 2:
+            play_type = "group3"
+        elif len(group_numbers) == 3:
+            play_type = "group6"
+        else:
+            return None
+        return {
+            "play_type": play_type,
+            "front_numbers": [],
+            "back_numbers": [],
+            "direct_hundreds": [],
+            "direct_tens": [],
+            "direct_units": [],
+            "group_numbers": group_numbers,
+            "multiplier": max(1, int(multiplier or 1)),
+            "is_append": False,
+            "bet_count": 1,
+            "amount": 2 * max(1, int(multiplier or 1)),
+        }
+
+    @staticmethod
+    def _build_pl3_direct_line(*, hundreds: list[str], tens: list[str], units: list[str], multiplier: int) -> dict[str, Any]:
+        resolved_multiplier = max(1, int(multiplier or 1))
+        return {
+            "play_type": "direct",
+            "front_numbers": [],
+            "back_numbers": [],
+            "direct_hundreds": hundreds,
+            "direct_tens": tens,
+            "direct_units": units,
+            "group_numbers": [],
+            "multiplier": resolved_multiplier,
+            "is_append": False,
+            "bet_count": max(1, len(hundreds) * len(tens) * len(units)),
+            "amount": max(1, len(hundreds) * len(tens) * len(units)) * 2 * resolved_multiplier,
+        }
 
     def _parse_pl5_lines(self, *, text_lines: list[str]) -> list[dict[str, Any]]:
         parsed_lines: list[dict[str, Any]] = []

@@ -46,6 +46,107 @@ class TicketOCRServiceTests(unittest.TestCase):
         self.assertEqual(lines[1]["group_numbers"], ["01", "08"])
         self.assertEqual(lines[1]["multiplier"], 2)
 
+    def test_parse_pl3_lines_supports_group_single_multiline_ticket(self) -> None:
+        lines = self.service._parse_pl3_lines(
+            text_lines=[
+                "体彩",
+                "排列3",
+                "组选单式票",
+                "1倍",
+                "①",
+                "3",
+                "6",
+                "8",
+                "②",
+                "3",
+                "6",
+                "9",
+                "③",
+                "1",
+                "3",
+                "7",
+                "④",
+                "0",
+                "2",
+                "6",
+            ]
+        )
+
+        self.assertEqual(len(lines), 4)
+        self.assertTrue(all(line["play_type"] == "group6" for line in lines))
+        self.assertEqual(lines[0]["group_numbers"], ["03", "06", "08"])
+        self.assertEqual(lines[3]["group_numbers"], ["00", "02", "06"])
+
+    def test_parse_pl3_lines_supports_recovered_direct_compound_from_group_ticket(self) -> None:
+        lines = self.service._parse_pl3_lines(
+            text_lines=[
+                "体彩",
+                "排列3",
+                "组选单式票",
+                "1倍",
+                "①46",
+                "7",
+                "②267",
+            ]
+        )
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["play_type"], "direct")
+        self.assertEqual(lines[0]["direct_hundreds"], ["04", "06"])
+        self.assertEqual(lines[0]["direct_tens"], ["07"])
+        self.assertEqual(lines[0]["direct_units"], ["02", "06", "07"])
+        self.assertEqual(lines[0]["bet_count"], 6)
+
+    def test_parse_pl3_lines_supports_direct_single_multiline_ticket(self) -> None:
+        lines = self.service._parse_pl3_lines(
+            text_lines=[
+                "直选单式票",
+                "1倍",
+                "①",
+                "3",
+                "1",
+                "7",
+                "②",
+                "3",
+                "8",
+                "2",
+                "⑨",
+                "5",
+                "0",
+                "8",
+                "⑩160",
+            ]
+        )
+
+        self.assertEqual(len(lines), 4)
+        self.assertTrue(all(line["play_type"] == "direct" for line in lines))
+        self.assertEqual(lines[0]["direct_hundreds"], ["03"])
+        self.assertEqual(lines[0]["direct_tens"], ["01"])
+        self.assertEqual(lines[0]["direct_units"], ["07"])
+        self.assertEqual(lines[-1]["direct_hundreds"], ["01"])
+        self.assertEqual(lines[-1]["direct_tens"], ["06"])
+        self.assertEqual(lines[-1]["direct_units"], ["00"])
+
+    def test_parse_pl3_lines_ignores_trailing_noise_after_direct_token(self) -> None:
+        lines = self.service._parse_pl3_lines(
+            text_lines=[
+                "直选单式票",
+                "2倍",
+                "④702",
+                "20",
+                "⑤580",
+            ]
+        )
+
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]["direct_hundreds"], ["07"])
+        self.assertEqual(lines[0]["direct_tens"], ["00"])
+        self.assertEqual(lines[0]["direct_units"], ["02"])
+        self.assertEqual(lines[0]["multiplier"], 2)
+        self.assertEqual(lines[1]["direct_hundreds"], ["05"])
+        self.assertEqual(lines[1]["direct_tens"], ["08"])
+        self.assertEqual(lines[1]["direct_units"], ["00"])
+
     def test_parse_dlt_lines_extracts_append_and_multiplier(self) -> None:
         lines = self.service._parse_dlt_lines(text_lines=["大乐透 01 02 03 04 05 + 06 07 追加 3倍"])
 
