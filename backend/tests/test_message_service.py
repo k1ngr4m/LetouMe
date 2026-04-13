@@ -168,6 +168,42 @@ class MessageServiceTests(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed.isoformat(), "2026-04-07")
 
+    def test_list_messages_default_sort_desc_by_resolved_created_at(self) -> None:
+        self.repository.list_messages = lambda **kwargs: {
+            "messages": [
+                {
+                    "id": 1,
+                    "lottery_code": "dlt",
+                    "target_period": "26040",
+                    "my_bet_record_id": 12,
+                    "message_type": "bet_settlement",
+                    "title": "开奖通知A",
+                    "content": "示例A",
+                    "snapshot_json": '{"settled_at":"2026-04-03T10:00:00Z"}',
+                    "read_at": None,
+                    "created_at": "0000-00-00 00:00:00",
+                },
+                {
+                    "id": 2,
+                    "lottery_code": "dlt",
+                    "target_period": "26041",
+                    "my_bet_record_id": 13,
+                    "message_type": "bet_settlement",
+                    "title": "开奖通知B",
+                    "content": "示例B",
+                    "snapshot_json": '{"settled_at":"2026-04-02T10:00:00Z"}',
+                    "read_at": None,
+                    "created_at": "0000-00-00 00:00:00",
+                },
+            ],
+            "total_count": 2,
+        }
+
+        payload = self.service.list_messages(user_id=1, lottery_code="dlt")
+        message_ids = [int(item["id"]) for item in payload["messages"]]
+
+        self.assertEqual(message_ids, [1, 2])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -65,8 +65,16 @@ class MessageService:
             limit=limit,
             offset=offset,
         )
+        serialized_messages = [self._serialize_message(item) for item in payload.get("messages", [])]
+        serialized_messages.sort(
+            key=lambda item: (
+                int(item.get("created_at") or 0),
+                int(item.get("id") or 0),
+            ),
+            reverse=True,
+        )
         return {
-            "messages": [self._serialize_message(item) for item in payload.get("messages", [])],
+            "messages": serialized_messages,
             "total_count": int(payload.get("total_count") or 0),
         }
 
