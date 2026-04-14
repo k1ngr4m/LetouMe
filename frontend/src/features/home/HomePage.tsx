@@ -3479,12 +3479,159 @@ function SavedSimulationTicketCard({
   onDelete: (ticketId: number) => void
   isDeleting: boolean
 }) {
+  const playTypeLabel = getSimulationSavedTicketPlayTypeLabel(lotteryCode, ticket)
+
   return (
     <article className={clsx('simulation-saved-card', isMatching && 'is-active-match')}>
-      <div className="simulation-saved-card__header">
-        <div>
+      <div className="simulation-saved-card__main">
+        <div className="simulation-saved-card__identity">
           <strong>{`方案 #${ticket.id}`}</strong>
           <span>{formatDateTimeLocal(ticket.created_at)}</span>
+        </div>
+        <div className="simulation-saved-card__numbers">
+          {lotteryCode === 'dlt' && ticket.play_type === 'dlt_dantuo' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">前胆</span>
+              {(ticket.front_dan || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-front-dan-${ball}`} value={ball} color="dlt-front" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">前拖</span>
+              {(ticket.front_tuo || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-front-tuo-${ball}`} value={ball} color="dlt-front" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">后胆</span>
+              {(ticket.back_dan || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-back-dan-${ball}`} value={ball} color="dlt-back" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">后拖</span>
+              {(ticket.back_tuo || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-back-tuo-${ball}`} value={ball} color="dlt-back" size="sm" />
+              ))}
+            </div>
+          ) : lotteryCode === 'dlt' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">前区</span>
+              {ticket.front_numbers.map((ball) => (
+                <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="dlt-front" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">后区</span>
+              {ticket.back_numbers.map((ball) => (
+                <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="dlt-back" size="sm" />
+              ))}
+            </div>
+          ) : lotteryCode === 'pl5' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">万位</span>
+              {(ticket.direct_ten_thousands || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-tt-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">千位</span>
+              {(ticket.direct_thousands || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-th-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">百位</span>
+              {(ticket.direct_hundreds || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">十位</span>
+              {(ticket.direct_tens || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">个位</span>
+              {(ticket.direct_units || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+            </div>
+          ) : lotteryCode === 'qxc' && (ticket.position_selections || []).length === 7 ? (
+            <div className="number-row number-row--tight">
+              {(ticket.position_selections || []).slice(0, 7).map((values, positionIndex) => (
+                <span key={`${ticket.id}-position-${positionIndex}`} className="simulation-saved-card__position-group">
+                  <span className="simulation-saved-card__segment-label">{QXC_POSITION_CONFIGS[positionIndex]?.title.replace('选号', '') || `第${positionIndex + 1}位`}</span>
+                  <span className="simulation-saved-card__position-values">
+                    {(values || []).map((ball) => (
+                      <NumberBall
+                        key={`${ticket.id}-position-${positionIndex}-${ball}`}
+                        value={ball}
+                        color={resolveDigitBallColor('qxc', positionIndex, 7)}
+                        size="sm"
+                      />
+                    ))}
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : ticket.play_type === 'pl3_dantuo' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">百位</span>
+              {([
+                ...(ticket.direct_hundreds_dan || []),
+                ...(ticket.direct_hundreds_tuo || []),
+              ] as Array<string>).map((ball, index) => (
+                <NumberBall key={`${ticket.id}-hundreds-${index}-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">十位</span>
+              {([
+                ...(ticket.direct_tens_dan || []),
+                ...(ticket.direct_tens_tuo || []),
+              ] as Array<string>).map((ball, index) => (
+                <NumberBall key={`${ticket.id}-tens-${index}-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">个位</span>
+              {([
+                ...(ticket.direct_units_dan || []),
+                ...(ticket.direct_units_tuo || []),
+              ] as Array<string>).map((ball, index) => (
+                <NumberBall key={`${ticket.id}-units-${index}-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+            </div>
+          ) : ticket.play_type === 'direct' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">百位</span>
+              {(ticket.direct_hundreds || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">十位</span>
+              {(ticket.direct_tens || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+              <span className="number-row__divider" />
+              <span className="simulation-saved-card__segment-label">个位</span>
+              {(ticket.direct_units || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+            </div>
+          ) : ticket.play_type === 'direct_sum' ? (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">和值</span>
+              {(ticket.sum_values || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-sum-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+            </div>
+          ) : (
+            <div className="number-row number-row--tight">
+              <span className="simulation-saved-card__segment-label">组选</span>
+              {(ticket.group_numbers || []).map((ball) => (
+                <NumberBall key={`${ticket.id}-g-${ball}`} value={ball} color="pl3pl5" size="sm" />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="simulation-saved-card__meta">
+        <div className="simulation-saved-card__summary">
+          <span>{`${playTypeLabel} · ${ticket.bet_count} 注`}</span>
+          <strong>{formatCurrency(ticket.amount)}</strong>
         </div>
         <div className="simulation-saved-card__actions">
           <button className={clsx('ghost-button', isMatching && 'is-active')} type="button" onClick={() => onMatch(ticket)}>
@@ -3495,126 +3642,19 @@ function SavedSimulationTicketCard({
           </button>
         </div>
       </div>
-      <div className="simulation-saved-card__numbers">
-        {lotteryCode === 'dlt' && ticket.play_type === 'dlt_dantuo' ? (
-          <div className="number-row number-row--tight">
-            {(ticket.front_dan || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-front-dan-${ball}`} value={ball} color="dlt-front" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.front_tuo || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-front-tuo-${ball}`} value={ball} color="dlt-front" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.back_dan || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-back-dan-${ball}`} value={ball} color="dlt-back" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.back_tuo || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-back-tuo-${ball}`} value={ball} color="dlt-back" size="sm" />
-            ))}
-          </div>
-        ) : lotteryCode === 'dlt' ? (
-          <div className="number-row number-row--tight">
-            {ticket.front_numbers.map((ball) => (
-              <NumberBall key={`${ticket.id}-front-${ball}`} value={ball} color="dlt-front" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {ticket.back_numbers.map((ball) => (
-              <NumberBall key={`${ticket.id}-back-${ball}`} value={ball} color="dlt-back" size="sm" />
-            ))}
-          </div>
-        ) : lotteryCode === 'pl5' ? (
-          <div className="number-row number-row--tight">
-            {(ticket.direct_ten_thousands || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-tt-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_thousands || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-th-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_hundreds || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_tens || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_units || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-          </div>
-        ) : lotteryCode === 'qxc' && (ticket.position_selections || []).length === 7 ? (
-          <div className="simulation-qxc-summary simulation-qxc-saved">
-            {(ticket.position_selections || []).slice(0, 7).map((values, positionIndex) => (
-              <span key={`${ticket.id}-position-${positionIndex}`} className="number-row__segment simulation-qxc-summary__segment">
-                <span className="number-row__segment-label">{QXC_POSITION_CONFIGS[positionIndex]?.title.replace('选号', '') || `第${positionIndex + 1}位`}</span>
-                <div className="number-row number-row--tight">
-                  {(values || []).map((ball) => (
-                    <NumberBall
-                      key={`${ticket.id}-position-${positionIndex}-${ball}`}
-                      value={ball}
-                      color={resolveDigitBallColor('qxc', positionIndex, 7)}
-                      size="sm"
-                    />
-                  ))}
-                </div>
-              </span>
-            ))}
-          </div>
-        ) : ticket.play_type === 'pl3_dantuo' ? (
-          <div className="number-row number-row--tight">
-            {([
-              ...(ticket.direct_hundreds_dan || []),
-              ...(ticket.direct_hundreds_tuo || []),
-              '|',
-              ...(ticket.direct_tens_dan || []),
-              ...(ticket.direct_tens_tuo || []),
-              '|',
-              ...(ticket.direct_units_dan || []),
-              ...(ticket.direct_units_tuo || []),
-            ] as Array<string>).map((ball, index) =>
-              ball === '|'
-                ? <span key={`${ticket.id}-divider-${index}`} className="number-row__divider" />
-                : <NumberBall key={`${ticket.id}-dt-${index}-${ball}`} value={ball} color="pl3pl5" size="sm" />,
-            )}
-          </div>
-        ) : ticket.play_type === 'direct' ? (
-          <div className="number-row number-row--tight">
-            {(ticket.direct_hundreds || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-h-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_tens || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-t-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-            <span className="number-row__divider" />
-            {(ticket.direct_units || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-u-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-          </div>
-        ) : ticket.play_type === 'direct_sum' ? (
-          <div className="number-row number-row--tight">
-            {(ticket.sum_values || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-sum-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-          </div>
-        ) : (
-          <div className="number-row number-row--tight">
-            {(ticket.group_numbers || []).map((ball) => (
-              <NumberBall key={`${ticket.id}-g-${ball}`} value={ball} color="pl3pl5" size="sm" />
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="simulation-saved-card__footer">
-        <span>{`${lotteryCode === 'dlt' ? (ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式') : lotteryCode === 'pl5' ? '直选' : lotteryCode === 'qxc' ? '复式' : ticket.play_type === 'pl3_dantuo' ? '直选胆拖' : ticket.play_type === 'group3' ? '组选3' : ticket.play_type === 'group6' ? '组选6' : ticket.play_type === 'direct_sum' ? '和值' : '直选'} · ${ticket.bet_count} 注`}</span>
-        <span>{formatCurrency(ticket.amount)}</span>
-      </div>
     </article>
   )
+}
+
+function getSimulationSavedTicketPlayTypeLabel(lotteryCode: LotteryCode, ticket: SimulationTicketRecord) {
+  if (lotteryCode === 'dlt') return ticket.play_type === 'dlt_dantuo' ? '胆拖' : '复式'
+  if (lotteryCode === 'pl5') return '直选'
+  if (lotteryCode === 'qxc') return '复式'
+  if (ticket.play_type === 'pl3_dantuo') return '直选胆拖'
+  if (ticket.play_type === 'group3') return '组选3'
+  if (ticket.play_type === 'group6') return '组选6'
+  if (ticket.play_type === 'direct_sum') return '和值'
+  return '直选'
 }
 
 function ModelListCard({

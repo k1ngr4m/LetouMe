@@ -2023,12 +2023,17 @@ describe('HomePage dashboard sidebar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
 
-    expect(await screen.findByText('2026-03-18 08:00')).toBeInTheDocument()
+    const savedTicketRow = (await screen.findByText('方案 #31')).closest('.simulation-saved-card')
+    expect(savedTicketRow).not.toBeNull()
+    expect(within(savedTicketRow as HTMLElement).getByText('2026-03-18 08:00')).toBeInTheDocument()
+    expect(within(savedTicketRow as HTMLElement).getByText('复式 · 1 注')).toBeInTheDocument()
+    expect(within(savedTicketRow as HTMLElement).getByText('2 元')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '历史匹配' }))
 
     expect(await screen.findByText('来源 方案 #31')).toBeInTheDocument()
     expect(screen.getByText('将方案 #31与近 30 期开奖数据进行对比，展示命中号码和最高奖级。')).toBeInTheDocument()
     expect(screen.getByText('第 2026031 期')).toBeInTheDocument()
+    expect(savedTicketRow).toHaveClass('is-active-match')
   })
 
   it('shows empty state when winning-only filter hides all simulation matches and resets on reselection', async () => {

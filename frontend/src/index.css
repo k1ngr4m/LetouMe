@@ -7994,8 +7994,15 @@ a {
 .simulation-match-list,
 .simulation-saved-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.simulation-match-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.simulation-saved-list {
+  grid-template-columns: 1fr;
 }
 
 .simulation-match-finance-summary {
@@ -8056,11 +8063,44 @@ a {
     linear-gradient(145deg, rgba(18, 41, 68, 0.8), rgba(11, 27, 45, 0.84));
 }
 
-.simulation-match-card__meta,
-.simulation-saved-card__header div {
+.simulation-match-card__meta {
   display: grid;
   gap: 0.2rem;
   justify-items: end;
+}
+
+.simulation-saved-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(145deg, rgba(24, 42, 70, 0.74), rgba(11, 23, 40, 0.88)),
+    rgba(10, 18, 30, 0.86);
+}
+
+.simulation-saved-card__main {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 10rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.simulation-saved-card__identity {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.simulation-saved-card__identity strong {
+  font-size: 1.02rem;
+  color: var(--text-1);
+}
+
+.simulation-saved-card__identity span {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .simulation-saved-card__actions {
@@ -8068,6 +8108,61 @@ a {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.simulation-saved-card__meta {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: end;
+}
+
+.simulation-saved-card__summary {
+  display: grid;
+  gap: 0.24rem;
+  justify-items: end;
+  color: var(--text-2);
+}
+
+.simulation-saved-card__summary strong {
+  color: var(--text-1);
+  font-size: 1.02rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-saved-card__numbers {
+  min-width: 0;
+}
+
+.simulation-saved-card__numbers .number-row {
+  justify-content: flex-start;
+  row-gap: 0.45rem;
+}
+
+.simulation-saved-card__segment-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.9rem;
+  padding: 0.2rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(119, 151, 207, 0.16);
+  color: var(--text-2);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.simulation-saved-card__position-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  flex-wrap: wrap;
+}
+
+.simulation-saved-card__position-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  flex-wrap: wrap;
 }
 
 .simulation-match-card__section {
@@ -8098,11 +8193,6 @@ a {
   border-radius: 999px;
   border: 1px solid rgba(160, 197, 250, 0.22);
   background: rgba(131, 173, 241, 0.14);
-}
-
-.simulation-saved-card__footer {
-  display: flex;
-  justify-content: space-between;
 }
 
 :root[data-theme='light'] .simulation-shell__header {
@@ -8147,6 +8237,11 @@ a {
   background:
     radial-gradient(circle at 100% 0%, rgba(150, 198, 255, 0.26), transparent 56%),
     linear-gradient(145deg, rgba(240, 248, 255, 0.96), rgba(226, 239, 255, 0.9));
+}
+
+:root[data-theme='light'] .simulation-saved-card__segment-label {
+  background: rgba(118, 147, 201, 0.16);
+  color: color-mix(in srgb, var(--text-2) 88%, var(--text-1) 12%);
 }
 
 :root[data-theme='light'] .simulation-section::before,
@@ -10010,19 +10105,29 @@ a {
   }
 
   .simulation-summary-bar__actions,
-  .simulation-match-card__header,
-  .simulation-saved-card__header,
-  .simulation-saved-card__footer {
+  .simulation-match-card__header {
     flex-direction: column;
     align-items: stretch;
   }
 
   .simulation-match-card__meta,
-  .simulation-saved-card__header div {
+  .simulation-saved-card__summary {
     justify-items: start;
   }
 
+  .simulation-saved-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .simulation-saved-card__main {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .simulation-saved-card__meta,
   .simulation-saved-card__actions {
+    justify-items: start;
     justify-content: flex-start;
   }
 
