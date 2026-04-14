@@ -356,7 +356,7 @@ class SimulationTicketService:
 
     @staticmethod
     def _serialize_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
-        created_at = ensure_timestamp(ticket.get("created_at"))
+        created_at = SimulationTicketService._normalize_ticket_created_at(ticket.get("created_at"))
         return {
             "id": int(ticket.get("id") or 0),
             "lottery_code": str(ticket.get("lottery_code") or "dlt"),
@@ -389,3 +389,15 @@ class SimulationTicketService:
             "amount": int(ticket.get("amount") or 0),
             "created_at": created_at or 0,
         }
+
+    @staticmethod
+    def _normalize_ticket_created_at(value: Any) -> int | None:
+        if isinstance(value, (bytes, bytearray)):
+            try:
+                value = value.decode("utf-8")
+            except UnicodeDecodeError:
+                value = value.decode("utf-8", errors="ignore")
+        timestamp = ensure_timestamp(value, assume_beijing=True)
+        if timestamp and timestamp > 0:
+            return timestamp
+        return None

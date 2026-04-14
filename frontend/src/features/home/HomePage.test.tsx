@@ -2022,6 +2022,8 @@ describe('HomePage dashboard sidebar', () => {
     renderPage()
 
     await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+
+    expect(await screen.findByText('2026-03-18 08:00')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '历史匹配' }))
 
     expect(await screen.findByText('来源 方案 #31')).toBeInTheDocument()

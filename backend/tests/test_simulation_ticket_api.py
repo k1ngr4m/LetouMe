@@ -68,10 +68,12 @@ class SimulationTicketApiTests(unittest.TestCase):
         ticket = create_response.json()["ticket"]
         self.assertEqual(ticket["bet_count"], 18)
         self.assertEqual(ticket["amount"], 36)
+        self.assertGreater(ticket["created_at"], 0)
 
         list_response = self.client.post("/api/simulation/tickets/list", json={})
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(len(list_response.json()["tickets"]), 1)
+        self.assertGreater(list_response.json()["tickets"][0]["created_at"], 0)
 
         delete_response = self.client.post("/api/simulation/tickets/delete", json={"ticket_id": ticket["id"]})
         self.assertEqual(delete_response.status_code, 200)
