@@ -52,6 +52,7 @@ type ModelPredictionMode = 'current' | 'history'
 type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
 type GenerationHistoryRangeMode = 'custom' | 'recent'
 type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
+type GenerationPromptHistoryPeriodCount = '30' | '50' | '100'
 type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
@@ -120,6 +121,7 @@ const EMPTY_GENERATION_FORM = {
   predictionPlayMode: 'direct' as ModelPredictionPlayMode,
   historyRangeMode: 'custom' as GenerationHistoryRangeMode,
   recentPeriodCount: '5' as GenerationRecentPeriodCount,
+  promptHistoryPeriodCount: '50' as GenerationPromptHistoryPeriodCount,
   overwrite: false,
   parallelism: '3',
   startPeriod: '',
@@ -201,6 +203,11 @@ const GENERATION_RECENT_PERIOD_OPTIONS: Array<{ value: GenerationRecentPeriodCou
   { value: '5', label: '近5期' },
   { value: '10', label: '近10期' },
   { value: '20', label: '近20期' },
+]
+const GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS: Array<{ value: GenerationPromptHistoryPeriodCount; label: string }> = [
+  { value: '30', label: '近30期' },
+  { value: '50', label: '近50期' },
+  { value: '100', label: '近100期' },
 ]
 const LOTTERY_FETCH_LIMIT_PRESET_OPTIONS = [10, 30, 50, 100, 200, 500] as const
 const LOTTERY_FETCH_LIMIT_DEFAULT = 30
@@ -1447,6 +1454,9 @@ export function SettingsPage() {
                 end_period: generationForm.endPeriod.trim(),
               }
           : {}
+      const promptHistoryPeriodPayload = {
+        prompt_history_period_count: Number(generationForm.promptHistoryPeriodCount.trim()) as 30 | 50 | 100,
+      }
       return generationForm.modelCodes.length > 1
         ? apiClient.bulkGenerateSettingsModelPredictions({
             lottery_code: generationForm.lotteryCode,
@@ -1456,6 +1466,7 @@ export function SettingsPage() {
             overwrite: generationForm.overwrite,
             parallelism,
             ...historyRangePayload,
+            ...promptHistoryPeriodPayload,
           })
         : apiClient.generateSettingsModelPredictions({
             lottery_code: generationForm.lotteryCode,
@@ -1465,6 +1476,7 @@ export function SettingsPage() {
             overwrite: generationForm.overwrite,
             parallelism,
             ...historyRangePayload,
+            ...promptHistoryPeriodPayload,
           })
     },
     onSuccess: (task) => {
@@ -1818,6 +1830,7 @@ export function SettingsPage() {
       predictionPlayMode: 'direct',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
+      promptHistoryPeriodCount: '50',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -1841,6 +1854,7 @@ export function SettingsPage() {
       predictionPlayMode: 'direct',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
+      promptHistoryPeriodCount: '50',
       overwrite: false,
       parallelism: '3',
       startPeriod: '',
@@ -4598,6 +4612,18 @@ export function SettingsPage() {
                       onChange={(event) => setGenerationForm((previous) => ({ ...previous, parallelism: event.target.value }))}
                       placeholder="默认 3"
                     />
+                  </label>
+                  <label className="field">
+                    <span>Prompt历史期数</span>
+                    <select
+                      value={generationForm.promptHistoryPeriodCount}
+                      aria-label="Prompt历史期数"
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, promptHistoryPeriodCount: event.target.value as GenerationPromptHistoryPeriodCount }))}
+                    >
+                      {GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
                 </div>
                 {generationForm.mode === 'history' ? (

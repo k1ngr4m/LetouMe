@@ -801,6 +801,7 @@ def generate_model_predictions(
                 lottery_code=lottery_code,
                 model_code=payload.model_code,
                 prediction_play_mode=prediction_play_mode,
+                prompt_history_period_count=payload.prompt_history_period_count,
                 overwrite=payload.overwrite,
                 progress_callback=progress_callback,
             )
@@ -809,6 +810,7 @@ def generate_model_predictions(
                 lottery_code=lottery_code,
                 model_code=payload.model_code,
                 prediction_play_mode=prediction_play_mode,
+                prompt_history_period_count=payload.prompt_history_period_count,
                 start_period=str(payload.start_period or ""),
                 end_period=str(payload.end_period or ""),
                 recent_period_count=payload.recent_period_count,
@@ -861,6 +863,7 @@ def bulk_generate_model_predictions(
                 model_codes=payload.model_codes,
                 mode=mode,
                 prediction_play_mode=prediction_play_mode,
+                prompt_history_period_count=payload.prompt_history_period_count,
                 overwrite=payload.overwrite,
                 parallelism=payload.parallelism,
                 start_period=payload.start_period,

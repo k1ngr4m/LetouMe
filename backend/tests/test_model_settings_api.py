@@ -361,7 +361,13 @@ class ModelSettingsApiTests(unittest.TestCase):
 
             response = self.client.post(
                 "/api/settings/models/predictions/generate",
-                json={"model_code": "claude-sonnet-4.6", "mode": "history", "overwrite": False, "recent_period_count": 10},
+                json={
+                    "model_code": "claude-sonnet-4.6",
+                    "mode": "history",
+                    "overwrite": False,
+                    "recent_period_count": 10,
+                    "prompt_history_period_count": 100,
+                },
             )
 
         self.assertEqual(response.status_code, 200)

@@ -29,13 +29,14 @@ QXC_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_prompt.md"
 QXC_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_compound_prompt.md"
 DLT_DANTUO_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_dantuo_prompt.md"
 DLT_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_compound_prompt.md"
-DEFAULT_CONTEXT_SIZE = 30
+DEFAULT_PROMPT_HISTORY_PERIOD_COUNT = 50
 DEFAULT_BULK_PARALLELISM = 3
 DEFAULT_SINGLE_MODEL_PARALLELISM = 3
 MAX_GENERATION_PARALLELISM = 8
 MAX_BULK_RETRIES_PER_MODEL = 1
 MAX_INVALID_PREDICTION_RETRIES = 2
 SUPPORTED_RECENT_PERIOD_COUNTS = {1, 5, 10, 20}
+SUPPORTED_PROMPT_HISTORY_PERIOD_COUNTS = {30, 50, 100}
 MODEL_REGISTRY_CACHE_TTL_SECONDS = 60
 PROVIDER_FAILURE_COOLDOWN_SECONDS = 300
 
@@ -89,11 +90,13 @@ class PredictionGenerationService:
         model_code: str,
         prediction_play_mode: str = "direct",
         overwrite: bool,
+        prompt_history_period_count: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
+        normalized_prompt_history_period_count = self._normalize_prompt_history_period_count(prompt_history_period_count)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
         prompt_template = self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
         lottery_data = self._load_lottery_history(normalized_code)
@@ -122,7 +125,7 @@ class PredictionGenerationService:
                 progress_callback(summary.to_dict())
             return summary.to_dict()
 
-        history_context = (lottery_data.get("data") or [])[:DEFAULT_CONTEXT_SIZE]
+        history_context = (lottery_data.get("data") or [])[:normalized_prompt_history_period_count]
         prediction_date = datetime.now().strftime("%Y-%m-%d")
         model = self._prepare_model(model_def)
         prediction = self._generate_prediction(
@@ -159,12 +162,14 @@ class PredictionGenerationService:
         end_period: str = "",
         recent_period_count: int | None = None,
         overwrite: bool,
+        prompt_history_period_count: int | None = None,
         parallelism: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
         normalized_code = normalize_lottery_code(lottery_code)
         normalized_play_mode = self._normalize_prediction_play_mode(prediction_play_mode, lottery_code=normalized_code)
+        normalized_prompt_history_period_count = self._normalize_prompt_history_period_count(prompt_history_period_count)
         model_def = self._get_model_definition(model_code, lottery_code=normalized_code)
         prompt_template = self._load_prompt_template(normalized_code, prediction_play_mode=normalized_play_mode)
         history_data = self._load_lottery_history(normalized_code)
@@ -235,7 +240,7 @@ class PredictionGenerationService:
                 period_map[period]
                 for period_int_value, period in sorted(sorted_periods_desc, reverse=True)
                 if period_int_value < period_int
-            ][:DEFAULT_CONTEXT_SIZE]
+            ][:normalized_prompt_history_period_count]
             if not history_context:
                 with summary_lock:
                     summary.failed_count += 1
@@ -361,6 +366,7 @@ class PredictionGenerationService:
         mode: str,
         prediction_play_mode: str = "direct",
         overwrite: bool,
+        prompt_history_period_count: int | None = None,
         parallelism: int | None = None,
         start_period: str | None = None,
         end_period: str | None = None,
@@ -375,6 +381,7 @@ class PredictionGenerationService:
             raise ValueError("不支持的生成模式")
         if mode == "history" and not recent_period_count and (not start_period or not end_period):
             raise ValueError("历史重算必须提供开始期号和结束期号，或选择最近期数")
+        normalized_prompt_history_period_count = self._normalize_prompt_history_period_count(prompt_history_period_count)
 
         summary = {
             "mode": mode,
@@ -402,6 +409,7 @@ class PredictionGenerationService:
                 unique_codes=unique_codes,
                 overwrite=overwrite,
                 prediction_play_mode=prediction_play_mode,
+                prompt_history_period_count=normalized_prompt_history_period_count,
                 parallelism=parallelism,
                 start_period=str(start_period or ""),
                 end_period=str(end_period or ""),
@@ -426,6 +434,7 @@ class PredictionGenerationService:
                             lottery_code=lottery_code,
                             model_code=model_code,
                             prediction_play_mode=prediction_play_mode,
+                            prompt_history_period_count=normalized_prompt_history_period_count,
                             overwrite=overwrite,
                         )
                         if mode == "current"
@@ -433,6 +442,7 @@ class PredictionGenerationService:
                             lottery_code=lottery_code,
                             model_code=model_code,
                             prediction_play_mode=prediction_play_mode,
+                            prompt_history_period_count=normalized_prompt_history_period_count,
                             start_period=str(start_period or ""),
                             end_period=str(end_period or ""),
                             recent_period_count=recent_period_count,
@@ -498,6 +508,7 @@ class PredictionGenerationService:
         unique_codes: list[str],
         overwrite: bool,
         prediction_play_mode: str,
+        prompt_history_period_count: int,
         parallelism: int | None,
         start_period: str,
         end_period: str,
@@ -535,7 +546,7 @@ class PredictionGenerationService:
                 period_map[history_period]
                 for period_int_value, history_period in sorted(sorted_periods_desc, reverse=True)
                 if period_int_value < period_int
-            ][:DEFAULT_CONTEXT_SIZE]
+            ][:prompt_history_period_count]
 
         thread_local = local()
         period_locks: dict[str, Lock] = {}
@@ -858,6 +869,15 @@ class PredictionGenerationService:
 
         selected_periods = available_periods[:recent_period_count]
         return str(min(selected_periods)), str(max(selected_periods))
+
+    @staticmethod
+    def _normalize_prompt_history_period_count(prompt_history_period_count: int | None) -> int:
+        if prompt_history_period_count is None:
+            return DEFAULT_PROMPT_HISTORY_PERIOD_COUNT
+        normalized = int(prompt_history_period_count)
+        if normalized not in SUPPORTED_PROMPT_HISTORY_PERIOD_COUNTS:
+            raise ValueError("Prompt历史期数仅支持 30、50、100")
+        return normalized
 
     def _prepare_model(self, model_def: ModelDefinition) -> Any:
         self._raise_if_provider_in_cooldown(model_def.provider)

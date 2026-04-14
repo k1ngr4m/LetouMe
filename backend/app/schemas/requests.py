@@ -80,6 +80,7 @@ class GenerateModelPredictionsPayload(BaseModel):
     start_period: str | None = None
     end_period: str | None = None
     recent_period_count: Literal[1, 5, 10, 20] | None = None
+    prompt_history_period_count: Literal[30, 50, 100] | None = None
 
 
 class BulkModelActionPayload(BaseModel):
@@ -98,6 +99,7 @@ class BulkGenerateModelPredictionsPayload(BaseModel):
     start_period: str | None = None
     end_period: str | None = None
     recent_period_count: Literal[1, 5, 10, 20] | None = None
+    prompt_history_period_count: Literal[30, 50, 100] | None = None
 
 
 class PredictionGenerationTaskPayload(BaseModel):

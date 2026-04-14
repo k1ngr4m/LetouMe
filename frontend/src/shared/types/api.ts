@@ -649,6 +649,7 @@ export type GenerateSettingsModelPredictionsPayload = {
   start_period?: string
   end_period?: string
   recent_period_count?: 1 | 5 | 10 | 20
+  prompt_history_period_count?: 30 | 50 | 100
 }
 
 export type BulkSettingsModelActionPayload = {
@@ -672,6 +673,7 @@ export type BulkGenerateSettingsModelPredictionsPayload = {
   start_period?: string
   end_period?: string
   recent_period_count?: 1 | 5 | 10 | 20
+  prompt_history_period_count?: 30 | 50 | 100
 }
 
 export type BulkModelActionResult = {

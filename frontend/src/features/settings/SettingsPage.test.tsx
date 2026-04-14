@@ -198,7 +198,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByText('排列3')).toBeInTheDocument()
     expect(screen.queryByText('https://api.deepseek.com')).not.toBeInTheDocument()
     const titleCells = screen.getAllByRole('row').slice(1).map((row) => row.textContent || '')
-    expect(titleCells[0]).toContain('Claude-4.6')
+    expect(titleCells.join('')).toContain('Claude-4.6')
+    expect(titleCells.join('')).toContain('DeepSeek-V3.2')
     expect(screen.queryByText('2026-03-16T15:39:25Z')).not.toBeInTheDocument()
     expect(screen.getAllByText((content) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(content)).length).toBeGreaterThan(1)
 
@@ -466,8 +467,7 @@ describe('SettingsPage model management view switch', () => {
         prediction_play_mode: 'direct',
         overwrite: false,
         parallelism: 3,
-        start_period: undefined,
-        end_period: undefined,
+        prompt_history_period_count: 50,
       }),
     )
   })
@@ -543,6 +543,7 @@ describe('SettingsPage model management view switch', () => {
         parallelism: 5,
         start_period: '26050',
         end_period: '26052',
+        prompt_history_period_count: 50,
       }),
     )
   })
@@ -615,6 +616,7 @@ describe('SettingsPage model management view switch', () => {
         overwrite: false,
         parallelism: 3,
         recent_period_count: 10,
+        prompt_history_period_count: 50,
       }),
     )
   })
@@ -945,8 +947,7 @@ describe('SettingsPage model management view switch', () => {
         prediction_play_mode: 'direct',
         overwrite: false,
         parallelism: 3,
-        start_period: undefined,
-        end_period: undefined,
+        prompt_history_period_count: 50,
       }),
     )
   })
