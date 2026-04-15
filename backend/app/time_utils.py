@@ -33,11 +33,11 @@ def ensure_timestamp(value: Any, *, assume_beijing: bool = False) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool):
-        return int(value)
+        return None
     if isinstance(value, int):
-        return value
+        return _normalize_epoch_value(value)
     if isinstance(value, float):
-        return int(value)
+        return _normalize_epoch_value(int(value))
     if isinstance(value, datetime):
         active = value
         if active.tzinfo is None:
@@ -49,7 +49,7 @@ def ensure_timestamp(value: Any, *, assume_beijing: bool = False) -> int | None:
     if not text:
         return None
     if text.isdigit() or (text.startswith("-") and text[1:].isdigit()):
-        return int(text)
+        return _normalize_epoch_value(int(text))
     normalized = text.replace("Z", "+00:00") if text.endswith("Z") else text
     try:
         parsed = datetime.fromisoformat(normalized)
@@ -73,7 +73,10 @@ def as_beijing_datetime(value: Any) -> datetime | None:
     timestamp = ensure_timestamp(value, assume_beijing=True)
     if timestamp is None:
         return None
-    return datetime.fromtimestamp(timestamp, tz=UTC).astimezone(BEIJING_TIMEZONE)
+    try:
+        return datetime.fromtimestamp(timestamp, tz=UTC).astimezone(BEIJING_TIMEZONE)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def format_beijing_datetime(value: Any, *, with_seconds: bool = True) -> str | None:
@@ -114,3 +117,12 @@ def _parse_date_value(value: str | date | datetime | None) -> date | None:
         except ValueError:
             continue
     return None
+
+
+def _normalize_epoch_value(value: int) -> int:
+    absolute = abs(value)
+    if absolute >= 1_000_000_000_000_000:
+        return int(value / 1_000_000)
+    if absolute >= 1_000_000_000_000:
+        return int(value / 1_000)
+    return value
