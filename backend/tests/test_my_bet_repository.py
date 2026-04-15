@@ -63,6 +63,17 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertIsNone(MyBetRepository._normalize_datetime_value(True))
         self.assertIsNone(MyBetRepository._normalize_datetime_value(None))
 
+    def test_normalize_meta_time_value_supports_datetime_and_epoch_modes(self) -> None:
+        self.assertEqual(
+            MyBetRepository._normalize_meta_time_value(1776074095, storage_mode="datetime"),
+            "2026-04-13 17:54:55",
+        )
+        self.assertEqual(
+            MyBetRepository._normalize_meta_time_value(1776074095000, storage_mode="epoch"),
+            1776074095,
+        )
+        self.assertIsNone(MyBetRepository._normalize_meta_time_value("bad-time", storage_mode="datetime"))
+
     def test_update_record_does_not_treat_unchanged_row_as_missing(self) -> None:
         repository = MyBetRepository()
         cursor = _FakeCursor()

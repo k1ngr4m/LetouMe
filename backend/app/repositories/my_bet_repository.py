@@ -9,6 +9,8 @@ from backend.app.time_utils import ensure_timestamp, format_beijing_datetime
 
 
 class MyBetRepository:
+    _meta_time_storage_mode: str | None = None
+
     def list_records(self, user_id: int, lottery_code: str = "dlt") -> list[dict[str, Any]]:
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
@@ -250,6 +252,7 @@ class MyBetRepository:
         source_type = str(payload.get("source_type") or "manual").strip().lower() or "manual"
         if source_type not in {"manual", "ocr"}:
             source_type = "manual"
+        storage_mode = MyBetRepository._resolve_meta_time_storage_mode(cursor)
         cursor.execute(
             """
             INSERT INTO my_bet_record_meta (
@@ -276,8 +279,8 @@ class MyBetRepository:
                 str(payload.get("ticket_image_url") or "") or None,
                 str(payload.get("ocr_text") or "") or None,
                 str(payload.get("ocr_provider") or "") or None,
-                MyBetRepository._normalize_datetime_value(payload.get("ocr_recognized_at")),
-                MyBetRepository._normalize_datetime_value(payload.get("ticket_purchased_at")),
+                MyBetRepository._normalize_meta_time_value(payload.get("ocr_recognized_at"), storage_mode=storage_mode),
+                MyBetRepository._normalize_meta_time_value(payload.get("ticket_purchased_at"), storage_mode=storage_mode),
             ),
         )
 
@@ -363,3 +366,25 @@ class MyBetRepository:
         if timestamp is None:
             return None
         return format_beijing_datetime(timestamp, with_seconds=True)
+
+    @staticmethod
+    def _normalize_meta_time_value(value: Any, *, storage_mode: str) -> int | str | None:
+        timestamp = ensure_timestamp(value, assume_beijing=True)
+        if timestamp is None:
+            return None
+        if storage_mode == "epoch":
+            return int(timestamp)
+        return format_beijing_datetime(timestamp, with_seconds=True)
+
+    @classmethod
+    def _resolve_meta_time_storage_mode(cls, cursor: Any) -> str:
+        if cls._meta_time_storage_mode in {"datetime", "epoch"}:
+            return cls._meta_time_storage_mode
+        try:
+            cursor.execute("SHOW COLUMNS FROM my_bet_record_meta LIKE 'ticket_purchased_at'")
+            row = cursor.fetchone() or {}
+            column_type = str((row.get("Type") if isinstance(row, dict) else "") or "").strip().lower()
+            cls._meta_time_storage_mode = "epoch" if "int" in column_type else "datetime"
+        except Exception:
+            cls._meta_time_storage_mode = "datetime"
+        return cls._meta_time_storage_mode
