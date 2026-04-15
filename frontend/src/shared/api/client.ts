@@ -63,6 +63,7 @@ import type {
   LotteryCode,
 } from '../types/api'
 import { appLogger, sanitizeForLog } from '../lib/logger'
+import { optimizeTicketImageForUpload } from '../lib/ticketImageUpload'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -318,16 +319,34 @@ export const apiClient = {
     })
   },
   recognizeMyBetByImage(lotteryCode: LotteryCode, image: File) {
-    const formData = new FormData()
-    formData.set('lottery_code', lotteryCode)
-    formData.set('image', image)
-    return requestFormData<MyBetOCRDraftResponse>('/api/my-bets/ocr/recognize', formData)
+    return optimizeTicketImageForUpload(image).then((optimized) => {
+      if (optimized.compressed) {
+        appLogger.info('Ticket image optimized before OCR recognize upload', {
+          lottery_code: lotteryCode,
+          original_size_bytes: optimized.originalSize,
+          optimized_size_bytes: optimized.outputSize,
+        })
+      }
+      const formData = new FormData()
+      formData.set('lottery_code', lotteryCode)
+      formData.set('image', optimized.file)
+      return requestFormData<MyBetOCRDraftResponse>('/api/my-bets/ocr/recognize', formData)
+    })
   },
   uploadMyBetOCRImage(lotteryCode: LotteryCode, image: File) {
-    const formData = new FormData()
-    formData.set('lottery_code', lotteryCode)
-    formData.set('image', image)
-    return requestFormData<MyBetOCRImageUploadResponse>('/api/my-bets/ocr/upload-image', formData)
+    return optimizeTicketImageForUpload(image).then((optimized) => {
+      if (optimized.compressed) {
+        appLogger.info('Ticket image optimized before upload', {
+          lottery_code: lotteryCode,
+          original_size_bytes: optimized.originalSize,
+          optimized_size_bytes: optimized.outputSize,
+        })
+      }
+      const formData = new FormData()
+      formData.set('lottery_code', lotteryCode)
+      formData.set('image', optimized.file)
+      return requestFormData<MyBetOCRImageUploadResponse>('/api/my-bets/ocr/upload-image', formData)
+    })
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
     return requestJson<SimulationTicketCreateResponse>('/api/simulation/tickets/create', {
