@@ -23,6 +23,7 @@ const {
   simulateJackpotPoolData,
   updateMyBet,
   simulateHistoryFilterLoading,
+  homeDataArgsCapture,
   toPng,
   setMotionPreference,
 } = vi.hoisted(() => ({
@@ -42,6 +43,15 @@ const {
   simulateJackpotPoolData: { current: false },
   updateMyBet: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
+  homeDataArgsCapture: {
+    current: null as null | {
+      lotteryCode: string
+      historyPage: number
+      historyPageSize: number
+      lotteryPage: number
+      lotteryPageSize: number
+    },
+  },
   toPng: vi.fn(),
   setMotionPreference: vi.fn(),
 }))
@@ -146,6 +156,13 @@ vi.mock('./hooks/useHomeData', () => ({
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
+    homeDataArgsCapture.current = {
+      lotteryCode: _lotteryCode,
+      historyPage,
+      historyPageSize,
+      lotteryPage,
+      lotteryPageSize,
+    }
     const isPl3 = _lotteryCode === 'pl3'
     const isPl5 = _lotteryCode === 'pl5'
     const isQxc = _lotteryCode === 'qxc'
@@ -933,6 +950,7 @@ beforeEach(() => {
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
   simulateJackpotPoolData.current = false
+  homeDataArgsCapture.current = null
   toPng.mockReset()
   toPng.mockResolvedValue('data:image/png;base64,mock-image')
   setMotionPreference.mockReset()
@@ -1846,6 +1864,26 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('开始日期')).toBeInTheDocument()
     expect(screen.getByText('结束日期')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '近 120 期' })).toBeInTheDocument()
+  })
+
+  it('queries 120 history rows on chart center backtest views', async () => {
+    renderPage('/dashboard/charts#backtest-base')
+
+    await screen.findByRole('heading', { name: '命中趋势折线' })
+    expect(homeDataArgsCapture.current).toMatchObject({
+      historyPage: 1,
+      historyPageSize: 120,
+    })
+  })
+
+  it('keeps paged history query size on history tab', async () => {
+    renderPage('/dashboard/history')
+
+    await screen.findByRole('heading', { name: '命中回溯' })
+    expect(homeDataArgsCapture.current).toMatchObject({
+      historyPage: 1,
+      historyPageSize: 20,
+    })
   })
 
   it('shows all revenue analysis charts together', async () => {

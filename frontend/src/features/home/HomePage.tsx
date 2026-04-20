@@ -719,10 +719,14 @@ export function HomePage() {
   const canNavigateDashboardTab = () =>
     activeTab !== 'my-bets' || !myBetsFormDirty || window.confirm('有未保存内容，确定离开当前页面吗？')
 
+  const chartHistoryFetchPageSize = Math.max(...CHART_TIME_PRESET_OPTIONS)
+  const historyQueryPage = activeTab === 'charts' ? 1 : historyPage
+  const historyQueryPageSize = activeTab === 'charts' ? chartHistoryFetchPageSize : historyPageSize
+
   const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(
     selectedLottery,
-    historyPage,
-    historyPageSize,
+    historyQueryPage,
+    historyQueryPageSize,
     historyStrategyFilters,
     historyPlayTypeFilters,
     1,
