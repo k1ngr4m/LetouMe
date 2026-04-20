@@ -3346,6 +3346,62 @@ a {
   gap: 0.45rem;
 }
 
+.chart-card__actions {
+  margin-left: auto;
+  position: relative;
+}
+
+.chart-export-menu__trigger {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.78rem;
+}
+
+.chart-export-menu__trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.chart-export-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.42rem);
+  right: 0;
+  z-index: 42;
+  min-width: 8.2rem;
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.38rem;
+  border-radius: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
+  background: color-mix(in srgb, var(--action-menu-bg) 92%, transparent);
+  box-shadow: var(--action-menu-shadow);
+}
+
+.chart-export-menu__item {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 0.62rem;
+  padding: 0.45rem 0.56rem;
+  background: var(--action-menu-item-bg);
+  color: var(--text-1);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms var(--motion-ease-standard), border-color 160ms var(--motion-ease-standard), color 160ms var(--motion-ease-standard);
+}
+
+.chart-export-menu__item:hover,
+.chart-export-menu__item:focus-visible {
+  background: var(--action-menu-item-hover-bg);
+  border-color: color-mix(in srgb, var(--brand-400, #f2a54f) 48%, transparent);
+}
+
+.chart-export-menu__item:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
 .chart-info-tooltip {
   position: relative;
   display: inline-flex;

@@ -1879,6 +1879,48 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('展示前区号码和值随期数变化的趋势，用来判断和值是否处于高位、低位或中枢附近震荡。适合观察节奏变化，不适合单独做号码判断。')).toBeInTheDocument()
   })
 
+  it('supports exporting chart card as png and csv on desktop', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:chart-export')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    renderPage('/dashboard/charts#number-base')
+
+    const exportButton = await screen.findByRole('button', { name: '导出图表：前区热号 Top 12' })
+    await userEvent.click(exportButton)
+    await userEvent.click(screen.getByRole('menuitem', { name: '导出 PNG' }))
+    await waitFor(() => expect(toPng).toHaveBeenCalledTimes(1))
+
+    await userEvent.click(exportButton)
+    await userEvent.click(screen.getByRole('menuitem', { name: '导出 CSV' }))
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledTimes(1))
+
+    createObjectURL.mockRestore()
+    revokeObjectURL.mockRestore()
+  })
+
+  it('hides chart export action on mobile', async () => {
+    const matchMediaMock = vi.fn().mockImplementation(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }))
+    const originalMatchMedia = window.matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: matchMediaMock,
+    })
+
+    renderPage('/dashboard/charts#number-base')
+    await screen.findByRole('heading', { name: '前区热号 Top 12' })
+
+    expect(screen.queryAllByRole('button', { name: /导出图表：/ })).toHaveLength(0)
+
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: originalMatchMedia,
+    })
+  })
+
   it('shows number distribution dashboard charts together', async () => {
     renderPage('/dashboard/charts#number-distribution')
 
