@@ -609,76 +609,36 @@ class PredictionRepository:
                     """,
                     (target_issue_id,),
                 )
-                cursor.execute(
-                    """
-                    SELECT id
-                    FROM prediction_batch
-                    WHERE status = 'current' AND target_issue_id = ?
-                    LIMIT 1
-                    """,
-                    (target_issue_id,),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT id
-                    FROM prediction_batch
-                    WHERE status = 'archived' AND target_issue_id = ?
-                    LIMIT 1
-                    """,
-                    (target_issue_id,),
-                )
-            existing = cursor.fetchone()
-
-            if existing:
-                batch_id = int(existing["id"])
+            cursor.execute(
+                """
+                INSERT INTO prediction_batch (target_issue_id, prediction_date, source_type, status, archived_at)
+                VALUES (?, ?, 'script', ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    id = LAST_INSERT_ID(id),
+                    prediction_date = VALUES(prediction_date),
+                    source_type = VALUES(source_type),
+                    status = VALUES(status),
+                    archived_at = VALUES(archived_at),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    target_issue_id,
+                    payload["prediction_date"],
+                    status,
+                    None,
+                ),
+            )
+            batch_id = int(cursor.lastrowid)
+            if archive_metadata:
                 cursor.execute(
                     """
                     UPDATE prediction_batch
-                    SET prediction_date = ?, source_type = ?, status = ?, archived_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET archived_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
-                    (
-                        payload["prediction_date"],
-                        "script",
-                        status,
-                        None,
-                        batch_id,
-                    ),
+                    (batch_id,),
                 )
-                if archive_metadata:
-                    cursor.execute(
-                        """
-                        UPDATE prediction_batch
-                        SET archived_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                        """,
-                        (batch_id,),
-                    )
-                cursor.execute("DELETE FROM prediction_model_run WHERE prediction_batch_id = ?", (batch_id,))
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO prediction_batch (target_issue_id, prediction_date, source_type, status, archived_at)
-                    VALUES (?, ?, 'script', ?, ?)
-                    """,
-                    (
-                        target_issue_id,
-                        payload["prediction_date"],
-                        status,
-                        None,
-                    ),
-                )
-                batch_id = int(cursor.lastrowid)
-                if archive_metadata:
-                    cursor.execute(
-                        """
-                        UPDATE prediction_batch
-                        SET archived_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                        """,
-                        (batch_id,),
-                    )
+            cursor.execute("DELETE FROM prediction_model_run WHERE prediction_batch_id = ?", (batch_id,))
 
         self._save_model_runs(
             connection,

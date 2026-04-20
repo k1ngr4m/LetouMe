@@ -82,6 +82,58 @@ class PredictionRepositoryTests(unittest.TestCase):
 
         self.assertEqual(repository.log_repository.log_failure.call_count, 1)
 
+    def test_upsert_batch_uses_atomic_insert_on_duplicate_for_archived(self) -> None:
+        repository = PredictionRepository(log_repository=Mock())
+        payload = {
+            "lottery_code": "pl5",
+            "target_period": "26099",
+            "prediction_date": "2026-04-18",
+            "models": [],
+        }
+
+        class _FakeCursor:
+            def __init__(self) -> None:
+                self.executed: list[tuple[str, tuple | None]] = []
+                self.lastrowid = 1202
+
+            def execute(self, query: str, params: tuple | None = None) -> None:
+                self.executed.append((" ".join(query.split()), params))
+
+            def fetchone(self):
+                return None
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+        class _FakeConnection:
+            def __init__(self) -> None:
+                self.cursor_instance = _FakeCursor()
+
+            def cursor(self) -> _FakeCursor:
+                return self.cursor_instance
+
+        connection = _FakeConnection()
+        with (
+            patch("backend.app.repositories.prediction_repository._upsert_issue", return_value=1202),
+            patch.object(repository, "_save_model_runs"),
+        ):
+            batch_id = repository._upsert_batch(
+                connection,
+                payload=payload,
+                status="archived",
+                archive_metadata=True,
+            )
+
+        self.assertEqual(batch_id, 1202)
+        executed_sql = [query for query, _ in connection.cursor_instance.executed]
+        self.assertTrue(any("INSERT INTO prediction_batch" in query for query in executed_sql))
+        self.assertTrue(any("ON DUPLICATE KEY UPDATE" in query for query in executed_sql))
+        self.assertFalse(any("SELECT id FROM prediction_batch" in query for query in executed_sql))
+        self.assertTrue(any("DELETE FROM prediction_model_run" in query for query in executed_sql))
+
 
 if __name__ == "__main__":
     unittest.main()

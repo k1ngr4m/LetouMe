@@ -378,8 +378,6 @@ class MyBetRepository:
 
     @classmethod
     def _resolve_meta_time_storage_mode(cls, cursor: Any) -> str:
-        if cls._meta_time_storage_mode in {"datetime", "epoch"}:
-            return cls._meta_time_storage_mode
         try:
             cursor.execute("SHOW COLUMNS FROM my_bet_record_meta LIKE 'ticket_purchased_at'")
             row = cursor.fetchone() or {}

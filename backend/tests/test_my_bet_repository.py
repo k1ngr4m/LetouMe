@@ -30,6 +30,17 @@ class _FakeCursor:
         return []
 
 
+class _FakeSchemaCursor:
+    def __init__(self, column_type: str) -> None:
+        self._column_type = column_type
+
+    def execute(self, query: str, params=None):
+        return 1
+
+    def fetchone(self):
+        return {"Type": self._column_type}
+
+
 class _CursorContext:
     def __init__(self, cursor: _FakeCursor) -> None:
         self._cursor = cursor
@@ -73,6 +84,46 @@ class MyBetRepositoryTests(unittest.TestCase):
             1776074095,
         )
         self.assertIsNone(MyBetRepository._normalize_meta_time_value("bad-time", storage_mode="datetime"))
+
+    def test_resolve_meta_time_storage_mode_uses_current_schema(self) -> None:
+        MyBetRepository._meta_time_storage_mode = "epoch"
+
+        mode = MyBetRepository._resolve_meta_time_storage_mode(_FakeSchemaCursor("datetime"))
+
+        self.assertEqual(mode, "datetime")
+        self.assertEqual(MyBetRepository._meta_time_storage_mode, "datetime")
+
+    def test_upsert_meta_converts_epoch_to_datetime_when_column_is_datetime(self) -> None:
+        cursor = _FakeCursor()
+        payload = {
+            "source_type": "ocr",
+            "ticket_purchased_at": "1776592860",
+            "ocr_recognized_at": "1776592860",
+        }
+
+        original_execute = cursor.execute
+
+        def execute_with_schema(query: str, params=None):
+            cursor.executed.append((" ".join(query.split()), params))
+            if "SHOW COLUMNS FROM my_bet_record_meta LIKE 'ticket_purchased_at'" in query:
+                return 1
+            return original_execute(query, params)
+
+        def fetchone_with_schema():
+            if cursor.executed and "SHOW COLUMNS FROM my_bet_record_meta LIKE 'ticket_purchased_at'" in cursor.executed[-1][0]:
+                return {"Type": "datetime"}
+            return _FakeCursor.fetchone(cursor)
+
+        cursor.execute = execute_with_schema  # type: ignore[method-assign]
+        cursor.fetchone = fetchone_with_schema  # type: ignore[method-assign]
+        MyBetRepository._meta_time_storage_mode = "epoch"
+
+        MyBetRepository._upsert_meta(cursor, record_id=12, lottery_code="pl5", payload=payload)
+
+        insert_sql, insert_params = next((item for item in cursor.executed if "INSERT INTO my_bet_record_meta" in item[0]), ("", None))
+        self.assertIn("INSERT INTO my_bet_record_meta", insert_sql)
+        self.assertEqual(insert_params[5], "2026-04-19 18:01:00")
+        self.assertEqual(insert_params[6], "2026-04-19 18:01:00")
 
     def test_update_record_does_not_treat_unchanged_row_as_missing(self) -> None:
         repository = MyBetRepository()
