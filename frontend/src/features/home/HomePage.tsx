@@ -82,6 +82,7 @@ import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const HISTORY_ROLLING_WINDOW_OPTIONS = [10, 20, 30] as const
+const CHART_TIME_PRESET_OPTIONS = [20, 50, 120] as const
 const MOBILE_SUMMARY_MODEL_CHIP_LIMIT = 6
 const MOBILE_EXPORT_MAX_WIDTH = 760
 const MODEL_SCORE_FILTERS: Array<{ value: ModelListScoreRange; label: string }> = [
@@ -503,6 +504,38 @@ function isMobileExportDisabled() {
   return window.innerWidth <= MOBILE_EXPORT_MAX_WIDTH
 }
 
+function parseDateToDayValue(value: string | null | undefined) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  const matched = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!matched) return null
+  const year = Number(matched[1])
+  const month = Number(matched[2])
+  const day = Number(matched[3])
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return Date.UTC(year, month - 1, day)
+}
+
+function resolveOrderedDateRange(start: string, end: string) {
+  const startValue = parseDateToDayValue(start)
+  const endValue = parseDateToDayValue(end)
+  if (startValue === null && endValue === null) return { start: null, end: null }
+  if (startValue !== null && endValue !== null && startValue > endValue) {
+    return { start: endValue, end: startValue }
+  }
+  return { start: startValue, end: endValue }
+}
+
+function isDateWithinRange(dateText: string | null | undefined, range: { start: number | null; end: number | null }) {
+  if (range.start === null && range.end === null) return true
+  const dateValue = parseDateToDayValue(dateText)
+  if (dateValue === null) return false
+  if (range.start !== null && dateValue < range.start) return false
+  if (range.end !== null && dateValue > range.end) return false
+  return true
+}
+
 const PL3_DIRECT_SUM_COST_RULES: Record<number, number> = {
   0: 2,
   1: 6,
@@ -638,6 +671,9 @@ export function HomePage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
   const [rollingHitWindow, setRollingHitWindow] = useState<(typeof HISTORY_ROLLING_WINDOW_OPTIONS)[number]>(10)
+  const [chartTimePreset, setChartTimePreset] = useState<(typeof CHART_TIME_PRESET_OPTIONS)[number]>(120)
+  const [chartDateStart, setChartDateStart] = useState('')
+  const [chartDateEnd, setChartDateEnd] = useState('')
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null)
   const [activeHistoryStatMenuId, setActiveHistoryStatMenuId] = useState<string | null>(null)
@@ -1119,6 +1155,18 @@ export function HomePage() {
   const summaryVisibleStrategyOptions = summaryStrategyOptions
   const summaryHiddenModelChipCount = Math.max(0, summarySelectableModels.length - summaryVisibleModelChips.length)
   const mobileExportDisabled = isMobileExportDisabled()
+  const chartTimeDateRange = useMemo(
+    () => resolveOrderedDateRange(chartDateStart, chartDateEnd),
+    [chartDateEnd, chartDateStart],
+  )
+  const chartCenterTimeFilteredDraws = useMemo(() => {
+    const drawsInDateRange = chartDraws.filter((draw) => isDateWithinRange(draw.date, chartTimeDateRange))
+    return drawsInDateRange.slice(0, chartTimePreset)
+  }, [chartDraws, chartTimeDateRange, chartTimePreset])
+  const chartCenterTimeFilteredHistory = useMemo(() => {
+    const historyInDateRange = filteredHistory.filter((record) => isDateWithinRange(record.actual_result?.date, chartTimeDateRange))
+    return historyInDateRange.slice(0, chartTimePreset)
+  }, [chartTimeDateRange, chartTimePreset, filteredHistory])
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
   const topHistoryModel = historyModelStats[0] || null
   const historyHitTrend = useMemo(
@@ -1130,32 +1178,32 @@ export function HomePage() {
     ? historyVisibleModels.filter((model) => chartHistoryModelIds.includes(model.model_id))
     : historyVisibleModels
   const chartCenterHistoryHitTrend = useMemo(
-    () => buildHistoryHitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryHitTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryProfitTrend = useMemo(
-    () => buildHistoryProfitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryProfitTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryCumulativeProfitTrend = useMemo(
-    () => buildHistoryCumulativeProfitTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryCumulativeProfitTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryCumulativeRoiTrend = useMemo(
-    () => buildHistoryCumulativeRoiTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryCumulativeRoiTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryRollingHitRateTrend = useMemo(
-    () => buildHistoryRollingHitRateTrend(filteredHistory, chartCenterHistoryVisibleModelIds, rollingHitWindow),
-    [chartCenterHistoryVisibleModelIds, filteredHistory, rollingHitWindow],
+    () => buildHistoryRollingHitRateTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds, rollingHitWindow),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory, rollingHitWindow],
   )
   const chartCenterHistoryDrawdownTrend = useMemo(
-    () => buildHistoryDrawdownTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryDrawdownTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryRankTrend = useMemo(
-    () => buildHistoryRankTrend(filteredHistory, chartCenterHistoryVisibleModelIds),
-    [chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryRankTrend(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds),
+    [chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryModelNameMap = useMemo(
     () =>
@@ -1166,12 +1214,12 @@ export function HomePage() {
     [chartCenterHistoryVisibleModels],
   )
   const chartCenterHistoryHeatmap = useMemo(
-    () => buildHistoryHitHeatmap(filteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
-    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryHitHeatmap(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
+    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const chartCenterHistoryProfitDistribution = useMemo(
-    () => buildHistoryProfitDistribution(filteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
-    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, filteredHistory],
+    () => buildHistoryProfitDistribution(chartCenterTimeFilteredHistory, chartCenterHistoryVisibleModelIds, chartCenterHistoryModelNameMap),
+    [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
   const chartCenterSummary = useMemo(() => {
@@ -1192,52 +1240,52 @@ export function HomePage() {
   const isPl3Lottery = selectedLottery === 'pl3'
   const isPl5Lottery = selectedLottery === 'pl5'
   const isQxcLottery = selectedLottery === 'qxc'
-  const redChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 0) : buildRedFrequencyChart(chartDraws)
-  const blueChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 1) : buildBlueFrequencyChart(chartDraws)
-  const pl3UnitChart = isPl3Lottery ? buildPl3PositionHotChart(chartDraws, 2) : []
+  const redChart = isPl3Lottery ? buildPl3PositionHotChart(chartCenterTimeFilteredDraws, 0) : buildRedFrequencyChart(chartCenterTimeFilteredDraws)
+  const blueChart = isPl3Lottery ? buildPl3PositionHotChart(chartCenterTimeFilteredDraws, 1) : buildBlueFrequencyChart(chartCenterTimeFilteredDraws)
+  const pl3UnitChart = isPl3Lottery ? buildPl3PositionHotChart(chartCenterTimeFilteredDraws, 2) : []
   const pl5PositionCharts = isPl5Lottery
-    ? ([0, 1, 2, 3, 4] as const).map((index) => buildPl5PositionHotChart(chartDraws, index))
+    ? ([0, 1, 2, 3, 4] as const).map((index) => buildPl5PositionHotChart(chartCenterTimeFilteredDraws, index))
     : []
   const qxcPositionCharts = isQxcLottery
-    ? ([0, 1, 2, 3, 4, 5, 6] as const).map((index) => buildQxcPositionHotChart(chartDraws, index))
+    ? ([0, 1, 2, 3, 4, 5, 6] as const).map((index) => buildQxcPositionHotChart(chartCenterTimeFilteredDraws, index))
     : []
   const oddEvenChart = isPl3Lottery
-    ? buildPl3OddEvenStructureChart(chartDraws)
+    ? buildPl3OddEvenStructureChart(chartCenterTimeFilteredDraws)
     : isPl5Lottery
-      ? buildPl5OddEvenStructureChart(chartDraws)
+      ? buildPl5OddEvenStructureChart(chartCenterTimeFilteredDraws)
       : isQxcLottery
-        ? buildQxcOddEvenStructureChart(chartDraws)
-      : buildOddEvenChart(chartDraws)
+        ? buildQxcOddEvenStructureChart(chartCenterTimeFilteredDraws)
+      : buildOddEvenChart(chartCenterTimeFilteredDraws)
   const sumTrendChart = isPl3Lottery
-    ? buildPl3SumTrendChart(chartDraws)
+    ? buildPl3SumTrendChart(chartCenterTimeFilteredDraws)
     : isPl5Lottery
-      ? buildPl5SumTrendChart(chartDraws)
+      ? buildPl5SumTrendChart(chartCenterTimeFilteredDraws)
       : isQxcLottery
-        ? buildQxcSumTrendChart(chartDraws)
-      : buildSumTrendChart(chartDraws)
+        ? buildQxcSumTrendChart(chartCenterTimeFilteredDraws)
+      : buildSumTrendChart(chartCenterTimeFilteredDraws)
   const sumDistributionChart = useMemo(
-    () => buildSumDistributionChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildSumDistributionChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const oddEvenDistributionChart = useMemo(
-    () => buildOddEvenDistributionChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildOddEvenDistributionChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const zoneShareDistributionChart = useMemo(
-    () => buildZoneShareDistributionChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildZoneShareDistributionChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const spanTrendChart = useMemo(
-    () => buildSpanTrendChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildSpanTrendChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const zoneDistributionChart = useMemo(
-    () => buildZoneDistributionChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildZoneDistributionChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const moduloTrendChart = useMemo(
-    () => buildModuloTrendChart(chartDraws, selectedLottery),
-    [chartDraws, selectedLottery],
+    () => buildModuloTrendChart(chartCenterTimeFilteredDraws, selectedLottery),
+    [chartCenterTimeFilteredDraws, selectedLottery],
   )
   const scoreViewModels = useMemo(
     () => sortModelsForScoreView(effectiveSelectedModels, modelScores, validPinnedModelIds, scoreViewSortKey, scoreViewSortDirection),
@@ -1415,6 +1463,11 @@ export function HomePage() {
     setChartHistoryModelIds((previous) =>
       previous.includes(modelId) ? previous.filter((item) => item !== modelId) : [...previous, modelId],
     )
+  }
+
+  function clearChartDateRange() {
+    setChartDateStart('')
+    setChartDateEnd('')
   }
 
   const hashTarget = location.hash.replace('#', '').trim() as ChartCenterItemKey
@@ -1841,89 +1894,139 @@ export function HomePage() {
         <Suspense fallback={<div className="state-shell">正在加载分析图表...</div>}>
           <div className="page-stack chart-center-page">
             <StatusCard title={activeChartMeta.title} subtitle={activeChartMeta.subtitle}>
-              {isChartBacktestView ? (
-                <div className="chart-center-toolbar" aria-label="回溯分析筛选">
-                  <div className="chart-center-toolbar__section">
-                    <span className="chart-center-toolbar__label">模型</span>
-                    <div className="filter-chip-group chart-center-toolbar__chips">
-                      {historyVisibleModels.map((model) => {
-                        const isActive = chartCenterHistoryVisibleModelIds.includes(model.model_id)
-                        return (
-                          <button
-                            key={`chart-history-model-${model.model_id}`}
-                            className={clsx('filter-chip', isActive ? 'is-active' : 'is-inactive')}
-                            type="button"
-                            onClick={() => toggleChartHistoryModel(model.model_id)}
-                          >
-                            {model.model_name}
-                          </button>
-                        )
-                      })}
-                      {chartHistoryModelIds.length ? (
-                        <button className="ghost-button ghost-button--compact" type="button" onClick={() => setChartHistoryModelIds([])}>
-                          全部模型
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="chart-center-toolbar__row">
-                    <label className="chart-center-toolbar__field">
-                      <span className="chart-center-toolbar__label">期号</span>
-                      <input
-                        className="input chart-center-toolbar__input"
-                        type="search"
-                        value={historyPeriodQuery}
-                        onChange={(event) => {
-                          setHistoryPage(1)
-                          setHistoryPeriodQuery(event.target.value)
-                        }}
-                        placeholder="输入期号筛选"
-                      />
-                    </label>
-
-                    <div className="chart-center-toolbar__field">
-                      <span className="chart-center-toolbar__label">玩法模式</span>
-                      {selectedLottery === 'pl3' ? (
-                        <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} />
-                      ) : selectedLottery === 'dlt' ? (
-                        <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} />
-                      ) : (
-                        <span className="chart-center-toolbar__badge">直选</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="chart-center-toolbar__section">
-                    <span className="chart-center-toolbar__label">方案</span>
-                    {showHistoryStrategyFilters ? (
-                      historyStrategyOptions.length ? (
-                        <div className="filter-chip-group chart-center-toolbar__chips">
-                          {historyStrategyOptions.map((strategy) => (
-                            <button
-                              key={`chart-history-strategy-${strategy}`}
-                              className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
-                              type="button"
-                              onClick={() => toggleHistoryStrategyFilter(strategy)}
-                            >
-                              {strategy}
-                            </button>
-                          ))}
-                          {historyStrategyFilters.length ? (
-                            <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
-                              清空方案
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <span className="model-filter-panel__empty">当前暂无可选方案</span>
-                      )
-                    ) : (
-                      <span className="chart-center-toolbar__badge">当前彩种暂无额外方案筛选</span>
-                    )}
+              <div className="chart-center-toolbar" aria-label="图表分析筛选">
+                <div className="chart-center-toolbar__section">
+                  <span className="chart-center-toolbar__label">时间维度</span>
+                  <div className="filter-chip-group chart-center-toolbar__chips">
+                    {CHART_TIME_PRESET_OPTIONS.map((periodCount) => (
+                      <button
+                        key={`chart-time-preset-${periodCount}`}
+                        type="button"
+                        className={clsx('filter-chip', chartTimePreset === periodCount ? 'is-active' : 'is-inactive')}
+                        onClick={() => setChartTimePreset(periodCount)}
+                      >
+                        近 {periodCount} 期
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ) : null}
+
+                <div className="chart-center-toolbar__row chart-center-toolbar__row--time">
+                  <label className="chart-center-toolbar__field">
+                    <span className="chart-center-toolbar__label">开始日期</span>
+                    <input
+                      className="input chart-center-toolbar__input"
+                      type="date"
+                      value={chartDateStart}
+                      onChange={(event) => setChartDateStart(event.target.value)}
+                    />
+                  </label>
+                  <label className="chart-center-toolbar__field">
+                    <span className="chart-center-toolbar__label">结束日期</span>
+                    <input
+                      className="input chart-center-toolbar__input"
+                      type="date"
+                      value={chartDateEnd}
+                      onChange={(event) => setChartDateEnd(event.target.value)}
+                    />
+                  </label>
+                  <div className="chart-center-toolbar__field chart-center-toolbar__field--action">
+                    <span className="chart-center-toolbar__label">快捷操作</span>
+                    <button
+                      className="ghost-button ghost-button--compact"
+                      type="button"
+                      onClick={clearChartDateRange}
+                      disabled={!chartDateStart && !chartDateEnd}
+                    >
+                      清空日期
+                    </button>
+                  </div>
+                </div>
+
+                {isChartBacktestView ? (
+                  <>
+                    <div className="chart-center-toolbar__section">
+                      <span className="chart-center-toolbar__label">模型</span>
+                      <div className="filter-chip-group chart-center-toolbar__chips">
+                        {historyVisibleModels.map((model) => {
+                          const isActive = chartCenterHistoryVisibleModelIds.includes(model.model_id)
+                          return (
+                            <button
+                              key={`chart-history-model-${model.model_id}`}
+                              className={clsx('filter-chip', isActive ? 'is-active' : 'is-inactive')}
+                              type="button"
+                              onClick={() => toggleChartHistoryModel(model.model_id)}
+                            >
+                              {model.model_name}
+                            </button>
+                          )
+                        })}
+                        {chartHistoryModelIds.length ? (
+                          <button className="ghost-button ghost-button--compact" type="button" onClick={() => setChartHistoryModelIds([])}>
+                            全部模型
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="chart-center-toolbar__row">
+                      <label className="chart-center-toolbar__field">
+                        <span className="chart-center-toolbar__label">期号</span>
+                        <input
+                          className="input chart-center-toolbar__input"
+                          type="search"
+                          value={historyPeriodQuery}
+                          onChange={(event) => {
+                            setHistoryPage(1)
+                            setHistoryPeriodQuery(event.target.value)
+                          }}
+                          placeholder="输入期号筛选"
+                        />
+                      </label>
+
+                      <div className="chart-center-toolbar__field">
+                        <span className="chart-center-toolbar__label">玩法模式</span>
+                        {selectedLottery === 'pl3' ? (
+                          <Pl3PredictionModeSwitch value={pl3PredictionMode} onChange={setPl3PredictionMode} />
+                        ) : selectedLottery === 'dlt' ? (
+                          <DltPredictionModeSwitch value={dltPredictionMode} onChange={setDltPredictionMode} />
+                        ) : (
+                          <span className="chart-center-toolbar__badge">直选</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="chart-center-toolbar__section">
+                      <span className="chart-center-toolbar__label">方案</span>
+                      {showHistoryStrategyFilters ? (
+                        historyStrategyOptions.length ? (
+                          <div className="filter-chip-group chart-center-toolbar__chips">
+                            {historyStrategyOptions.map((strategy) => (
+                              <button
+                                key={`chart-history-strategy-${strategy}`}
+                                className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
+                                type="button"
+                                onClick={() => toggleHistoryStrategyFilter(strategy)}
+                              >
+                                {strategy}
+                              </button>
+                            ))}
+                            {historyStrategyFilters.length ? (
+                              <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
+                                清空方案
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="model-filter-panel__empty">当前暂无可选方案</span>
+                        )
+                      ) : (
+                        <span className="chart-center-toolbar__badge">当前彩种暂无额外方案筛选</span>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </div>
 
               <div className="chart-center-content" data-chart-center-item={activeChartCenterItem}>
                 {activeChartCenterItem === CHART_CENTER_ITEMS.numberBase ? (

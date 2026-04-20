@@ -1842,6 +1842,10 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('期号')).toBeInTheDocument()
     expect(screen.getByText('方案')).toBeInTheDocument()
     expect(screen.getByText('玩法模式')).toBeInTheDocument()
+    expect(screen.getByText('时间维度')).toBeInTheDocument()
+    expect(screen.getByText('开始日期')).toBeInTheDocument()
+    expect(screen.getByText('结束日期')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '近 120 期' })).toBeInTheDocument()
   })
 
   it('shows all revenue analysis charts together', async () => {
@@ -1865,6 +1869,9 @@ describe('HomePage dashboard sidebar', () => {
     renderPage('/dashboard/charts#number-base')
 
     expect(await screen.findByRole('heading', { name: '前区和值趋势' })).toBeInTheDocument()
+    expect(screen.getByText('时间维度')).toBeInTheDocument()
+    expect(screen.getByText('开始日期')).toBeInTheDocument()
+    expect(screen.getByText('结束日期')).toBeInTheDocument()
     expect(screen.queryByText('模型')).not.toBeInTheDocument()
     expect(screen.queryByText('方案')).not.toBeInTheDocument()
   })
@@ -1919,6 +1926,30 @@ describe('HomePage dashboard sidebar', () => {
       writable: true,
       value: originalMatchMedia,
     })
+  })
+
+  it('disables chart csv export when date range has no chart draws', async () => {
+    renderPage('/dashboard/charts#number-base')
+    await screen.findByRole('heading', { name: '前区热号 Top 12' })
+
+    await userEvent.type(screen.getByLabelText('开始日期'), '2026-03-11')
+    await userEvent.type(screen.getByLabelText('结束日期'), '2026-03-12')
+
+    const exportButton = screen.getByRole('button', { name: '导出图表：前区热号 Top 12' })
+    await userEvent.click(exportButton)
+    expect(screen.getByRole('menuitem', { name: '导出 CSV' })).toBeDisabled()
+  })
+
+  it('applies time filter to backtest charts', async () => {
+    renderPage('/dashboard/charts#backtest-base')
+    await screen.findByRole('heading', { name: '命中趋势折线' })
+
+    await userEvent.type(screen.getByLabelText('开始日期'), '2026-03-11')
+    await userEvent.type(screen.getByLabelText('结束日期'), '2026-03-12')
+
+    const exportButton = screen.getByRole('button', { name: '导出图表：命中趋势折线' })
+    await userEvent.click(exportButton)
+    expect(screen.getByRole('menuitem', { name: '导出 CSV' })).toBeDisabled()
   })
 
   it('shows number distribution dashboard charts together', async () => {

@@ -3530,9 +3530,21 @@ a {
   align-items: end;
 }
 
+.chart-center-toolbar__row--time {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .chart-center-toolbar__field {
   display: grid;
   gap: 0.45rem;
+}
+
+.chart-center-toolbar__field--action {
+  align-content: end;
+}
+
+.chart-center-toolbar__field--action .ghost-button {
+  min-height: 2.5rem;
 }
 
 .chart-center-toolbar__label {
