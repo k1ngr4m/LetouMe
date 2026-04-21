@@ -364,11 +364,19 @@ class SmartPredictionService:
                 progress_callback({"stage": "stage1", "message": f"阶段1推理中（第 {attempt}/{max_attempts} 次）", "percent": 45})
             try:
                 raw_result = model.predict(prompt)
+                raw_meta = raw_result.get("_meta") if isinstance(raw_result, dict) else None
+                json_repaired = bool(isinstance(raw_meta, dict) and raw_meta.get("json_repaired"))
+                if json_repaired:
+                    warnings_list = raw_result.get("warnings")
+                    if not isinstance(warnings_list, list):
+                        warnings_list = []
+                        raw_result["warnings"] = warnings_list
+                    warnings_list.append("阶段1模型输出存在截断或格式瑕疵，系统已自动修复并降级校验。")
                 result = self._merge_stage1_rows(
                     source_rows=source_rows,
                     source_warnings=source_warnings,
                     raw_result=raw_result,
-                    strict_validation=strict_validation,
+                    strict_validation=(strict_validation and not json_repaired),
                 )
                 if progress_callback:
                     progress_callback({"stage": "stage1", "message": "阶段1结果校验完成", "percent": 100})
@@ -430,7 +438,6 @@ class SmartPredictionService:
                     raw_result,
                     strict_validation=strict_validation,
                     stage1_rows=stage1_rows,
-                    stage1_existing_signatures=stage1_existing_signatures,
                 )
                 if progress_callback:
                     progress_callback({"stage": "stage2", "message": "阶段2结果校验完成", "percent": 100})
@@ -727,7 +734,6 @@ class SmartPredictionService:
         *,
         strict_validation: bool,
         stage1_rows: list[dict[str, Any]],
-        stage1_existing_signatures: set[str],
     ) -> dict[str, Any]:
         if not isinstance(raw_result, dict):
             raise ValueError("阶段2模型输出格式无效")
@@ -739,7 +745,6 @@ class SmartPredictionService:
 
         tickets: list[dict[str, list[str]]] = []
         ticket_signatures: set[str] = set()
-        reused_stage1_ticket_count = 0
         for ticket in raw_tickets:
             if not isinstance(ticket, dict):
                 raise ValueError("阶段2 ticket 项格式无效")
@@ -749,13 +754,9 @@ class SmartPredictionService:
             if strict_validation and signature in ticket_signatures:
                 raise ValueError("阶段2 5注单式号码必须互不重复")
             ticket_signatures.add(signature)
-            if signature in stage1_existing_signatures:
-                reused_stage1_ticket_count += 1
             tickets.append({"red_balls": red_balls, "blue_balls": blue_balls})
         if strict_validation and len(tickets) != 5:
             raise ValueError("阶段2 tickets 必须输出 5 注号码")
-        if strict_validation and reused_stage1_ticket_count > 1:
-            raise ValueError("阶段2最多允许1注与阶段1已有组合完全重复")
 
         raw_dantuo = raw_result.get("dantuo")
         if not isinstance(raw_dantuo, dict):
