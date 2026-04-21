@@ -102,7 +102,10 @@ class SmartPredictionRepository:
                     tuple(params + [run_id]),
                 )
                 if cursor.rowcount == 0:
-                    raise KeyError(run_id)
+                    existing = self.get_run(run_id)
+                    if not existing:
+                        raise KeyError(run_id)
+                    return existing
         return self.get_run(run_id) or {}
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
