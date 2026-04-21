@@ -4,7 +4,6 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { useLotterySelection } from '../../shared/lottery/LotterySelectionProvider'
 import { HOME_TAB_PATHS, type HomeRulesRouteState } from './navigation'
 import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
-import { SmartPredictionPanel } from './SmartPredictionPanel'
 
 const QXC_PRIZE_TABLE_IMAGE_PATH = '/rules/qxc-prize-table.png'
 const DLT_PRIZE_TABLE_IMAGE_PATH = '/rules/dlt-prize-table.png'
@@ -254,7 +253,6 @@ export function HomeRulesPage() {
   const isPl3 = selectedLottery === 'pl3'
   const isPl5 = selectedLottery === 'pl5'
   const isQxc = selectedLottery === 'qxc'
-  const activeTab = location.hash === '#smart-prediction' ? 'smart-prediction' : 'rules'
 
   return (
     <div className="page-stack rules-page">
@@ -270,7 +268,7 @@ export function HomeRulesPage() {
         </div>
         <div className="rules-page__lottery-note">当前查看彩种：{isPl3 ? '排列3' : isPl5 ? '排列5' : isQxc ? '七星彩' : '大乐透'}</div>
       </section>
-      <HomeDashboardTabStrip activeTab={activeTab} />
+      <HomeDashboardTabStrip activeTab="rules" />
 
       {!isPl3 && !isPl5 && !isQxc ? (
         <>
@@ -380,10 +378,6 @@ export function HomeRulesPage() {
           </div>
         </StatusCard>
       )}
-
-      <section id="smart-prediction">
-        <SmartPredictionPanel lotteryCode={selectedLottery} />
-      </section>
     </div>
   )
 }

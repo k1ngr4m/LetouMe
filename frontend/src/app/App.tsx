@@ -7,7 +7,7 @@ import { MotionProvider } from '../shared/theme/MotionProvider'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { LotterySelectionProvider } from '../shared/lottery/LotterySelectionProvider'
 import { ToastProvider } from '../shared/feedback/ToastProvider'
-import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
+import { HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
@@ -25,6 +25,9 @@ const HomeModelDetailPage = lazy(() =>
   import('../features/home/HomeModelDetailPage').then((module) => ({ default: module.HomeModelDetailPage })),
 )
 const HomeRulesPage = lazy(() => import('../features/home/HomeRulesPage').then((module) => ({ default: module.HomeRulesPage })))
+const HomeSmartPredictionPage = lazy(() =>
+  import('../features/home/HomeSmartPredictionPage').then((module) => ({ default: module.HomeSmartPredictionPage })),
+)
 const MessageCenterPage = lazy(() => import('../features/messages/MessageCenterPage').then((module) => ({ default: module.MessageCenterPage })))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 
@@ -114,6 +117,16 @@ export function App() {
                 <ProtectedRoute>
                   <AppShell>
                     <HomeRulesPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={HOME_SMART_PREDICTION_PATH}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <HomeSmartPredictionPage />
                   </AppShell>
                 </ProtectedRoute>
               }

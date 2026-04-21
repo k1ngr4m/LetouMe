@@ -25,7 +25,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 import { UserAvatar } from './UserAvatar'
-import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
+import { HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import { apiClient } from '../api/client'
@@ -130,6 +130,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const isChartCenterRoute = location.pathname === HOME_TAB_PATHS.charts
   const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
+  const isSmartPredictionRoute = location.pathname === HOME_SMART_PREDICTION_PATH
+  const canUseSmartPrediction = user?.role === 'super_admin'
   const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
     canOpenSettings && isSettingsRoute ? 'settings' : 'workspace',
@@ -169,6 +171,7 @@ export function AppShell({ children }: PropsWithChildren) {
     if (location.pathname === HOME_TAB_PATHS.simulation) return '模拟试玩'
     if (location.pathname === HOME_TAB_PATHS['my-bets']) return '我的投注'
     if (location.pathname === HOME_RULES_PATH) return '规则说明'
+    if (location.pathname === HOME_SMART_PREDICTION_PATH) return '智能预测'
     if (location.pathname === MESSAGE_CENTER_PATH) return '消息中心'
     return '预测总览'
   }, [location.pathname])
@@ -589,6 +592,17 @@ export function AppShell({ children }: PropsWithChildren) {
                 <WalletCards size={16} aria-hidden="true" />
                 <span>我的投注</span>
               </NavLink>
+              {canUseSmartPrediction ? (
+                <NavLink
+                  className={({ isActive }) => `crm-nav-item${isActive || isSmartPredictionRoute ? ' is-active' : ''}`}
+                  to={HOME_SMART_PREDICTION_PATH}
+                  onClick={onWorkspaceNavigate}
+                  title="智能预测"
+                >
+                  <Sparkles size={16} aria-hidden="true" />
+                  <span>智能预测</span>
+                </NavLink>
+              ) : null}
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_RULES_PATH} onClick={onWorkspaceNavigate} title="规则说明">
                 <BookOpen size={16} aria-hidden="true" />
                 <span>规则说明</span>
