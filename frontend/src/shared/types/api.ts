@@ -828,6 +828,13 @@ export type SmartPredictionStage2Ticket = {
   blue_balls: string[]
 }
 
+export type SmartPredictionTop15Number = {
+  zone: 'front' | 'back'
+  number: string
+  probability: number
+  source: 'stat' | 'hybrid'
+}
+
 export type SmartPredictionStage2Result = {
   target_period: string
   generated_at: string
@@ -838,6 +845,7 @@ export type SmartPredictionStage2Result = {
     back_dan: string[]
     back_tuo: string[]
   }
+  top15_numbers?: SmartPredictionTop15Number[]
 }
 
 export type SmartPredictionRun = {

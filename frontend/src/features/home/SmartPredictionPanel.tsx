@@ -363,6 +363,19 @@ function SmartPredictionDltPanel() {
               ))}
             </div>
           ) : null}
+          {activeRun?.stage2_result?.top15_numbers?.length ? (
+            <div className="smart-prediction-top15">
+              <h4>概率最高15个号码</h4>
+              <div className="smart-prediction-top15__grid">
+                {activeRun.stage2_result.top15_numbers.map((item, index) => (
+                  <article key={`${item.zone}-${item.number}-${index}`}>
+                    <strong>{item.zone === 'front' ? '前区' : '后区'}-{item.number}</strong>
+                    <span>{(item.probability * 100).toFixed(2)}%</span>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {activeRun?.stage2_result?.dantuo ? (
             <div className="smart-prediction-dantuo">
               <h4>胆拖</h4>

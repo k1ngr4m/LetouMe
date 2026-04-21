@@ -11264,6 +11264,43 @@ a {
   margin-top: 0.6rem;
 }
 
+.smart-prediction-top15 {
+  margin-top: 0.6rem;
+  border: 1px solid var(--line-color);
+  border-radius: 0.78rem;
+  padding: 0.72rem;
+  background: var(--surface-color);
+}
+
+.smart-prediction-top15 h4 {
+  margin: 0 0 0.52rem;
+  font-size: 0.88rem;
+}
+
+.smart-prediction-top15__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.4rem;
+}
+
+.smart-prediction-top15__grid article {
+  border: 1px solid var(--line-color);
+  border-radius: 0.62rem;
+  padding: 0.45rem 0.52rem;
+  display: grid;
+  gap: 0.2rem;
+  background: color-mix(in srgb, var(--surface-color) 92%, #ffffff 8%);
+}
+
+.smart-prediction-top15__grid strong {
+  font-size: 0.82rem;
+}
+
+.smart-prediction-top15__grid span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
 .smart-prediction-history-list {
   display: grid;
   gap: 0.55rem;

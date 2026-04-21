@@ -83,6 +83,21 @@ class SmartPredictionService:
             raise ValueError("当前目标期号不存在，无法发起智能预测")
 
         run_id = uuid4().hex
+        self.logger.info(
+            "Creating smart prediction run",
+            extra={
+                "context": {
+                    "run_id": run_id,
+                    "user_id": int(user_id),
+                    "lottery_code": "dlt",
+                    "stage1_model_code": stage1_model_code,
+                    "stage2_model_code": stage2_model_code,
+                    "data_model_codes": data_model_codes,
+                    "strategy_codes": strategy_codes,
+                    "target_period": target_period,
+                }
+            },
+        )
         self.repository.create_run(
             {
                 "run_id": run_id,
@@ -388,9 +403,12 @@ class SmartPredictionService:
         strict_validation = bool(options.get("strict_validation", True))
         retry_once = bool(options.get("retry_once", True))
         prompt_template = STAGE2_PROMPT_PATH.read_text(encoding="utf-8")
+        stage1_rows = stage1_result.get("rows") if isinstance(stage1_result.get("rows"), list) else []
+        stage1_existing_signatures = self._collect_stage1_signatures(stage1_rows)
         stage2_context_payload = {
             "target_period": str(run.get("target_period") or ""),
-            "stage1_rows": stage1_result.get("rows") or [],
+            "stage1_rows": stage1_rows,
+            "stage1_existing_tickets": sorted(stage1_existing_signatures),
             "warnings": stage1_result.get("warnings") or [],
         }
         prompt = (
@@ -408,7 +426,12 @@ class SmartPredictionService:
                 progress_callback({"stage": "stage2", "message": f"阶段2推理中（第 {attempt}/{max_attempts} 次）", "percent": 55})
             try:
                 raw_result = model.predict(prompt)
-                normalized = self._normalize_stage2_result(raw_result, strict_validation=strict_validation)
+                normalized = self._normalize_stage2_result(
+                    raw_result,
+                    strict_validation=strict_validation,
+                    stage1_rows=stage1_rows,
+                    stage1_existing_signatures=stage1_existing_signatures,
+                )
                 if progress_callback:
                     progress_callback({"stage": "stage2", "message": "阶段2结果校验完成", "percent": 100})
                 return {
@@ -504,25 +527,67 @@ class SmartPredictionService:
         data_model_codes = self._normalize_string_list(run.get("data_model_codes"))
         strategy_codes = self._normalize_strategy_codes(run.get("strategy_codes"))
         target_period = str(run.get("target_period") or "").strip()
+        run_id = str(run.get("run_id") or "").strip()
         current_payload = self.prediction_service.get_current_payload_by_period(
             target_period,
             lottery_code="dlt",
             include_inactive_models=False,
         )
         models = current_payload.get("models") if isinstance(current_payload, dict) else []
-        model_by_id = {str(model.get("model_id") or "").strip(): model for model in (models if isinstance(models, list) else [])}
+        model_candidates_by_id: dict[str, list[dict[str, Any]]] = {}
+        for model in (models if isinstance(models, list) else []):
+            model_id = str(model.get("model_id") or "").strip()
+            if not model_id:
+                continue
+            model_candidates_by_id.setdefault(model_id, []).append(model)
+        self.logger.info(
+            "Building stage1 source rows",
+            extra={
+                "context": {
+                    "run_id": run_id,
+                    "target_period": target_period,
+                    "requested_model_count": len(data_model_codes),
+                    "requested_strategy_count": len(strategy_codes),
+                    "available_model_record_count": len(models if isinstance(models, list) else []),
+                    "distinct_available_model_count": len(model_candidates_by_id),
+                }
+            },
+        )
         rows: list[dict[str, Any]] = []
         warnings: list[str] = []
         for model_id in data_model_codes:
-            model = model_by_id.get(model_id)
-            if not model:
+            model_candidates = model_candidates_by_id.get(model_id) or []
+            if not model_candidates:
                 warnings.append(f"模型 {model_id} 在当前期号无可用预测，已跳过。")
+                self.logger.warning(
+                    "Smart prediction model not found in current payload",
+                    extra={"context": {"run_id": run_id, "target_period": target_period, "model_id": model_id}},
+                )
                 continue
+            model_name = str(model_candidates[0].get("model_name") or model_id)
             for strategy_code in strategy_codes:
                 strategy_label = STRATEGY_LABEL_BY_CODE[strategy_code]
-                group = self._find_direct_group_by_strategy(model, strategy_code)
+                group = None
+                for candidate in model_candidates:
+                    candidate_group = self._find_direct_group_by_strategy(candidate, strategy_code)
+                    if candidate_group:
+                        group = candidate_group
+                        break
                 if not group:
                     warnings.append(f"模型 {model_id} 缺少策略 {strategy_label} 的普通5+2预测，已跳过。")
+                    self.logger.warning(
+                        "Smart prediction direct group missing for strategy",
+                        extra={
+                            "context": {
+                                "run_id": run_id,
+                                "target_period": target_period,
+                                "model_id": model_id,
+                                "strategy_code": strategy_code,
+                                "strategy_label": strategy_label,
+                                "candidate_record_count": len(model_candidates),
+                            }
+                        },
+                    )
                     continue
                 red_balls = [self._normalize_ball(item) for item in (group.get("red_balls") or [])]
                 blue_balls = [self._normalize_ball(item) for item in (group.get("blue_balls") or [])]
@@ -531,12 +596,23 @@ class SmartPredictionService:
                         "strategy_code": strategy_code,
                         "strategy_label": strategy_label,
                         "model_id": model_id,
-                        "model_name": str(model.get("model_name") or model_id),
+                        "model_name": model_name,
                         "expected_numbers": f"{' '.join(red_balls)} + {' '.join(blue_balls)}",
                         "red_balls": red_balls,
                         "blue_balls": blue_balls,
                     }
                 )
+        self.logger.info(
+            "Stage1 source rows built",
+            extra={
+                "context": {
+                    "run_id": run_id,
+                    "target_period": target_period,
+                    "source_row_count": len(rows),
+                    "warning_count": len(warnings),
+                }
+            },
+        )
         return rows, warnings
 
     def _merge_stage1_rows(
@@ -645,7 +721,14 @@ class SmartPredictionService:
             result[f"p{index}"] = round(float(probability), 6)
         return result
 
-    def _normalize_stage2_result(self, raw_result: dict[str, Any], *, strict_validation: bool) -> dict[str, Any]:
+    def _normalize_stage2_result(
+        self,
+        raw_result: dict[str, Any],
+        *,
+        strict_validation: bool,
+        stage1_rows: list[dict[str, Any]],
+        stage1_existing_signatures: set[str],
+    ) -> dict[str, Any]:
         if not isinstance(raw_result, dict):
             raise ValueError("阶段2模型输出格式无效")
         raw_tickets = raw_result.get("tickets")
@@ -656,6 +739,7 @@ class SmartPredictionService:
 
         tickets: list[dict[str, list[str]]] = []
         ticket_signatures: set[str] = set()
+        reused_stage1_ticket_count = 0
         for ticket in raw_tickets:
             if not isinstance(ticket, dict):
                 raise ValueError("阶段2 ticket 项格式无效")
@@ -665,9 +749,13 @@ class SmartPredictionService:
             if strict_validation and signature in ticket_signatures:
                 raise ValueError("阶段2 5注单式号码必须互不重复")
             ticket_signatures.add(signature)
+            if signature in stage1_existing_signatures:
+                reused_stage1_ticket_count += 1
             tickets.append({"red_balls": red_balls, "blue_balls": blue_balls})
         if strict_validation and len(tickets) != 5:
             raise ValueError("阶段2 tickets 必须输出 5 注号码")
+        if strict_validation and reused_stage1_ticket_count > 1:
+            raise ValueError("阶段2最多允许1注与阶段1已有组合完全重复")
 
         raw_dantuo = raw_result.get("dantuo")
         if not isinstance(raw_dantuo, dict):
@@ -684,6 +772,10 @@ class SmartPredictionService:
         has_back_dantuo = bool(back_dan and back_tuo)
         if strict_validation and not (has_front_dantuo or has_back_dantuo):
             raise ValueError("阶段2 胆拖至少一侧需要形成有效胆码+拖码结构")
+        top15_numbers = self._build_top15_numbers(
+            stage1_rows=stage1_rows,
+            top15_candidates=raw_result.get("top15_candidates"),
+        )
         return {
             "tickets": tickets[:5],
             "dantuo": {
@@ -692,7 +784,144 @@ class SmartPredictionService:
                 "back_dan": back_dan,
                 "back_tuo": back_tuo,
             },
+            "top15_numbers": top15_numbers,
         }
+
+    @staticmethod
+    def _collect_stage1_signatures(stage1_rows: list[dict[str, Any]]) -> set[str]:
+        signatures: set[str] = set()
+        for row in stage1_rows:
+            if not isinstance(row, dict):
+                continue
+            front_numbers, back_numbers = SmartPredictionService._extract_expected_numbers(row)
+            if len(front_numbers) != 5 or len(back_numbers) != 2:
+                continue
+            signatures.add(f"{','.join(front_numbers)}+{','.join(back_numbers)}")
+        return signatures
+
+    @staticmethod
+    def _extract_expected_numbers(row: dict[str, Any]) -> tuple[list[str], list[str]]:
+        text = str(row.get("expected_numbers") or "").strip()
+        if "+" not in text:
+            return [], []
+        front_part, back_part = text.split("+", 1)
+        front_numbers = [token for token in front_part.strip().split() if token]
+        back_numbers = [token for token in back_part.strip().split() if token]
+        normalized_front = [SmartPredictionService._normalize_ball(item) for item in front_numbers]
+        normalized_back = [SmartPredictionService._normalize_ball(item) for item in back_numbers]
+        return normalized_front, normalized_back
+
+    def _build_top15_numbers(self, *, stage1_rows: list[dict[str, Any]], top15_candidates: Any) -> list[dict[str, Any]]:
+        stage1_scores: dict[tuple[str, str], float] = {}
+        for row in stage1_rows:
+            if not isinstance(row, dict):
+                continue
+            interval_probability = float(row.get("interval_probability") or 0)
+            expected_value = float(row.get("expected_value") or 0)
+            row_confidence = 0.55 * max(0.0, min(1.0, interval_probability)) + 0.45 * max(0.0, min(1.0, expected_value / 7.0))
+            front_numbers, back_numbers = self._extract_expected_numbers(row)
+            for number in front_numbers:
+                stage1_scores[("front", number)] = float(stage1_scores.get(("front", number), 0.0) + row_confidence)
+            for number in back_numbers:
+                stage1_scores[("back", number)] = float(stage1_scores.get(("back", number), 0.0) + row_confidence)
+
+        front_sum = sum(score for (zone, _), score in stage1_scores.items() if zone == "front")
+        back_sum = sum(score for (zone, _), score in stage1_scores.items() if zone == "back")
+        stat_scores: dict[tuple[str, str], float] = {}
+        for key, score in stage1_scores.items():
+            zone, _ = key
+            zone_probability = score / front_sum if zone == "front" and front_sum > 0 else score / back_sum if zone == "back" and back_sum > 0 else 0.0
+            zone_weight = 5 / 7 if zone == "front" else 2 / 7
+            stat_scores[key] = zone_probability * zone_weight
+
+        llm_scores: dict[tuple[str, str], float] = {}
+        if isinstance(top15_candidates, list):
+            for index, item in enumerate(top15_candidates):
+                if not isinstance(item, dict):
+                    continue
+                zone = self._normalize_zone(str(item.get("zone") or ""))
+                if not zone:
+                    continue
+                number = self._normalize_ball(item.get("number"))
+                if not self._is_valid_zone_ball(zone, number):
+                    continue
+                probability = item.get("probability")
+                if isinstance(probability, (float, int)) and 0 <= float(probability) <= 1:
+                    score = float(probability)
+                else:
+                    score = 1.0 / float(index + 1)
+                llm_scores[(zone, number)] = max(float(llm_scores.get((zone, number), 0.0)), score)
+
+        llm_total = sum(llm_scores.values())
+        if llm_total > 0:
+            llm_scores = {key: value / llm_total for key, value in llm_scores.items()}
+
+        all_keys = set(stat_scores) | set(llm_scores)
+        combined_scores: dict[tuple[str, str], float] = {}
+        for key in all_keys:
+            combined_scores[key] = 0.85 * float(stat_scores.get(key, 0.0)) + 0.15 * float(llm_scores.get(key, 0.0))
+        if not combined_scores:
+            return []
+
+        total_score = sum(combined_scores.values())
+        normalized_scores = (
+            {key: score / total_score for key, score in combined_scores.items()} if total_score > 0 else {}
+        )
+        sorted_items = sorted(
+            normalized_scores.items(),
+            key=lambda item: (-item[1], 0 if item[0][0] == "front" else 1, int(item[0][1])),
+        )
+        if len(sorted_items) < 15:
+            selected = {key for key, _ in sorted_items}
+            for number in range(1, 36):
+                key = ("front", f"{number:02d}")
+                if key in selected:
+                    continue
+                sorted_items.append((key, 0.0))
+                selected.add(key)
+                if len(sorted_items) >= 15:
+                    break
+            if len(sorted_items) < 15:
+                for number in range(1, 13):
+                    key = ("back", f"{number:02d}")
+                    if key in selected:
+                        continue
+                    sorted_items.append((key, 0.0))
+                    selected.add(key)
+                    if len(sorted_items) >= 15:
+                        break
+        sorted_items = sorted_items[:15]
+        result = []
+        for (zone, number), probability in sorted_items:
+            result.append(
+                {
+                    "zone": zone,
+                    "number": number,
+                    "probability": round(float(probability), 4),
+                    "source": "hybrid" if (zone, number) in llm_scores else "stat",
+                }
+            )
+        return result
+
+    @staticmethod
+    def _normalize_zone(value: str) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized in {"front", "red", "前区"}:
+            return "front"
+        if normalized in {"back", "blue", "后区"}:
+            return "back"
+        return ""
+
+    @staticmethod
+    def _is_valid_zone_ball(zone: str, value: str) -> bool:
+        if not str(value or "").isdigit():
+            return False
+        number = int(value)
+        if zone == "front":
+            return 1 <= number <= 35
+        if zone == "back":
+            return 1 <= number <= 12
+        return False
 
     @staticmethod
     def _normalize_zone_numbers(values: Any, *, minimum: int, maximum: int, expected_count: int | None) -> list[str]:
