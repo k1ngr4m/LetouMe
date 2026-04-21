@@ -128,6 +128,35 @@ class PredictionHistoryDetailPayload(BaseModel):
     target_period: str
 
 
+class SmartPredictionRunStartPayload(BaseModel):
+    lottery_code: str = "dlt"
+    data_model_codes: list[str] = Field(default_factory=list)
+    stage1_model_code: str
+    stage2_model_code: str
+    history_period_count: Literal[30, 50, 100] = 50
+    strategy_codes: list[Literal["hot", "cold", "balanced", "cycle", "composite"]] = Field(default_factory=list)
+    include_trend: bool = True
+    include_scores: bool = True
+    auto_stage2: bool = True
+    retry_once: bool = True
+    strict_validation: bool = True
+
+
+class SmartPredictionRunIdPayload(BaseModel):
+    run_id: str
+
+
+class SmartPredictionRunListPayload(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+class SmartPredictionStage2StartPayload(BaseModel):
+    run_id: str
+    stage2_model_code: str | None = None
+    force_rerun: bool = True
+
+
 class SimulationTicketPayload(BaseModel):
     lottery_code: str = "dlt"
     play_type: str | None = None

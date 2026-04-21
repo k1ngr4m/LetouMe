@@ -113,6 +113,35 @@ class SettingsPredictionRecordDetailResponse(BaseModel):
     model_stats: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class SmartPredictionRunResponse(BaseModel):
+    run_id: str
+    lottery_code: str = "dlt"
+    target_period: str
+    created_by_user_id: int
+    status: str
+    stage1_task_id: str | None = None
+    stage2_task_id: str | None = None
+    stage1_status: str
+    stage2_status: str
+    stage1_model_code: str
+    stage2_model_code: str
+    history_period_count: int
+    data_model_codes: list[str] = Field(default_factory=list)
+    strategy_codes: list[str] = Field(default_factory=list)
+    options: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    stage1_result: dict[str, Any] | None = None
+    stage2_result: dict[str, Any] | None = None
+    error_message: str | None = None
+    created_at: int | None = None
+    updated_at: int | None = None
+
+
+class SmartPredictionRunListResponse(BaseModel):
+    runs: list[SmartPredictionRunResponse] = Field(default_factory=list)
+    total_count: int = 0
+
+
 class SimulationTicketRecordResponse(BaseModel):
     id: int
     lottery_code: str = "dlt"

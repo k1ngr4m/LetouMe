@@ -10,6 +10,12 @@ vi.mock('../../shared/lib/storage', () => ({
   saveSelectedLottery: () => undefined,
 }))
 
+vi.mock('../../shared/auth/AuthProvider', () => ({
+  useAuth: () => ({
+    user: { role: 'admin' },
+  }),
+}))
+
 function renderPage(initialEntry: string | { pathname: string; state?: unknown } = '/dashboard/rules') {
   const client = new QueryClient({
     defaultOptions: {
@@ -49,6 +55,7 @@ describe('HomeRulesPage', () => {
     expect(screen.getByRole('heading', { name: '大乐透规则' })).toBeInTheDocument()
     expect(document.querySelector('.tab-strip.dashboard-tab-strip')).not.toBeNull()
     expect(screen.getByRole('button', { name: '规则' })).toHaveClass('is-active')
+    expect(screen.getByRole('button', { name: '智能预测' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '中国体育彩票超级大乐透游戏规则' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '第一章 总则' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '第三章 设奖' })).toBeInTheDocument()

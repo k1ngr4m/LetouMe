@@ -560,6 +560,36 @@ SCHEMA_STATEMENTS = [
         INDEX idx_maintenance_run_log_status_created (status, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS smart_prediction_run (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        run_id VARCHAR(64) NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        target_period VARCHAR(32) NOT NULL,
+        created_by_user_id BIGINT NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        stage1_task_id VARCHAR(64) NULL,
+        stage2_task_id VARCHAR(64) NULL,
+        stage1_status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        stage2_status VARCHAR(32) NOT NULL DEFAULT 'idle',
+        stage1_model_code VARCHAR(128) NOT NULL,
+        stage2_model_code VARCHAR(128) NOT NULL,
+        history_period_count INT NOT NULL DEFAULT 50,
+        data_model_codes_json LONGTEXT NULL,
+        strategy_codes_json LONGTEXT NULL,
+        options_json LONGTEXT NULL,
+        warnings_json LONGTEXT NULL,
+        stage1_result_json LONGTEXT NULL,
+        stage2_result_json LONGTEXT NULL,
+        error_message TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_smart_prediction_run_user FOREIGN KEY (created_by_user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_smart_prediction_run_created (created_at),
+        INDEX idx_smart_prediction_run_status_created (status, created_at),
+        INDEX idx_smart_prediction_run_user_created (created_by_user_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [

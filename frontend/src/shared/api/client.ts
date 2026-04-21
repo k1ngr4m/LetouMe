@@ -57,6 +57,9 @@ import type {
   SimulationTicketPayload,
   SiteMessageListResponse,
   SiteMessageUnreadCountResponse,
+  SmartPredictionRun,
+  SmartPredictionRunListResponse,
+  SmartPredictionRunStartPayload,
   SuccessResponse,
   UserListResponse,
   RegisterPayload,
@@ -241,6 +244,42 @@ export const apiClient = {
     return requestJson<PredictionsHistoryResponse>('/api/predictions/history/detail', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod }),
+    })
+  },
+  startSmartPredictionRun(payload: SmartPredictionRunStartPayload) {
+    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/start', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: payload.lottery_code || 'dlt', ...payload }),
+    })
+  },
+  getSmartPredictionRunDetail(runId: string) {
+    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/detail', {
+      method: 'POST',
+      body: JSON.stringify({ run_id: runId }),
+    })
+  },
+  cancelSmartPredictionRun(runId: string) {
+    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ run_id: runId }),
+    })
+  },
+  startSmartPredictionStage2(runId: string, stage2ModelCode?: string, forceRerun = true) {
+    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/stage2/start', {
+      method: 'POST',
+      body: JSON.stringify({ run_id: runId, stage2_model_code: stage2ModelCode, force_rerun: forceRerun }),
+    })
+  },
+  listSmartPredictionRuns(payload?: { limit?: number; offset?: number }) {
+    return requestJson<SmartPredictionRunListResponse>('/api/predictions/smart/history/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getSmartPredictionHistoryDetail(runId: string) {
+    return requestJson<SmartPredictionRun>('/api/predictions/smart/history/detail', {
+      method: 'POST',
+      body: JSON.stringify({ run_id: runId }),
     })
   },
   getSimulationTickets(lotteryCode: LotteryCode = 'dlt') {

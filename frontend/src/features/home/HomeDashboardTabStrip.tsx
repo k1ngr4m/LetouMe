@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { BookOpen, ChartColumnIncreasing, CircleDollarSign, History, Sparkles, WalletCards } from 'lucide-react'
 import { HOME_RULES_PATH, getDashboardPath } from './navigation'
 
-type DashboardActiveTab = 'prediction' | 'simulation' | 'charts' | 'history' | 'my-bets' | 'rules'
+type DashboardActiveTab = 'prediction' | 'simulation' | 'charts' | 'history' | 'my-bets' | 'rules' | 'smart-prediction'
 
 export function HomeDashboardTabStrip({
   activeTab,
@@ -124,6 +124,12 @@ export function HomeDashboardTabStrip({
       label: '规则',
       icon: BookOpen,
       onClick: () => guardedNavigate(() => navigate(HOME_RULES_PATH)),
+    },
+    {
+      key: 'smart-prediction',
+      label: '智能预测',
+      icon: Sparkles,
+      onClick: () => guardedNavigate(() => navigate(`${HOME_RULES_PATH}#smart-prediction`)),
     },
     {
       key: 'my-bets',

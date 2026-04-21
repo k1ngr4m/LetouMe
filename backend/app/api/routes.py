@@ -76,6 +76,10 @@ from backend.app.schemas.requests import (
     PredictionsHistoryListPayload,
     ProfileUpdatePayload,
     PredictionHistoryDetailPayload,
+    SmartPredictionRunIdPayload,
+    SmartPredictionRunListPayload,
+    SmartPredictionRunStartPayload,
+    SmartPredictionStage2StartPayload,
     ScheduleTaskCodePayload,
     ScheduleRunLogListPayload,
     ScheduleTaskPayload,
@@ -108,6 +112,8 @@ from backend.app.schemas.responses import (
     SiteMessageUnreadCountResponse,
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
+    SmartPredictionRunListResponse,
+    SmartPredictionRunResponse,
     SimulationTicketCreateResponse,
     SimulationTicketQuoteResponse,
     SimulationTicketListResponse,
@@ -125,6 +131,7 @@ from backend.app.services.schedule_service import schedule_service
 from backend.app.services.message_service import MessageService
 from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.simulation_ticket_service import SimulationTicketService
+from backend.app.services.smart_prediction_service import smart_prediction_service
 from backend.app.services.ticket_ocr_service import TicketOCRService
 
 
@@ -368,6 +375,59 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])
     return {"predictions_history": [record], "total_count": 1, "model_stats": prediction_service._build_model_stats([record], score_profiles)}
+
+
+@router.post("/predictions/smart/run/start", response_model=SmartPredictionRunResponse)
+def start_smart_prediction_run(payload: SmartPredictionRunStartPayload, current_user: dict = Depends(require_super_admin)) -> dict:
+    try:
+        return smart_prediction_service.start_run(int(current_user["id"]), payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/predictions/smart/run/detail", response_model=SmartPredictionRunResponse)
+def get_smart_prediction_run_detail(payload: SmartPredictionRunIdPayload, _: dict = Depends(require_super_admin)) -> dict:
+    run = smart_prediction_service.get_run(payload.run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="智能预测运行记录不存在")
+    return run
+
+
+@router.post("/predictions/smart/run/cancel", response_model=SmartPredictionRunResponse)
+def cancel_smart_prediction_run(payload: SmartPredictionRunIdPayload, _: dict = Depends(require_super_admin)) -> dict:
+    try:
+        return smart_prediction_service.cancel_run(payload.run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="智能预测运行记录不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/predictions/smart/run/stage2/start", response_model=SmartPredictionRunResponse)
+def start_smart_prediction_stage2(payload: SmartPredictionStage2StartPayload, _: dict = Depends(require_super_admin)) -> dict:
+    try:
+        return smart_prediction_service.start_stage2(
+            payload.run_id,
+            stage2_model_code=payload.stage2_model_code,
+            force_rerun=payload.force_rerun,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="智能预测运行记录不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/predictions/smart/history/list", response_model=SmartPredictionRunListResponse)
+def list_smart_prediction_runs(payload: SmartPredictionRunListPayload, _: dict = Depends(require_super_admin)) -> dict:
+    return smart_prediction_service.list_runs(limit=payload.limit, offset=payload.offset)
+
+
+@router.post("/predictions/smart/history/detail", response_model=SmartPredictionRunResponse)
+def get_smart_prediction_history_detail(payload: SmartPredictionRunIdPayload, _: dict = Depends(require_super_admin)) -> dict:
+    run = smart_prediction_service.get_run(payload.run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="智能预测运行记录不存在")
+    return run
 
 
 @router.post("/simulation/tickets/list", response_model=SimulationTicketListResponse)

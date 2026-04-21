@@ -794,6 +794,101 @@ export type SettingsPredictionRecordDetail = {
   model_stats?: PredictionHistoryModelStat[]
 }
 
+export type SmartPredictionStrategyCode = 'hot' | 'cold' | 'balanced' | 'cycle' | 'composite'
+
+export type SmartPredictionStage1Row = {
+  strategy_code: SmartPredictionStrategyCode
+  strategy_label: string
+  model_id: string
+  model_name: string
+  expected_numbers: string
+  primary_hit: number
+  expected_value: number
+  high_prob_range: string
+  interval_probability: number
+  p0: number
+  p1: number
+  p2: number
+  p3: number
+  p4: number
+  p5: number
+  p6: number
+  p7: number
+}
+
+export type SmartPredictionStage1Result = {
+  target_period: string
+  generated_at: string
+  rows: SmartPredictionStage1Row[]
+  warnings: string[]
+}
+
+export type SmartPredictionStage2Ticket = {
+  red_balls: string[]
+  blue_balls: string[]
+}
+
+export type SmartPredictionStage2Result = {
+  target_period: string
+  generated_at: string
+  tickets: SmartPredictionStage2Ticket[]
+  dantuo: {
+    front_dan: string[]
+    front_tuo: string[]
+    back_dan: string[]
+    back_tuo: string[]
+  }
+}
+
+export type SmartPredictionRun = {
+  run_id: string
+  lottery_code: LotteryCode
+  target_period: string
+  created_by_user_id: number
+  status: string
+  stage1_task_id?: string | null
+  stage2_task_id?: string | null
+  stage1_status: string
+  stage2_status: string
+  stage1_model_code: string
+  stage2_model_code: string
+  history_period_count: 30 | 50 | 100
+  data_model_codes: string[]
+  strategy_codes: SmartPredictionStrategyCode[]
+  options: {
+    include_trend: boolean
+    include_scores: boolean
+    auto_stage2: boolean
+    retry_once: boolean
+    strict_validation: boolean
+  }
+  warnings: string[]
+  stage1_result?: SmartPredictionStage1Result | null
+  stage2_result?: SmartPredictionStage2Result | null
+  error_message?: string | null
+  created_at?: number | null
+  updated_at?: number | null
+}
+
+export type SmartPredictionRunStartPayload = {
+  lottery_code?: LotteryCode
+  data_model_codes: string[]
+  stage1_model_code: string
+  stage2_model_code: string
+  history_period_count: 30 | 50 | 100
+  strategy_codes: SmartPredictionStrategyCode[]
+  include_trend: boolean
+  include_scores: boolean
+  auto_stage2: boolean
+  retry_once: boolean
+  strict_validation: boolean
+}
+
+export type SmartPredictionRunListResponse = {
+  runs: SmartPredictionRun[]
+  total_count: number
+}
+
 export type AuthUser = {
   id: number
   username: string
