@@ -959,7 +959,7 @@ export function buildPl3PositionHotChart(draws: LotteryDraw[], positionIndex: 0 
 }
 
 export function buildPl3SumTrendChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const sum = resolvePl3Digits(draw).reduce((total, digit) => total + Number(digit), 0)
     return {
       period: draw.period,
@@ -969,7 +969,7 @@ export function buildPl3SumTrendChart(draws: LotteryDraw[]) {
 }
 
 export function buildPl3OddEvenStructureChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const oddCount = resolvePl3Digits(draw).filter((digit) => Number(digit) % 2 === 1).length
     return {
       period: draw.period,
@@ -1003,7 +1003,7 @@ export function buildQxcPositionHotChart(draws: LotteryDraw[], positionIndex: 0 
 }
 
 export function buildPl5SumTrendChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const sum = resolvePl5Digits(draw).reduce((total, digit) => total + Number(digit), 0)
     return {
       period: draw.period,
@@ -1013,7 +1013,7 @@ export function buildPl5SumTrendChart(draws: LotteryDraw[]) {
 }
 
 export function buildPl5OddEvenStructureChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const oddCount = resolvePl5Digits(draw).filter((digit) => Number(digit) % 2 === 1).length
     return {
       period: draw.period,
@@ -1024,14 +1024,14 @@ export function buildPl5OddEvenStructureChart(draws: LotteryDraw[]) {
 }
 
 export function buildQxcSumTrendChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => ({
+  return [...draws].reverse().map((draw) => ({
     period: draw.period,
     sum: resolveQxcDigits(draw).reduce((total, digit) => total + Number(digit), 0),
   }))
 }
 
 export function buildQxcOddEvenStructureChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const oddCount = resolveQxcDigits(draw).filter((digit) => Number(digit) % 2 === 1).length
     return {
       period: draw.period,
@@ -1042,7 +1042,7 @@ export function buildQxcOddEvenStructureChart(draws: LotteryDraw[]) {
 }
 
 export function buildOddEvenChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => ({
+  return [...draws].reverse().map((draw) => ({
     period: draw.period,
     odd: draw.red_balls.filter((ball) => Number(ball) % 2 === 1).length,
     even: draw.red_balls.filter((ball) => Number(ball) % 2 === 0).length,
@@ -1050,7 +1050,7 @@ export function buildOddEvenChart(draws: LotteryDraw[]) {
 }
 
 export function buildSumTrendChart(draws: LotteryDraw[]) {
-  return draws.slice(0, 20).reverse().map((draw) => ({
+  return [...draws].reverse().map((draw) => ({
     period: draw.period,
     sum: draw.red_balls.reduce((total, ball) => total + Number(ball), 0),
   }))
@@ -1175,7 +1175,7 @@ export function buildZoneShareDistributionChart(draws: LotteryDraw[], lotteryCod
 }
 
 export function buildSpanTrendChart(draws: LotteryDraw[], lotteryCode: LotteryCode) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const values =
       lotteryCode === 'pl3'
         ? resolvePl3Digits(draw).map(Number)
@@ -1226,7 +1226,7 @@ export function buildZoneDistributionChart(draws: LotteryDraw[], lotteryCode: Lo
 }
 
 export function buildModuloTrendChart(draws: LotteryDraw[], lotteryCode: LotteryCode) {
-  return draws.slice(0, 20).reverse().map((draw) => {
+  return [...draws].reverse().map((draw) => {
     const values =
       lotteryCode === 'pl3'
         ? resolvePl3Digits(draw)

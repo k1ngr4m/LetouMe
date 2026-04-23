@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildModuloTrendChart,
+  buildOddEvenChart,
   buildOddEvenDistributionChart,
   buildZoneShareDistributionChart,
   buildHistoryCumulativeProfitTrend,
@@ -23,6 +24,7 @@ import {
   buildQxcPositionHotChart,
   buildQxcSumTrendChart,
   buildSpanTrendChart,
+  buildSumTrendChart,
   buildSumDistributionChart,
   buildSummary,
   compareNumbers,
@@ -240,7 +242,7 @@ describe('pl3 analysis chart builders', () => {
     expect(chart.find((item) => item.ball === '00')).toMatchObject({ count: 0 })
   })
 
-  it('builds sum trend from last 20 draws in ascending period order', () => {
+  it('builds sum trend from provided draws in ascending period order', () => {
     const chart = buildPl3SumTrendChart(
       [
         {
@@ -528,6 +530,76 @@ describe('qxc analysis chart builders', () => {
       { period: '2026032', value: 142, pattern: '1-4-2' },
       { period: '2026033', value: 223, pattern: '2-2-3' },
     ])
+  })
+})
+
+describe('trend builders honor provided draw window', () => {
+  function pad(value: number) {
+    return String(value).padStart(2, '0')
+  }
+
+  function makePeriods(count: number) {
+    return Array.from({ length: count }, (_, index) => `26${String(count - index).padStart(4, '0')}`)
+  }
+
+  const periods = makePeriods(25)
+  const earliestPeriod = periods[periods.length - 1]
+  const latestPeriod = periods[0]
+
+  const dltDraws = periods.map((period, index) => ({
+    period,
+    date: `2026-03-${pad((index % 28) + 1)}`,
+    lottery_code: 'dlt' as const,
+    red_balls: [1, 2, 3, 4, 5].map((seed) => pad((index + seed) % 35 || 35)),
+    blue_balls: [1, 2].map((seed) => pad((index + seed) % 12 || 12)),
+  }))
+
+  const pl3Draws = periods.map((period, index) => ({
+    period,
+    date: `2026-03-${pad((index % 28) + 1)}`,
+    lottery_code: 'pl3' as const,
+    red_balls: [0, 1, 2].map((seed) => pad((index + seed) % 10)),
+    blue_balls: [],
+    digits: [0, 1, 2].map((seed) => pad((index + seed) % 10)),
+  }))
+
+  const pl5Draws = periods.map((period, index) => ({
+    period,
+    date: `2026-03-${pad((index % 28) + 1)}`,
+    lottery_code: 'pl5' as const,
+    red_balls: [],
+    blue_balls: [],
+    digits: [0, 1, 2, 3, 4].map((seed) => pad((index + seed) % 10)),
+  }))
+
+  const qxcDraws = periods.map((period, index) => ({
+    period,
+    date: `2026-03-${pad((index % 28) + 1)}`,
+    lottery_code: 'qxc' as const,
+    red_balls: [],
+    blue_balls: [],
+    digits: [0, 1, 2, 3, 4, 5, 6].map((seed) => pad((index + seed) % 10)),
+  }))
+
+  it('does not truncate trend series to 20 points', () => {
+    const charts = [
+      buildPl3SumTrendChart(pl3Draws),
+      buildPl3OddEvenStructureChart(pl3Draws),
+      buildPl5SumTrendChart(pl5Draws),
+      buildPl5OddEvenStructureChart(pl5Draws),
+      buildQxcSumTrendChart(qxcDraws),
+      buildQxcOddEvenStructureChart(qxcDraws),
+      buildSumTrendChart(dltDraws),
+      buildOddEvenChart(dltDraws),
+      buildSpanTrendChart(dltDraws, 'dlt'),
+      buildModuloTrendChart(dltDraws, 'dlt'),
+    ]
+
+    for (const chart of charts) {
+      expect(chart).toHaveLength(periods.length)
+      expect(chart[0]?.period).toBe(earliestPeriod)
+      expect(chart[chart.length - 1]?.period).toBe(latestPeriod)
+    }
   })
 })
 
