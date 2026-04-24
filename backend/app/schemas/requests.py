@@ -104,6 +104,14 @@ class ExpertCurrentDetailPayload(BaseModel):
 
 class ExpertPredictionRunStartPayload(BaseModel):
     lottery_code: str = "dlt"
+    expert_code: str | None = None
+    mode: str = "current"
+    overwrite: bool = False
+    parallelism: int | None = Field(default=None, ge=1, le=8)
+    start_period: str | None = None
+    end_period: str | None = None
+    recent_period_count: Literal[1, 5, 10, 20] | None = None
+    prompt_history_period_count: Literal[30, 50, 100] | None = None
 
 
 class ExpertPredictionTaskPayload(BaseModel):

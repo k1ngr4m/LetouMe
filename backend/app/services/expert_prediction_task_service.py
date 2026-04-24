@@ -17,20 +17,30 @@ class ExpertPredictionTaskService:
         self,
         *,
         lottery_code: str,
+        mode: str = "current",
+        expert_code: str = "__experts__",
         worker: Callable[[Callable[[dict[str, Any]], None]], dict[str, Any]],
         on_update: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
+        normalized_mode = str(mode or "current").strip().lower()
+        normalized_expert_code = str(expert_code or "__experts__").strip() or "__experts__"
         task = self.runner.create_task(
             initial_task={
                 "lottery_code": lottery_code,
+                "mode": normalized_mode,
+                "expert_code": normalized_expert_code,
                 "progress_summary": {
                     "lottery_code": lottery_code,
+                    "mode": normalized_mode,
+                    "expert_code": normalized_expert_code,
                     "selected_count": 0,
                     "processed_count": 0,
                     "failed_count": 0,
                     "skipped_count": 0,
                     "failed_experts": [],
                     "processed_experts": [],
+                    "failed_periods": [],
+                    "failed_details": [],
                     "target_period": "",
                 },
                 "error_message": None,
@@ -44,8 +54,8 @@ class ExpertPredictionTaskService:
             schedule_task_code=None,
             trigger_type="manual",
             task_type="expert_generate",
-            mode="current",
-            model_code="__experts__",
+            mode=normalized_mode,
+            model_code=normalized_expert_code,
             status=str(task.get("status") or "queued"),
             created_at=task.get("created_at"),
         )
@@ -64,10 +74,12 @@ class ExpertPredictionTaskService:
         if not task_id:
             return
         summary = state.get("progress_summary") if isinstance(state.get("progress_summary"), dict) else {}
+        mode_value = str(state.get("mode") or summary.get("mode") or "current").strip() or "current"
+        expert_code_value = str(state.get("expert_code") or summary.get("expert_code") or "__experts__").strip() or "__experts__"
         payload = {
             "task_type": "expert_generate",
-            "mode": "current",
-            "model_code": "__experts__",
+            "mode": mode_value,
+            "model_code": expert_code_value,
             "status": str(state.get("status") or "queued"),
             "started_at": state.get("started_at"),
             "finished_at": state.get("finished_at"),
@@ -90,8 +102,8 @@ class ExpertPredictionTaskService:
                     schedule_task_code=None,
                     trigger_type="manual",
                     task_type="expert_generate",
-                    mode="current",
-                    model_code="__experts__",
+                    mode=mode_value,
+                    model_code=expert_code_value,
                     status=payload["status"],
                     created_at=state.get("created_at"),
                 )

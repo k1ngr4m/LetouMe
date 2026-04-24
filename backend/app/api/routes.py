@@ -792,8 +792,46 @@ def start_settings_expert_prediction_run(
         lottery_code = normalize_lottery_code(payload.lottery_code)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    mode = payload.mode.strip().lower()
+    if mode not in {"current", "history"}:
+        raise HTTPException(status_code=400, detail="不支持的生成模式")
+    if mode == "history" and not payload.recent_period_count and (not payload.start_period or not payload.end_period):
+        raise HTTPException(status_code=400, detail="历史重算必须提供开始期号和结束期号，或选择最近期数")
+    expert_code = str(payload.expert_code or "").strip()
+    if expert_code:
+        try:
+            expert = expert_service.get_expert(expert_code)
+            if not expert or bool(expert.get("is_deleted")):
+                raise KeyError(expert_code)
+            if str(expert.get("lottery_code") or "dlt").strip().lower() != lottery_code:
+                raise ValueError("生成彩种必须与专家配置彩种一致")
+            if not bool(expert.get("is_active")):
+                raise ValueError("已停用专家不能生成预测数据")
+            return expert_prediction_task_service.create_task(
+                lottery_code=lottery_code,
+                mode=mode,
+                expert_code=expert_code,
+                worker=lambda progress_callback: expert_prediction_service.generate_for_expert(
+                    lottery_code=lottery_code,
+                    expert_code=expert_code,
+                    mode=mode,
+                    overwrite=payload.overwrite,
+                    parallelism=payload.parallelism,
+                    start_period=payload.start_period,
+                    end_period=payload.end_period,
+                    recent_period_count=payload.recent_period_count,
+                    prompt_history_period_count=payload.prompt_history_period_count,
+                    progress_callback=progress_callback,
+                ),
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="专家不存在") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     return expert_prediction_task_service.create_task(
         lottery_code=lottery_code,
+        mode="current",
+        expert_code="__experts__",
         worker=lambda progress_callback: expert_prediction_service.generate_current_for_all(
             lottery_code=lottery_code,
             progress_callback=progress_callback,

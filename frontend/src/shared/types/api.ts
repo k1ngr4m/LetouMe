@@ -661,21 +661,45 @@ export type SettingsExpertPayload = {
 export type ExpertPredictionTask = {
   task_id: string
   lottery_code?: LotteryCode
+  mode?: 'current' | 'history'
+  expert_code?: string
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'partial_succeeded'
   created_at: number
   started_at?: number | null
   finished_at?: number | null
   progress_summary: {
     lottery_code?: LotteryCode
+    mode?: 'current' | 'history'
+    expert_code?: string
+    expert_name?: string
     target_period?: string
+    parallelism?: number
     selected_count?: number
     processed_count?: number
     skipped_count?: number
     failed_count?: number
     processed_experts?: string[]
     failed_experts?: Array<{ expert_code: string; reason: string }>
+    processed_periods?: string[]
+    skipped_periods?: string[]
+    failed_periods?: string[]
+    failed_details?: Array<{ target_period?: string; reason: string }>
+    task_total_count?: number
+    task_completed_count?: number
   }
   error_message?: string | null
+}
+
+export type ExpertPredictionRunStartPayload = {
+  lottery_code: LotteryCode
+  expert_code?: string
+  mode?: 'current' | 'history'
+  overwrite?: boolean
+  parallelism?: number
+  start_period?: string
+  end_period?: string
+  recent_period_count?: 1 | 5 | 10 | 20
+  prompt_history_period_count?: 30 | 50 | 100
 }
 
 export type SettingsProviderPayload = {

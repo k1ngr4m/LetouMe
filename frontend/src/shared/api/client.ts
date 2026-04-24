@@ -12,6 +12,7 @@ import type {
   GenerateSettingsModelPredictionsPayload,
   ExpertCurrentDetail,
   ExpertPredictionTask,
+  ExpertPredictionRunStartPayload,
   ExpertPublicListResponse,
   LoginPayload,
   MyBetRecordCreateResponse,
@@ -471,10 +472,11 @@ export const apiClient = {
       body: JSON.stringify({ expert_code: expertCode }),
     })
   },
-  startSettingsExpertPredictionRun(lotteryCode: LotteryCode = 'dlt') {
+  startSettingsExpertPredictionRun(payload: LotteryCode | ExpertPredictionRunStartPayload = 'dlt') {
+    const body = typeof payload === 'string' ? { lottery_code: payload } : payload
     return requestJson<ExpertPredictionTask>('/api/settings/experts/predictions/run/start', {
       method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode }),
+      body: JSON.stringify(body),
     })
   },
   getSettingsExpertPredictionTask(taskId: string) {

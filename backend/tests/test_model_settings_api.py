@@ -332,6 +332,65 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "bulk-task-1")
         create_task.assert_called_once()
 
+    def test_generate_expert_prediction_task_endpoint_accepts_single_expert_payload(self) -> None:
+        with (
+            patch("backend.app.api.routes.expert_service.get_expert") as get_expert,
+            patch("backend.app.api.routes.expert_prediction_task_service.create_task") as create_task,
+        ):
+            get_expert.return_value = {
+                "expert_code": "wei-rong-jie",
+                "lottery_code": "dlt",
+                "is_active": True,
+                "is_deleted": False,
+            }
+            create_task.return_value = {
+                "task_id": "expert-task-1",
+                "status": "queued",
+                "lottery_code": "dlt",
+                "mode": "history",
+                "expert_code": "wei-rong-jie",
+                "created_at": 1770000000,
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "lottery_code": "dlt",
+                    "mode": "history",
+                    "expert_code": "wei-rong-jie",
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post(
+                "/api/settings/experts/predictions/run/start",
+                json={
+                    "lottery_code": "dlt",
+                    "expert_code": "wei-rong-jie",
+                    "mode": "history",
+                    "overwrite": True,
+                    "recent_period_count": 10,
+                    "parallelism": 3,
+                    "prompt_history_period_count": 50,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "expert-task-1")
+        create_task.assert_called_once()
+        self.assertEqual(create_task.call_args.kwargs["mode"], "history")
+        self.assertEqual(create_task.call_args.kwargs["expert_code"], "wei-rong-jie")
+
+    def test_generate_expert_prediction_task_endpoint_rejects_history_without_range(self) -> None:
+        response = self.client.post(
+            "/api/settings/experts/predictions/run/start",
+            json={"lottery_code": "dlt", "expert_code": "wei-rong-jie", "mode": "history"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "历史重算必须提供开始期号和结束期号，或选择最近期数")
+
     def test_generate_prediction_task_endpoint_accepts_recent_period_count(self) -> None:
         with (
             patch("backend.app.api.routes.prediction_generation_service.validate_model") as validate_model,

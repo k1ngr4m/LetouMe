@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
-import type { ExpertConfig, SettingsExpert, SettingsExpertPayload } from '../../shared/types/api'
+import type { ExpertConfig, ExpertPredictionTask, LotteryCode, SettingsExpert, SettingsExpertPayload } from '../../shared/types/api'
 
 const DEFAULT_CONFIG: ExpertConfig = {
   dlt_front_weights: {
@@ -75,6 +75,30 @@ const TAB_FIELDS: Record<ConfigTabKey, Array<{ key: string; label: string }>> = 
 }
 
 const STRICT_SUM_TABS: ConfigTabKey[] = ['dlt_front_weights', 'dlt_back_weights', 'strategy_preferences']
+type ExpertGenerationMode = 'current' | 'history'
+type ExpertGenerationRangeMode = 'recent' | 'custom'
+type ExpertGenerationRecentPeriodCount = '1' | '5' | '10' | '20'
+type ExpertGenerationPromptHistoryPeriodCount = '30' | '50' | '100'
+
+const GENERATION_RECENT_PERIOD_OPTIONS: Array<{ value: ExpertGenerationRecentPeriodCount; label: string }> = [
+  { value: '1', label: '最近1期' },
+  { value: '5', label: '最近5期' },
+  { value: '10', label: '最近10期' },
+  { value: '20', label: '最近20期' },
+]
+
+const GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS: Array<{ value: ExpertGenerationPromptHistoryPeriodCount; label: string }> = [
+  { value: '30', label: '近30期' },
+  { value: '50', label: '近50期' },
+  { value: '100', label: '近100期' },
+]
+
+const LOTTERY_LABELS: Record<LotteryCode, string> = {
+  dlt: '大乐透',
+  pl3: '排列3',
+  pl5: '排列5',
+  qxc: '七星彩',
+}
 
 function cloneDefaultConfig(): ExpertConfig {
   return {
@@ -112,6 +136,15 @@ function clampWeight(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
 
+function getTaskStatusLabel(status: string | undefined) {
+  if (status === 'queued') return '排队中'
+  if (status === 'running') return '执行中'
+  if (status === 'succeeded') return '已完成'
+  if (status === 'partial_succeeded') return '部分完成'
+  if (status === 'failed') return '失败'
+  return status || '-'
+}
+
 export function ExpertsSettingsPage() {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
@@ -121,6 +154,18 @@ export function ExpertsSettingsPage() {
   const [form, setForm] = useState<SettingsExpertPayload>(EMPTY_FORM)
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabKey>('dlt_front_weights')
   const [taskId, setTaskId] = useState('')
+  const [generationExpert, setGenerationExpert] = useState<SettingsExpert | null>(null)
+  const [generationTask, setGenerationTask] = useState<ExpertPredictionTask | null>(null)
+  const [generationForm, setGenerationForm] = useState({
+    mode: 'current' as ExpertGenerationMode,
+    overwrite: false,
+    parallelism: '3',
+    historyRangeMode: 'recent' as ExpertGenerationRangeMode,
+    recentPeriodCount: '10' as ExpertGenerationRecentPeriodCount,
+    startPeriod: '',
+    endPeriod: '',
+    promptHistoryPeriodCount: '50' as ExpertGenerationPromptHistoryPeriodCount,
+  })
 
   const expertsQuery = useQuery({
     queryKey: ['settings-experts'],
@@ -134,6 +179,15 @@ export function ExpertsSettingsPage() {
     queryKey: ['settings-expert-run-task', taskId],
     queryFn: async () => apiClient.getSettingsExpertPredictionTask(taskId),
     enabled: Boolean(taskId),
+    refetchInterval: (query) => {
+      const status = String(query.state.data?.status || '')
+      return status === 'queued' || status === 'running' ? 1500 : false
+    },
+  })
+  const generationTaskQuery = useQuery({
+    queryKey: ['settings-expert-generation-task', generationTask?.task_id],
+    queryFn: async () => apiClient.getSettingsExpertPredictionTask(generationTask?.task_id || ''),
+    enabled: Boolean(generationTask?.task_id),
     refetchInterval: (query) => {
       const status = String(query.state.data?.status || '')
       return status === 'queued' || status === 'running' ? 1500 : false
@@ -199,6 +253,40 @@ export function ExpertsSettingsPage() {
     },
   })
 
+  const generationMutation = useMutation({
+    mutationFn: async () => {
+      if (!generationExpert) throw new Error('请选择专家')
+      const historyRangePayload =
+        generationForm.mode === 'history'
+          ? generationForm.historyRangeMode === 'recent'
+            ? { recent_period_count: Number(generationForm.recentPeriodCount) as 1 | 5 | 10 | 20 }
+            : {
+                start_period: generationForm.startPeriod.trim(),
+                end_period: generationForm.endPeriod.trim(),
+              }
+          : {}
+      return apiClient.startSettingsExpertPredictionRun({
+        lottery_code: generationExpert.lottery_code,
+        expert_code: generationExpert.expert_code,
+        mode: generationForm.mode,
+        overwrite: generationForm.overwrite,
+        parallelism: Number(generationForm.parallelism.trim()) || 3,
+        prompt_history_period_count: Number(generationForm.promptHistoryPeriodCount) as 30 | 50 | 100,
+        ...historyRangePayload,
+      })
+    },
+    onSuccess: (task) => {
+      setGenerationTask(task)
+      setMessage('已启动专家预测生成任务')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-experts'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '任务启动失败')
+      setMessageType('error')
+    },
+  })
+
   function openCreate() {
     setEditingCode(null)
     setForm({ ...EMPTY_FORM, config: cloneDefaultConfig() })
@@ -218,6 +306,21 @@ export function ExpertsSettingsPage() {
     })
     setActiveConfigTab('dlt_front_weights')
     setFormOpen(true)
+  }
+
+  function openGeneration(expert: SettingsExpert) {
+    setGenerationExpert(expert)
+    setGenerationTask(null)
+    setGenerationForm({
+      mode: 'current',
+      overwrite: false,
+      parallelism: '3',
+      historyRangeMode: 'recent',
+      recentPeriodCount: '10',
+      startPeriod: '',
+      endPeriod: '',
+      promptHistoryPeriodCount: '50',
+    })
   }
 
   function updateWeight(tab: ConfigTabKey, fieldKey: string, value: number) {
@@ -242,10 +345,7 @@ export function ExpertsSettingsPage() {
   }
 
   const normalizedConfig = useMemo(() => normalizeExpertConfig(form.config), [form.config])
-  const invalidStrictTabs = useMemo(
-    () => STRICT_SUM_TABS.filter((key) => getTabTotal(normalizedConfig, key) !== 100),
-    [normalizedConfig],
-  )
+  const invalidStrictTabs = STRICT_SUM_TABS.filter((key) => getTabTotal(normalizedConfig, key) !== 100)
   const canSubmit = invalidStrictTabs.length === 0
   const activeTabTotal = getTabTotal(normalizedConfig, activeConfigTab)
   const activeTabProgress = Math.max(0, Math.min(100, activeTabTotal))
@@ -261,6 +361,14 @@ export function ExpertsSettingsPage() {
   const taskStatusText = runTaskQuery.data
     ? `任务状态：${runTaskQuery.data.status}（成功 ${runTaskQuery.data.progress_summary?.processed_count || 0} / 失败 ${runTaskQuery.data.progress_summary?.failed_count || 0}）`
     : ''
+  const visibleGenerationTask = generationTaskQuery.data || generationTask
+  const generationSummary = visibleGenerationTask?.progress_summary || {}
+  const generationTaskTotal = generationSummary.task_total_count || generationSummary.selected_count || 1
+  const generationTaskCompleted =
+    generationSummary.task_completed_count ||
+    (generationSummary.processed_count || 0) + (generationSummary.skipped_count || 0) + (generationSummary.failed_count || 0)
+  const generationProgressPercent = generationTaskTotal > 0 ? Math.round((generationTaskCompleted / generationTaskTotal) * 100) : 0
+  const generationFailedDetails = generationSummary.failed_details || []
 
   return (
     <div className="page-section">
@@ -319,6 +427,9 @@ export function ExpertsSettingsPage() {
                       >
                         {expert.is_active ? '停用' : '启用'}
                       </button>
+                      <button className="ghost-button ghost-button--compact" type="button" onClick={() => openGeneration(expert)}>
+                        生成预测
+                      </button>
                       <button className="ghost-button ghost-button--compact" type="button" onClick={() => deleteMutation.mutate(expert.expert_code)}>
                         删除
                       </button>
@@ -337,6 +448,205 @@ export function ExpertsSettingsPage() {
           </table>
         </div>
       </StatusCard>
+
+      {generationExpert ? (
+        <div className="modal-overlay" onClick={() => setGenerationExpert(null)}>
+          <div className="modal-card modal-card--form generation-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form
+              className="settings-form-grid generation-modal__form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                generationMutation.mutate()
+              }}
+            >
+              <div className="modal-card__header generation-modal__header">
+                <div className="generation-modal__header-main">
+                  <p className="modal-card__eyebrow">专家预测生成</p>
+                  <h3>{generationExpert.display_name}</h3>
+                  <p className="generation-modal__lottery">当前生成彩种：{LOTTERY_LABELS[generationExpert.lottery_code] || generationExpert.lottery_code.toUpperCase()}</p>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setGenerationExpert(null)}>
+                  关闭
+                </button>
+              </div>
+              <section className="generation-modal__section generation-modal__section--config">
+                <div className="generation-modal__section-title">
+                  <strong>任务参数</strong>
+                  <span>设置模式、覆盖策略、并发线程数与Prompt历史期数。</span>
+                </div>
+                <div className="generation-modal__grid">
+                  <label className="field">
+                    <span>彩种</span>
+                    <input value={LOTTERY_LABELS[generationExpert.lottery_code] || generationExpert.lottery_code.toUpperCase()} readOnly disabled />
+                  </label>
+                  <label className="field">
+                    <span>生成模式</span>
+                    <select
+                      value={generationForm.mode}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ExpertGenerationMode }))}
+                    >
+                      <option value="current">当前期生成</option>
+                      <option value="history">历史重算</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>结果策略</span>
+                    <select
+                      value={generationForm.overwrite ? 'overwrite' : 'skip'}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, overwrite: event.target.value === 'overwrite' }))}
+                    >
+                      <option value="skip">已有结果时跳过</option>
+                      <option value="overwrite">已有结果时覆盖</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>并发线程数</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={8}
+                      step={1}
+                      value={generationForm.parallelism}
+                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, parallelism: event.target.value }))}
+                      placeholder="默认 3"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Prompt历史期数</span>
+                    <select
+                      value={generationForm.promptHistoryPeriodCount}
+                      onChange={(event) =>
+                        setGenerationForm((previous) => ({
+                          ...previous,
+                          promptHistoryPeriodCount: event.target.value as ExpertGenerationPromptHistoryPeriodCount,
+                        }))
+                      }
+                    >
+                      {GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {generationForm.mode === 'history' ? (
+                  <div className="generation-modal__history-grid">
+                    <label className="field">
+                      <span>历史范围</span>
+                      <select
+                        value={generationForm.historyRangeMode === 'recent' ? generationForm.recentPeriodCount : 'custom'}
+                        onChange={(event) => {
+                          const nextValue = event.target.value
+                          setGenerationForm((previous) => ({
+                            ...previous,
+                            historyRangeMode: nextValue === 'custom' ? 'custom' : 'recent',
+                            recentPeriodCount: nextValue === 'custom' ? previous.recentPeriodCount : (nextValue as ExpertGenerationRecentPeriodCount),
+                          }))
+                        }}
+                      >
+                        <option value="custom">自定义</option>
+                        {GENERATION_RECENT_PERIOD_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>开始期号</span>
+                      <input
+                        value={generationForm.startPeriod}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, startPeriod: event.target.value }))}
+                        required={generationForm.historyRangeMode === 'custom'}
+                        disabled={generationForm.historyRangeMode === 'recent'}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>结束期号</span>
+                      <input
+                        value={generationForm.endPeriod}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, endPeriod: event.target.value }))}
+                        required={generationForm.historyRangeMode === 'custom'}
+                        disabled={generationForm.historyRangeMode === 'recent'}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </section>
+              {visibleGenerationTask ? (
+                <section className="generation-modal__section generation-modal__section--task" aria-live="polite">
+                  <div className="generation-modal__section-title">
+                    <strong>任务状态</strong>
+                    <span>创建后会持续刷新执行进度与失败明细。</span>
+                  </div>
+                  <section className="generation-task-panel">
+                    <div className="generation-task-panel__header">
+                      <div>
+                        <p className="modal-card__eyebrow">任务状态</p>
+                        <h4>{generationSummary.mode === 'history' ? '专家历史生成任务' : '专家当前期生成任务'}</h4>
+                      </div>
+                      <span className={clsx('status-pill', visibleGenerationTask.status === 'succeeded' && 'is-active', visibleGenerationTask.status === 'failed' && 'is-deleted')}>
+                        {getTaskStatusLabel(visibleGenerationTask.status)}
+                      </span>
+                    </div>
+                    <div className="generation-task-panel__progress-meta">
+                      <strong>{generationProgressPercent}%</strong>
+                      <span>{generationTaskCompleted} / {generationTaskTotal} 个任务</span>
+                    </div>
+                    <div className="generation-task-panel__progress-bar" role="progressbar" aria-valuemin={0} aria-valuemax={generationTaskTotal} aria-valuenow={generationTaskCompleted}>
+                      <span style={{ width: `${generationProgressPercent}%` }} />
+                    </div>
+                    <div className="generation-task-panel__stats">
+                      <article>
+                        <strong>{generationSummary.parallelism || '-'}</strong>
+                        <span>并发线程数</span>
+                      </article>
+                      <article>
+                        <strong>{generationSummary.processed_count || 0}</strong>
+                        <span>成功</span>
+                      </article>
+                      <article>
+                        <strong>{generationSummary.skipped_count || 0}</strong>
+                        <span>跳过</span>
+                      </article>
+                      <article>
+                        <strong>{generationSummary.failed_count || 0}</strong>
+                        <span>失败</span>
+                      </article>
+                    </div>
+                    {generationFailedDetails.length ? (
+                      <div className="generation-task-panel__failures">
+                        <div className="generation-task-panel__failures-title">
+                          <strong>失败期号</strong>
+                          <span>{generationFailedDetails.length} 个</span>
+                        </div>
+                        <div className="generation-task-panel__failure-list">
+                          {generationFailedDetails.map((item) => (
+                            <article key={`${item.target_period || 'current'}-${item.reason}`} className="generation-task-panel__failure-item">
+                              <div>
+                                <strong>{item.target_period || generationSummary.target_period || '-'}</strong>
+                                <span>{generationExpert.expert_code}</span>
+                              </div>
+                              <p>{item.reason}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {visibleGenerationTask.error_message ? <div className="state-shell state-shell--error">任务失败：{visibleGenerationTask.error_message}</div> : null}
+                  </section>
+                </section>
+              ) : null}
+              <div className="form-actions generation-modal__actions">
+                <button className="primary-button" type="submit" disabled={generationMutation.isPending}>
+                  {generationMutation.isPending ? '创建中...' : '创建任务'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {formOpen ? (
         <div className="modal-overlay" onClick={() => setFormOpen(false)}>

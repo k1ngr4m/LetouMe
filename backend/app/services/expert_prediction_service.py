@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from statistics import mean
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
@@ -24,6 +26,7 @@ DEFAULT_STRATEGY_PREFERENCES = {
     "trend_deviation": 20,
     "stability": 20,
 }
+DEFAULT_EXPERT_HISTORY_PARALLELISM = 3
 
 
 class ExpertPredictionService:
@@ -181,6 +184,323 @@ class ExpertPredictionService:
         )
         runtime_cache.invalidate_prefix("experts:public:")
         return summary
+
+    def generate_for_expert(
+        self,
+        *,
+        expert_code: str,
+        lottery_code: str = "dlt",
+        mode: str = "current",
+        overwrite: bool = False,
+        prompt_history_period_count: int | None = None,
+        parallelism: int | None = None,
+        start_period: str | None = None,
+        end_period: str | None = None,
+        recent_period_count: int | None = None,
+        progress_callback=None,
+    ) -> dict[str, Any]:
+        ensure_schema()
+        normalized_code = normalize_lottery_code(lottery_code)
+        normalized_mode = str(mode or "current").strip().lower()
+        if normalized_mode not in {"current", "history"}:
+            raise ValueError("不支持的生成模式")
+        if normalized_code != "dlt":
+            raise ValueError("专家预测首版仅支持大乐透")
+
+        expert = self.expert_service.get_expert(expert_code)
+        if not expert or bool(expert.get("is_deleted")):
+            raise KeyError(expert_code)
+        if not bool(expert.get("is_active")):
+            raise ValueError("已停用专家不能生成预测数据")
+        if str(expert.get("lottery_code") or "dlt").strip().lower() != normalized_code:
+            raise ValueError("生成彩种必须与专家配置彩种一致")
+
+        prompt_count = self.prediction_generation_service._normalize_prompt_history_period_count(prompt_history_period_count)
+        if normalized_mode == "current":
+            target_period = self._resolve_target_period(normalized_code)
+            prediction_date = datetime.now().strftime("%Y-%m-%d")
+            history = self.lottery_service.get_recent_draws(limit=prompt_count, lottery_code=normalized_code)
+            summary = self._build_single_expert_summary(
+                expert=expert,
+                lottery_code=normalized_code,
+                mode=normalized_mode,
+                target_period=target_period,
+                parallelism=1,
+            )
+            if progress_callback:
+                progress_callback(dict(summary))
+            self._generate_one_expert_period(
+                expert=expert,
+                lottery_code=normalized_code,
+                target_period=target_period,
+                prediction_date=prediction_date,
+                history_context=history,
+                overwrite=overwrite,
+                summary=summary,
+            )
+            summary["task_completed_count"] = 1
+            runtime_cache.invalidate_prefix("experts:public:")
+            if progress_callback:
+                progress_callback(dict(summary))
+            return summary
+
+        history_data = self.prediction_generation_service._load_lottery_history(normalized_code)
+        resolved_start, resolved_end = self.prediction_generation_service._resolve_history_period_range(
+            history_data,
+            start_period=str(start_period or ""),
+            end_period=str(end_period or ""),
+            recent_period_count=recent_period_count,
+        )
+        period_map = self.prediction_generation_service._build_period_map(history_data)
+        sorted_periods = sorted((int(period), period) for period in period_map if str(period).isdigit())
+        target_periods = [str(period) for period in range(int(resolved_start), int(resolved_end) + 1)]
+        max_workers = self.prediction_generation_service._normalize_parallelism(
+            parallelism,
+            task_count=len(target_periods),
+            default_parallelism=DEFAULT_EXPERT_HISTORY_PARALLELISM,
+        )
+        summary = self._build_single_expert_summary(
+            expert=expert,
+            lottery_code=normalized_code,
+            mode=normalized_mode,
+            target_period=f"{resolved_start}-{resolved_end}",
+            parallelism=max_workers,
+        )
+        summary["task_total_count"] = len(target_periods)
+        summary_lock = Lock()
+
+        def emit_progress_snapshot() -> None:
+            if progress_callback:
+                progress_callback(dict(summary))
+
+        emit_progress_snapshot()
+
+        def run_period(target_period: str) -> tuple[str, str, str | None]:
+            if target_period not in period_map:
+                return "failed", target_period, "历史开奖不存在"
+            target_int = int(target_period)
+            history_context = [
+                period_map[period]
+                for period_int, period in sorted(sorted_periods, reverse=True)
+                if period_int < target_int
+            ][:prompt_count]
+            if not history_context:
+                return "failed", target_period, "缺少可用于Prompt的历史开奖"
+            actual_result = period_map[target_period]
+            prediction_date = self.prediction_generation_service._make_prediction_date(actual_result.get("date"))
+            local_summary = self._build_single_expert_summary(
+                expert=expert,
+                lottery_code=normalized_code,
+                mode=normalized_mode,
+                target_period=target_period,
+                parallelism=max_workers,
+            )
+            self._generate_one_expert_period(
+                expert=expert,
+                lottery_code=normalized_code,
+                target_period=target_period,
+                prediction_date=prediction_date,
+                history_context=history_context,
+                overwrite=overwrite,
+                summary=local_summary,
+            )
+            if local_summary["processed_count"] > 0:
+                return "processed", target_period, None
+            if local_summary["skipped_count"] > 0:
+                return "skipped", target_period, None
+            failed = local_summary.get("failed_details") or []
+            reason = str((failed[0] or {}).get("reason") or "专家预测生成失败") if failed else "专家预测生成失败"
+            return "failed", target_period, reason
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(run_period, target_period): target_period for target_period in target_periods}
+            for future in as_completed(futures):
+                target_period = futures[future]
+                try:
+                    status, finished_period, reason = future.result()
+                except Exception as exc:
+                    status, finished_period, reason = "failed", target_period, str(exc)
+                    self.logger.exception(
+                        "Expert history generation worker crashed",
+                        extra={"context": {"expert_code": expert_code, "target_period": target_period}},
+                    )
+                with summary_lock:
+                    summary["task_completed_count"] = int(summary.get("task_completed_count") or 0) + 1
+                    if status == "processed":
+                        summary["processed_count"] += 1
+                        summary["processed_periods"].append(finished_period)
+                    elif status == "skipped":
+                        summary["skipped_count"] += 1
+                        summary["skipped_periods"].append(finished_period)
+                    else:
+                        summary["failed_count"] += 1
+                        summary["failed_periods"].append(finished_period)
+                        summary["failed_details"].append({"target_period": finished_period, "reason": reason or "专家预测生成失败"})
+                    emit_progress_snapshot()
+
+        runtime_cache.invalidate_prefix("experts:public:")
+        return summary
+
+    def _build_single_expert_summary(
+        self,
+        *,
+        expert: dict[str, Any],
+        lottery_code: str,
+        mode: str,
+        target_period: str,
+        parallelism: int,
+    ) -> dict[str, Any]:
+        expert_code = str(expert.get("expert_code") or "")
+        return {
+            "lottery_code": lottery_code,
+            "mode": mode,
+            "expert_code": expert_code,
+            "expert_name": expert.get("display_name"),
+            "target_period": target_period,
+            "parallelism": parallelism,
+            "selected_count": 1,
+            "processed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "processed_experts": [],
+            "failed_experts": [],
+            "processed_periods": [],
+            "skipped_periods": [],
+            "failed_periods": [],
+            "failed_details": [],
+            "task_total_count": 1,
+            "task_completed_count": 0,
+        }
+
+    def _generate_one_expert_period(
+        self,
+        *,
+        expert: dict[str, Any],
+        lottery_code: str,
+        target_period: str,
+        prediction_date: str,
+        history_context: list[dict[str, Any]],
+        overwrite: bool,
+        summary: dict[str, Any],
+    ) -> None:
+        expert_code = str(expert.get("expert_code") or "")
+        batch = self.repository.upsert_batch(
+            {
+                "task_id": f"expert-batch-{uuid4().hex}",
+                "lottery_code": lottery_code,
+                "target_period": target_period,
+                "prediction_date": prediction_date,
+                "status": "running",
+                "summary": {
+                    **summary,
+                    "target_period": target_period,
+                },
+            }
+        )
+        existing_result = self._find_result_for_expert(
+            lottery_code=lottery_code,
+            target_period=target_period,
+            expert=expert,
+        )
+        if existing_result and str(existing_result.get("status") or "") == "succeeded" and not overwrite:
+            summary["skipped_count"] += 1
+            summary["skipped_periods"].append(target_period)
+            self.repository.update_batch(
+                str(batch.get("task_id") or ""),
+                {
+                    "status": "succeeded",
+                    "summary": summary,
+                },
+            )
+            return
+
+        try:
+            precompute = self._build_precompute(history_context, window_count=len(history_context))
+            prompt = self._build_prompt(
+                expert=expert,
+                precompute=precompute,
+                target_period=target_period,
+                prediction_date=prediction_date,
+            )
+            parsed = self._generate_first_tier_with_model(expert=expert, prompt=prompt)
+            tier1_front, tier1_back = self._resolve_tier1_numbers(parsed=parsed, precompute=precompute)
+            tiers = self._build_nested_tiers(
+                tier1_front=tier1_front,
+                tier1_back=tier1_back,
+                precompute=precompute,
+                expert=expert,
+            )
+            analysis = self._build_analysis(parsed=parsed, expert=expert, precompute=precompute)
+            self.repository.upsert_result(
+                {
+                    "batch_id": int(batch.get("id") or 0),
+                    "expert_id": int(expert.get("id") or 0),
+                    "expert_code": expert_code,
+                    "lottery_code": lottery_code,
+                    "target_period": target_period,
+                    "status": "succeeded",
+                    "error_message": None,
+                    "prompt_snapshot": prompt,
+                    "precompute": precompute,
+                    "tiers": tiers,
+                    "analysis": analysis,
+                    "generated_at": datetime.now(),
+                }
+            )
+            summary["processed_count"] += 1
+            summary["processed_experts"].append(expert_code)
+            summary["processed_periods"].append(target_period)
+            self.repository.update_batch(
+                str(batch.get("task_id") or ""),
+                {
+                    "status": "succeeded",
+                    "summary": summary,
+                },
+            )
+        except Exception as exc:
+            self.logger.exception(
+                "Expert prediction generation failed",
+                extra={"context": {"expert_code": expert_code, "target_period": target_period}},
+            )
+            self.repository.upsert_result(
+                {
+                    "batch_id": int(batch.get("id") or 0),
+                    "expert_id": int(expert.get("id") or 0),
+                    "expert_code": expert_code,
+                    "lottery_code": lottery_code,
+                    "target_period": target_period,
+                    "status": "failed",
+                    "error_message": str(exc),
+                    "prompt_snapshot": "",
+                    "precompute": {},
+                    "tiers": {},
+                    "analysis": {},
+                    "generated_at": datetime.now(),
+                }
+            )
+            summary["failed_count"] += 1
+            summary["failed_experts"].append({"expert_code": expert_code, "reason": str(exc)})
+            summary["failed_periods"].append(target_period)
+            summary["failed_details"].append({"target_period": target_period, "reason": str(exc)})
+            self.repository.update_batch(
+                str(batch.get("task_id") or ""),
+                {
+                    "status": "failed",
+                    "summary": summary,
+                },
+            )
+
+    def _find_result_for_expert(self, *, lottery_code: str, target_period: str, expert: dict[str, Any]) -> dict[str, Any] | None:
+        expert_id = int(expert.get("id") or 0)
+        expert_code = str(expert.get("expert_code") or "")
+        return next(
+            (
+                item
+                for item in self.repository.list_results_by_period(lottery_code=lottery_code, target_period=target_period)
+                if (expert_id > 0 and int(item.get("expert_id") or 0) == expert_id) or str(item.get("expert_code") or "") == expert_code
+            ),
+            None,
+        )
 
     def list_current_experts(self, *, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
@@ -551,9 +871,9 @@ class ExpertPredictionService:
             "technical_style": f"当前前区热点参考: {'/'.join(str(item) for item in hot_front if item)}",
         }
 
-    def _build_precompute(self, history: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_precompute(self, history: list[dict[str, Any]], *, window_count: int = 50) -> dict[str, Any]:
         valid_history = [item for item in history if isinstance(item, dict) and item.get("red_balls")]
-        window = valid_history[:50]
+        window = valid_history[:window_count]
         front_rows = self._build_zone_stats(window, zone="front")
         back_rows = self._build_zone_stats(window, zone="back")
         shape_metrics = self._build_shape_metrics(window)
