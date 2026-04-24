@@ -112,6 +112,8 @@ describe('ExpertsSettingsPage generation', () => {
     renderPage()
 
     await screen.findByText('魏荣杰')
+    expect(screen.getByText('2026-02-02 10:40')).toBeInTheDocument()
+    expect(screen.queryByText(/1970/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '生成预测' }))
 
     expect(screen.getByRole('heading', { name: '魏荣杰' })).toBeInTheDocument()

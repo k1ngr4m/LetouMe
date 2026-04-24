@@ -390,6 +390,10 @@ class ExpertRepository:
         normalized = str(value).strip()
         return normalized or None
 
+    @staticmethod
+    def _serialize_db_timestamp(value: Any) -> int | None:
+        return ensure_timestamp(value, assume_beijing=True)
+
     def _serialize_expert_row(self, row: dict[str, Any]) -> dict[str, Any]:
         config = self._load_json(row.get("config_json"), {})
         return {
@@ -403,8 +407,8 @@ class ExpertRepository:
             "is_active": bool(row.get("is_active")),
             "is_deleted": bool(row.get("is_deleted")),
             "config": config if isinstance(config, dict) else {},
-            "updated_at": ensure_timestamp(row.get("updated_at")) or 0,
-            "created_at": ensure_timestamp(row.get("created_at")) or 0,
+            "updated_at": self._serialize_db_timestamp(row.get("updated_at")) or 0,
+            "created_at": self._serialize_db_timestamp(row.get("created_at")) or 0,
         }
 
     def _serialize_batch_row(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -417,8 +421,8 @@ class ExpertRepository:
             "prediction_date": str(row.get("prediction_date") or ""),
             "status": str(row.get("status") or "queued"),
             "summary": summary if isinstance(summary, dict) else {},
-            "updated_at": ensure_timestamp(row.get("updated_at")) or 0,
-            "created_at": ensure_timestamp(row.get("created_at")) or 0,
+            "updated_at": self._serialize_db_timestamp(row.get("updated_at")) or 0,
+            "created_at": self._serialize_db_timestamp(row.get("created_at")) or 0,
         }
 
     def _serialize_result_row(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -441,9 +445,9 @@ class ExpertRepository:
             "precompute": precompute if isinstance(precompute, dict) else {},
             "tiers": tiers if isinstance(tiers, dict) else {},
             "analysis": analysis if isinstance(analysis, dict) else {},
-            "generated_at": ensure_timestamp(row.get("generated_at")),
-            "updated_at": ensure_timestamp(row.get("updated_at")) or 0,
-            "created_at": ensure_timestamp(row.get("created_at")) or 0,
+            "generated_at": self._serialize_db_timestamp(row.get("generated_at")),
+            "updated_at": self._serialize_db_timestamp(row.get("updated_at")) or 0,
+            "created_at": self._serialize_db_timestamp(row.get("created_at")) or 0,
             "is_active": bool(row.get("is_active")) if "is_active" in row else True,
             "is_deleted": bool(row.get("is_deleted")) if "is_deleted" in row else False,
         }

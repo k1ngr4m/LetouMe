@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
+import { formatDateTimeBeijing } from '../../shared/lib/format'
 import type { ExpertConfig, ExpertPredictionTask, LotteryCode, SettingsExpert, SettingsExpertPayload } from '../../shared/types/api'
 
 const DEFAULT_CONFIG: ExpertConfig = {
@@ -414,7 +415,7 @@ export function ExpertsSettingsPage() {
                   <td>
                     <span className={clsx('status-pill', expert.is_active ? 'is-active' : 'is-muted')}>{expert.is_active ? '启用中' : '已停用'}</span>
                   </td>
-                  <td>{new Date(expert.updated_at).toLocaleString()}</td>
+                  <td>{formatDateTimeBeijing(expert.updated_at)}</td>
                   <td>
                     <div className="settings-model-table__actions">
                       <button className="ghost-button ghost-button--compact" type="button" onClick={() => openEdit(expert)}>
