@@ -12705,6 +12705,28 @@ a {
   text-overflow: ellipsis;
 }
 
+.crm-nav-item__beta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0.08rem 0.32rem;
+  border: 1px solid rgba(255, 214, 176, 0.38);
+  background: rgba(255, 151, 77, 0.16);
+  color: #ffd6aa;
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.crm-nav-item.is-active .crm-nav-item__beta {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff9f0;
+}
+
 .crm-chart-nav {
   display: grid;
   gap: 0.72rem;
@@ -14213,6 +14235,7 @@ a {
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-message-nav-item span,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-message-nav-item em,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item span,
+  .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-item__beta,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-nav-submenu,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__back span,
   .crm-shell.is-sidebar-collapsed .crm-sidebar:not(:hover) .crm-sidebar__collapse-btn span {

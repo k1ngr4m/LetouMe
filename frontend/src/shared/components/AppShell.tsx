@@ -592,6 +592,9 @@ export function AppShell({ children }: PropsWithChildren) {
               >
                 <UsersRound size={16} aria-hidden="true" />
                 <span>专家预测</span>
+                <em className="crm-nav-item__beta" aria-label="Beta">
+                  BETA
+                </em>
               </NavLink>
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
                 <CircleDollarSign size={16} aria-hidden="true" />
