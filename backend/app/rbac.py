@@ -7,6 +7,7 @@ from backend.app.db.connection import ensure_schema, get_connection
 
 BASIC_PROFILE_PERMISSION = "basic_profile"
 MODEL_MANAGEMENT_PERMISSION = "model_management"
+EXPERT_MANAGEMENT_PERMISSION = "expert_management"
 USER_MANAGEMENT_PERMISSION = "user_management"
 ROLE_MANAGEMENT_PERMISSION = "role_management"
 SCHEDULE_MANAGEMENT_PERMISSION = "schedule_management"
@@ -22,6 +23,10 @@ DEFAULT_PERMISSIONS = {
     MODEL_MANAGEMENT_PERMISSION: {
         "name": "模型管理",
         "description": "允许查看、创建、编辑、启停和删除模型配置，以及查看 Provider 列表。",
+    },
+    EXPERT_MANAGEMENT_PERMISSION: {
+        "name": "专家管理",
+        "description": "允许查看、创建、编辑、启停和删除专家配置，并手动触发专家预测生成任务。",
     },
     USER_MANAGEMENT_PERMISSION: {
         "name": "用户管理",

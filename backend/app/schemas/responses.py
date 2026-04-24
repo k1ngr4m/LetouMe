@@ -142,6 +142,55 @@ class SmartPredictionRunListResponse(BaseModel):
     total_count: int = 0
 
 
+class ExpertResponse(BaseModel):
+    id: int
+    expert_code: str
+    display_name: str
+    bio: str = ""
+    model_code: str
+    lottery_code: str = "dlt"
+    history_window_count: int = 50
+    is_active: bool = True
+    is_deleted: bool = False
+    config: dict[str, Any] = Field(default_factory=dict)
+    updated_at: int = 0
+    created_at: int = 0
+
+
+class ExpertListResponse(BaseModel):
+    experts: list[ExpertResponse] = Field(default_factory=list)
+
+
+class ExpertPredictionTaskResponse(BaseModel):
+    task_id: str
+    lottery_code: str = "dlt"
+    status: str
+    created_at: int
+    started_at: int | None = None
+    finished_at: int | None = None
+    progress_summary: dict[str, Any] = Field(default_factory=dict)
+    error_message: str | None = None
+
+
+class ExpertPublicListResponse(BaseModel):
+    lottery_code: str = "dlt"
+    target_period: str = ""
+    experts: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ExpertCurrentDetailResponse(BaseModel):
+    expert_code: str
+    display_name: str
+    bio: str = ""
+    model_code: str
+    lottery_code: str = "dlt"
+    target_period: str
+    config: dict[str, Any] = Field(default_factory=dict)
+    tiers: dict[str, Any] = Field(default_factory=dict)
+    analysis: dict[str, Any] = Field(default_factory=dict)
+    generated_at: int | None = None
+
+
 class SimulationTicketRecordResponse(BaseModel):
     id: int
     lottery_code: str = "dlt"

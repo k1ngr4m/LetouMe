@@ -590,6 +590,62 @@ SCHEMA_STATEMENTS = [
         INDEX idx_smart_prediction_run_user_created (created_by_user_id, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS expert_profile (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        expert_code VARCHAR(64) NOT NULL UNIQUE,
+        display_name VARCHAR(128) NOT NULL,
+        bio TEXT NULL,
+        model_code VARCHAR(128) NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        history_window_count INT NOT NULL DEFAULT 50,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+        config_json LONGTEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_expert_profile_lottery_active (lottery_code, is_active, is_deleted),
+        INDEX idx_expert_profile_model_code (model_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS expert_prediction_batch (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        task_id VARCHAR(64) NOT NULL UNIQUE,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        target_period VARCHAR(32) NOT NULL,
+        prediction_date VARCHAR(32) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        summary_json LONGTEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_expert_prediction_batch_period (lottery_code, target_period),
+        INDEX idx_expert_prediction_batch_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS expert_prediction_result (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        batch_id BIGINT NOT NULL,
+        expert_id BIGINT NOT NULL,
+        expert_code VARCHAR(64) NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        target_period VARCHAR(32) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        error_message TEXT NULL,
+        prompt_snapshot LONGTEXT NULL,
+        precompute_json LONGTEXT NULL,
+        tiers_json LONGTEXT NULL,
+        analysis_json LONGTEXT NULL,
+        generated_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_expert_prediction_result_batch FOREIGN KEY (batch_id) REFERENCES expert_prediction_batch(id) ON DELETE CASCADE,
+        CONSTRAINT fk_expert_prediction_result_expert FOREIGN KEY (expert_id) REFERENCES expert_profile(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_expert_prediction_result_batch_expert (batch_id, expert_id),
+        INDEX idx_expert_prediction_result_query (lottery_code, target_period, expert_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [

@@ -10,6 +10,9 @@ import type {
   ForgotPasswordResetPayload,
   ForgotPasswordSendCodePayload,
   GenerateSettingsModelPredictionsPayload,
+  ExpertCurrentDetail,
+  ExpertPredictionTask,
+  ExpertPublicListResponse,
   LoginPayload,
   MyBetRecordCreateResponse,
   MyBetOCRDraftResponse,
@@ -47,6 +50,9 @@ import type {
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProvider,
+  SettingsExpert,
+  SettingsExpertListResponse,
+  SettingsExpertPayload,
   SettingsProviderModelDiscoveryPayload,
   SettingsProviderModelDiscoveryResponse,
   SettingsProviderListResponse,
@@ -246,6 +252,18 @@ export const apiClient = {
       body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod }),
     })
   },
+  getExpertsList(lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<ExpertPublicListResponse>('/api/experts/list', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: lotteryCode }),
+    })
+  },
+  getExpertCurrentDetail(expertCode: string, lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<ExpertCurrentDetail>('/api/experts/current/detail', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: lotteryCode, expert_code: expertCode }),
+    })
+  },
   startSmartPredictionRun(payload: SmartPredictionRunStartPayload) {
     return requestJson<SmartPredictionRun>('/api/predictions/smart/run/start', {
       method: 'POST',
@@ -409,6 +427,60 @@ export const apiClient = {
     return requestJson<SettingsModelListResponse>('/api/settings/models/list', {
       method: 'POST',
       body: JSON.stringify({ include_deleted: includeDeleted, lottery_code: lotteryCode }),
+    })
+  },
+  getSettingsExperts(includeDeleted = false, lotteryCode?: LotteryCode) {
+    return requestJson<SettingsExpertListResponse>('/api/settings/experts/list', {
+      method: 'POST',
+      body: JSON.stringify({ include_deleted: includeDeleted, lottery_code: lotteryCode }),
+    })
+  },
+  getSettingsExpert(expertCode: string) {
+    return requestJson<SettingsExpert>('/api/settings/experts/detail', {
+      method: 'POST',
+      body: JSON.stringify({ expert_code: expertCode }),
+    })
+  },
+  createSettingsExpert(payload: SettingsExpertPayload) {
+    return requestJson<SettingsExpert>('/api/settings/experts/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  updateSettingsExpert(expertCode: string, payload: SettingsExpertPayload) {
+    return requestJson<SettingsExpert>('/api/settings/experts/update', {
+      method: 'POST',
+      body: JSON.stringify({ original_expert_code: expertCode, ...payload }),
+    })
+  },
+  toggleSettingsExpert(expertCode: string, isActive: boolean) {
+    return requestJson<SettingsExpert>('/api/settings/experts/status', {
+      method: 'POST',
+      body: JSON.stringify({ expert_code: expertCode, is_active: isActive }),
+    })
+  },
+  deleteSettingsExpert(expertCode: string) {
+    return requestJson<SettingsExpert>('/api/settings/experts/delete', {
+      method: 'POST',
+      body: JSON.stringify({ expert_code: expertCode }),
+    })
+  },
+  restoreSettingsExpert(expertCode: string) {
+    return requestJson<SettingsExpert>('/api/settings/experts/restore', {
+      method: 'POST',
+      body: JSON.stringify({ expert_code: expertCode }),
+    })
+  },
+  startSettingsExpertPredictionRun(lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<ExpertPredictionTask>('/api/settings/experts/predictions/run/start', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: lotteryCode }),
+    })
+  },
+  getSettingsExpertPredictionTask(taskId: string) {
+    return requestJson<ExpertPredictionTask>('/api/settings/experts/predictions/task-detail', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
     })
   },
   getSettingsModel(modelCode: string) {

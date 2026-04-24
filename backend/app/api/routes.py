@@ -14,6 +14,7 @@ from backend.app.auth import (
     get_auth_service,
     require_basic_profile_permission,
     require_current_user,
+    require_expert_management_permission,
     require_model_management_permission,
     require_role_management_permission,
     require_schedule_management_permission,
@@ -62,6 +63,14 @@ from backend.app.schemas.requests import (
     MyBetRecordUpdatePayload,
     ModelListPayload,
     ModelStatusUpdatePayload,
+    ExpertCodePayload,
+    ExpertCurrentDetailPayload,
+    ExpertListPayload,
+    ExpertPredictionRunStartPayload,
+    ExpertPredictionTaskPayload,
+    ExpertSettingsPayload,
+    ExpertStatusUpdatePayload,
+    ExpertUpdatePayload,
     ModelUpdatePayload,
     ProviderCodePayload,
     ProviderCreatePayload,
@@ -105,6 +114,11 @@ from backend.app.schemas.responses import (
     MyBetOCRImageUploadResponse,
     MyBetRecordUpdateResponse,
     PredictionGenerationTaskResponse,
+    ExpertCurrentDetailResponse,
+    ExpertListResponse,
+    ExpertResponse,
+    ExpertPredictionTaskResponse,
+    ExpertPublicListResponse,
     PredictionsHistoryResponse,
     ScheduleTaskListResponse,
     ScheduleTaskResponse,
@@ -124,6 +138,9 @@ from backend.app.rbac import MODEL_MANAGEMENT_PERMISSION, SCHEDULE_MANAGEMENT_PE
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.model_service import ModelService
+from backend.app.services.expert_service import ExpertService
+from backend.app.services.expert_prediction_service import expert_prediction_service
+from backend.app.services.expert_prediction_task_service import expert_prediction_task_service
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
 from backend.app.services.prediction_service import PredictionService
@@ -139,6 +156,7 @@ router = APIRouter(prefix="/api")
 lottery_service = LotteryService()
 prediction_service = PredictionService()
 model_service = ModelService()
+expert_service = ExpertService()
 prediction_generation_service = PredictionGenerationService()
 simulation_ticket_service = SimulationTicketService()
 my_bet_service = MyBetService()
@@ -375,6 +393,22 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])
     return {"predictions_history": [record], "total_count": 1, "model_stats": prediction_service._build_model_stats([record], score_profiles)}
+
+
+@router.post("/experts/list", response_model=ExpertPublicListResponse)
+def list_public_experts(payload: PaginationPayload, _: dict = Depends(require_current_user)) -> dict:
+    return expert_prediction_service.list_current_experts(lottery_code=payload.lottery_code)
+
+
+@router.post("/experts/current/detail", response_model=ExpertCurrentDetailResponse)
+def get_public_expert_current_detail(payload: ExpertCurrentDetailPayload, _: dict = Depends(require_current_user)) -> dict:
+    detail = expert_prediction_service.get_current_expert_detail(
+        lottery_code=payload.lottery_code,
+        expert_code=payload.expert_code,
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="专家当期方案不存在")
+    return detail
 
 
 @router.post("/predictions/smart/run/start", response_model=SmartPredictionRunResponse)
@@ -687,6 +721,95 @@ def restore_settings_model(payload: ModelCodePayload, _: dict = Depends(require_
         return model_service.restore_model(payload.model_code)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="模型不存在") from exc
+
+
+@router.post("/settings/experts/list", response_model=ExpertListResponse)
+def list_settings_experts(payload: ExpertListPayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    return {
+        "experts": expert_service.list_experts(
+            include_deleted=payload.include_deleted,
+            lottery_code=payload.lottery_code,
+        )
+    }
+
+
+@router.post("/settings/experts/detail", response_model=ExpertResponse)
+def get_settings_expert(payload: ExpertCodePayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    expert = expert_service.get_expert(payload.expert_code)
+    if not expert:
+        raise HTTPException(status_code=404, detail="专家不存在")
+    return expert
+
+
+@router.post("/settings/experts/create", response_model=ExpertResponse)
+def create_settings_expert(payload: ExpertSettingsPayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    try:
+        return expert_service.create_expert(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/experts/update", response_model=ExpertResponse)
+def update_settings_expert(payload: ExpertUpdatePayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    try:
+        return expert_service.update_expert(payload.original_expert_code, payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="专家不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/settings/experts/status", response_model=ExpertResponse)
+def update_settings_expert_status(payload: ExpertStatusUpdatePayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    try:
+        return expert_service.set_expert_active(payload.expert_code, payload.is_active)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="专家不存在") from exc
+
+
+@router.post("/settings/experts/delete", response_model=ExpertResponse)
+def delete_settings_expert(payload: ExpertCodePayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    try:
+        return expert_service.delete_expert(payload.expert_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="专家不存在") from exc
+
+
+@router.post("/settings/experts/restore", response_model=ExpertResponse)
+def restore_settings_expert(payload: ExpertCodePayload, _: dict = Depends(require_expert_management_permission)) -> dict:
+    try:
+        return expert_service.restore_expert(payload.expert_code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="专家不存在") from exc
+
+
+@router.post("/settings/experts/predictions/run/start", response_model=ExpertPredictionTaskResponse)
+def start_settings_expert_prediction_run(
+    payload: ExpertPredictionRunStartPayload,
+    _: dict = Depends(require_expert_management_permission),
+) -> dict:
+    try:
+        lottery_code = normalize_lottery_code(payload.lottery_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return expert_prediction_task_service.create_task(
+        lottery_code=lottery_code,
+        worker=lambda progress_callback: expert_prediction_service.generate_current_for_all(
+            lottery_code=lottery_code,
+            progress_callback=progress_callback,
+        ),
+    )
+
+
+@router.post("/settings/experts/predictions/task-detail", response_model=ExpertPredictionTaskResponse)
+def get_settings_expert_prediction_task(
+    payload: ExpertPredictionTaskPayload,
+    _: dict = Depends(require_expert_management_permission),
+) -> dict:
+    task = expert_prediction_task_service.get_task(payload.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return task
 
 
 @router.post("/settings/providers/list", response_model=ProviderListResponse)

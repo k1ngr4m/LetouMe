@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -68,6 +68,48 @@ class ProviderUpdatePayload(ProviderSettingsPayload):
 class ModelStatusUpdatePayload(BaseModel):
     model_code: str
     is_active: bool
+
+
+class ExpertListPayload(BaseModel):
+    include_deleted: bool = False
+    lottery_code: str | None = None
+
+
+class ExpertCodePayload(BaseModel):
+    expert_code: str
+
+
+class ExpertSettingsPayload(BaseModel):
+    expert_code: str | None = None
+    display_name: str
+    bio: str | None = ""
+    model_code: str
+    lottery_code: str = "dlt"
+    is_active: bool = True
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExpertUpdatePayload(ExpertSettingsPayload):
+    original_expert_code: str
+    expert_code: str
+
+
+class ExpertStatusUpdatePayload(BaseModel):
+    expert_code: str
+    is_active: bool
+
+
+class ExpertCurrentDetailPayload(BaseModel):
+    lottery_code: str = "dlt"
+    expert_code: str
+
+
+class ExpertPredictionRunStartPayload(BaseModel):
+    lottery_code: str = "dlt"
+
+
+class ExpertPredictionTaskPayload(BaseModel):
+    task_id: str
 
 
 class GenerateModelPredictionsPayload(BaseModel):

@@ -16,6 +16,7 @@ from backend.app.config import Settings, load_settings
 from backend.app.logging_utils import get_logger
 from backend.app.rbac import (
     BASIC_PROFILE_PERMISSION,
+    EXPERT_MANAGEMENT_PERMISSION,
     MODEL_MANAGEMENT_PERMISSION,
     NORMAL_USER_ROLE,
     ROLE_MANAGEMENT_PERMISSION,
@@ -661,6 +662,10 @@ def require_basic_profile_permission(current_user: dict[str, Any] = Depends(requ
 
 
 def require_model_management_permission(current_user: dict[str, Any] = Depends(require_permission(MODEL_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
+    return current_user
+
+
+def require_expert_management_permission(current_user: dict[str, Any] = Depends(require_permission(EXPERT_MANAGEMENT_PERMISSION))) -> dict[str, Any]:
     return current_user
 
 

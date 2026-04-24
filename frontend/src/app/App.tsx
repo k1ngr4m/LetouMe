@@ -11,6 +11,7 @@ import { HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CE
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
+const EXPERT_MANAGEMENT_PERMISSION = 'expert_management'
 const SCHEDULE_MANAGEMENT_PERMISSION = 'schedule_management'
 const USER_MANAGEMENT_PERMISSION = 'user_management'
 const ROLE_MANAGEMENT_PERMISSION = 'role_management'
@@ -30,6 +31,7 @@ const HomeSmartPredictionPage = lazy(() =>
 )
 const MessageCenterPage = lazy(() => import('../features/messages/MessageCenterPage').then((module) => ({ default: module.MessageCenterPage })))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const ExpertsSettingsPage = lazy(() => import('../features/settings/ExpertsSettingsPage').then((module) => ({ default: module.ExpertsSettingsPage })))
 
 function RouteLoadingFallback() {
   return <div style={{ padding: '24px', textAlign: 'center' }}>加载中...</div>
@@ -168,6 +170,16 @@ export function App() {
                 <ProtectedRoute requiredPermission={MODEL_MANAGEMENT_PERMISSION}>
                   <AppShell>
                     <SettingsPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/experts"
+              element={
+                <ProtectedRoute requiredPermission={EXPERT_MANAGEMENT_PERMISSION}>
+                  <AppShell>
+                    <ExpertsSettingsPage />
                   </AppShell>
                 </ProtectedRoute>
               }

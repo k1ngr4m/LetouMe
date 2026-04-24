@@ -623,6 +623,62 @@ export type SettingsModelConnectivityTestResponse = {
   duration_ms: number
 }
 
+export type ExpertConfig = {
+  dlt_front_weights: Record<string, number>
+  dlt_back_weights: Record<string, number>
+  strategy_preferences: Record<string, number>
+  pl3_reserved_weights: Record<string, number>
+}
+
+export type SettingsExpert = {
+  id: number
+  expert_code: string
+  display_name: string
+  bio: string
+  model_code: string
+  lottery_code: LotteryCode
+  history_window_count: number
+  is_active: boolean
+  is_deleted: boolean
+  config: ExpertConfig
+  updated_at: number
+  created_at: number
+}
+
+export type SettingsExpertListResponse = {
+  experts: SettingsExpert[]
+}
+
+export type SettingsExpertPayload = {
+  expert_code?: string
+  display_name: string
+  bio?: string
+  model_code: string
+  lottery_code: LotteryCode
+  is_active: boolean
+  config: ExpertConfig
+}
+
+export type ExpertPredictionTask = {
+  task_id: string
+  lottery_code?: LotteryCode
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'partial_succeeded'
+  created_at: number
+  started_at?: number | null
+  finished_at?: number | null
+  progress_summary: {
+    lottery_code?: LotteryCode
+    target_period?: string
+    selected_count?: number
+    processed_count?: number
+    skipped_count?: number
+    failed_count?: number
+    processed_experts?: string[]
+    failed_experts?: Array<{ expert_code: string; reason: string }>
+  }
+  error_message?: string | null
+}
+
 export type SettingsProviderPayload = {
   code?: string
   name: string
@@ -876,6 +932,47 @@ export type SmartPredictionRun = {
   error_message?: string | null
   created_at?: number | null
   updated_at?: number | null
+}
+
+export type ExpertListItem = {
+  expert_code: string
+  display_name: string
+  bio: string
+  lottery_code: LotteryCode
+  target_period: string
+  model_code: string
+  dlt_front_weights: Record<string, number>
+  dlt_back_weights: Record<string, number>
+  strategy_preferences: Record<string, number>
+  generated_at?: number | null
+}
+
+export type ExpertPublicListResponse = {
+  lottery_code: LotteryCode
+  target_period: string
+  experts: ExpertListItem[]
+}
+
+export type ExpertCurrentDetail = {
+  expert_code: string
+  display_name: string
+  bio: string
+  model_code: string
+  lottery_code: LotteryCode
+  target_period: string
+  config: ExpertConfig
+  tiers: {
+    tier1?: { front: string[]; back: string[] }
+    tier2?: { front: string[]; back: string[] }
+    tier3?: { front: string[]; back: string[] }
+    tier4?: { front: string[]; back: string[] }
+    tier5?: { front: string[]; back: string[] }
+  }
+  analysis: {
+    strategy_summary?: string
+    technical_style?: string
+  }
+  generated_at?: number | null
 }
 
 export type SmartPredictionRunStartPayload = {

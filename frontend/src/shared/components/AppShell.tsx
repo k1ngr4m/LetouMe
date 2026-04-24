@@ -35,6 +35,7 @@ const SETTINGS_PATHS = {
   profile: '/settings/profile',
   account: '/settings/account',
   models: '/settings/models',
+  experts: '/settings/experts',
   maintenance: '/settings/maintenance',
   schedules: '/settings/schedules',
   users: '/settings/users',
@@ -122,6 +123,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const canOpenSettings = hasPermission('basic_profile')
   const canManageModels = hasPermission('model_management')
+  const canManageExperts = hasPermission('expert_management')
   const canManageSchedules = hasPermission('schedule_management')
   const canManageUsers = hasPermission('user_management')
   const canManageRoles = hasPermission('role_management')
@@ -630,6 +632,12 @@ export function AppShell({ children }: PropsWithChildren) {
                     <span>维护记录</span>
                   </NavLink>
                 </>
+              ) : null}
+              {canManageExperts ? (
+                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.experts} onClick={onSettingsNavigate} title="专家管理">
+                  <Sparkles size={16} aria-hidden="true" />
+                  <span>专家管理</span>
+                </NavLink>
               ) : null}
               {canManageSchedules ? (
                 <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.schedules} onClick={onSettingsNavigate} title="任务调度">
