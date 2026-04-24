@@ -205,16 +205,22 @@ class ExpertPredictionService:
     def _build_current_expert_list_payload(self, lottery_code: str, target_period: str) -> dict[str, Any]:
         experts = self.expert_service.list_experts(include_deleted=False, lottery_code=lottery_code)
         result_rows = self.repository.list_results_by_period(lottery_code=lottery_code, target_period=target_period)
-        result_map = {
+        result_map_by_code = {
             str(item.get("expert_code") or ""): item
             for item in result_rows
             if str(item.get("status") or "") == "succeeded"
+        }
+        result_map_by_id = {
+            int(item.get("expert_id") or 0): item
+            for item in result_rows
+            if str(item.get("status") or "") == "succeeded" and int(item.get("expert_id") or 0) > 0
         }
         cards = []
         for expert in experts:
             if not bool(expert.get("is_active")) or bool(expert.get("is_deleted")):
                 continue
-            result = result_map.get(str(expert.get("expert_code") or ""))
+            expert_id = int(expert.get("id") or 0)
+            result = result_map_by_id.get(expert_id) or result_map_by_code.get(str(expert.get("expert_code") or ""))
             if not result:
                 continue
             config = expert.get("config") if isinstance(expert.get("config"), dict) else {}
@@ -243,16 +249,28 @@ class ExpertPredictionService:
         if not expert or bool(expert.get("is_deleted")) or not bool(expert.get("is_active")):
             return None
         result_rows = self.repository.list_results_by_period(lottery_code=lottery_code, target_period=target_period)
+        expert_id = int(expert.get("id") or 0)
         result = next(
             (
                 item
                 for item in result_rows
-                if str(item.get("expert_code") or "") == expert_code and str(item.get("status") or "") == "succeeded"
+                if str(item.get("status") or "") == "succeeded"
+                and (
+                    (expert_id > 0 and int(item.get("expert_id") or 0) == expert_id)
+                    or str(item.get("expert_code") or "") == expert_code
+                )
             ),
             None,
         )
         if not result:
             return None
+        tiers = result.get("tiers") if isinstance(result.get("tiers"), dict) else {}
+        precompute = result.get("precompute") if isinstance(result.get("precompute"), dict) else {}
+        process = self._build_process_detail(
+            tiers=tiers,
+            precompute=precompute,
+            expert=expert,
+        )
         return {
             "expert_code": expert.get("expert_code"),
             "display_name": expert.get("display_name"),
@@ -261,9 +279,91 @@ class ExpertPredictionService:
             "lottery_code": lottery_code,
             "target_period": target_period,
             "config": expert.get("config") if isinstance(expert.get("config"), dict) else {},
-            "tiers": result.get("tiers") if isinstance(result.get("tiers"), dict) else {},
+            "tiers": tiers,
             "analysis": result.get("analysis") if isinstance(result.get("analysis"), dict) else {},
+            "process": process,
             "generated_at": result.get("generated_at"),
+        }
+
+    def _build_process_detail(
+        self,
+        *,
+        tiers: dict[str, Any],
+        precompute: dict[str, Any],
+        expert: dict[str, Any],
+    ) -> dict[str, Any]:
+        tier_order = ("tier1", "tier2", "tier3", "tier4", "tier5")
+        score_map_front = (precompute.get("score_map") or {}).get("front", {})
+        score_map_back = (precompute.get("score_map") or {}).get("back", {})
+        strategy_weights = (
+            ((expert.get("config") or {}).get("strategy_preferences") if isinstance(expert.get("config"), dict) else {})
+            or DEFAULT_STRATEGY_PREFERENCES
+        )
+        tier_trace: dict[str, Any] = {}
+        number_insights: dict[str, Any] = {}
+
+        previous_front: list[str] = []
+        previous_back: list[str] = []
+        for tier_key in tier_order:
+            tier = tiers.get(tier_key) if isinstance(tiers.get(tier_key), dict) else {}
+            current_front = sorted({str(value) for value in (tier.get("front") or []) if str(value).isdigit()}, key=lambda value: int(value))
+            current_back = sorted({str(value) for value in (tier.get("back") or []) if str(value).isdigit()}, key=lambda value: int(value))
+            kept_front = sorted(set(previous_front).intersection(current_front), key=lambda value: int(value)) if previous_front else []
+            removed_front = sorted(set(previous_front).difference(current_front), key=lambda value: int(value)) if previous_front else []
+            kept_back = sorted(set(previous_back).intersection(current_back), key=lambda value: int(value)) if previous_back else []
+            removed_back = sorted(set(previous_back).difference(current_back), key=lambda value: int(value)) if previous_back else []
+            tier_trace[tier_key] = {
+                "front": {
+                    "count": len(current_front),
+                    "kept_from_previous": kept_front,
+                    "removed_from_previous": removed_front,
+                },
+                "back": {
+                    "count": len(current_back),
+                    "kept_from_previous": kept_back,
+                    "removed_from_previous": removed_back,
+                },
+            }
+            number_insights[tier_key] = {
+                "front": [self._build_number_insight(number, score_map_front.get(number) or {}) for number in current_front],
+                "back": [self._build_number_insight(number, score_map_back.get(number) or {}) for number in current_back],
+            }
+            previous_front = current_front
+            previous_back = current_back
+        return {
+            "tier_trace": tier_trace,
+            "strategy_weights": {
+                "miss_rebound": int(strategy_weights.get("miss_rebound", 0)),
+                "hot_cold_pattern": int(strategy_weights.get("hot_cold_pattern", 0)),
+                "trend_deviation": int(strategy_weights.get("trend_deviation", 0)),
+                "stability": int(strategy_weights.get("stability", 0)),
+            },
+            "number_insights": number_insights,
+        }
+
+    @staticmethod
+    def _build_number_insight(number: str, row: dict[str, Any]) -> dict[str, Any]:
+        temperature = str(row.get("temperature") or "warm")
+        current_omit = int(row.get("current_omit") or 0)
+        avg_omit = float(row.get("avg_omit") or 0.0)
+        trend_score = float(row.get("trend_score") or 0.0)
+        if temperature == "cold" and current_omit <= avg_omit:
+            reason = "冷态回补信号增强"
+        elif avg_omit > 0 and current_omit < avg_omit:
+            reason = "小遗漏优先筛入"
+        elif trend_score > 0:
+            reason = "走势偏差向上"
+        elif temperature == "hot":
+            reason = "热态延续稳定"
+        else:
+            reason = "结构稳定度优先"
+        return {
+            "number": number,
+            "temperature": temperature,
+            "current_omit": current_omit,
+            "avg_omit": round(avg_omit, 2),
+            "trend_score": round(trend_score, 4),
+            "reason": reason,
         }
 
     def _resolve_target_period(self, lottery_code: str) -> str:

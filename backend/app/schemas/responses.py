@@ -188,6 +188,7 @@ class ExpertCurrentDetailResponse(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
     tiers: dict[str, Any] = Field(default_factory=dict)
     analysis: dict[str, Any] = Field(default_factory=dict)
+    process: dict[str, Any] = Field(default_factory=dict)
     generated_at: int | None = None
 
 

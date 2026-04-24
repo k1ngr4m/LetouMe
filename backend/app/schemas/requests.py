@@ -80,7 +80,6 @@ class ExpertCodePayload(BaseModel):
 
 
 class ExpertSettingsPayload(BaseModel):
-    expert_code: str | None = None
     display_name: str
     bio: str | None = ""
     model_code: str
@@ -91,7 +90,6 @@ class ExpertSettingsPayload(BaseModel):
 
 class ExpertUpdatePayload(ExpertSettingsPayload):
     original_expert_code: str
-    expert_code: str
 
 
 class ExpertStatusUpdatePayload(BaseModel):

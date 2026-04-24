@@ -32,7 +32,6 @@ const DEFAULT_CONFIG: ExpertConfig = {
 }
 
 const EMPTY_FORM: SettingsExpertPayload = {
-  expert_code: '',
   display_name: '',
   bio: '',
   model_code: '',
@@ -41,8 +40,76 @@ const EMPTY_FORM: SettingsExpertPayload = {
   config: DEFAULT_CONFIG,
 }
 
-function stringifyConfig(config: ExpertConfig) {
-  return JSON.stringify(config, null, 2)
+type ConfigTabKey = 'dlt_front_weights' | 'dlt_back_weights' | 'strategy_preferences' | 'pl3_reserved_weights'
+
+const CONFIG_TABS: Array<{ key: ConfigTabKey; label: string }> = [
+  { key: 'dlt_front_weights', label: 'DLT 前区权重' },
+  { key: 'dlt_back_weights', label: 'DLT 后区权重' },
+  { key: 'strategy_preferences', label: '策略倾向' },
+]
+
+const TAB_FIELDS: Record<ConfigTabKey, Array<{ key: string; label: string }>> = {
+  dlt_front_weights: [
+    { key: 'any3', label: '任意3连' },
+    { key: 'dan2', label: '2胆' },
+    { key: 'dan1', label: '1胆' },
+    { key: 'prime_composite_ratio', label: '质合比' },
+    { key: 'big_small_ratio', label: '大小比' },
+  ],
+  dlt_back_weights: [
+    { key: 'quad_zone', label: '四分区' },
+    { key: 'any2', label: '任意2码' },
+    { key: 'big_small', label: '大小' },
+  ],
+  strategy_preferences: [
+    { key: 'miss_rebound', label: '遗漏回补' },
+    { key: 'hot_cold_pattern', label: '冷热形态' },
+    { key: 'trend_deviation', label: '走势偏差' },
+    { key: 'stability', label: '形态稳定度' },
+  ],
+  pl3_reserved_weights: [
+    { key: 'hundreds', label: '百位' },
+    { key: 'tens', label: '十位' },
+    { key: 'units', label: '个位' },
+  ],
+}
+
+const STRICT_SUM_TABS: ConfigTabKey[] = ['dlt_front_weights', 'dlt_back_weights', 'strategy_preferences']
+
+function cloneDefaultConfig(): ExpertConfig {
+  return {
+    dlt_front_weights: { ...DEFAULT_CONFIG.dlt_front_weights },
+    dlt_back_weights: { ...DEFAULT_CONFIG.dlt_back_weights },
+    strategy_preferences: { ...DEFAULT_CONFIG.strategy_preferences },
+    pl3_reserved_weights: { ...DEFAULT_CONFIG.pl3_reserved_weights },
+  }
+}
+
+function normalizeExpertConfig(input: ExpertConfig | undefined | null): ExpertConfig {
+  const source = input || cloneDefaultConfig()
+  return {
+    dlt_front_weights: {
+      ...DEFAULT_CONFIG.dlt_front_weights,
+      ...(source.dlt_front_weights || {}),
+    },
+    dlt_back_weights: {
+      ...DEFAULT_CONFIG.dlt_back_weights,
+      ...(source.dlt_back_weights || {}),
+    },
+    strategy_preferences: {
+      ...DEFAULT_CONFIG.strategy_preferences,
+      ...(source.strategy_preferences || {}),
+    },
+    pl3_reserved_weights: {
+      ...DEFAULT_CONFIG.pl3_reserved_weights,
+      ...(source.pl3_reserved_weights || {}),
+    },
+  }
+}
+
+function clampWeight(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, Math.round(value)))
 }
 
 export function ExpertsSettingsPage() {
@@ -52,7 +119,7 @@ export function ExpertsSettingsPage() {
   const [editingCode, setEditingCode] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<SettingsExpertPayload>(EMPTY_FORM)
-  const [configText, setConfigText] = useState(stringifyConfig(DEFAULT_CONFIG))
+  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabKey>('dlt_front_weights')
   const [taskId, setTaskId] = useState('')
 
   const expertsQuery = useQuery({
@@ -80,14 +147,15 @@ export function ExpertsSettingsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let config: ExpertConfig
-      try {
-        const parsed = JSON.parse(configText)
-        config = parsed as ExpertConfig
-      } catch {
-        throw new Error('配置 JSON 解析失败')
+      const normalizedConfig = normalizeExpertConfig(form.config)
+      const invalidTabs = STRICT_SUM_TABS.filter((key) => getTabTotal(normalizedConfig, key) !== 100)
+      if (invalidTabs.length) {
+        const tabLabels = CONFIG_TABS.filter((item) => invalidTabs.includes(item.key))
+          .map((item) => item.label)
+          .join('、')
+        throw new Error(`${tabLabels}权重总和必须为100`)
       }
-      const payload: SettingsExpertPayload = { ...form, config, lottery_code: 'dlt' }
+      const payload: SettingsExpertPayload = { ...form, config: normalizedConfig, lottery_code: 'dlt' }
       if (editingCode) {
         return apiClient.updateSettingsExpert(editingCode, payload)
       }
@@ -133,25 +201,62 @@ export function ExpertsSettingsPage() {
 
   function openCreate() {
     setEditingCode(null)
-    setForm(EMPTY_FORM)
-    setConfigText(stringifyConfig(DEFAULT_CONFIG))
+    setForm({ ...EMPTY_FORM, config: cloneDefaultConfig() })
+    setActiveConfigTab('dlt_front_weights')
     setFormOpen(true)
   }
 
   function openEdit(expert: SettingsExpert) {
     setEditingCode(expert.expert_code)
     setForm({
-      expert_code: expert.expert_code,
       display_name: expert.display_name,
       bio: expert.bio,
       model_code: expert.model_code,
       lottery_code: 'dlt',
       is_active: expert.is_active,
-      config: expert.config,
+      config: normalizeExpertConfig(expert.config),
     })
-    setConfigText(stringifyConfig(expert.config))
+    setActiveConfigTab('dlt_front_weights')
     setFormOpen(true)
   }
+
+  function updateWeight(tab: ConfigTabKey, fieldKey: string, value: number) {
+    setForm((previous) => {
+      const normalizedConfig = normalizeExpertConfig(previous.config)
+      return {
+        ...previous,
+        config: {
+          ...normalizedConfig,
+          [tab]: {
+            ...normalizedConfig[tab],
+            [fieldKey]: clampWeight(value),
+          },
+        },
+      }
+    })
+  }
+
+  function getTabTotal(config: ExpertConfig, tab: ConfigTabKey) {
+    const fields = TAB_FIELDS[tab]
+    return fields.reduce((sum, field) => sum + Number(config[tab][field.key] || 0), 0)
+  }
+
+  const normalizedConfig = useMemo(() => normalizeExpertConfig(form.config), [form.config])
+  const invalidStrictTabs = useMemo(
+    () => STRICT_SUM_TABS.filter((key) => getTabTotal(normalizedConfig, key) !== 100),
+    [normalizedConfig],
+  )
+  const canSubmit = invalidStrictTabs.length === 0
+  const activeTabTotal = getTabTotal(normalizedConfig, activeConfigTab)
+  const activeTabProgress = Math.max(0, Math.min(100, activeTabTotal))
+  const activeTabStrict = STRICT_SUM_TABS.includes(activeConfigTab)
+  const activeTabStatus = activeTabStrict
+    ? activeTabTotal === 100
+      ? 'ok'
+      : activeTabTotal > 100
+        ? 'over'
+        : 'under'
+    : 'normal'
 
   const taskStatusText = runTaskQuery.data
     ? `任务状态：${runTaskQuery.data.status}（成功 ${runTaskQuery.data.progress_summary?.processed_count || 0} / 失败 ${runTaskQuery.data.progress_summary?.failed_count || 0}）`
@@ -244,10 +349,12 @@ export function ExpertsSettingsPage() {
                 saveMutation.mutate()
               }}
             >
-              <label className="field">
-                <span>专家编码</span>
-                <input value={form.expert_code || ''} onChange={(event) => setForm((prev) => ({ ...prev, expert_code: event.target.value }))} required />
-              </label>
+              {editingCode ? (
+                <label className="field">
+                  <span>专家编码</span>
+                  <input value={editingCode} readOnly disabled />
+                </label>
+              ) : null}
               <label className="field">
                 <span>专家名称</span>
                 <input value={form.display_name} onChange={(event) => setForm((prev) => ({ ...prev, display_name: event.target.value }))} required />
@@ -267,10 +374,68 @@ export function ExpertsSettingsPage() {
                 <span>专家简介</span>
                 <textarea rows={3} value={form.bio || ''} onChange={(event) => setForm((prev) => ({ ...prev, bio: event.target.value }))} />
               </label>
-              <label className="field field--full">
-                <span>配置 JSON（DLT 权重 + PL3 预留）</span>
-                <textarea rows={16} value={configText} onChange={(event) => setConfigText(event.target.value)} />
-              </label>
+              <section className="field field--full expert-config-panel">
+                <span>专家配置（可视化权重）</span>
+                <div className="expert-config-tabs" role="tablist" aria-label="专家配置分组">
+                  {CONFIG_TABS.map((tab) => {
+                    const tabTotal = getTabTotal(normalizedConfig, tab.key)
+                    const strict = STRICT_SUM_TABS.includes(tab.key)
+                    const status = strict ? (tabTotal === 100 ? 'ok' : tabTotal > 100 ? 'over' : 'under') : 'normal'
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        className={clsx('expert-config-tab', activeConfigTab === tab.key && 'is-active', status !== 'normal' && `is-${status}`)}
+                        onClick={() => setActiveConfigTab(tab.key)}
+                        role="tab"
+                        aria-selected={activeConfigTab === tab.key}
+                      >
+                        <span>{tab.label}</span>
+                        <small>{tabTotal}/100</small>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="expert-config-progress">
+                  <div className={clsx('expert-config-progress__bar', `is-${activeTabStatus}`)} style={{ width: `${activeTabProgress}%` }} />
+                </div>
+                <div className={clsx('expert-config-progress__meta', activeTabStatus === 'ok' && 'is-ok', activeTabStatus === 'over' && 'is-over')}>
+                  {activeTabStrict
+                    ? `当前分组总和 ${activeTabTotal}/100${activeTabTotal === 100 ? '（已满足）' : activeTabTotal > 100 ? '（超出）' : '（不足）'}`
+                    : `当前分组总和 ${activeTabTotal}/100（PL3 预留不强制总和）`}
+                </div>
+                <div className="expert-weight-grid">
+                  {TAB_FIELDS[activeConfigTab].map((field) => {
+                    const value = Number(normalizedConfig[activeConfigTab][field.key] || 0)
+                    return (
+                      <article key={`${activeConfigTab}-${field.key}`} className="expert-weight-card">
+                        <header className="expert-weight-card__header">
+                          <strong>{field.label}</strong>
+                          <span>{value}%</span>
+                        </header>
+                        <div className="expert-weight-card__controls">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={value}
+                            onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={value}
+                            onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
+                          />
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </section>
               <label className="toggle-chip">
                 <input
                   type="checkbox"
@@ -280,10 +445,18 @@ export function ExpertsSettingsPage() {
                 <span>启用专家</span>
               </label>
               <div className="form-actions">
+                {!canSubmit ? (
+                  <div className="state-shell state-shell--error">
+                    {CONFIG_TABS.filter((item) => invalidStrictTabs.includes(item.key))
+                      .map((item) => item.label)
+                      .join('、')}
+                    权重总和必须为100
+                  </div>
+                ) : null}
                 <button className="ghost-button" type="button" onClick={() => setFormOpen(false)}>
                   取消
                 </button>
-                <button className="primary-button" type="submit" disabled={saveMutation.isPending}>
+                <button className="primary-button" type="submit" disabled={saveMutation.isPending || !canSubmit}>
                   {saveMutation.isPending ? '保存中...' : '保存'}
                 </button>
               </div>

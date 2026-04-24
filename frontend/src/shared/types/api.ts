@@ -650,7 +650,6 @@ export type SettingsExpertListResponse = {
 }
 
 export type SettingsExpertPayload = {
-  expert_code?: string
   display_name: string
   bio?: string
   model_code: string
@@ -971,6 +970,50 @@ export type ExpertCurrentDetail = {
   analysis: {
     strategy_summary?: string
     technical_style?: string
+  }
+  process?: {
+    tier_trace?: Record<
+      'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5',
+      {
+        front: {
+          count: number
+          kept_from_previous: string[]
+          removed_from_previous: string[]
+        }
+        back: {
+          count: number
+          kept_from_previous: string[]
+          removed_from_previous: string[]
+        }
+      }
+    >
+    strategy_weights?: {
+      miss_rebound: number
+      hot_cold_pattern: number
+      trend_deviation: number
+      stability: number
+    }
+    number_insights?: Record<
+      'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5',
+      {
+        front: Array<{
+          number: string
+          temperature: string
+          current_omit: number
+          avg_omit: number
+          trend_score: number
+          reason: string
+        }>
+        back: Array<{
+          number: string
+          temperature: string
+          current_omit: number
+          avg_omit: number
+          trend_score: number
+          reason: string
+        }>
+      }
+    >
   }
   generated_at?: number | null
 }

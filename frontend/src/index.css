@@ -101,6 +101,159 @@
   --hero-text-font: 'Exo 2', 'Avenir Next', 'Segoe UI', sans-serif;
 }
 
+.expert-config-panel {
+  border: 1px solid color-mix(in srgb, var(--color-border), transparent 24%);
+  border-radius: 16px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--color-surface-2), transparent 20%);
+}
+
+.expert-config-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.expert-config-tab {
+  min-width: 140px;
+  border: 1px solid color-mix(in srgb, var(--color-border), transparent 12%);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 10px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.expert-config-tab:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary), transparent 42%);
+}
+
+.expert-config-tab.is-active {
+  border-color: color-mix(in srgb, var(--color-primary), transparent 20%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--color-primary), transparent 86%);
+}
+
+.expert-config-tab small {
+  font-size: 12px;
+  opacity: 0.74;
+}
+
+.expert-config-tab.is-ok small {
+  color: #14a44d;
+}
+
+.expert-config-tab.is-over small {
+  color: #ef4444;
+}
+
+.expert-config-tab.is-under small {
+  color: #f59e0b;
+}
+
+.expert-config-progress {
+  margin-top: 12px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border), transparent 45%);
+  overflow: hidden;
+}
+
+.expert-config-progress__bar {
+  height: 100%;
+  background: color-mix(in srgb, var(--color-primary), white 18%);
+  transition: width 200ms ease, background-color 200ms ease;
+}
+
+.expert-config-progress__bar.is-ok {
+  background: #14a44d;
+}
+
+.expert-config-progress__bar.is-over {
+  background: #ef4444;
+}
+
+.expert-config-progress__bar.is-under {
+  background: #f59e0b;
+}
+
+.expert-config-progress__meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text), transparent 34%);
+}
+
+.expert-config-progress__meta.is-ok {
+  color: #14a44d;
+}
+
+.expert-config-progress__meta.is-over {
+  color: #ef4444;
+}
+
+.expert-weight-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.expert-weight-card {
+  border: 1px solid color-mix(in srgb, var(--color-border), transparent 20%);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--color-surface), transparent 10%);
+}
+
+.expert-weight-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.expert-weight-card__header span {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-primary), black 6%);
+}
+
+.expert-weight-card__controls {
+  display: grid;
+  grid-template-columns: 1fr 82px;
+  gap: 8px;
+  align-items: center;
+}
+
+.expert-weight-card__controls input[type='range'] {
+  width: 100%;
+}
+
+.expert-weight-card__controls input[type='number'] {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--color-border), transparent 16%);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 6px 8px;
+}
+
+@media (max-width: 860px) {
+  .expert-weight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expert-weight-card__controls {
+    grid-template-columns: 1fr;
+  }
+}
+
 :root[data-motion='minimal'] {
   --motion-fast: 1ms;
   --motion-base: 1ms;
@@ -11404,6 +11557,138 @@ a {
   border-color: #72a8ff;
 }
 
+.expert-prediction-page__hint {
+  margin-bottom: 0.8rem;
+}
+
+.expert-prediction-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.expert-prediction-card__bio {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.expert-tier-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.expert-tier-card {
+  border: 1px solid var(--line-color);
+  border-radius: 0.86rem;
+  padding: 0.72rem;
+  background: var(--surface-color);
+  display: grid;
+  gap: 0.58rem;
+}
+
+.expert-tier-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.expert-tier-card__header h3 {
+  margin: 0;
+  font-size: 0.93rem;
+}
+
+.expert-tier-card__header span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.expert-tier-card__content {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.expert-tier-card__content section {
+  border: 1px solid var(--line-color);
+  border-radius: 0.7rem;
+  padding: 0.56rem;
+  background: color-mix(in srgb, var(--surface-color) 92%, #ffffff 8%);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.expert-tier-card__content h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.expert-tier-tablist {
+  margin-top: 0.1rem;
+}
+
+.expert-process-card {
+  border: 1px solid var(--line-color);
+  border-radius: 0.86rem;
+  padding: 0.72rem;
+  background: var(--surface-color);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.expert-process-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.expert-process-trace {
+  display: grid;
+  gap: 0.36rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.expert-process-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.46rem;
+}
+
+.expert-process-weights span {
+  border: 1px solid var(--line-color);
+  border-radius: 999px;
+  padding: 0.24rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-color) 93%, #ffffff 7%);
+}
+
+.expert-process-tables {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.expert-process-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line-color);
+  border-radius: 0.68rem;
+  overflow: hidden;
+}
+
+.expert-process-table th,
+.expert-process-table td {
+  border: 1px solid var(--line-color);
+  padding: 0.42rem 0.46rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.expert-process-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 @media (max-width: 1080px) {
   .smart-prediction-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -11411,6 +11696,10 @@ a {
 
   .smart-prediction-flow {
     position: static;
+  }
+
+  .expert-tier-card__content {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

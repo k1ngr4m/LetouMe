@@ -55,6 +55,7 @@ export const HOME_TAB_PATHS: Record<HomeTab, string> = {
 }
 export const HOME_RULES_PATH = '/dashboard/rules'
 export const HOME_SMART_PREDICTION_PATH = '/dashboard/smart-prediction'
+export const HOME_EXPERT_PREDICTION_PATH = '/dashboard/expert-prediction'
 export const MESSAGE_CENTER_PATH = '/dashboard/messages'
 
 export function getDashboardPath(tab: HomeTab) {

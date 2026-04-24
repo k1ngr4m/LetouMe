@@ -10,7 +10,6 @@ from backend.app.repositories.expert_repository import ExpertRepository
 from backend.app.repositories.model_repository import ModelRepository
 
 
-EXPERT_CODE_PATTERN = re.compile(r"^[a-z0-9_-]{3,64}$")
 FRONT_WEIGHT_KEYS = ["any3", "dan2", "dan1", "prime_composite_ratio", "big_small_ratio"]
 BACK_WEIGHT_KEYS = ["quad_zone", "any2", "big_small"]
 STRATEGY_WEIGHT_KEYS = ["miss_rebound", "hot_cold_pattern", "trend_deviation", "stability"]
@@ -52,7 +51,7 @@ class ExpertService:
         return created
 
     def update_expert(self, expert_code: str, payload: dict[str, Any]) -> dict[str, Any]:
-        normalized = self._normalize_payload(payload, is_create=False)
+        normalized = self._normalize_payload(payload, is_create=False, original_expert_code=expert_code)
         updated = self.repository.update_expert(str(expert_code).strip(), normalized)
         self._invalidate_cache(expert_code=str(expert_code).strip())
         if str(updated.get("expert_code") or "") != str(expert_code).strip():
@@ -78,15 +77,16 @@ class ExpertService:
     def _build_default_weight_map(keys: list[str]) -> dict[str, int]:
         return {key: 0 for key in keys}
 
-    def _normalize_payload(self, payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:
+    def _normalize_payload(self, payload: dict[str, Any], *, is_create: bool, original_expert_code: str | None = None) -> dict[str, Any]:
         display_name = str(payload.get("display_name") or "").strip()
         if not display_name:
             raise ValueError("专家名称不能为空")
-        expert_code = str(payload.get("expert_code") or "").strip().lower()
-        if not expert_code:
-            expert_code = self._build_expert_code(display_name)
-        if not EXPERT_CODE_PATTERN.match(expert_code):
-            raise ValueError("专家编码仅支持 3-64 位小写字母、数字、下划线或中划线")
+        if is_create:
+            expert_code = self._build_unique_expert_code(display_name)
+        else:
+            expert_code = str(original_expert_code or "").strip().lower()
+            if not expert_code:
+                raise ValueError("专家编码不能为空")
         model_code = str(payload.get("model_code") or "").strip()
         if not model_code:
             raise ValueError("底层模型不能为空")
@@ -154,9 +154,24 @@ class ExpertService:
 
     def _build_expert_code(self, display_name: str) -> str:
         normalized = re.sub(r"[^a-z0-9_-]+", "-", display_name.lower()).strip("-_")
-        if len(normalized) >= 3:
-            return normalized[:64]
+        compact = re.sub(r"-{2,}", "-", normalized).strip("-_")
+        if len(compact) >= 3:
+            return compact[:64]
         return f"expert-{int(time())}"
+
+    def _build_unique_expert_code(self, display_name: str) -> str:
+        base_code = self._build_expert_code(display_name)
+        if len(base_code) < 3:
+            base_code = f"expert-{int(time())}"
+        candidate = base_code
+        suffix = 2
+        while self.repository.get_expert(candidate):
+            suffix_token = f"-{suffix}"
+            max_base_len = 64 - len(suffix_token)
+            trimmed_base = base_code[:max_base_len].rstrip("-_")
+            candidate = f"{trimmed_base}{suffix_token}" if trimmed_base else f"expert{suffix_token}"
+            suffix += 1
+        return candidate
 
     def _ensure_seed_expert(self) -> None:
         if runtime_cache.get("experts:seeded:v1"):
