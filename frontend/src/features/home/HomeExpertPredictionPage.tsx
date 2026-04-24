@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { useQuery } from '@tanstack/react-query'
+import { createPortal } from 'react-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -456,8 +457,8 @@ function ExpertHistoryDetailModal({
   isError: boolean
   onClose: () => void
 }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+  return createPortal(
+    <div className="modal-shell" onClick={onClose}>
       <div className="modal-card expert-history-detail-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal-card__header">
           <div>
@@ -509,7 +510,8 @@ function ExpertHistoryDetailModal({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
