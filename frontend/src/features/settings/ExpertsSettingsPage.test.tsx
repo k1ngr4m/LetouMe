@@ -60,7 +60,25 @@ describe('ExpertsSettingsPage generation', () => {
         },
       ],
     })
-    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v3.2',
+          display_name: 'DeepSeek V3.2',
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['dlt'],
+        },
+      ],
+    })
+    apiClientMock.updateSettingsExpert.mockResolvedValue({
+      expert_code: 'wei-rong-jie',
+      display_name: '魏荣杰',
+      model_code: 'deepseek-v3.2',
+      lottery_code: 'dlt',
+      is_active: true,
+      config: {},
+    })
     apiClientMock.startSettingsExpertPredictionRun.mockResolvedValue({
       task_id: 'expert-task-1',
       status: 'queued',
@@ -138,5 +156,48 @@ describe('ExpertsSettingsPage generation', () => {
       recent_period_count: 10,
     })
     expect(await screen.findByText('专家历史生成任务')).toBeInTheDocument()
+  })
+
+  it('edits expanded expert weights and submits the new config keys', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText('魏荣杰')
+    await user.click(screen.getByRole('button', { name: '编辑' }))
+
+    expect(screen.getByRole('heading', { name: '编辑专家' })).toBeInTheDocument()
+    expect(screen.getByText('基础比例 / 分布类')).toBeInTheDocument()
+    expect(screen.getByText('和值 / 均值 / 跨度类')).toBeInTheDocument()
+    expect(screen.getByLabelText('五区比权重')).toHaveValue(8)
+    expect(screen.getByLabelText('012路比权重')).toHaveValue(6)
+
+    await user.click(screen.getByRole('tab', { name: /策略倾向/ }))
+    expect(screen.getByText('遗漏相关')).toBeInTheDocument()
+    expect(screen.getByText('回补信号')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(apiClientMock.updateSettingsExpert).toHaveBeenCalled())
+    expect(apiClientMock.updateSettingsExpert).toHaveBeenCalledWith(
+      'wei-rong-jie',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          dlt_front_weights: expect.objectContaining({
+            five_zone_ratio: 8,
+            mod3_ratio: 6,
+            frequency_probability: 2,
+          }),
+          dlt_back_weights: expect.objectContaining({
+            three_zone_ratio: 10,
+            odd_even_shape: 7,
+          }),
+          strategy_preferences: expect.objectContaining({
+            avg_omit: 8,
+            rebound_probability: 4,
+            inertia_continuation: 3,
+          }),
+        }),
+      }),
+    )
   })
 })

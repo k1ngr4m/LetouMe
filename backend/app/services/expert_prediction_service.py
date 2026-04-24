@@ -13,18 +13,50 @@ from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.repositories.expert_repository import ExpertRepository
-from backend.app.services.expert_service import ExpertService
+from backend.app.services.expert_service import BACK_WEIGHT_KEYS, FRONT_WEIGHT_KEYS, STRATEGY_WEIGHT_KEYS, ExpertService
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_service import PredictionService
 
 
 PRIME_NUMBERS_FRONT = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31}
+PRIME_NUMBERS_BACK = {2, 3, 5, 7, 11}
+LEGACY_FRONT_WEIGHT_MAP = {
+    "any3": "consecutive_numbers",
+    "dan2": "dan3",
+    "dan1": "position_dan",
+}
+LEGACY_BACK_WEIGHT_MAP = {
+    "quad_zone": "fine_zone_ratio",
+    "any2": "dan2",
+}
+LEGACY_STRATEGY_WEIGHT_MAP = {
+    "miss_rebound": "rebound_probability",
+    "hot_cold_pattern": "hot_warm_cold_ratio",
+    "trend_deviation": "sum_deviation",
+    "stability": "ac_value",
+}
 DEFAULT_STRATEGY_PREFERENCES = {
-    "miss_rebound": 40,
-    "hot_cold_pattern": 20,
-    "trend_deviation": 20,
-    "stability": 20,
+    "avg_omit": 8,
+    "max_omit": 7,
+    "current_omit": 8,
+    "omit_layer": 6,
+    "omit_sum": 5,
+    "hot_number": 6,
+    "warm_number": 5,
+    "cold_number": 5,
+    "hot_warm_cold_ratio": 6,
+    "sum_deviation": 5,
+    "tail_deviation": 4,
+    "zone_deviation": 4,
+    "odd_even_deviation": 4,
+    "ac_value": 5,
+    "neighbor_count": 4,
+    "repeat_count": 4,
+    "gap_distribution": 4,
+    "rebound_probability": 4,
+    "reversal_signal": 3,
+    "inertia_continuation": 3,
 }
 DEFAULT_EXPERT_HISTORY_PARALLELISM = 3
 
@@ -762,10 +794,7 @@ class ExpertPredictionService:
         tier_order = ("tier1", "tier2", "tier3", "tier4", "tier5")
         score_map_front = (precompute.get("score_map") or {}).get("front", {})
         score_map_back = (precompute.get("score_map") or {}).get("back", {})
-        strategy_weights = (
-            ((expert.get("config") or {}).get("strategy_preferences") if isinstance(expert.get("config"), dict) else {})
-            or DEFAULT_STRATEGY_PREFERENCES
-        )
+        strategy_weights = self._get_strategy_weights(expert)
         tier_trace: dict[str, Any] = {}
         number_insights: dict[str, Any] = {}
 
@@ -800,10 +829,12 @@ class ExpertPredictionService:
         return {
             "tier_trace": tier_trace,
             "strategy_weights": {
-                "miss_rebound": int(strategy_weights.get("miss_rebound", 0)),
-                "hot_cold_pattern": int(strategy_weights.get("hot_cold_pattern", 0)),
-                "trend_deviation": int(strategy_weights.get("trend_deviation", 0)),
-                "stability": int(strategy_weights.get("stability", 0)),
+                key: int(strategy_weights.get(key, 0))
+                for key in STRATEGY_WEIGHT_KEYS
+            },
+            "algorithm_weights": {
+                "front": self._get_zone_algorithm_weights(expert, zone="front"),
+                "back": self._get_zone_algorithm_weights(expert, zone="back"),
             },
             "number_insights": number_insights,
         }
@@ -814,6 +845,15 @@ class ExpertPredictionService:
         current_omit = int(row.get("current_omit") or 0)
         avg_omit = float(row.get("avg_omit") or 0.0)
         trend_score = float(row.get("trend_score") or 0.0)
+        scoring_factors = sorted(
+            (
+                (str(key).replace("algo_", "").replace("strategy_", "").replace("_signal", ""), float(value or 0.0))
+                for key, value in row.items()
+                if str(key).startswith(("algo_", "strategy_")) and str(key).endswith("_signal")
+            ),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:5]
         if temperature == "cold" and current_omit <= avg_omit:
             reason = "冷态回补信号增强"
         elif avg_omit > 0 and current_omit < avg_omit:
@@ -830,6 +870,7 @@ class ExpertPredictionService:
             "current_omit": current_omit,
             "avg_omit": round(avg_omit, 2),
             "trend_score": round(trend_score, 4),
+            "scoring_factors": [{"name": name, "score": round(score, 4)} for name, score in scoring_factors],
             "reason": reason,
         }
 
@@ -907,30 +948,47 @@ class ExpertPredictionService:
 
     def _sort_by_score(self, numbers: list[str], *, zone: str, precompute: dict[str, Any], expert: dict[str, Any]) -> list[str]:
         score_map = precompute.get("score_map", {}).get(zone, {})
-        strategy_preferences = (
-            ((expert.get("config") or {}).get("strategy_preferences") if isinstance(expert.get("config"), dict) else {})
-            or DEFAULT_STRATEGY_PREFERENCES
-        )
-        miss_w = int(strategy_preferences.get("miss_rebound", 0))
-        hot_w = int(strategy_preferences.get("hot_cold_pattern", 0))
-        trend_w = int(strategy_preferences.get("trend_deviation", 0))
-        stability_w = int(strategy_preferences.get("stability", 0))
-        total_w = max(1, miss_w + hot_w + trend_w + stability_w)
+        algorithm_weights = self._get_zone_algorithm_weights(expert, zone=zone)
+        strategy_weights = self._get_strategy_weights(expert)
+        total_w = max(1, sum(algorithm_weights.values()) + sum(strategy_weights.values()))
 
         def score_value(number: str) -> float:
             row = score_map.get(number, {})
-            miss_signal = float(row.get("miss_signal") or 0.0)
-            hot_signal = float(row.get("hot_signal") or 0.0)
-            trend_signal = float(row.get("trend_signal") or 0.0)
-            stability_signal = float(row.get("stability_signal") or 0.0)
-            return (
-                miss_signal * miss_w
-                + hot_signal * hot_w
-                + trend_signal * trend_w
-                + stability_signal * stability_w
-            ) / total_w
+            algorithm_score = sum(float(row.get(f"algo_{key}_signal") or 0.0) * weight for key, weight in algorithm_weights.items())
+            strategy_score = sum(float(row.get(f"strategy_{key}_signal") or 0.0) * weight for key, weight in strategy_weights.items())
+            return (algorithm_score + strategy_score) / total_w
 
         return sorted(numbers, key=lambda value: (-score_value(value), int(value)))
+
+    def _get_zone_algorithm_weights(self, expert: dict[str, Any], *, zone: str) -> dict[str, int]:
+        config = expert.get("config") if isinstance(expert.get("config"), dict) else {}
+        if zone == "front":
+            return self._normalize_weight_snapshot(config.get("dlt_front_weights"), FRONT_WEIGHT_KEYS, LEGACY_FRONT_WEIGHT_MAP)
+        return self._normalize_weight_snapshot(config.get("dlt_back_weights"), BACK_WEIGHT_KEYS, LEGACY_BACK_WEIGHT_MAP)
+
+    def _get_strategy_weights(self, expert: dict[str, Any]) -> dict[str, int]:
+        config = expert.get("config") if isinstance(expert.get("config"), dict) else {}
+        raw = config.get("strategy_preferences") if isinstance(config, dict) else {}
+        normalized = self._normalize_weight_snapshot(raw, STRATEGY_WEIGHT_KEYS, LEGACY_STRATEGY_WEIGHT_MAP)
+        return normalized if sum(normalized.values()) > 0 else dict(DEFAULT_STRATEGY_PREFERENCES)
+
+    @staticmethod
+    def _normalize_weight_snapshot(raw: Any, keys: list[str], legacy_map: dict[str, str] | None = None) -> dict[str, int]:
+        source = raw if isinstance(raw, dict) else {}
+        result = {key: 0 for key in keys}
+        for key in keys:
+            try:
+                result[key] = max(0, min(100, int(source.get(key, 0))))
+            except (TypeError, ValueError):
+                result[key] = 0
+        for legacy_key, target_key in (legacy_map or {}).items():
+            if target_key not in result or target_key in source:
+                continue
+            try:
+                result[target_key] = max(0, min(100, int(source.get(legacy_key, 0))))
+            except (TypeError, ValueError):
+                continue
+        return result
 
     def _fill_zone_numbers(self, numbers: list[str], *, zone: str, expected: int, precompute: dict[str, Any]) -> list[str]:
         normalized = list(dict.fromkeys(numbers))
@@ -1053,13 +1111,15 @@ class ExpertPredictionService:
         recent10 = {idx: 0 for idx in range(1, max_number + 1)}
         recent30 = {idx: 0 for idx in range(1, max_number + 1)}
         sequences: dict[int, list[int]] = {idx: [] for idx in range(1, max_number + 1)}
+        parsed_draws: list[list[int]] = []
 
         for draw_index, draw in enumerate(history):
-            numbers = {
+            numbers = sorted({
                 int(str(item))
                 for item in (draw.get(key) or [])
                 if str(item).isdigit()
-            }
+            })
+            parsed_draws.append(numbers)
             for number in range(1, max_number + 1):
                 hit = 1 if number in numbers else 0
                 frequencies[number] += hit
@@ -1074,6 +1134,9 @@ class ExpertPredictionService:
         min_freq = min(frequency_values)
         hot_threshold = max(1, int(len(history) * 0.22))
         cold_threshold = max(0, int(len(history) * 0.08))
+        last_numbers = set(parsed_draws[0]) if parsed_draws else set()
+        skip_numbers = set(parsed_draws[1]) if len(parsed_draws) > 1 else set()
+        recent_group_counts = self._build_recent_group_counts(parsed_draws[:10], zone=zone)
 
         rows: list[dict[str, Any]] = []
         for number in range(1, max_number + 1):
@@ -1092,6 +1155,17 @@ class ExpertPredictionService:
                 temperature = "cold"
             else:
                 temperature = "warm"
+            group_signals = self._build_number_group_signals(number, zone=zone, recent_group_counts=recent_group_counts)
+            repeat_signal = 1.0 if number in last_numbers else 0.0
+            skip_repeat_signal = 1.0 if number in skip_numbers else 0.0
+            neighbor_signal = 1.0 if any(abs(number - previous) == 1 for previous in last_numbers) else 0.0
+            consecutive_signal = max(neighbor_signal, 1.0 if number - 1 in last_numbers or number + 1 in last_numbers else 0.0)
+            odd_even_signal = self._bounded_signal(1 - abs((number % 2) - 0.5) * 0.2)
+            tail_signal = group_signals.get("tail_balance_signal", 0.0)
+            centrality_signal = 1 - abs(number - ((max_number + 1) / 2)) / max_number
+            omit_pressure_signal = self._bounded_signal(current_omit / max(1.0, max_omit or avg_omit or 1.0))
+            reversal_signal = self._bounded_signal(omit_pressure_signal * (1 - hot_signal))
+            inertia_signal = self._bounded_signal(hot_signal if temperature == "hot" else hot_signal * 0.5)
             rows.append(
                 {
                     "number": str(number).zfill(2),
@@ -1105,9 +1179,120 @@ class ExpertPredictionService:
                     "miss_signal": round(miss_signal, 4),
                     "stability_signal": round(stability_signal, 4),
                     "trend_signal": round(trend_signal, 4),
+                    "algo_big_small_ratio_signal": group_signals.get("big_small_signal", 0.0),
+                    "algo_prime_composite_ratio_signal": group_signals.get("prime_signal", 0.0),
+                    "algo_five_zone_ratio_signal": group_signals.get("front_zone_signal", 0.0),
+                    "algo_mod3_ratio_signal": group_signals.get("mod3_signal", 0.0),
+                    "algo_three_zone_ratio_signal": group_signals.get("back_three_zone_signal", 0.0),
+                    "algo_fine_zone_ratio_signal": group_signals.get("back_fine_zone_signal", 0.0),
+                    "algo_sum_value_signal": round(self._bounded_signal(centrality_signal), 4),
+                    "algo_mean_value_signal": round(self._bounded_signal(centrality_signal), 4),
+                    "algo_span_value_signal": round(group_signals.get("edge_balance_signal", 0.0), 4),
+                    "algo_max_gap_signal": round(self._bounded_signal(1 - abs(centrality_signal - 0.5)), 4),
+                    "algo_gap_value_signal": round(self._bounded_signal(1 - abs(centrality_signal - 0.5)), 4),
+                    "algo_tail_sum_distribution_signal": round(tail_signal, 4),
+                    "algo_consecutive_numbers_signal": round(consecutive_signal, 4),
+                    "algo_repeat_numbers_signal": round(repeat_signal, 4),
+                    "algo_neighbor_numbers_signal": round(neighbor_signal, 4),
+                    "algo_skip_repeat_numbers_signal": round(skip_repeat_signal, 4),
+                    "algo_hot_warm_cold_numbers_signal": round(hot_signal if temperature != "cold" else miss_signal, 4),
+                    "algo_omit_value_signal": round(miss_signal, 4),
+                    "algo_position_dan_signal": round(stability_signal, 4),
+                    "algo_dan1_signal": round(stability_signal, 4),
+                    "algo_dan2_signal": round((stability_signal + hot_signal) / 2, 4),
+                    "algo_dan3_signal": round((stability_signal + miss_signal) / 2, 4),
+                    "algo_dan4_signal": round((stability_signal + trend_signal) / 2, 4),
+                    "algo_dan5_signal": round(stability_signal, 4),
+                    "algo_full_drag_signal": round(1 - stability_signal, 4),
+                    "algo_compound_front_signal": round((hot_signal + trend_signal + miss_signal) / 3, 4),
+                    "algo_compound_back_signal": round((hot_signal + trend_signal + miss_signal) / 3, 4),
+                    "algo_total_omit_signal": round(omit_pressure_signal, 4),
+                    "algo_ac_value_signal": round(group_signals.get("ac_signal", 0.0), 4),
+                    "algo_frequency_probability_signal": round(hot_signal, 4),
+                    "algo_odd_even_shape_signal": round(odd_even_signal, 4),
+                    "strategy_avg_omit_signal": round(stability_signal, 4),
+                    "strategy_max_omit_signal": round(omit_pressure_signal, 4),
+                    "strategy_current_omit_signal": round(miss_signal, 4),
+                    "strategy_omit_layer_signal": round(miss_signal if temperature == "cold" else stability_signal, 4),
+                    "strategy_omit_sum_signal": round(omit_pressure_signal, 4),
+                    "strategy_hot_number_signal": round(1.0 if temperature == "hot" else hot_signal * 0.5, 4),
+                    "strategy_warm_number_signal": round(1.0 if temperature == "warm" else 0.35, 4),
+                    "strategy_cold_number_signal": round(1.0 if temperature == "cold" else miss_signal * 0.5, 4),
+                    "strategy_hot_warm_cold_ratio_signal": round(hot_signal if temperature != "cold" else miss_signal, 4),
+                    "strategy_sum_deviation_signal": round(self._bounded_signal(centrality_signal), 4),
+                    "strategy_tail_deviation_signal": round(tail_signal, 4),
+                    "strategy_zone_deviation_signal": round(max(group_signals.get("front_zone_signal", 0.0), group_signals.get("back_three_zone_signal", 0.0)), 4),
+                    "strategy_odd_even_deviation_signal": round(odd_even_signal, 4),
+                    "strategy_ac_value_signal": round(group_signals.get("ac_signal", 0.0), 4),
+                    "strategy_neighbor_count_signal": round(neighbor_signal, 4),
+                    "strategy_repeat_count_signal": round(repeat_signal, 4),
+                    "strategy_gap_distribution_signal": round(group_signals.get("edge_balance_signal", 0.0), 4),
+                    "strategy_rebound_probability_signal": round(miss_signal, 4),
+                    "strategy_reversal_signal_signal": round(reversal_signal, 4),
+                    "strategy_inertia_continuation_signal": round(inertia_signal, 4),
                 }
             )
         return sorted(rows, key=lambda item: (-int(item["frequency"]), int(item["number"])))
+
+    @staticmethod
+    def _bounded_signal(value: float) -> float:
+        return round(max(0.0, min(1.0, float(value))), 4)
+
+    def _build_recent_group_counts(self, draws: list[list[int]], *, zone: str) -> dict[str, dict[int, int]]:
+        max_number = 35 if zone == "front" else 12
+        counts: dict[str, dict[int, int]] = {
+            "big_small": {0: 0, 1: 0},
+            "prime": {0: 0, 1: 0},
+            "front_zone": {idx: 0 for idx in range(5)},
+            "mod3": {idx: 0 for idx in range(3)},
+            "back_three_zone": {idx: 0 for idx in range(3)},
+            "back_fine_zone": {idx: 0 for idx in range(6)},
+            "tail": {idx: 0 for idx in range(10)},
+            "edge": {0: 0, 1: 0},
+        }
+        primes = PRIME_NUMBERS_FRONT if zone == "front" else PRIME_NUMBERS_BACK
+        for numbers in draws:
+            for number in numbers:
+                counts["big_small"][1 if number > (17 if zone == "front" else 6) else 0] += 1
+                counts["prime"][1 if number in primes else 0] += 1
+                counts["tail"][number % 10] += 1
+                counts["edge"][1 if number in {1, max_number} else 0] += 1
+                counts["edge"][0 if number not in {1, max_number} else 1] += 0
+                if zone == "front":
+                    counts["front_zone"][min(4, (number - 1) // 7)] += 1
+                    counts["mod3"][number % 3] += 1
+                else:
+                    counts["back_three_zone"][min(2, (number - 1) // 4)] += 1
+                    counts["back_fine_zone"][min(5, (number - 1) // 2)] += 1
+        return counts
+
+    def _build_number_group_signals(self, number: int, *, zone: str, recent_group_counts: dict[str, dict[int, int]]) -> dict[str, float]:
+        primes = PRIME_NUMBERS_FRONT if zone == "front" else PRIME_NUMBERS_BACK
+        big_small_key = 1 if number > (17 if zone == "front" else 6) else 0
+        prime_key = 1 if number in primes else 0
+        tail_key = number % 10
+        front_zone_key = min(4, (number - 1) // 7)
+        back_three_zone_key = min(2, (number - 1) // 4)
+        back_fine_zone_key = min(5, (number - 1) // 2)
+
+        def scarcity(group: str, key: int) -> float:
+            values = recent_group_counts.get(group, {})
+            maximum = max(values.values()) if values else 0
+            return self._bounded_signal(1 - (values.get(key, 0) / max(1, maximum)))
+
+        max_number = 35 if zone == "front" else 12
+        edge_balance = 1 - abs(number - ((max_number + 1) / 2)) / ((max_number + 1) / 2)
+        return {
+            "big_small_signal": scarcity("big_small", big_small_key),
+            "prime_signal": scarcity("prime", prime_key),
+            "front_zone_signal": scarcity("front_zone", front_zone_key),
+            "mod3_signal": scarcity("mod3", number % 3),
+            "back_three_zone_signal": scarcity("back_three_zone", back_three_zone_key),
+            "back_fine_zone_signal": scarcity("back_fine_zone", back_fine_zone_key),
+            "tail_balance_signal": scarcity("tail", tail_key),
+            "edge_balance_signal": self._bounded_signal(edge_balance),
+            "ac_signal": self._bounded_signal(1 - abs(edge_balance - 0.55)),
+        }
 
     @staticmethod
     def _calculate_current_omit(seq: list[int]) -> int:

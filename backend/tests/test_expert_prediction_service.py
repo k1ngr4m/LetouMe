@@ -147,6 +147,46 @@ class ExpertPredictionServiceTests(unittest.TestCase):
 
         self.assertIsNone(detail)
 
+    def test_algorithm_weights_change_candidate_sorting(self) -> None:
+        service = self._build_service()
+        precompute = {
+            "score_map": {
+                "front": {
+                    "01": {
+                        "algo_big_small_ratio_signal": 0.0,
+                        "algo_frequency_probability_signal": 1.0,
+                        "strategy_avg_omit_signal": 0.0,
+                    },
+                    "18": {
+                        "algo_big_small_ratio_signal": 1.0,
+                        "algo_frequency_probability_signal": 0.0,
+                        "strategy_avg_omit_signal": 0.0,
+                    },
+                }
+            }
+        }
+        big_small_expert = {
+            "config": {
+                "dlt_front_weights": {"big_small_ratio": 100},
+                "strategy_preferences": {"avg_omit": 100},
+            }
+        }
+        frequency_expert = {
+            "config": {
+                "dlt_front_weights": {"frequency_probability": 100},
+                "strategy_preferences": {"avg_omit": 100},
+            }
+        }
+
+        self.assertEqual(
+            service._sort_by_score(["01", "18"], zone="front", precompute=precompute, expert=big_small_expert),
+            ["18", "01"],
+        )
+        self.assertEqual(
+            service._sort_by_score(["01", "18"], zone="front", precompute=precompute, expert=frequency_expert),
+            ["01", "18"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

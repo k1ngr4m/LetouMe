@@ -8,22 +8,73 @@ import type { ExpertConfig, ExpertPredictionTask, LotteryCode, SettingsExpert, S
 
 const DEFAULT_CONFIG: ExpertConfig = {
   dlt_front_weights: {
-    any3: 20,
-    dan2: 20,
-    dan1: 20,
-    prime_composite_ratio: 20,
-    big_small_ratio: 20,
+    big_small_ratio: 8,
+    prime_composite_ratio: 8,
+    five_zone_ratio: 8,
+    mod3_ratio: 6,
+    sum_value: 6,
+    mean_value: 4,
+    span_value: 5,
+    max_gap: 4,
+    tail_sum_distribution: 4,
+    consecutive_numbers: 4,
+    repeat_numbers: 4,
+    neighbor_numbers: 4,
+    skip_repeat_numbers: 4,
+    hot_warm_cold_numbers: 6,
+    omit_value: 6,
+    position_dan: 3,
+    dan3: 3,
+    dan4: 2,
+    dan5: 1,
+    full_drag: 1,
+    compound_front: 1,
+    total_omit: 4,
+    ac_value: 2,
+    frequency_probability: 2,
   },
   dlt_back_weights: {
-    quad_zone: 34,
-    any2: 33,
-    big_small: 33,
+    three_zone_ratio: 10,
+    fine_zone_ratio: 8,
+    big_small: 8,
+    prime_composite_ratio: 7,
+    sum_value: 8,
+    span_value: 8,
+    gap_value: 6,
+    consecutive_numbers: 5,
+    repeat_numbers: 6,
+    skip_repeat_numbers: 5,
+    odd_even_shape: 7,
+    dan1: 5,
+    dan2: 4,
+    dan3: 3,
+    full_drag: 2,
+    compound_back: 2,
+    total_omit: 3,
+    ac_value: 1,
+    frequency_probability: 2,
   },
   strategy_preferences: {
-    miss_rebound: 40,
-    hot_cold_pattern: 20,
-    trend_deviation: 20,
-    stability: 20,
+    avg_omit: 8,
+    max_omit: 7,
+    current_omit: 8,
+    omit_layer: 6,
+    omit_sum: 5,
+    hot_number: 6,
+    warm_number: 5,
+    cold_number: 5,
+    hot_warm_cold_ratio: 6,
+    sum_deviation: 5,
+    tail_deviation: 4,
+    zone_deviation: 4,
+    odd_even_deviation: 4,
+    ac_value: 5,
+    neighbor_count: 4,
+    repeat_count: 4,
+    gap_distribution: 4,
+    rebound_probability: 4,
+    reversal_signal: 3,
+    inertia_continuation: 3,
   },
   pl3_reserved_weights: {
     hundreds: 34,
@@ -44,36 +95,179 @@ const EMPTY_FORM: SettingsExpertPayload = {
 type ConfigTabKey = 'dlt_front_weights' | 'dlt_back_weights' | 'strategy_preferences' | 'pl3_reserved_weights'
 
 const CONFIG_TABS: Array<{ key: ConfigTabKey; label: string }> = [
-  { key: 'dlt_front_weights', label: 'DLT 前区权重' },
-  { key: 'dlt_back_weights', label: 'DLT 后区权重' },
+  { key: 'dlt_front_weights', label: '前区权重' },
+  { key: 'dlt_back_weights', label: '后区权重' },
   { key: 'strategy_preferences', label: '策略倾向' },
 ]
 
-const TAB_FIELDS: Record<ConfigTabKey, Array<{ key: string; label: string }>> = {
+type WeightField = { key: string; label: string; hint?: string }
+type WeightSection = { title: string; fields: WeightField[] }
+
+const WEIGHT_SECTIONS: Record<ConfigTabKey, WeightSection[]> = {
   dlt_front_weights: [
-    { key: 'any3', label: '任意3连' },
-    { key: 'dan2', label: '2胆' },
-    { key: 'dan1', label: '1胆' },
-    { key: 'prime_composite_ratio', label: '质合比' },
-    { key: 'big_small_ratio', label: '大小比' },
+    {
+      title: '基础比例 / 分布类',
+      fields: [
+        { key: 'big_small_ratio', label: '大小比', hint: '01-17 小号，18-35 大号' },
+        { key: 'prime_composite_ratio', label: '质合比', hint: '前区质数与合数比例' },
+        { key: 'five_zone_ratio', label: '五区比', hint: '01-07、08-14、15-21、22-28、29-35' },
+        { key: 'mod3_ratio', label: '012路比', hint: '除3余0/1/2分布' },
+      ],
+    },
+    {
+      title: '和值 / 均值 / 跨度类',
+      fields: [
+        { key: 'sum_value', label: '和值' },
+        { key: 'mean_value', label: '均值' },
+        { key: 'span_value', label: '跨度' },
+        { key: 'max_gap', label: '最大间距' },
+        { key: 'tail_sum_distribution', label: '尾和 / 尾分布' },
+      ],
+    },
+    {
+      title: '连号 / 邻号 / 重码类',
+      fields: [
+        { key: 'consecutive_numbers', label: '连号' },
+        { key: 'repeat_numbers', label: '重码' },
+        { key: 'neighbor_numbers', label: '斜连码' },
+        { key: 'skip_repeat_numbers', label: '隔期码' },
+      ],
+    },
+    {
+      title: '冷热 / 遗漏类',
+      fields: [
+        { key: 'hot_warm_cold_numbers', label: '热温冷号' },
+        { key: 'omit_value', label: '遗漏值 / 平均遗漏' },
+      ],
+    },
+    {
+      title: '定位 / 胆拖 / 复式倾向',
+      fields: [
+        { key: 'position_dan', label: '定位胆' },
+        { key: 'dan3', label: '3胆' },
+        { key: 'dan4', label: '4胆' },
+        { key: 'dan5', label: '5胆' },
+        { key: 'full_drag', label: '全拖' },
+        { key: 'compound_front', label: '前区复式' },
+      ],
+    },
+    {
+      title: '通用参数',
+      fields: [
+        { key: 'total_omit', label: '遗漏总值' },
+        { key: 'ac_value', label: 'AC值' },
+        { key: 'frequency_probability', label: '出号频率 / 概率' },
+      ],
+    },
   ],
   dlt_back_weights: [
-    { key: 'quad_zone', label: '四分区' },
-    { key: 'any2', label: '任意2码' },
-    { key: 'big_small', label: '大小' },
+    {
+      title: '分区 / 比例类',
+      fields: [
+        { key: 'three_zone_ratio', label: '三区比', hint: '01-04、05-08、09-12' },
+        { key: 'fine_zone_ratio', label: '五区 / 六区比' },
+        { key: 'big_small', label: '大小比', hint: '01-06 小，07-12 大' },
+        { key: 'prime_composite_ratio', label: '质合比' },
+      ],
+    },
+    {
+      title: '和值 / 跨度 / 间距类',
+      fields: [
+        { key: 'sum_value', label: '和值' },
+        { key: 'span_value', label: '跨度' },
+        { key: 'gap_value', label: '间距 / 差值' },
+      ],
+    },
+    {
+      title: '连号 / 重码 / 形态类',
+      fields: [
+        { key: 'consecutive_numbers', label: '后区连号' },
+        { key: 'repeat_numbers', label: '重码' },
+        { key: 'skip_repeat_numbers', label: '隔期码' },
+        { key: 'odd_even_shape', label: '奇偶形态' },
+      ],
+    },
+    {
+      title: '胆拖 / 复式倾向',
+      fields: [
+        { key: 'dan1', label: '1胆' },
+        { key: 'dan2', label: '2胆' },
+        { key: 'dan3', label: '3胆' },
+        { key: 'full_drag', label: '全拖' },
+        { key: 'compound_back', label: '后区复式' },
+      ],
+    },
+    {
+      title: '通用参数',
+      fields: [
+        { key: 'total_omit', label: '遗漏总值' },
+        { key: 'ac_value', label: 'AC值' },
+        { key: 'frequency_probability', label: '出号频率 / 概率' },
+      ],
+    },
   ],
   strategy_preferences: [
-    { key: 'miss_rebound', label: '遗漏回补' },
-    { key: 'hot_cold_pattern', label: '冷热形态' },
-    { key: 'trend_deviation', label: '走势偏差' },
-    { key: 'stability', label: '形态稳定度' },
+    {
+      title: '遗漏相关',
+      fields: [
+        { key: 'avg_omit', label: '平均遗漏' },
+        { key: 'max_omit', label: '最大遗漏' },
+        { key: 'current_omit', label: '当前遗漏' },
+        { key: 'omit_layer', label: '遗漏层级' },
+        { key: 'omit_sum', label: '遗漏和' },
+      ],
+    },
+    {
+      title: '冷热温形态',
+      fields: [
+        { key: 'hot_number', label: '热号' },
+        { key: 'warm_number', label: '温号' },
+        { key: 'cold_number', label: '冷号' },
+        { key: 'hot_warm_cold_ratio', label: '热温冷比例' },
+      ],
+    },
+    {
+      title: '偏差类',
+      fields: [
+        { key: 'sum_deviation', label: '和值偏差' },
+        { key: 'tail_deviation', label: '尾数偏差' },
+        { key: 'zone_deviation', label: '区间偏差' },
+        { key: 'odd_even_deviation', label: '奇偶偏差' },
+      ],
+    },
+    {
+      title: '形态稳定度',
+      fields: [
+        { key: 'ac_value', label: 'AC值' },
+        { key: 'neighbor_count', label: '邻号个数' },
+        { key: 'repeat_count', label: '重号个数' },
+        { key: 'gap_distribution', label: '间距分布' },
+      ],
+    },
+    {
+      title: '回补信号',
+      fields: [
+        { key: 'rebound_probability', label: '欲出几率' },
+        { key: 'reversal_signal', label: '反转信号' },
+        { key: 'inertia_continuation', label: '惯性延续' },
+      ],
+    },
   ],
   pl3_reserved_weights: [
-    { key: 'hundreds', label: '百位' },
-    { key: 'tens', label: '十位' },
-    { key: 'units', label: '个位' },
+    {
+      title: '排列3预留',
+      fields: [
+        { key: 'hundreds', label: '百位' },
+        { key: 'tens', label: '十位' },
+        { key: 'units', label: '个位' },
+      ],
+    },
   ],
 }
+
+const TAB_FIELDS: Record<ConfigTabKey, WeightField[]> = Object.fromEntries(
+  Object.entries(WEIGHT_SECTIONS).map(([key, sections]) => [key, sections.flatMap((section) => section.fields)]),
+) as Record<ConfigTabKey, WeightField[]>
 
 const STRICT_SUM_TABS: ConfigTabKey[] = ['dlt_front_weights', 'dlt_back_weights', 'strategy_preferences']
 type ExpertGenerationMode = 'current' | 'history'
@@ -715,36 +909,51 @@ export function ExpertsSettingsPage() {
                     ? `当前分组总和 ${activeTabTotal}/100${activeTabTotal === 100 ? '（已满足）' : activeTabTotal > 100 ? '（超出）' : '（不足）'}`
                     : `当前分组总和 ${activeTabTotal}/100（PL3 预留不强制总和）`}
                 </div>
-                <div className="expert-weight-grid">
-                  {TAB_FIELDS[activeConfigTab].map((field) => {
-                    const value = Number(normalizedConfig[activeConfigTab][field.key] || 0)
-                    return (
-                      <article key={`${activeConfigTab}-${field.key}`} className="expert-weight-card">
-                        <header className="expert-weight-card__header">
-                          <strong>{field.label}</strong>
-                          <span>{value}%</span>
-                        </header>
-                        <div className="expert-weight-card__controls">
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={value}
-                            onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={value}
-                            onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
-                          />
-                        </div>
-                      </article>
-                    )
-                  })}
+                <div className="expert-weight-sections">
+                  {WEIGHT_SECTIONS[activeConfigTab].map((section, sectionIndex) => (
+                    <details key={`${activeConfigTab}-${section.title}`} className="expert-weight-section" open={sectionIndex < 2}>
+                      <summary>
+                        <strong>{section.title}</strong>
+                        <span>{section.fields.reduce((sum, field) => sum + Number(normalizedConfig[activeConfigTab][field.key] || 0), 0)}/100</span>
+                      </summary>
+                      <div className="expert-weight-grid">
+                        {section.fields.map((field) => {
+                          const value = Number(normalizedConfig[activeConfigTab][field.key] || 0)
+                          return (
+                            <article key={`${activeConfigTab}-${field.key}`} className="expert-weight-card">
+                              <header className="expert-weight-card__header">
+                                <div>
+                                  <strong>{field.label}</strong>
+                                  {field.hint ? <small>{field.hint}</small> : null}
+                                </div>
+                                <span>{value}%</span>
+                              </header>
+                              <div className="expert-weight-card__controls">
+                                <input
+                                  aria-label={`${field.label}权重滑杆`}
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={value}
+                                  onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
+                                />
+                                <input
+                                  aria-label={`${field.label}权重`}
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={value}
+                                  onChange={(event) => updateWeight(activeConfigTab, field.key, Number(event.target.value))}
+                                />
+                              </div>
+                            </article>
+                          )
+                        })}
+                      </div>
+                    </details>
+                  ))}
                 </div>
               </section>
               <label className="toggle-chip">
