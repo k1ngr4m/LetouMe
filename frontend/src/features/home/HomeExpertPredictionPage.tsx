@@ -31,6 +31,32 @@ const EXPERT_PAGE_TABS: Array<{ key: ExpertPageTab; label: string }> = [
 ]
 
 const HISTORY_PAGE_SIZE = 10
+const STRATEGY_WEIGHT_LABELS: Record<string, string> = {
+  miss_rebound: '遗漏回补',
+  hot_cold_pattern: '冷热形态',
+  trend_deviation: '走势偏差',
+  stability: '形态稳定度',
+  avg_omit: '平均遗漏',
+  max_omit: '最大遗漏',
+  current_omit: '当前遗漏',
+  omit_layer: '遗漏层级',
+  omit_sum: '遗漏和',
+  hot_number: '热号',
+  warm_number: '温号',
+  cold_number: '冷号',
+  hot_warm_cold_ratio: '热温冷比例',
+  sum_deviation: '和值偏差',
+  tail_deviation: '尾数偏差',
+  zone_deviation: '区间偏差',
+  odd_even_deviation: '奇偶偏差',
+  ac_value: 'AC值',
+  neighbor_count: '邻号个数',
+  repeat_count: '重号个数',
+  gap_distribution: '间距分布',
+  rebound_probability: '欲出几率',
+  reversal_signal: '反转信号',
+  inertia_continuation: '惯性延续',
+}
 
 export function HomeExpertPredictionPage() {
   const { selectedLottery, setSelectedLottery } = useLotterySelection()
@@ -209,14 +235,7 @@ export function HomeExpertPredictionPage() {
                           <div className="state-shell">当前档位暂无筛选轨迹。</div>
                         )}
 
-                        {strategyWeights ? (
-                          <div className="expert-process-weights">
-                            <span>遗漏回补 {strategyWeights.miss_rebound}%</span>
-                            <span>冷热形态 {strategyWeights.hot_cold_pattern}%</span>
-                            <span>走势偏差 {strategyWeights.trend_deviation}%</span>
-                            <span>形态稳定度 {strategyWeights.stability}%</span>
-                          </div>
-                        ) : null}
+                        <StrategyWeightBadges weights={strategyWeights} />
 
                         {tierInsights ? (
                           <div className="expert-process-tables">
@@ -576,17 +595,27 @@ function ExpertHistoryProcessSection({ detail }: { detail: ExpertHistoryDetail }
         <div className="state-shell">当前详情暂无筛选轨迹。</div>
       )}
 
-      {strategyWeights ? (
-        <div className="expert-process-weights">
-          <span>遗漏回补 {strategyWeights.miss_rebound}%</span>
-          <span>冷热形态 {strategyWeights.hot_cold_pattern}%</span>
-          <span>走势偏差 {strategyWeights.trend_deviation}%</span>
-          <span>形态稳定度 {strategyWeights.stability}%</span>
-        </div>
-      ) : null}
+      <StrategyWeightBadges weights={strategyWeights} />
 
       {detail.analysis?.strategy_summary ? <div className="state-shell">{detail.analysis.strategy_summary}</div> : null}
       {detail.analysis?.technical_style ? <div className="state-shell">{detail.analysis.technical_style}</div> : null}
     </section>
+  )
+}
+
+function StrategyWeightBadges({ weights }: { weights?: Record<string, number> | null }) {
+  if (!weights || typeof weights !== 'object') return null
+  const visibleWeights = Object.entries(weights)
+    .map(([key, value]) => ({ key, label: STRATEGY_WEIGHT_LABELS[key] || key, value: Number(value) }))
+    .filter((item) => Number.isFinite(item.value) && item.value > 0)
+  if (!visibleWeights.length) return null
+  return (
+    <div className="expert-process-weights">
+      {visibleWeights.map((item) => (
+        <span key={item.key}>
+          {item.label} {item.value}%
+        </span>
+      ))}
+    </div>
   )
 }

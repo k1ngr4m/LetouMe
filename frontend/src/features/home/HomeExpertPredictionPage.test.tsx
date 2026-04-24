@@ -169,10 +169,9 @@ describe('HomeExpertPredictionPage', () => {
           },
         },
         strategy_weights: {
-          miss_rebound: 40,
-          hot_cold_pattern: 20,
-          trend_deviation: 20,
-          stability: 20,
+          avg_omit: 8,
+          rebound_probability: 4,
+          inertia_continuation: 3,
         },
       },
       generated_at: 1770000000,
@@ -211,6 +210,9 @@ describe('HomeExpertPredictionPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('魏荣杰 · 第 26033 期')).toBeInTheDocument()
     expect(screen.getByText('稳健筛选')).toBeInTheDocument()
+    expect(screen.getByText('平均遗漏 8%')).toBeInTheDocument()
+    expect(screen.getByText('欲出几率 4%')).toBeInTheDocument()
+    expect(screen.queryByText(/遗漏回补\s*%/)).not.toBeInTheDocument()
     const tier1Front = screen.getByTestId('tier1-front-numbers')
     expect(within(tier1Front).getByText('01')).toHaveClass('number-ball--dlt-front')
     expect(within(tier1Front).getByText('09')).toHaveClass('number-ball--muted')
