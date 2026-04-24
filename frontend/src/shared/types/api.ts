@@ -976,6 +976,16 @@ export type ExpertPublicListResponse = {
   experts: ExpertListItem[]
 }
 
+export type ExpertTierKey = 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5'
+export type ExpertTierNumbers = { front: string[]; back: string[] }
+export type ExpertTierHit = {
+  front_hit_count: number
+  front_hits: string[]
+  back_hit_count: number
+  back_hits: string[]
+  total_hit_count: number
+}
+
 export type ExpertCurrentDetail = {
   expert_code: string
   display_name: string
@@ -985,11 +995,11 @@ export type ExpertCurrentDetail = {
   target_period: string
   config: ExpertConfig
   tiers: {
-    tier1?: { front: string[]; back: string[] }
-    tier2?: { front: string[]; back: string[] }
-    tier3?: { front: string[]; back: string[] }
-    tier4?: { front: string[]; back: string[] }
-    tier5?: { front: string[]; back: string[] }
+    tier1?: ExpertTierNumbers
+    tier2?: ExpertTierNumbers
+    tier3?: ExpertTierNumbers
+    tier4?: ExpertTierNumbers
+    tier5?: ExpertTierNumbers
   }
   analysis: {
     strategy_summary?: string
@@ -1039,6 +1049,51 @@ export type ExpertCurrentDetail = {
       }
     >
   }
+  generated_at?: number | null
+}
+
+export type ExpertHistorySummary = {
+  expert_code: string
+  display_name: string
+  bio?: string
+  model_code?: string
+  generated_at?: number | null
+  best_total_hit_count: number
+  tier_hits: Partial<Record<ExpertTierKey, ExpertTierHit>>
+}
+
+export type ExpertHistoryRecord = {
+  target_period: string
+  actual_result: {
+    period: string
+    date?: string | null
+    red_balls: string[]
+    blue_balls: string[]
+  }
+  experts: ExpertHistorySummary[]
+}
+
+export type ExpertHistoryListResponse = {
+  lottery_code: LotteryCode
+  total_count: number
+  limit: number
+  offset: number
+  records: ExpertHistoryRecord[]
+  experts: Array<{ expert_code: string; display_name: string }>
+}
+
+export type ExpertHistoryDetail = {
+  expert_code: string
+  display_name: string
+  bio: string
+  model_code: string
+  lottery_code: LotteryCode
+  target_period: string
+  actual_result: ExpertHistoryRecord['actual_result']
+  tiers: Partial<Record<ExpertTierKey, ExpertTierNumbers>>
+  tier_hits: Partial<Record<ExpertTierKey, ExpertTierHit>>
+  analysis: ExpertCurrentDetail['analysis']
+  process?: ExpertCurrentDetail['process']
   generated_at?: number | null
 }
 

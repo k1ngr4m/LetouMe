@@ -65,6 +65,8 @@ from backend.app.schemas.requests import (
     ModelStatusUpdatePayload,
     ExpertCodePayload,
     ExpertCurrentDetailPayload,
+    ExpertHistoryDetailPayload,
+    ExpertHistoryListPayload,
     ExpertListPayload,
     ExpertPredictionRunStartPayload,
     ExpertPredictionTaskPayload,
@@ -115,6 +117,8 @@ from backend.app.schemas.responses import (
     MyBetRecordUpdateResponse,
     PredictionGenerationTaskResponse,
     ExpertCurrentDetailResponse,
+    ExpertHistoryDetailResponse,
+    ExpertHistoryListResponse,
     ExpertListResponse,
     ExpertResponse,
     ExpertPredictionTaskResponse,
@@ -408,6 +412,35 @@ def get_public_expert_current_detail(payload: ExpertCurrentDetailPayload, _: dic
     )
     if not detail:
         raise HTTPException(status_code=404, detail="专家当期方案不存在")
+    return detail
+
+
+@router.post("/experts/history/list", response_model=ExpertHistoryListResponse)
+def list_public_expert_history(payload: ExpertHistoryListPayload, _: dict = Depends(require_current_user)) -> dict:
+    try:
+        return expert_prediction_service.list_history_experts(
+            lottery_code=payload.lottery_code,
+            expert_code=payload.expert_code,
+            period_query=payload.period_query,
+            limit=payload.limit,
+            offset=payload.offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/experts/history/detail", response_model=ExpertHistoryDetailResponse)
+def get_public_expert_history_detail(payload: ExpertHistoryDetailPayload, _: dict = Depends(require_current_user)) -> dict:
+    try:
+        detail = expert_prediction_service.get_history_expert_detail(
+            lottery_code=payload.lottery_code,
+            target_period=payload.target_period,
+            expert_code=payload.expert_code,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not detail:
+        raise HTTPException(status_code=404, detail="专家历史方案不存在")
     return detail
 
 

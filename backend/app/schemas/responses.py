@@ -192,6 +192,30 @@ class ExpertCurrentDetailResponse(BaseModel):
     generated_at: int | None = None
 
 
+class ExpertHistoryListResponse(BaseModel):
+    lottery_code: str = "dlt"
+    total_count: int = 0
+    limit: int | None = None
+    offset: int = 0
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    experts: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ExpertHistoryDetailResponse(BaseModel):
+    expert_code: str
+    display_name: str
+    bio: str = ""
+    model_code: str = ""
+    lottery_code: str = "dlt"
+    target_period: str
+    actual_result: dict[str, Any] = Field(default_factory=dict)
+    tiers: dict[str, Any] = Field(default_factory=dict)
+    tier_hits: dict[str, Any] = Field(default_factory=dict)
+    analysis: dict[str, Any] = Field(default_factory=dict)
+    process: dict[str, Any] = Field(default_factory=dict)
+    generated_at: int | None = None
+
+
 class SimulationTicketRecordResponse(BaseModel):
     id: int
     lottery_code: str = "dlt"

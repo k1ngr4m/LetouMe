@@ -11,6 +11,8 @@ import type {
   ForgotPasswordSendCodePayload,
   GenerateSettingsModelPredictionsPayload,
   ExpertCurrentDetail,
+  ExpertHistoryDetail,
+  ExpertHistoryListResponse,
   ExpertPredictionTask,
   ExpertPredictionRunStartPayload,
   ExpertPublicListResponse,
@@ -263,6 +265,18 @@ export const apiClient = {
     return requestJson<ExpertCurrentDetail>('/api/experts/current/detail', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: lotteryCode, expert_code: expertCode }),
+    })
+  },
+  getExpertHistoryList(payload?: { lottery_code?: LotteryCode; expert_code?: string; period_query?: string; limit?: number; offset?: number }) {
+    return requestJson<ExpertHistoryListResponse>('/api/experts/history/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getExpertHistoryDetail(targetPeriod: string, expertCode: string, lotteryCode: LotteryCode = 'dlt') {
+    return requestJson<ExpertHistoryDetail>('/api/experts/history/detail', {
+      method: 'POST',
+      body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod, expert_code: expertCode }),
     })
   },
   startSmartPredictionRun(payload: SmartPredictionRunStartPayload) {

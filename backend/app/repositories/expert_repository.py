@@ -325,6 +325,44 @@ class ExpertRepository:
                 rows = cursor.fetchall()
         return [self._serialize_result_row(row) for row in rows]
 
+    def list_history_results(
+        self,
+        *,
+        lottery_code: str,
+        expert_code: str | None = None,
+        period_query: str | None = None,
+    ) -> list[dict[str, Any]]:
+        conditions = ["r.lottery_code = ?", "r.status = 'succeeded'"]
+        params: list[Any] = [str(lottery_code).strip().lower()]
+        normalized_expert_code = str(expert_code or "").strip()
+        if normalized_expert_code:
+            conditions.append("r.expert_code = ?")
+            params.append(normalized_expert_code)
+        normalized_period_query = str(period_query or "").strip()
+        if normalized_period_query:
+            conditions.append("r.target_period LIKE ?")
+            params.append(f"%{normalized_period_query}%")
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT
+                        r.*,
+                        e.display_name,
+                        e.bio,
+                        e.model_code,
+                        e.is_active,
+                        e.is_deleted
+                    FROM expert_prediction_result r
+                    INNER JOIN expert_profile e ON e.id = r.expert_id
+                    WHERE {" AND ".join(conditions)}
+                    ORDER BY CAST(r.target_period AS UNSIGNED) DESC, r.target_period DESC, e.updated_at DESC, e.id DESC
+                    """,
+                    tuple(params),
+                )
+                rows = cursor.fetchall()
+        return [self._serialize_result_row(row) for row in rows]
+
     @staticmethod
     def _optional_str(value: Any) -> str | None:
         normalized = str(value or "").strip()
@@ -394,6 +432,7 @@ class ExpertRepository:
             "expert_code": str(row.get("expert_code") or ""),
             "display_name": str(row.get("display_name") or ""),
             "bio": str(row.get("bio") or ""),
+            "model_code": str(row.get("model_code") or ""),
             "lottery_code": str(row.get("lottery_code") or "dlt"),
             "target_period": str(row.get("target_period") or ""),
             "status": str(row.get("status") or "queued"),

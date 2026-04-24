@@ -102,6 +102,20 @@ class ExpertCurrentDetailPayload(BaseModel):
     expert_code: str
 
 
+class ExpertHistoryListPayload(BaseModel):
+    lottery_code: str = "dlt"
+    expert_code: str | None = None
+    period_query: str | None = None
+    limit: int | None = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+class ExpertHistoryDetailPayload(BaseModel):
+    lottery_code: str = "dlt"
+    target_period: str
+    expert_code: str
+
+
 class ExpertPredictionRunStartPayload(BaseModel):
     lottery_code: str = "dlt"
     expert_code: str | None = None

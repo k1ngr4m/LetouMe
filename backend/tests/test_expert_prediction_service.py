@@ -31,6 +31,22 @@ class ExpertPredictionServiceTests(unittest.TestCase):
         lottery_service.get_recent_draws.return_value = [
             {"period": "26032", "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["01", "02"]}
         ]
+        lottery_service.get_history_payload.return_value = {
+            "data": [
+                {
+                    "period": "26033",
+                    "date": "2026-03-15",
+                    "red_balls": ["01", "02", "03", "04", "05"],
+                    "blue_balls": ["01", "02"],
+                },
+                {
+                    "period": "26032",
+                    "date": "2026-03-12",
+                    "red_balls": ["11", "12", "13", "14", "15"],
+                    "blue_balls": ["03", "04"],
+                },
+            ]
+        }
 
         prediction_generation_service = Mock()
         prediction_generation_service._normalize_prompt_history_period_count.side_effect = lambda value: value or 50
@@ -87,6 +103,49 @@ class ExpertPredictionServiceTests(unittest.TestCase):
         self.assertEqual(summary["processed_count"], 1)
         self.assertEqual(summary["skipped_count"], 0)
         service.repository.upsert_result.assert_called_once()
+
+    def test_list_history_experts_filters_to_draws_and_builds_tier_hits(self) -> None:
+        service = self._build_service()
+        service.repository.list_history_results.return_value = [
+            {
+                "expert_code": "wei-rong-jie",
+                "display_name": "魏荣杰",
+                "bio": "稳健专家",
+                "model_code": "deepseek-v3.2",
+                "target_period": "26033",
+                "status": "succeeded",
+                "generated_at": 1770000000,
+                "tiers": {
+                    "tier1": {"front": ["01", "06"], "back": ["02"]},
+                    "tier5": {"front": ["01", "02", "03", "09", "10"], "back": ["01", "12"]},
+                },
+            },
+            {
+                "expert_code": "wei-rong-jie",
+                "display_name": "魏荣杰",
+                "target_period": "99999",
+                "status": "succeeded",
+                "tiers": {"tier1": {"front": ["01"], "back": ["01"]}},
+            },
+        ]
+
+        payload = service.list_history_experts(lottery_code="dlt", limit=10, offset=0)
+
+        self.assertEqual(payload["total_count"], 1)
+        record = payload["records"][0]
+        self.assertEqual(record["target_period"], "26033")
+        expert = record["experts"][0]
+        self.assertEqual(expert["tier_hits"]["tier1"]["front_hits"], ["01"])
+        self.assertEqual(expert["tier_hits"]["tier1"]["back_hits"], ["02"])
+        self.assertEqual(expert["tier_hits"]["tier5"]["total_hit_count"], 4)
+
+    def test_get_history_expert_detail_returns_none_when_missing(self) -> None:
+        service = self._build_service()
+        service.repository.list_results_by_period.return_value = []
+
+        detail = service.get_history_expert_detail(lottery_code="dlt", target_period="26033", expert_code="wei-rong-jie")
+
+        self.assertIsNone(detail)
 
 
 if __name__ == "__main__":

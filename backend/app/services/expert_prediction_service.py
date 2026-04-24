@@ -502,6 +502,55 @@ class ExpertPredictionService:
             None,
         )
 
+    def _find_result_for_expert_code(self, *, lottery_code: str, target_period: str, expert_code: str) -> dict[str, Any] | None:
+        return next(
+            (
+                item
+                for item in self.repository.list_results_by_period(lottery_code=lottery_code, target_period=target_period)
+                if str(item.get("expert_code") or "") == expert_code
+            ),
+            None,
+        )
+
+    def _build_actual_draw_map(self, lottery_code: str) -> dict[str, dict[str, Any]]:
+        history_payload = self.lottery_service.get_history_payload(lottery_code=lottery_code)
+        draw_map: dict[str, dict[str, Any]] = {}
+        for draw in history_payload.get("data", []):
+            if not isinstance(draw, dict):
+                continue
+            period = str(draw.get("period") or "").strip()
+            if not period:
+                continue
+            raw_blue = draw.get("blue_balls") if isinstance(draw.get("blue_balls"), list) else [draw.get("blue_ball")] if draw.get("blue_ball") else []
+            draw_map[period] = {
+                "period": period,
+                "date": draw.get("date"),
+                "red_balls": sorted(str(item).zfill(2) for item in (draw.get("red_balls") or [])),
+                "blue_balls": sorted(str(item).zfill(2) for item in raw_blue),
+            }
+        return draw_map
+
+    def _build_tier_hits(self, tiers: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+        actual_front = {str(item).zfill(2) for item in (actual_result.get("red_balls") or [])}
+        actual_back = {str(item).zfill(2) for item in (actual_result.get("blue_balls") or [])}
+        result: dict[str, Any] = {}
+        for tier_key in ("tier1", "tier2", "tier3", "tier4", "tier5"):
+            tier = tiers.get(tier_key) if isinstance(tiers.get(tier_key), dict) else {}
+            front_hits = sorted({str(item).zfill(2) for item in (tier.get("front") or [])} & actual_front)
+            back_hits = sorted({str(item).zfill(2) for item in (tier.get("back") or [])} & actual_back)
+            result[tier_key] = {
+                "front_hit_count": len(front_hits),
+                "front_hits": front_hits,
+                "back_hit_count": len(back_hits),
+                "back_hits": back_hits,
+                "total_hit_count": len(front_hits) + len(back_hits),
+            }
+        return result
+
+    @staticmethod
+    def _period_sort_key(period: str) -> tuple[int, str]:
+        return (int(period), period) if period.isdigit() else (0, period)
+
     def list_current_experts(self, *, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         target_period = self._resolve_target_period(normalized_code)
@@ -521,6 +570,104 @@ class ExpertPredictionService:
             ttl_seconds=60,
             loader=lambda: self._build_current_expert_detail_payload(normalized_code, target_period, str(expert_code).strip()),
         )
+
+    def list_history_experts(
+        self,
+        *,
+        lottery_code: str = "dlt",
+        expert_code: str | None = None,
+        period_query: str | None = None,
+        limit: int | None = 20,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        if normalized_code != "dlt":
+            raise ValueError("专家预测首版仅支持大乐透")
+        rows = self.repository.list_history_results(
+            lottery_code=normalized_code,
+            expert_code=str(expert_code or "").strip() or None,
+            period_query=str(period_query or "").strip() or None,
+        )
+        draw_map = self._build_actual_draw_map(normalized_code)
+        grouped: dict[str, dict[str, Any]] = {}
+        expert_options: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            target_period = str(row.get("target_period") or "").strip()
+            actual_result = draw_map.get(target_period)
+            if not actual_result:
+                continue
+            code = str(row.get("expert_code") or "")
+            expert_options[code] = {
+                "expert_code": code,
+                "display_name": row.get("display_name") or code,
+            }
+            entry = grouped.setdefault(
+                target_period,
+                {
+                    "target_period": target_period,
+                    "actual_result": actual_result,
+                    "experts": [],
+                },
+            )
+            tiers = row.get("tiers") if isinstance(row.get("tiers"), dict) else {}
+            tier_hits = self._build_tier_hits(tiers, actual_result)
+            best_total_hit_count = max((int(item.get("total_hit_count") or 0) for item in tier_hits.values()), default=0)
+            entry["experts"].append(
+                {
+                    "expert_code": code,
+                    "display_name": row.get("display_name") or code,
+                    "bio": row.get("bio") or "",
+                    "model_code": row.get("model_code") or "",
+                    "generated_at": row.get("generated_at"),
+                    "best_total_hit_count": best_total_hit_count,
+                    "tier_hits": tier_hits,
+                }
+            )
+        records = sorted(grouped.values(), key=lambda item: self._period_sort_key(str(item.get("target_period") or "")), reverse=True)
+        total_count = len(records)
+        normalized_limit = int(limit) if limit is not None else total_count
+        paged_records = records[int(offset) : int(offset) + normalized_limit]
+        return {
+            "lottery_code": normalized_code,
+            "total_count": total_count,
+            "limit": normalized_limit,
+            "offset": int(offset),
+            "records": paged_records,
+            "experts": sorted(expert_options.values(), key=lambda item: str(item.get("display_name") or "")),
+        }
+
+    def get_history_expert_detail(self, *, lottery_code: str = "dlt", target_period: str, expert_code: str) -> dict[str, Any] | None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        if normalized_code != "dlt":
+            raise ValueError("专家预测首版仅支持大乐透")
+        actual_result = self._build_actual_draw_map(normalized_code).get(str(target_period).strip())
+        if not actual_result:
+            return None
+        result = self._find_result_for_expert_code(
+            lottery_code=normalized_code,
+            target_period=str(target_period).strip(),
+            expert_code=str(expert_code).strip(),
+        )
+        if not result or str(result.get("status") or "") != "succeeded":
+            return None
+        expert = self.expert_service.get_expert(str(expert_code).strip()) or {}
+        tiers = result.get("tiers") if isinstance(result.get("tiers"), dict) else {}
+        precompute = result.get("precompute") if isinstance(result.get("precompute"), dict) else {}
+        process = self._build_process_detail(tiers=tiers, precompute=precompute, expert=expert) if expert else {}
+        return {
+            "expert_code": result.get("expert_code"),
+            "display_name": result.get("display_name") or expert.get("display_name") or result.get("expert_code"),
+            "bio": result.get("bio") or expert.get("bio") or "",
+            "model_code": result.get("model_code") or expert.get("model_code") or "",
+            "lottery_code": normalized_code,
+            "target_period": str(target_period).strip(),
+            "actual_result": actual_result,
+            "tiers": tiers,
+            "tier_hits": self._build_tier_hits(tiers, actual_result),
+            "analysis": result.get("analysis") if isinstance(result.get("analysis"), dict) else {},
+            "process": process,
+            "generated_at": result.get("generated_at"),
+        }
 
     def _build_current_expert_list_payload(self, lottery_code: str, target_period: str) -> dict[str, Any]:
         experts = self.expert_service.list_experts(include_deleted=False, lottery_code=lottery_code)
