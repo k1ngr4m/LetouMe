@@ -35,9 +35,16 @@ def ensure_timestamp(value: Any, *, assume_beijing: bool = False) -> int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
+        compact_timestamp = _parse_compact_datetime(str(value), assume_beijing=assume_beijing)
+        if compact_timestamp is not None:
+            return compact_timestamp
         return _normalize_epoch_value(value)
     if isinstance(value, float):
-        return _normalize_epoch_value(int(value))
+        integer_value = int(value)
+        compact_timestamp = _parse_compact_datetime(str(integer_value), assume_beijing=assume_beijing)
+        if compact_timestamp is not None:
+            return compact_timestamp
+        return _normalize_epoch_value(integer_value)
     if isinstance(value, datetime):
         active = value
         if active.tzinfo is None:
@@ -48,6 +55,9 @@ def ensure_timestamp(value: Any, *, assume_beijing: bool = False) -> int | None:
     text = str(value).strip()
     if not text:
         return None
+    compact_timestamp = _parse_compact_datetime(text, assume_beijing=assume_beijing)
+    if compact_timestamp is not None:
+        return compact_timestamp
     if text.isdigit() or (text.startswith("-") and text[1:].isdigit()):
         return _normalize_epoch_value(int(text))
     normalized = text.replace("Z", "+00:00") if text.endswith("Z") else text
@@ -67,6 +77,25 @@ def ensure_timestamp(value: Any, *, assume_beijing: bool = False) -> int | None:
         except ValueError:
             continue
     return None
+
+
+def _parse_compact_datetime(value: str, *, assume_beijing: bool = False) -> int | None:
+    if not value.isdigit():
+        return None
+    formats = {
+        14: "%Y%m%d%H%M%S",
+        12: "%Y%m%d%H%M",
+        8: "%Y%m%d",
+    }
+    fmt = formats.get(len(value))
+    if fmt is None:
+        return None
+    try:
+        parsed = datetime.strptime(value, fmt)
+    except ValueError:
+        return None
+    parsed = parsed.replace(tzinfo=BEIJING_TIMEZONE if assume_beijing else UTC)
+    return int(parsed.astimezone(UTC).timestamp())
 
 
 def as_beijing_datetime(value: Any) -> datetime | None:

@@ -6,6 +6,7 @@ from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.lotteries import SUPPORTED_LOTTERY_CODES, normalize_lottery_code
+from backend.app.time_utils import now_ts
 from backend.core.model_config import DEEPSEEK_BASE_URL, DEFAULT_BASE_URL, LMSTUDIO_BASE_URL, SUPPORTED_API_FORMATS, invalidate_model_registry_cache
 
 
@@ -103,7 +104,7 @@ class ModelRepository:
                         is_deleted,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         model_code,
@@ -116,6 +117,7 @@ class ModelRepository:
                         self._optional_str(payload.get("app_code")) or "",
                         float(payload.get("temperature")),
                         0,
+                        now_ts(),
                     ),
                 )
                 cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (model_code,))
@@ -156,7 +158,7 @@ class ModelRepository:
                         api_key = ?,
                         app_code = ?,
                         temperature = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE model_code = ?
                     """,
                     (
@@ -169,6 +171,7 @@ class ModelRepository:
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
                         float(payload.get("temperature")),
+                        now_ts(),
                         model_code,
                     ),
                 )
@@ -182,10 +185,10 @@ class ModelRepository:
                 cursor.execute(
                     """
                     UPDATE ai_model
-                    SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    SET is_active = ?, updated_at = ?
                     WHERE model_code = ?
                     """,
-                    (1 if is_active else 0, model_code),
+                    (1 if is_active else 0, now_ts(), model_code),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(model_code)
@@ -200,10 +203,10 @@ class ModelRepository:
                 cursor.execute(
                     """
                     UPDATE ai_model
-                    SET is_deleted = 1, is_active = 0, updated_at = CURRENT_TIMESTAMP
+                    SET is_deleted = 1, is_active = 0, updated_at = ?
                     WHERE model_code = ?
                     """,
-                    (model_code,),
+                    (now_ts(), model_code),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(model_code)
@@ -405,10 +408,10 @@ class ModelRepository:
                 cursor.execute(
                     f"""
                     UPDATE ai_model
-                    SET {field_name} = ?, updated_at = CURRENT_TIMESTAMP
+                    SET {field_name} = ?, updated_at = ?
                     WHERE model_code = ?
                     """,
-                    (value, model_code),
+                    (value, now_ts(), model_code),
                 )
                 if cursor.rowcount == 0:
                     raise KeyError(model_code)

@@ -320,4 +320,4 @@ class ModelService:
 
 
 def _format_datetime(value: Any) -> int | None:
-    return ensure_timestamp(value)
+    return ensure_timestamp(value, assume_beijing=True)

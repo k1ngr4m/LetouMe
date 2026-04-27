@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from backend.app.db.connection import ensure_schema, get_connection
 from backend.app.lotteries import normalize_lottery_code
+from backend.app.time_utils import now_ts
 
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
@@ -311,7 +312,7 @@ def bootstrap_default_models() -> None:
                             is_deleted,
                             updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                         """,
                         (
                             item["model_code"],
@@ -324,6 +325,7 @@ def bootstrap_default_models() -> None:
                             item.get("api_key") or "",
                             item.get("app_code") or "",
                             item.get("temperature"),
+                            now_ts(),
                         ),
                     )
                     cursor.execute(
@@ -383,16 +385,16 @@ def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
             SET provider_model_id = ?,
                 api_model_name = ?,
                 base_url = ?,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = ?
             WHERE model_code = ?
             """,
-            (legacy_chat_provider_model_id, "deepseek-chat", DEEPSEEK_BASE_URL, "deepseek-v3.2"),
+            (legacy_chat_provider_model_id, "deepseek-chat", DEEPSEEK_BASE_URL, now_ts(), "deepseek-v3.2"),
         )
     cursor.execute(
         """
         UPDATE ai_model
         SET base_url = ?,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = ?
         WHERE provider_model_id IN (
             SELECT pmc.id
             FROM provider_model_config pmc
@@ -400,7 +402,7 @@ def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
         )
         AND (base_url IS NULL OR base_url = '' OR base_url = 'https://api.deepseek.com/v1')
         """,
-        (DEEPSEEK_BASE_URL, deepseek_provider_id),
+        (DEEPSEEK_BASE_URL, now_ts(), deepseek_provider_id),
     )
     for tag in ("reasoning",):
         cursor.execute(

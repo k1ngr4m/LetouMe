@@ -99,7 +99,7 @@ SCHEMA_STATEMENTS = [
         temperature DOUBLE NULL,
         is_deleted TINYINT(1) NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        updated_at BIGINT NOT NULL DEFAULT 0,
         CONSTRAINT fk_ai_model_provider_model FOREIGN KEY (provider_model_id) REFERENCES provider_model_config(id),
         INDEX idx_ai_model_provider_model_active (provider_model_id, is_active),
         INDEX idx_ai_model_provider_model (provider_model_id),
