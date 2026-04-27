@@ -71,14 +71,14 @@ class ModelFactoryTests(unittest.TestCase):
         ):
             ModelFactory.build_openai_client(
                 provider="deepseek",
-                base_url="https://api.deepseek.com/v1",
+                base_url="https://api.deepseek.com",
                 api_key="test-key",
             )
 
         httpx_client.assert_not_called()
         openai_client.assert_called_once_with(
             api_key="test-key",
-            base_url="https://api.deepseek.com/v1",
+            base_url="https://api.deepseek.com",
         )
 
 

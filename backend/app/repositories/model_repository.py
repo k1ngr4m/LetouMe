@@ -24,12 +24,14 @@ PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
         "provider_name": "DeepSeek",
         "website_url": "https://platform.deepseek.com",
         "api_format": "openai_compatible",
-        "base_url": "https://api.deepseek.com/v1",
+        "base_url": DEEPSEEK_BASE_URL,
         "remark": "",
         "is_system_preset": True,
         "model_configs": [
-            {"model_id": "deepseek-chat", "display_name": "DeepSeek V3.2"},
-            {"model_id": "deepseek-reasoner", "display_name": "DeepSeek R1"},
+            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash"},
+            {"model_id": "deepseek-v4-pro", "display_name": "DeepSeek V4 Pro"},
+            {"model_id": "deepseek-chat", "display_name": "DeepSeek Chat (legacy alias)"},
+            {"model_id": "deepseek-reasoner", "display_name": "DeepSeek Reasoner (legacy alias)"},
         ],
     },
     "aimixhub": {

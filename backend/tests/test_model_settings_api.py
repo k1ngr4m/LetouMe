@@ -46,7 +46,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         deepseek_chat = next(model for model in payload["models"] if model["model_code"] == "deepseek-v3.2")
         self.assertEqual(deepseek_chat["provider"], "deepseek")
         self.assertEqual(deepseek_chat["api_model_name"], "deepseek-chat")
-        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com/v1")
+        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com")
 
     def test_get_model_detail_serializes_updated_at(self) -> None:
         response = self.client.post("/api/settings/model/detail", json={"model_code": "claude-sonnet-4.6"})
@@ -210,7 +210,7 @@ class ModelSettingsApiTests(unittest.TestCase):
                     "provider": "deepseek",
                     "api_format": "openai_compatible",
                     "api_model_name": "deepseek-chat",
-                    "base_url": "https://api.deepseek.com/v1",
+                    "base_url": "https://api.deepseek.com",
                     "api_key": "test-key",
                     "app_code": "",
                 },
@@ -230,7 +230,7 @@ class ModelSettingsApiTests(unittest.TestCase):
                     "provider": "deepseek",
                     "api_format": "openai_compatible",
                     "api_model_name": "deepseek-chat",
-                    "base_url": "https://api.deepseek.com/v1",
+                    "base_url": "https://api.deepseek.com",
                     "api_key": "",
                     "app_code": "",
                 },

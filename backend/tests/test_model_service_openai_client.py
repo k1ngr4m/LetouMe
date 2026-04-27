@@ -29,7 +29,7 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "API key cannot be empty"):
             ModelService._build_openai_client(
                 provider="deepseek",
-                base_url="https://api.deepseek.com/v1",
+                base_url="https://api.deepseek.com",
                 api_key="",
             )
 

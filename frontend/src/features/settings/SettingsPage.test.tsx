@@ -810,7 +810,7 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
         { code: 'custom-provider', name: 'My Provider', is_system_preset: false, api_format: 'openai_compatible', base_url: '' },
-        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com/v1' },
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
         { code: 'aimixhub', name: 'AiMixHub', is_system_preset: true, api_format: 'anthropic', base_url: 'https://aihubmix.com/v1' },
       ],
     })
@@ -838,7 +838,7 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
-        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com/v1' },
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
       ],
     })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })

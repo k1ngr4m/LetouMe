@@ -246,7 +246,13 @@ class ExpertService:
         if existing:
             runtime_cache.set("experts:seeded:v1", True, ttl_seconds=3600)
             return
-        seed_model_candidates = ["deepseek-v3.2", "deepseek-chat", "claude-sonnet-4.6"]
+        seed_model_candidates = [
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+            "deepseek-v3.2",
+            "deepseek-chat",
+            "claude-sonnet-4.6",
+        ]
         selected_model_code = ""
         for model_code in seed_model_candidates:
             model = self.model_repository.get_model(model_code)

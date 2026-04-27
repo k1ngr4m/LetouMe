@@ -13,7 +13,7 @@ from backend.app.lotteries import normalize_lottery_code
 
 
 DEFAULT_BASE_URL = "https://aihubmix.com/v1"
-DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1"
 SUPPORTED_PROVIDERS = (
     "openai",
@@ -81,6 +81,32 @@ DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
         "display_name": "DeepSeek-v3.2",
         "provider": "deepseek",
         "api_model_name": "deepseek-chat",
+        "version": "1",
+        "tags": ["reasoning"],
+        "is_active": False,
+        "base_url": DEEPSEEK_BASE_URL,
+        "api_key": "",
+        "app_code": "",
+        "lottery_codes": ["dlt"],
+    },
+    {
+        "model_code": "deepseek-v4-flash",
+        "display_name": "DeepSeek-V4-Flash",
+        "provider": "deepseek",
+        "api_model_name": "deepseek-v4-flash",
+        "version": "1",
+        "tags": ["reasoning", "fast"],
+        "is_active": False,
+        "base_url": DEEPSEEK_BASE_URL,
+        "api_key": "",
+        "app_code": "",
+        "lottery_codes": ["dlt"],
+    },
+    {
+        "model_code": "deepseek-v4-pro",
+        "display_name": "DeepSeek-V4-Pro",
+        "provider": "deepseek",
+        "api_model_name": "deepseek-v4-pro",
         "version": "1",
         "tags": ["reasoning"],
         "is_active": False,
@@ -263,12 +289,18 @@ def bootstrap_default_models() -> None:
                     existing_row = cursor.fetchone()
                     if existing_row:
                         continue
+                    provider_model_id = _ensure_provider_model_config(
+                        cursor,
+                        provider_ids[item["provider"]],
+                        item["api_model_name"],
+                        item["display_name"],
+                    )
                     cursor.execute(
                         """
                         INSERT INTO ai_model (
                             model_code,
                             display_name,
-                            provider_id,
+                            provider_model_id,
                             api_model_name,
                             version,
                             is_active,
@@ -284,7 +316,7 @@ def bootstrap_default_models() -> None:
                         (
                             item["model_code"],
                             item["display_name"],
-                            provider_ids[item["provider"]],
+                            provider_model_id,
                             item["api_model_name"],
                             item.get("version"),
                             1 if item.get("is_active") else 0,
@@ -333,20 +365,43 @@ def bootstrap_default_models() -> None:
 
 def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
     deepseek_provider_id = provider_ids["deepseek"]
+    legacy_chat_provider_model_id = _ensure_provider_model_config(
+        cursor,
+        deepseek_provider_id,
+        "deepseek-chat",
+        "DeepSeek Chat (legacy alias)",
+    )
+    _ensure_provider_model_config(cursor, deepseek_provider_id, "deepseek-reasoner", "DeepSeek Reasoner (legacy alias)")
+    _ensure_provider_model_config(cursor, deepseek_provider_id, "deepseek-v4-flash", "DeepSeek V4 Flash")
+    _ensure_provider_model_config(cursor, deepseek_provider_id, "deepseek-v4-pro", "DeepSeek V4 Pro")
     cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", ("deepseek-v3.2",))
     row = cursor.fetchone()
     if row:
         cursor.execute(
             """
             UPDATE ai_model
-            SET provider_id = ?,
+            SET provider_model_id = ?,
                 api_model_name = ?,
                 base_url = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE model_code = ?
             """,
-            (deepseek_provider_id, "deepseek-chat", DEEPSEEK_BASE_URL, "deepseek-v3.2"),
+            (legacy_chat_provider_model_id, "deepseek-chat", DEEPSEEK_BASE_URL, "deepseek-v3.2"),
         )
+    cursor.execute(
+        """
+        UPDATE ai_model
+        SET base_url = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE provider_model_id IN (
+            SELECT pmc.id
+            FROM provider_model_config pmc
+            WHERE pmc.provider_id = ?
+        )
+        AND (base_url IS NULL OR base_url = '' OR base_url = 'https://api.deepseek.com/v1')
+        """,
+        (DEEPSEEK_BASE_URL, deepseek_provider_id),
+    )
     for tag in ("reasoning",):
         cursor.execute(
             """
@@ -356,6 +411,45 @@ def _migrate_deepseek_models(cursor, provider_ids: dict[str, int]) -> None:
             """,
             (tag, tag),
         )
+
+
+def _ensure_provider_model_config(cursor, provider_id: int, model_id: str, display_name: str) -> int:
+    cursor.execute(
+        """
+        SELECT id
+        FROM provider_model_config
+        WHERE provider_id = ? AND model_id = ?
+        LIMIT 1
+        """,
+        (provider_id, model_id),
+    )
+    row = cursor.fetchone()
+    if row:
+        cursor.execute(
+            """
+            UPDATE provider_model_config
+            SET display_name = ?,
+                is_deleted = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (display_name, int(row["id"])),
+        )
+        return int(row["id"])
+
+    cursor.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) AS sort_order FROM provider_model_config WHERE provider_id = ?",
+        (provider_id,),
+    )
+    sort_order = int((cursor.fetchone() or {}).get("sort_order") or 0) + 1
+    cursor.execute(
+        """
+        INSERT INTO provider_model_config (provider_id, model_id, display_name, sort_order, is_deleted)
+        VALUES (?, ?, ?, ?, 0)
+        """,
+        (provider_id, model_id, display_name, sort_order),
+    )
+    return int(cursor.lastrowid)
 
 
 def _provider_name(provider_code: str) -> str:
