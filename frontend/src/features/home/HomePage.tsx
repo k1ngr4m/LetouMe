@@ -78,7 +78,6 @@ import {
   type ScoreViewSortKey,
 } from './navigation'
 import { HomeDashboardTabStrip } from './HomeDashboardTabStrip'
-import { ExpertPredictionPanel } from './ExpertPredictionPanel'
 
 const HISTORY_DEFAULT_PAGE_SIZE = 20
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -689,7 +688,6 @@ export function HomePage() {
   const [summaryStrategyFilters, setSummaryStrategyFilters] = useState<string[]>([])
   const [historyStrategyFilters, setHistoryStrategyFilters] = useState<string[]>([])
   const [isSummaryModelChipsExpanded, setIsSummaryModelChipsExpanded] = useState(false)
-  const [predictionContentTab, setPredictionContentTab] = useState<'models' | 'experts'>('models')
   const [myBetsFormDirty, setMyBetsFormDirty] = useState(false)
   const summaryPlayTypeFilters = useMemo<PredictionPlayType[]>(
     () =>
@@ -1601,25 +1599,8 @@ export function HomePage() {
               <strong>{currentJackpotDisplay}</strong>
             </article>
           </section>
-          <div className="filter-chip-group" role="tablist" aria-label="预测内容切换">
-            <button
-              type="button"
-              className={clsx('filter-chip', predictionContentTab === 'models' && 'is-active')}
-              onClick={() => setPredictionContentTab('models')}
-            >
-              模型预测
-            </button>
-            <button
-              type="button"
-              className={clsx('filter-chip', predictionContentTab === 'experts' && 'is-active')}
-              onClick={() => setPredictionContentTab('experts')}
-            >
-              专家方案
-            </button>
-          </div>
-          {predictionContentTab === 'models' ? (
-            <div className="dashboard-layout">
-          <div className="page-section dashboard-content">
+          <div className="dashboard-layout">
+            <div className="page-section dashboard-content">
             <section ref={modelSectionRef} data-section="models" className="prediction-overview-section prediction-overview-section--models">
               <StatusCard
                 title="模型列表"
@@ -1908,11 +1889,8 @@ export function HomePage() {
                   )}
               </StatusCard>
             </section>
+            </div>
           </div>
-          </div>
-          ) : (
-            <ExpertPredictionPanel lotteryCode={selectedLottery} />
-          )}
         </>
       ) : null}
 
