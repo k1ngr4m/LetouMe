@@ -325,6 +325,38 @@ class ExpertRepository:
                 rows = cursor.fetchall()
         return [self._serialize_result_row(row) for row in rows]
 
+    def list_result_summaries_by_period(self, *, lottery_code: str, target_period: str) -> list[dict[str, Any]]:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        r.id,
+                        r.batch_id,
+                        r.expert_id,
+                        r.expert_code,
+                        r.lottery_code,
+                        r.target_period,
+                        r.status,
+                        r.error_message,
+                        r.generated_at,
+                        r.updated_at,
+                        r.created_at,
+                        e.display_name,
+                        e.bio,
+                        e.model_code,
+                        e.is_active,
+                        e.is_deleted
+                    FROM expert_prediction_result r
+                    INNER JOIN expert_profile e ON e.id = r.expert_id
+                    WHERE r.lottery_code = ? AND r.target_period = ?
+                    ORDER BY e.updated_at DESC, e.id DESC
+                    """,
+                    (str(lottery_code).strip().lower(), str(target_period).strip()),
+                )
+                rows = cursor.fetchall()
+        return [self._serialize_result_row(row) for row in rows]
+
     def list_history_results(
         self,
         *,

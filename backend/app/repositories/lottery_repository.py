@@ -142,6 +142,53 @@ class LotteryRepository:
             lottery_code=normalized_code,
         )
 
+    def list_draws_by_periods(self, periods: list[str], lottery_code: str = "dlt") -> dict[str, dict[str, Any]]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        stored_periods = sorted(
+            {storage_issue_no(normalized_code, period) for period in periods if str(period or "").strip()}
+        )
+        if not stored_periods:
+            return {}
+
+        rows: list[dict[str, Any]] = []
+        numbers_by_result: dict[int, list[dict[str, Any]]] = {}
+        prizes_by_result: dict[int, list[dict[str, Any]]] = {}
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    for chunk in _iter_chunks(stored_periods, IN_QUERY_CHUNK_SIZE):
+                        placeholders = ", ".join("?" for _ in chunk)
+                        cursor.execute(
+                            f"""
+                            SELECT
+                                di.id AS issue_id,
+                                di.issue_no AS period,
+                                di.draw_date,
+                                di.updated_at,
+                                dr.id AS draw_result_id,
+                                dr.jackpot_pool_balance
+                            FROM draw_issue di
+                            INNER JOIN draw_result dr ON dr.issue_id = di.id
+                            WHERE di.issue_no IN ({placeholders})
+                            """,
+                            tuple(chunk),
+                        )
+                        rows.extend(cursor.fetchall())
+                    result_ids = [int(row["draw_result_id"]) for row in rows if row.get("draw_result_id")]
+                    numbers_by_result = self._fetch_draw_numbers(cursor, result_ids)
+                    prizes_by_result = self._fetch_draw_prizes(cursor, result_ids)
+
+        result: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            draw = self._to_draw_dict(
+                row,
+                numbers_by_result.get(row["draw_result_id"], []),
+                prizes_by_result.get(row["draw_result_id"], []),
+                lottery_code=normalized_code,
+            )
+            result[str(draw.get("period") or "")] = draw
+        return result
+
     def get_latest_draw(self, lottery_code: str = "dlt") -> dict[str, Any] | None:
         draws = self.list_draws(limit=1, lottery_code=lottery_code)
         return draws[0] if draws else None
@@ -180,6 +227,43 @@ class LotteryRepository:
             prizes_by_result.get(row["draw_result_id"], []),
             lottery_code=normalized_code,
         )
+
+    def list_previous_jackpot_pool_by_periods(self, periods: list[str], lottery_code: str = "dlt") -> dict[str, int]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        stored_periods = sorted(
+            {storage_issue_no(normalized_code, period) for period in periods if str(period or "").strip()}
+        )
+        if not stored_periods:
+            return {}
+
+        result: dict[str, int] = {}
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    for chunk in _iter_chunks(stored_periods, IN_QUERY_CHUNK_SIZE):
+                        placeholders = ", ".join("?" for _ in chunk)
+                        cursor.execute(
+                            f"""
+                            SELECT
+                                target.issue_no AS target_period,
+                                previous_result.jackpot_pool_balance
+                            FROM draw_issue target
+                            INNER JOIN draw_issue previous_issue ON previous_issue.issue_no = (
+                                SELECT MAX(candidate.issue_no)
+                                FROM draw_issue candidate
+                                INNER JOIN draw_result candidate_result ON candidate_result.issue_id = candidate.id
+                                WHERE candidate.issue_no < target.issue_no
+                            )
+                            INNER JOIN draw_result previous_result ON previous_result.issue_id = previous_issue.id
+                            WHERE target.issue_no IN ({placeholders})
+                            """,
+                            tuple(chunk),
+                        )
+                        for row in cursor.fetchall():
+                            target_period = display_period(normalized_code, str(row.get("target_period") or ""))
+                            if target_period:
+                                result[target_period] = int(row.get("jackpot_pool_balance") or 0)
+        return result
 
     def _upsert_draw(self, draw: dict[str, Any], lottery_code: str = "dlt") -> None:
         period = str(draw["period"])

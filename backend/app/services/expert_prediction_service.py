@@ -703,7 +703,8 @@ class ExpertPredictionService:
 
     def _build_current_expert_list_payload(self, lottery_code: str, target_period: str) -> dict[str, Any]:
         experts = self.expert_service.list_experts(include_deleted=False, lottery_code=lottery_code)
-        result_rows = self.repository.list_results_by_period(lottery_code=lottery_code, target_period=target_period)
+        list_result_summaries = getattr(self.repository, "list_result_summaries_by_period", self.repository.list_results_by_period)
+        result_rows = list_result_summaries(lottery_code=lottery_code, target_period=target_period)
         result_map_by_code = {
             str(item.get("expert_code") or ""): item
             for item in result_rows
@@ -875,6 +876,10 @@ class ExpertPredictionService:
         }
 
     def _resolve_target_period(self, lottery_code: str) -> str:
+        get_current_target_period = getattr(self.prediction_service, "get_current_target_period", None)
+        target_period = str(get_current_target_period(lottery_code=lottery_code) if callable(get_current_target_period) else "").strip()
+        if target_period:
+            return target_period
         current_payload = self.prediction_service.get_current_payload(lottery_code=lottery_code, include_inactive_models=False)
         target_period = str(current_payload.get("target_period") or "").strip()
         if target_period:

@@ -58,7 +58,31 @@ class MyBetService:
 
     def list_records(self, user_id: int, lottery_code: str = "dlt") -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
-        records = [self._serialize_with_settlement(item, lottery_code=normalized_code) for item in self.repository.list_records(user_id, lottery_code=normalized_code)]
+        raw_records = self.repository.list_records(user_id, lottery_code=normalized_code)
+        serialized_records = [self._serialize_record(item) for item in raw_records]
+        target_periods = [
+            str(item.get("target_period") or "")
+            for item in serialized_records
+            if str(item.get("target_period") or "").strip()
+        ]
+        draw_cache = self.lottery_repository.list_draws_by_periods(target_periods, lottery_code=normalized_code)
+        previous_jackpot_cache = (
+            self.lottery_repository.list_previous_jackpot_pool_by_periods(target_periods, lottery_code=normalized_code)
+            if normalized_code == "dlt"
+            else {}
+        )
+        records = [
+            {
+                **item,
+                **self._calculate_settlement(
+                    item,
+                    lottery_code=normalized_code,
+                    draw_cache=draw_cache,
+                    previous_jackpot_cache=previous_jackpot_cache,
+                ),
+            }
+            for item in serialized_records
+        ]
         total_amount = sum(int(item.get("amount") or 0) for item in records)
         total_discount_amount = sum(int(item.get("discount_amount") or 0) for item in records)
         total_net_amount = sum(int(item.get("net_amount") or 0) for item in records)
@@ -576,12 +600,31 @@ class MyBetService:
             raise ValueError(f"{position}胆码与拖码不可重复")
         return dan_numbers, tuo_numbers, sorted({*dan_numbers, *tuo_numbers})
 
-    def _serialize_with_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
+    def _serialize_with_settlement(
+        self,
+        record: dict[str, Any],
+        *,
+        lottery_code: str,
+        draw_cache: dict[str, dict[str, Any]] | None = None,
+        previous_jackpot_cache: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
         serialized = self._serialize_record(record)
-        settlement = self._calculate_settlement(serialized, lottery_code=lottery_code)
+        settlement = self._calculate_settlement(
+            serialized,
+            lottery_code=lottery_code,
+            draw_cache=draw_cache,
+            previous_jackpot_cache=previous_jackpot_cache,
+        )
         return {**serialized, **settlement}
 
-    def _calculate_settlement(self, record: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
+    def _calculate_settlement(
+        self,
+        record: dict[str, Any],
+        *,
+        lottery_code: str,
+        draw_cache: dict[str, dict[str, Any]] | None = None,
+        previous_jackpot_cache: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
         target_period = str(record.get("target_period") or "")
         if not target_period:
             net_amount = int(record.get("net_amount") or 0)
@@ -595,7 +638,9 @@ class MyBetService:
                 "actual_result": None,
                 "lines": list(record.get("lines") or []),
             }
-        draw = self.lottery_repository.get_draw_by_period(target_period, lottery_code=lottery_code)
+        draw = (draw_cache or {}).get(target_period)
+        if draw is None and draw_cache is None:
+            draw = self.lottery_repository.get_draw_by_period(target_period, lottery_code=lottery_code)
         if not draw:
             net_amount = int(record.get("net_amount") or 0)
             return {
@@ -609,10 +654,13 @@ class MyBetService:
                 "lines": list(record.get("lines") or []),
             }
         if lottery_code == "dlt":
-            previous_draw = self.lottery_repository.get_previous_draw_by_period(target_period, lottery_code=lottery_code)
+            previous_jackpot_pool = (previous_jackpot_cache or {}).get(target_period)
+            if previous_jackpot_pool is None and previous_jackpot_cache is None:
+                previous_draw = self.lottery_repository.get_previous_draw_by_period(target_period, lottery_code=lottery_code)
+                previous_jackpot_pool = int(previous_draw.get("jackpot_pool_balance") or 0) if previous_draw else 0
             draw = {
                 **draw,
-                "previous_jackpot_pool": int(previous_draw.get("jackpot_pool_balance") or 0) if previous_draw else 0,
+                "previous_jackpot_pool": int(previous_jackpot_pool or 0),
             }
 
         total_prize_amount = 0

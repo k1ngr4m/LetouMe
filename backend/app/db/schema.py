@@ -41,6 +41,7 @@ SCHEMA_STATEMENTS = [
         ball_value VARCHAR(8) NOT NULL,
         CONSTRAINT fk_draw_result_number_result FOREIGN KEY (draw_result_id) REFERENCES draw_result(id) ON DELETE CASCADE,
         UNIQUE KEY uq_draw_result_number_position (draw_result_id, ball_color, ball_position),
+        INDEX idx_draw_result_number_result_order (draw_result_id, ball_color, ball_position, ball_value),
         INDEX idx_draw_result_number_color_value (ball_color, ball_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -164,6 +165,7 @@ SCHEMA_STATEMENTS = [
         CONSTRAINT fk_prediction_model_run_model FOREIGN KEY (model_id) REFERENCES ai_model(id),
         UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode),
         INDEX idx_prediction_model_run_batch (prediction_batch_id),
+        INDEX idx_prediction_model_run_batch_order (prediction_batch_id, display_order, id),
         INDEX idx_prediction_model_run_model (model_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -179,7 +181,8 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_prediction_group_model_run FOREIGN KEY (model_run_id) REFERENCES prediction_model_run(id) ON DELETE CASCADE,
         UNIQUE KEY uq_prediction_group_model_run_group (model_run_id, group_no),
-        INDEX idx_prediction_group_model_run (model_run_id)
+        INDEX idx_prediction_group_model_run (model_run_id),
+        INDEX idx_prediction_group_run_order (model_run_id, group_no, id, play_type, sum_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -233,7 +236,8 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_draw_result_prize_result FOREIGN KEY (draw_result_id) REFERENCES draw_result(id) ON DELETE CASCADE,
         UNIQUE KEY uq_draw_result_prize_level_type (draw_result_id, prize_level, prize_type),
-        INDEX idx_draw_result_prize_result (draw_result_id)
+        INDEX idx_draw_result_prize_result (draw_result_id),
+        INDEX idx_draw_result_prize_result_order (draw_result_id, id, prize_level, prize_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -377,7 +381,8 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
-        INDEX idx_my_bet_record_user_period (user_id, lottery_code, target_period, created_at)
+        INDEX idx_my_bet_record_user_period (user_id, lottery_code, target_period, created_at),
+        INDEX idx_my_bet_record_user_list (user_id, lottery_code, target_period, created_at, id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -605,6 +610,7 @@ SCHEMA_STATEMENTS = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_expert_profile_lottery_active (lottery_code, is_active, is_deleted),
+        INDEX idx_expert_profile_public_order (lottery_code, is_deleted, is_active, updated_at, id),
         INDEX idx_expert_profile_model_code (model_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -643,7 +649,8 @@ SCHEMA_STATEMENTS = [
         CONSTRAINT fk_expert_prediction_result_batch FOREIGN KEY (batch_id) REFERENCES expert_prediction_batch(id) ON DELETE CASCADE,
         CONSTRAINT fk_expert_prediction_result_expert FOREIGN KEY (expert_id) REFERENCES expert_profile(id) ON DELETE CASCADE,
         UNIQUE KEY uq_expert_prediction_result_batch_expert (batch_id, expert_id),
-        INDEX idx_expert_prediction_result_query (lottery_code, target_period, expert_code)
+        INDEX idx_expert_prediction_result_query (lottery_code, target_period, expert_code),
+        INDEX idx_expert_prediction_result_period_status (lottery_code, target_period, status, expert_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
 ]
@@ -680,6 +687,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         ball_value VARCHAR(8) NOT NULL,
         CONSTRAINT fk_{fk_prefix}_draw_result_number_result FOREIGN KEY (draw_result_id) REFERENCES {table_prefix}_draw_result(id) ON DELETE CASCADE,
         UNIQUE KEY uq_draw_result_number_position (draw_result_id, ball_color, ball_position),
+        INDEX idx_draw_result_number_result_order (draw_result_id, ball_color, ball_position, ball_value),
         INDEX idx_draw_result_number_color_value (ball_color, ball_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -715,6 +723,7 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         CONSTRAINT fk_{fk_prefix}_prediction_model_run_model FOREIGN KEY (model_id) REFERENCES ai_model(id),
         UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode),
         INDEX idx_prediction_model_run_batch (prediction_batch_id),
+        INDEX idx_prediction_model_run_batch_order (prediction_batch_id, display_order, id),
         INDEX idx_prediction_model_run_model (model_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
@@ -730,7 +739,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_prediction_group_model_run FOREIGN KEY (model_run_id) REFERENCES {table_prefix}_prediction_model_run(id) ON DELETE CASCADE,
         UNIQUE KEY uq_prediction_group_model_run_group (model_run_id, group_no),
-        INDEX idx_prediction_group_model_run (model_run_id)
+        INDEX idx_prediction_group_model_run (model_run_id),
+        INDEX idx_prediction_group_run_order (model_run_id, group_no, id, play_type, sum_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -782,7 +792,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_draw_result_prize_result FOREIGN KEY (draw_result_id) REFERENCES {table_prefix}_draw_result(id) ON DELETE CASCADE,
         UNIQUE KEY uq_draw_result_prize_level_type (draw_result_id, prize_level, prize_type),
-        INDEX idx_draw_result_prize_result (draw_result_id)
+        INDEX idx_draw_result_prize_result (draw_result_id),
+        INDEX idx_draw_result_prize_result_order (draw_result_id, id, prize_level, prize_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -833,7 +844,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_my_bet_record_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
-        INDEX idx_my_bet_record_user_period (user_id, target_period, created_at)
+        INDEX idx_my_bet_record_user_period (user_id, target_period, created_at),
+        INDEX idx_my_bet_record_user_list (user_id, target_period, created_at, id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
@@ -904,6 +916,36 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
         "drop": {
             "uq_draw_result_number_value": "ALTER TABLE draw_result_number DROP INDEX uq_draw_result_number_value",
         },
+        "add": {
+            "idx_draw_result_number_result_order": (
+                "ALTER TABLE draw_result_number "
+                "ADD INDEX idx_draw_result_number_result_order (draw_result_id, ball_color, ball_position, ball_value)"
+            ),
+        },
+    },
+    "draw_result_prize": {
+        "add": {
+            "idx_draw_result_prize_result_order": (
+                "ALTER TABLE draw_result_prize "
+                "ADD INDEX idx_draw_result_prize_result_order (draw_result_id, id, prize_level, prize_type)"
+            ),
+        },
+    },
+    "expert_profile": {
+        "add": {
+            "idx_expert_profile_public_order": (
+                "ALTER TABLE expert_profile "
+                "ADD INDEX idx_expert_profile_public_order (lottery_code, is_deleted, is_active, updated_at, id)"
+            ),
+        },
+    },
+    "expert_prediction_result": {
+        "add": {
+            "idx_expert_prediction_result_period_status": (
+                "ALTER TABLE expert_prediction_result "
+                "ADD INDEX idx_expert_prediction_result_period_status (lottery_code, target_period, status, expert_id)"
+            ),
+        },
     },
     "prediction_group_number": {
         "drop": {
@@ -927,6 +969,10 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
                 "ALTER TABLE prediction_model_run "
                 "ADD UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode)"
             ),
+            "idx_prediction_model_run_batch_order": (
+                "ALTER TABLE prediction_model_run "
+                "ADD INDEX idx_prediction_model_run_batch_order (prediction_batch_id, display_order, id)"
+            ),
         },
     },
     "prediction_group": {
@@ -934,6 +980,10 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
             "idx_prediction_group_model_run_play_type": (
                 "ALTER TABLE prediction_group "
                 "ADD INDEX idx_prediction_group_model_run_play_type (model_run_id, play_type)"
+            ),
+            "idx_prediction_group_run_order": (
+                "ALTER TABLE prediction_group "
+                "ADD INDEX idx_prediction_group_run_order (model_run_id, group_no, id, play_type, sum_value)"
             ),
         },
     },
@@ -945,6 +995,14 @@ SCHEMA_INDEX_MIGRATIONS: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
     },
+    "my_bet_record": {
+        "add": {
+            "idx_my_bet_record_user_list": (
+                "ALTER TABLE my_bet_record "
+                "ADD INDEX idx_my_bet_record_user_list (user_id, lottery_code, target_period, created_at, id)"
+            ),
+        },
+    },
 }
 
 for _lottery_code in SUPPORTED_LOTTERY_CODES:
@@ -952,6 +1010,20 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
     SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}draw_result_number"] = {
         "drop": {
             "uq_draw_result_number_value": f"ALTER TABLE {_table_prefix}draw_result_number DROP INDEX uq_draw_result_number_value",
+        },
+        "add": {
+            "idx_draw_result_number_result_order": (
+                f"ALTER TABLE {_table_prefix}draw_result_number "
+                "ADD INDEX idx_draw_result_number_result_order (draw_result_id, ball_color, ball_position, ball_value)"
+            ),
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}draw_result_prize"] = {
+        "add": {
+            "idx_draw_result_prize_result_order": (
+                f"ALTER TABLE {_table_prefix}draw_result_prize "
+                "ADD INDEX idx_draw_result_prize_result_order (draw_result_id, id, prize_level, prize_type)"
+            ),
         },
     }
     SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_group_number"] = {
@@ -976,6 +1048,10 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
                 f"ALTER TABLE {_table_prefix}prediction_model_run "
                 "ADD UNIQUE KEY uq_prediction_model_run_batch_model_mode (prediction_batch_id, model_id, prediction_play_mode)"
             ),
+            "idx_prediction_model_run_batch_order": (
+                f"ALTER TABLE {_table_prefix}prediction_model_run "
+                "ADD INDEX idx_prediction_model_run_batch_order (prediction_batch_id, display_order, id)"
+            ),
         },
     }
     SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}prediction_group"] = {
@@ -983,6 +1059,18 @@ for _lottery_code in SUPPORTED_LOTTERY_CODES:
             "idx_prediction_group_model_run_play_type": (
                 f"ALTER TABLE {_table_prefix}prediction_group "
                 "ADD INDEX idx_prediction_group_model_run_play_type (model_run_id, play_type)"
+            ),
+            "idx_prediction_group_run_order": (
+                f"ALTER TABLE {_table_prefix}prediction_group "
+                "ADD INDEX idx_prediction_group_run_order (model_run_id, group_no, id, play_type, sum_value)"
+            ),
+        },
+    }
+    SCHEMA_INDEX_MIGRATIONS[f"{_table_prefix}my_bet_record"] = {
+        "add": {
+            "idx_my_bet_record_user_list": (
+                f"ALTER TABLE {_table_prefix}my_bet_record "
+                "ADD INDEX idx_my_bet_record_user_list (user_id, target_period, created_at, id)"
             ),
         },
     }

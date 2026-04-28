@@ -1171,6 +1171,7 @@ describe('HomePage dashboard sidebar', () => {
 
     const modelSectionTitle = screen.getByRole('heading', { name: '模型列表' })
     expect(summary.compareDocumentPosition(modelSectionTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '专家方案' })).not.toBeInTheDocument()
   })
 
   it('shows jackpot amount when draw provides jackpot data', () => {

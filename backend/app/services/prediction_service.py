@@ -162,6 +162,14 @@ class PredictionService:
         self.logger.debug("Loaded current prediction payload", extra={"context": {"target_period": payload.get("target_period"), "model_count": len(payload.get("models", []))}})
         return payload
 
+    def get_current_target_period(self, lottery_code: str = "dlt") -> str | None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        return runtime_cache.get_or_set(
+            f"predictions:{normalized_code}:current-target-period",
+            ttl_seconds=60,
+            loader=lambda: self.prediction_repository.get_current_target_period(lottery_code=normalized_code),
+        )
+
     def get_current_payload_by_period(
         self,
         target_period: str,

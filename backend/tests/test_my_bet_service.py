@@ -338,6 +338,92 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["net_amount"], 6)
         self.assertEqual(result["net_profit"], -6)
 
+    def test_list_records_batches_draw_lookup_for_settlement(self) -> None:
+        class FakeRepository:
+            def list_records(self, user_id: int, lottery_code: str = "dlt"):
+                return [
+                    {
+                        "id": 1,
+                        "lottery_code": lottery_code,
+                        "target_period": "26040",
+                        "play_type": "dlt",
+                        "multiplier": 1,
+                        "is_append": 0,
+                        "bet_count": 1,
+                        "amount": 2,
+                        "discount_amount": 0,
+                        "source_type": "manual",
+                        "created_at": "2026-03-31T00:00:00Z",
+                        "updated_at": "2026-03-31T00:00:00Z",
+                        "lines": [
+                            {
+                                "line_no": 1,
+                                "play_type": "dlt",
+                                "front_numbers": "01,02,03,04,05",
+                                "back_numbers": "01,02",
+                                "multiplier": 1,
+                                "is_append": 0,
+                                "bet_count": 1,
+                                "amount": 2,
+                            }
+                        ],
+                    },
+                    {
+                        "id": 2,
+                        "lottery_code": lottery_code,
+                        "target_period": "26040",
+                        "play_type": "dlt",
+                        "multiplier": 1,
+                        "is_append": 0,
+                        "bet_count": 1,
+                        "amount": 2,
+                        "discount_amount": 0,
+                        "source_type": "manual",
+                        "created_at": "2026-03-31T00:00:00Z",
+                        "updated_at": "2026-03-31T00:00:00Z",
+                        "lines": [
+                            {
+                                "line_no": 1,
+                                "play_type": "dlt",
+                                "front_numbers": "06,07,08,09,10",
+                                "back_numbers": "03,04",
+                                "multiplier": 1,
+                                "is_append": 0,
+                                "bet_count": 1,
+                                "amount": 2,
+                            }
+                        ],
+                    },
+                ]
+
+        class FakeLotteryRepository:
+            def __init__(self) -> None:
+                self.draw_periods: list[list[str]] = []
+                self.previous_periods: list[list[str]] = []
+
+            def list_draws_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                self.draw_periods.append(list(periods))
+                return {}
+
+            def list_previous_jackpot_pool_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                self.previous_periods.append(list(periods))
+                return {}
+
+            def get_draw_by_period(self, *args, **kwargs):
+                raise AssertionError("list_records should use batched draw lookup")
+
+            def get_previous_draw_by_period(self, *args, **kwargs):
+                raise AssertionError("list_records should use batched previous jackpot lookup")
+
+        lottery_repository = FakeLotteryRepository()
+        service = MyBetService(repository=FakeRepository(), lottery_repository=lottery_repository)
+
+        result = service.list_records(1, lottery_code="dlt")
+
+        self.assertEqual(result["summary"]["total_count"], 2)
+        self.assertEqual(lottery_repository.draw_periods, [["26040", "26040"]])
+        self.assertEqual(lottery_repository.previous_periods, [["26040", "26040"]])
+
 
 if __name__ == "__main__":
     unittest.main()

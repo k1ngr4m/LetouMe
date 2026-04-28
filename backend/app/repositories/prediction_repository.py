@@ -69,6 +69,26 @@ class PredictionRepository:
                         return None
                     return self._build_batch_payload(cursor, row, lottery_code=normalized_code, include_actual_result=False)
 
+    def get_current_target_period(self, lottery_code: str = "dlt") -> str | None:
+        normalized_code = normalize_lottery_code(lottery_code)
+        with use_lottery_table_scope(normalized_code):
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT di.issue_no AS target_period
+                        FROM prediction_batch pb
+                        INNER JOIN draw_issue di ON di.id = pb.target_issue_id
+                        WHERE pb.status = 'current'
+                        ORDER BY di.issue_no DESC
+                        LIMIT 1
+                        """,
+                    )
+                    row = cursor.fetchone()
+        if not row:
+            return None
+        return display_period(normalized_code, str(row.get("target_period") or ""))
+
     def get_current_prediction_by_period(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
         normalized_code = normalize_lottery_code(lottery_code)
         with use_lottery_table_scope(normalized_code):
@@ -1537,7 +1557,6 @@ class PredictionRepository:
                 SELECT draw_result_id, prize_level, prize_type, winner_count, prize_amount, total_amount
                 FROM draw_result_prize
                 WHERE draw_result_id IN ({placeholders})
-                ORDER BY draw_result_id ASC, id ASC
                 """,
                 tuple(chunk),
             )
