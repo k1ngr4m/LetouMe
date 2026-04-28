@@ -28,6 +28,7 @@ class PredictionGenerationTaskServiceTests(unittest.TestCase):
         log_repository.create_log.assert_called_once_with(
             task_id="task-1",
             lottery_code="pl3",
+            schedule_task_code=None,
             trigger_type="manual",
             task_type="prediction_generate",
             mode="current",
@@ -57,7 +58,7 @@ class PredictionGenerationTaskServiceTests(unittest.TestCase):
             "error_message": None,
         }
 
-        service._handle_task_update(state, trigger_type="manual")
+        service._handle_task_update(state, schedule_task_code=None, trigger_type="manual")
 
         args = log_repository.update_by_task_id.call_args.args
         self.assertEqual(args[0], "task-1")
@@ -85,7 +86,7 @@ class PredictionGenerationTaskServiceTests(unittest.TestCase):
             "error_message": None,
         }
 
-        service._handle_task_update(state, trigger_type="schedule")
+        service._handle_task_update(state, schedule_task_code=None, trigger_type="schedule")
 
         self.assertEqual(log_repository.update_by_task_id.call_count, 2)
         log_repository.create_log.assert_called_once()

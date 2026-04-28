@@ -157,7 +157,9 @@ class ScheduleRepository:
                     (1 if is_active else 0, ensure_timestamp(next_run_at), now_ts(), task_code),
                 )
                 if cursor.rowcount == 0:
-                    raise KeyError(task_code)
+                    cursor.execute("SELECT 1 FROM scheduled_task WHERE task_code = ?", (task_code,))
+                    if not cursor.fetchone():
+                        raise KeyError(task_code)
         return self.get_task(task_code) or {}
 
     def set_task_model_codes(
@@ -224,7 +226,9 @@ class ScheduleRepository:
                     params,
                 )
                 if cursor.rowcount == 0:
-                    raise KeyError(task_code)
+                    cursor.execute("SELECT 1 FROM scheduled_task WHERE task_code = ?", (task_code,))
+                    if not cursor.fetchone():
+                        raise KeyError(task_code)
         return self.get_task(task_code) or {}
 
     def list_due_tasks(self, due_before: datetime) -> list[dict[str, Any]]:
