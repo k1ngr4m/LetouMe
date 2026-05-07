@@ -1354,6 +1354,10 @@ export function MyBetsPanel({
               </div>
 
               <section className="my-bets-modal__section my-bets-modal__section--base">
+                <div className="my-bets-modal__section-heading">
+                  <strong>基础信息</strong>
+                  <span>先确认期号和购票时间，OCR 识别后会自动回填来源。</span>
+                </div>
                 <div className="settings-form-grid my-bets-modal__grid">
                   <label className="my-bets-modal__field">
                     目标期号
@@ -1397,7 +1401,13 @@ export function MyBetsPanel({
                     <span>图片先缓存本地，点击“开始OCR识别”后填充表单，保存投注时再上传图床。</span>
                   </div>
                   <div className="my-bets-image-uploader__actions">
-                    <input ref={editImageInputRef} type="file" accept="image/*" onChange={handleEditImageChange} />
+                    <label className="my-bets-image-uploader__file-control">
+                      <input ref={editImageInputRef} type="file" accept="image/*" onChange={handleEditImageChange} />
+                      <span className="my-bets-image-uploader__file-button">选择图片</span>
+                      <span className="my-bets-image-uploader__file-name">
+                        {form.ticketImageFile?.name || (form.ticketImageUrl && !form.ticketImageFile ? '已保存票据图片' : '未选择图片')}
+                      </span>
+                    </label>
                     <button
                       className="primary-button"
                       type="button"
@@ -1432,7 +1442,7 @@ export function MyBetsPanel({
                   return (
                     <section key={`edit-line-${index}`} className="simulation-section my-bets-modal__line-section">
                       <div className="simulation-section__header">
-                        <div>
+                        <div className="my-bets-modal__line-title">
                           <h3>{`子注单 #${index + 1}`}</h3>
                           <span>{`预计 ${quote.betCount} 注 / ${quote.amount} 元`}</span>
                         </div>
