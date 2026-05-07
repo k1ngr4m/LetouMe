@@ -381,13 +381,13 @@ describe('HomeModelDetailPage', () => {
     expect(within(page as HTMLElement).getByText('未找到对应模型：`missing-model`')).toBeInTheDocument()
   })
 
-  it('uses direct_sum score profile in pl3 detail when entering from sum mode', () => {
+  it('uses the current direct_sum score profile in pl3 detail when entering from sum mode', () => {
     window.localStorage.setItem('letoumeSelectedLottery', 'pl3')
     renderPage('/dashboard/models/model-a', { scrollY: 320, predictionPlayMode: 'direct_sum' })
 
     expect(screen.getByRole('heading', { name: '模型A' })).toBeInTheDocument()
-    expect(screen.getByText('综合 95')).toBeInTheDocument()
-    expect(screen.getByText('近期 93 / 长期 90')).toBeInTheDocument()
+    expect(screen.getByText('综合 91')).toBeInTheDocument()
+    expect(screen.getByText('近期 93 / 长期 88')).toBeInTheDocument()
     expect(screen.queryByText('综合 35')).not.toBeInTheDocument()
   })
 })

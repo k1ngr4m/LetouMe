@@ -1178,6 +1178,98 @@ describe('normalizePredictionModelPlayMode', () => {
 })
 
 describe('buildModelScores', () => {
+  it('prefers the current model score profile over paginated history stats', () => {
+    const modelScores = buildModelScores(
+      {
+        model_stats: [
+          {
+            model_id: 'm1',
+            model_name: 'Model 1',
+            prediction_play_mode: 'direct',
+            periods: 20,
+            winning_periods: 4,
+            bet_count: 100,
+            winning_bet_count: 8,
+            cost_amount: 200,
+            prize_amount: 60,
+            win_rate_by_period: 0.2,
+            win_rate_by_bet: 0.08,
+            score_profile: {
+              overall_score: 34,
+              per_bet_score: 22,
+              per_period_score: 36,
+              recent_score: 34,
+              long_term_score: 34,
+              component_scores: { profit: 28, hit_rate: 31, stability: 44, ceiling: 39, floor: 29 },
+            } as never,
+          },
+        ],
+        predictions_history: [],
+        total_count: 0,
+        strategy_options: [],
+      },
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          prediction_play_mode: 'direct',
+          predictions: [],
+          score_profile: {
+            overall_score: 34,
+            per_bet_score: 22,
+            per_period_score: 36,
+            recent_score: 34,
+            long_term_score: 33,
+            component_scores: { profit: 27, hit_rate: 30, stability: 44, ceiling: 39, floor: 29 },
+          } as never,
+        },
+      ],
+    )
+
+    const score = resolveModelScore(modelScores, { model_id: 'm1', prediction_play_mode: 'direct', predictions: [] })
+    expect(score?.recentScore).toBe(34)
+    expect(score?.longTermScore).toBe(33)
+  })
+
+  it('falls back to history stats when the current model has no score profile', () => {
+    const modelScores = buildModelScores(
+      {
+        model_stats: [
+          {
+            model_id: 'm1',
+            model_name: 'Model 1',
+            prediction_play_mode: 'direct',
+            periods: 20,
+            winning_periods: 4,
+            bet_count: 100,
+            winning_bet_count: 8,
+            cost_amount: 200,
+            prize_amount: 60,
+            win_rate_by_period: 0.2,
+            win_rate_by_bet: 0.08,
+            score_profile: {
+              overall_score: 34,
+              per_bet_score: 22,
+              per_period_score: 36,
+              recent_score: 34,
+              long_term_score: 34,
+              component_scores: { profit: 28, hit_rate: 31, stability: 44, ceiling: 39, floor: 29 },
+            } as never,
+          },
+        ],
+        predictions_history: [],
+        total_count: 0,
+        strategy_options: [],
+      },
+      [{ model_id: 'm1', model_name: 'Model 1', model_provider: 'openai', prediction_play_mode: 'direct', predictions: [] }],
+    )
+
+    const score = resolveModelScore(modelScores, { model_id: 'm1', prediction_play_mode: 'direct', predictions: [] })
+    expect(score?.recentScore).toBe(34)
+    expect(score?.longTermScore).toBe(34)
+  })
+
   it('keeps score profiles separated by prediction play mode for the same model id', () => {
     const modelScores = buildModelScores(
       {
