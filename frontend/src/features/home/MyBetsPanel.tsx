@@ -9,7 +9,6 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import { useMotion } from '../../shared/theme/MotionProvider'
-import { IMGLOC_CONTENT_BLOCKED_MESSAGE, isImglocContentBlockedError } from './lib/myBetUploadFallback'
 import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
 
 type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo'
@@ -864,19 +863,8 @@ export function MyBetsPanel({
   const saveMutation = useMutation({
     mutationFn: async () => {
       let ticketImageUrl = form.ticketImageUrl
-      let imageUploadWarning: string | null = null
       if (form.sourceType === 'ocr' && form.ticketImageFile) {
-        try {
-          const uploadResult = await apiClient.uploadMyBetOCRImage(lotteryCode, form.ticketImageFile)
-          ticketImageUrl = uploadResult.ticket_image_url || ''
-        } catch (error) {
-          const message = error instanceof Error ? error.message : ''
-          if (!isImglocContentBlockedError(message)) {
-            throw error
-          }
-          ticketImageUrl = ''
-          imageUploadWarning = IMGLOC_CONTENT_BLOCKED_MESSAGE
-        }
+        ticketImageUrl = ''
       }
       const payload: MyBetRecordPayload = {
         lottery_code: lotteryCode,
@@ -893,15 +881,15 @@ export function MyBetsPanel({
       if (editingRecord) {
         const updatePayload: MyBetRecordUpdatePayload = { ...payload, record_id: editingRecord.id }
         const response = await apiClient.updateMyBet(updatePayload)
-        return { response, imageUploadWarning }
+        return { response }
       }
       const response = await apiClient.createMyBet(payload)
-      return { response, imageUploadWarning }
+      return { response }
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       const successMessage = editingRecord ? '投注已更新。' : '投注已添加。'
       setMessageTone('success')
-      setMessage(result.imageUploadWarning ? `${successMessage}${result.imageUploadWarning}` : successMessage)
+      setMessage(successMessage)
       revokeObjectUrlIfNeeded(form.ticketImagePreviewUrl)
       setViewMode('list')
       setEditingRecord(null)
@@ -932,7 +920,7 @@ export function MyBetsPanel({
   const ocrMutation = useMutation({
     mutationFn: async () => {
       if (!form.ticketImageFile || !form.ticketImagePreviewUrl) {
-        throw new Error('请先上传并缓存票据图片')
+        throw new Error('请先选择票据图片')
       }
       return apiClient.recognizeMyBetByImage(lotteryCode, form.ticketImageFile)
     },
@@ -1398,7 +1386,7 @@ export function MyBetsPanel({
                       <ImageIcon size={15} aria-hidden="true" />
                       票据图片
                     </strong>
-                    <span>图片先缓存本地，点击“开始OCR识别”后填充表单，保存投注时再上传图床。</span>
+                    <span>图片仅用于本次 OCR 识别，当前不会上传图床；后续找到新图床后再接入保存图片。</span>
                   </div>
                   <div className="my-bets-image-uploader__actions">
                     <label className="my-bets-image-uploader__file-control">

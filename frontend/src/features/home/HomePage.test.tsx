@@ -15,6 +15,7 @@ const {
   getPredictionsHistoryDetail,
   getSimulationTickets,
   quoteSimulationTicket,
+  recognizeMyBetByImage,
   simulateDltModeCoexistCurrentPredictions,
   simulateDltCompoundCurrentPredictions,
   simulateDltDantuoCurrentPredictions,
@@ -22,6 +23,7 @@ const {
   simulatePl3SumHistoryMislabel,
   simulateJackpotPoolData,
   updateMyBet,
+  uploadMyBetOCRImage,
   simulateHistoryFilterLoading,
   homeDataArgsCapture,
   toPng,
@@ -35,6 +37,7 @@ const {
   getPredictionsHistoryDetail: vi.fn(),
   getSimulationTickets: vi.fn(),
   quoteSimulationTicket: vi.fn(),
+  recognizeMyBetByImage: vi.fn(),
   simulateDltModeCoexistCurrentPredictions: { current: false },
   simulateDltCompoundCurrentPredictions: { current: false },
   simulateDltDantuoCurrentPredictions: { current: false },
@@ -42,6 +45,7 @@ const {
   simulatePl3SumHistoryMislabel: { current: false },
   simulateJackpotPoolData: { current: false },
   updateMyBet: vi.fn(),
+  uploadMyBetOCRImage: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
   homeDataArgsCapture: {
     current: null as null | {
@@ -142,7 +146,9 @@ vi.mock('../../shared/api/client', () => ({
     getPredictionsHistoryDetail,
     getSimulationTickets,
     quoteSimulationTicket,
+    recognizeMyBetByImage,
     updateMyBet,
+    uploadMyBetOCRImage,
   },
 }))
 
@@ -1047,6 +1053,43 @@ beforeEach(() => {
   })
   deleteMyBet.mockReset()
   deleteMyBet.mockResolvedValue({ success: true })
+  recognizeMyBetByImage.mockReset()
+  recognizeMyBetByImage.mockResolvedValue({
+    lottery_code: 'dlt',
+    target_period: '2026033',
+    source_type: 'ocr',
+    ticket_image_url: '',
+    ocr_text: 'mock ocr text',
+    ocr_provider: 'baidu',
+    ocr_recognized_at: 1773801600,
+    lines: [
+      {
+        line_no: 1,
+        play_type: 'dlt',
+        front_numbers: ['01', '02', '03', '04', '05'],
+        back_numbers: ['06', '07'],
+        direct_ten_thousands: [],
+        direct_thousands: [],
+        direct_hundreds: [],
+        direct_tens: [],
+        direct_units: [],
+        direct_hundreds_dan: [],
+        direct_hundreds_tuo: [],
+        direct_tens_dan: [],
+        direct_tens_tuo: [],
+        direct_units_dan: [],
+        direct_units_tuo: [],
+        group_numbers: [],
+        multiplier: 1,
+        is_append: false,
+        bet_count: 1,
+        amount: 2,
+      },
+    ],
+    warnings: [],
+  })
+  uploadMyBetOCRImage.mockReset()
+  uploadMyBetOCRImage.mockResolvedValue({ lottery_code: 'dlt', ticket_image_url: 'https://img.test/ticket.jpg' })
   createSimulationTicket.mockReset()
   createSimulationTicket.mockResolvedValue({
     ticket: {
@@ -3208,7 +3251,7 @@ describe('HomePage dashboard sidebar', () => {
 
   it('supports create and delete on my-bets tab', async () => {
     renderPage('/dashboard/my-bets')
-    await screen.findByText('我的投注')
+    await screen.findByRole('heading', { name: '我的投注' })
     await waitFor(() => expect(screen.getByText('第 2026032 期')).toBeInTheDocument(), { timeout: 10000 })
 
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
@@ -3238,6 +3281,34 @@ describe('HomePage dashboard sidebar', () => {
         }),
       ),
     )
+  })
+
+  it('saves OCR my-bets without uploading the local ticket image to image hosting', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
+    const formView = await screen.findByTestId('my-bets-form-view')
+    const imageInput = formView.querySelector("input[type='file']") as HTMLInputElement
+    const ticketImage = new File(['ticket-image'], 'ticket.jpg', { type: 'image/jpeg' })
+
+    await userEvent.upload(imageInput, ticketImage)
+    await userEvent.click(within(formView).getByRole('button', { name: '开始OCR识别' }))
+    await waitFor(() => expect(recognizeMyBetByImage).toHaveBeenCalledWith('dlt', ticketImage))
+
+    await userEvent.click(within(formView).getByRole('button', { name: '添加投注' }))
+
+    await waitFor(() =>
+      expect(createMyBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'dlt',
+          source_type: 'ocr',
+          ticket_image_url: '',
+          ocr_text: 'mock ocr text',
+        }),
+      ),
+    )
+    expect(uploadMyBetOCRImage).not.toHaveBeenCalled()
   })
 
   it('keeps my-bets details collapsed by default and supports expand controls', async () => {
