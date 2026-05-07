@@ -8923,6 +8923,7 @@ a {
 }
 
 .my-bets-modal__grid {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.72rem;
 }
@@ -9203,6 +9204,49 @@ a {
   gap: 0.72rem;
 }
 
+.my-bets-modal__line-section .my-bets-modal__grid {
+  align-items: end;
+}
+
+.my-bets-modal__line-section .toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: end;
+  min-height: 2.5rem;
+  width: 100%;
+  gap: 0.46rem;
+  padding: 0 0.8rem;
+  border-radius: 0.78rem;
+  border-color: rgba(139, 164, 202, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-2);
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.my-bets-modal__line-section .toggle-chip:hover {
+  transform: none;
+  border-color: rgba(255, 169, 77, 0.38);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.my-bets-modal__line-section .toggle-chip:has(input:checked) {
+  color: #ffe6bf;
+  border-color: rgba(255, 169, 77, 0.62);
+  background: rgba(255, 169, 77, 0.14);
+  box-shadow: 0 0 0 3px rgba(255, 169, 77, 0.08);
+}
+
+.my-bets-modal__line-section .toggle-chip input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: #f2a54f;
+}
+
 .my-bets-modal__line-title {
   display: flex;
   align-items: baseline;
@@ -9423,6 +9467,17 @@ a {
 :root[data-theme='light'] .my-bets-modal__line-title span {
   background: rgba(244, 150, 45, 0.14);
   color: #9b5f17;
+}
+
+:root[data-theme='light'] .my-bets-modal__line-section .toggle-chip {
+  border-color: rgba(133, 150, 178, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme='light'] .my-bets-modal__line-section .toggle-chip:has(input:checked) {
+  color: #9b5f17;
+  border-color: rgba(244, 150, 45, 0.42);
+  background: rgba(244, 150, 45, 0.14);
 }
 
 :root[data-theme='light'] .my-bets-status.is-pending {
