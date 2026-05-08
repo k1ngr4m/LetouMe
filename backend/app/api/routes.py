@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 
 from backend.app.auth import (
     AuthService,
@@ -729,6 +730,33 @@ def chat_with_assistant(payload: AssistantChatPayload, current_user: dict = Depe
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AI 服务暂不可用: {exc}") from exc
+
+
+@router.post("/assistant/chat/stream")
+def stream_chat_with_assistant(payload: AssistantChatPayload, current_user: dict = Depends(require_current_user)) -> StreamingResponse:
+    def event_stream():
+        try:
+            for item in assistant_service.stream_chat_events(
+                user_id=int(current_user["id"]),
+                message=payload.message,
+                model_code=payload.model_code,
+                context=payload.context,
+                conversation_id=payload.conversation_id,
+            ):
+                event = str(item.get("event") or "message")
+                data = {key: value for key, value in item.items() if key != "event"}
+                yield f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'message': str(exc) or 'AI 服务暂不可用'}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/settings/profile/update", response_model=CurrentUserResponse)

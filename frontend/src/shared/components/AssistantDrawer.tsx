@@ -3,7 +3,6 @@ import clsx from 'clsx'
 import { Copy, History, LoaderCircle, Plus, Send, Sparkles, Trash2, X } from 'lucide-react'
 import { apiClient } from '../api/client'
 import type {
-  AssistantChatResponse,
   AssistantContext,
   AssistantConversation,
   AssistantMessage,
@@ -359,7 +358,9 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
     () => models.find((model) => model.model_code === selectedModelCode) || null,
     [models, selectedModelCode],
   )
-  const displayMessages = messages.length > 0 ? messages : [WELCOME_MESSAGE]
+  const displayMessages = (messages.length > 0 ? messages : [WELCOME_MESSAGE]).filter((message) => (
+    message.role !== 'assistant' || message.content.trim() || status !== 'thinking'
+  ))
   const isComposerDisabled = status === 'thinking' || !selectedModelCode || models.length <= 0
 
   const contextChips = useMemo(() => {
@@ -487,19 +488,47 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
       status: 'success',
       created_at: Math.floor(Date.now() / 1000),
     }
-    setMessages((current) => [...current, userMessage])
+    const assistantMessageId = makeMessageId()
+    const assistantMessage: AssistantMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      model_code: selectedModelCode,
+      status: 'success',
+      created_at: Math.floor(Date.now() / 1000),
+    }
+    setMessages((current) => [...current, userMessage, assistantMessage])
     setDraft('')
     setErrorMessage('')
     setStatus('thinking')
     try {
-      const response: AssistantChatResponse = await apiClient.chatWithAssistant({
-        message: content,
-        model_code: selectedModelCode,
-        context: requestContext,
-        conversation_id: conversationId,
-      })
-      setConversationId(response.conversation_id)
-      setMessages(response.messages)
+      await apiClient.streamAssistantChat(
+        {
+          message: content,
+          model_code: selectedModelCode,
+          context: requestContext,
+          conversation_id: conversationId,
+        },
+        {
+          onMeta: (payload) => {
+            setConversationId(payload.conversation_id)
+          },
+          onDelta: (delta) => {
+            setMessages((current) => current.map((message) => (
+              message.id === assistantMessageId
+                ? { ...message, content: `${message.content}${delta}` }
+                : message
+            )))
+          },
+          onDone: (payload) => {
+            setConversationId(payload.conversation_id)
+            setMessages(payload.messages)
+          },
+          onError: (message) => {
+            setErrorMessage(message)
+          },
+        },
+      )
       setStatus('connected')
       await refreshConversations()
     } catch (error) {
@@ -621,14 +650,6 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
               ) : null}
             </article>
           ))}
-          {status === 'thinking' ? (
-            <article className="assistant-message assistant-message--assistant">
-              <div className="assistant-message__bubble assistant-message__bubble--thinking">
-                <LoaderCircle size={15} aria-hidden="true" />
-                <span>正在思考...</span>
-              </div>
-            </article>
-          ) : null}
         </div>
 
         <form className="assistant-composer" onSubmit={handleSubmit}>

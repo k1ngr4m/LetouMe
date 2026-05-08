@@ -15,6 +15,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     getAssistantConversationDetail: vi.fn(),
     deleteAssistantConversation: vi.fn(),
     chatWithAssistant: vi.fn(),
+    streamAssistantChat: vi.fn(),
     getCurrentPredictions: vi.fn(),
     getMyBets: vi.fn(),
   },
@@ -103,6 +104,17 @@ describe('App routing', () => {
       context_summary: '',
       model_code: 'assistant-model',
       messages: [],
+    })
+    vi.mocked(apiClient.streamAssistantChat).mockImplementation(async (_payload, handlers) => {
+      handlers?.onMeta?.({ conversation_id: 'asst-test', context_summary: '', model_code: 'assistant-model' })
+      handlers?.onDelta?.('ok')
+      handlers?.onDone?.({
+        conversation_id: 'asst-test',
+        answer: 'ok',
+        context_summary: '',
+        model_code: 'assistant-model',
+        messages: [],
+      })
     })
     vi.mocked(apiClient.getCurrentPredictions).mockResolvedValue({
       lottery_code: 'dlt',
@@ -306,7 +318,7 @@ describe('App routing', () => {
 
     expect(apiClient.getCurrentPredictions).toHaveBeenCalledWith('dlt')
     expect(apiClient.getMyBets).toHaveBeenCalledWith('dlt')
-    expect(apiClient.chatWithAssistant).toHaveBeenCalledWith(expect.objectContaining({
+    expect(apiClient.streamAssistantChat).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.stringContaining('本期该彩种的投注数据'),
       context: expect.objectContaining({
         target_period: '26001',
@@ -319,7 +331,34 @@ describe('App routing', () => {
           records: [expect.objectContaining({ id: 1 })],
         }),
       }),
-    }))
+    }), expect.any(Object))
+  })
+
+  it('does not show thinking placeholder during streamed replies', async () => {
+    let resolveStream: (() => void) | undefined
+    vi.mocked(apiClient.streamAssistantChat).mockImplementation(async (_payload, handlers) => {
+      handlers?.onMeta?.({ conversation_id: 'asst-test', context_summary: '', model_code: 'assistant-model' })
+      await new Promise<void>((resolve) => {
+        resolveStream = resolve
+      })
+      handlers?.onDelta?.('ok')
+      handlers?.onDone?.({
+        conversation_id: 'asst-test',
+        answer: 'ok',
+        context_summary: '',
+        model_code: 'assistant-model',
+        messages: [{ id: 10, role: 'assistant', content: 'ok', model_code: 'assistant-model', status: 'success', created_at: 1 }],
+      })
+    })
+
+    renderApp(['/dashboard/prediction'])
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 助手' }))
+    await userEvent.type(screen.getByPlaceholderText('问我任何关于当前页面的问题'), 'hello')
+    await userEvent.click(screen.getByRole('button', { name: '发送问题' }))
+
+    expect(screen.queryByText('正在思考...')).not.toBeInTheDocument()
+    resolveStream?.()
+    expect(await screen.findByText('ok')).toBeInTheDocument()
   })
 
   it('sends empty current-period my bets context when there are no matching records', async () => {
@@ -327,14 +366,14 @@ describe('App routing', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'AI 助手' }))
     await userEvent.click(await screen.findByRole('button', { name: '分析我的投注' }))
 
-    expect(apiClient.chatWithAssistant).toHaveBeenCalledWith(expect.objectContaining({
+    expect(apiClient.streamAssistantChat).toHaveBeenCalledWith(expect.objectContaining({
       context: expect.objectContaining({
         my_bets: expect.objectContaining({
           record_count: 0,
           records: [],
         }),
       }),
-    }))
+    }), expect.any(Object))
   })
 
   it('places the assistant button to the right of the user menu', async () => {

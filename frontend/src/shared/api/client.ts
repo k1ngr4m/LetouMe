@@ -7,6 +7,7 @@ import type {
   AssistantConversationDetailResponse,
   AssistantConversationListResponse,
   AssistantModelListResponse,
+  AssistantStreamHandlers,
   BacktestSummaryResponse,
   BulkGenerateSettingsModelPredictionsPayload,
   BulkModelActionResult,
@@ -163,6 +164,99 @@ async function requestFormData<T>(path: string, formData: FormData): Promise<T> 
     duration_ms: Number((performance.now() - startedAt).toFixed(2)),
   })
   return data as T
+}
+
+export type ParsedSseEvent = {
+  event: string
+  data: unknown
+}
+
+export function parseSseChunk(chunk: string): ParsedSseEvent[] {
+  return chunk
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      let event = 'message'
+      const dataLines: string[] = []
+      block.split('\n').forEach((line) => {
+        if (line.startsWith('event:')) {
+          event = line.slice(6).trim()
+          return
+        }
+        if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trim())
+        }
+      })
+      const dataText = dataLines.join('\n')
+      let data: unknown = {}
+      if (dataText) {
+        try {
+          data = JSON.parse(dataText)
+        } catch {
+          data = { message: dataText }
+        }
+      }
+      return { event, data }
+    })
+}
+
+async function requestAssistantStream(payload: AssistantChatPayload, handlers: AssistantStreamHandlers = {}) {
+  const response = await fetch(buildUrl('/api/assistant/chat/stream').toString(), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    const detail = data && typeof data === 'object' && 'detail' in data ? data.detail : '请求失败'
+    throw new Error(typeof detail === 'string' ? detail : '请求失败')
+  }
+  if (!response.body) {
+    throw new Error('浏览器不支持流式响应')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const boundaryIndex = buffer.lastIndexOf('\n\n')
+    if (boundaryIndex < 0) continue
+    const ready = buffer.slice(0, boundaryIndex + 2)
+    buffer = buffer.slice(boundaryIndex + 2)
+    for (const event of parseSseChunk(ready)) {
+      const data = event.data as Record<string, unknown>
+      if (event.event === 'meta') {
+        handlers.onMeta?.(data as Parameters<NonNullable<AssistantStreamHandlers['onMeta']>>[0])
+      } else if (event.event === 'delta') {
+        handlers.onDelta?.(String(data.content || ''))
+      } else if (event.event === 'done') {
+        handlers.onDone?.(data as Parameters<NonNullable<AssistantStreamHandlers['onDone']>>[0])
+      } else if (event.event === 'error') {
+        const message = String(data.message || '本次回答失败，可重试')
+        handlers.onError?.(message)
+        throw new Error(message)
+      }
+    }
+  }
+  const trailing = decoder.decode()
+  if (trailing) buffer += trailing
+  if (buffer.trim()) {
+    for (const event of parseSseChunk(buffer)) {
+      const data = event.data as Record<string, unknown>
+      if (event.event === 'delta') handlers.onDelta?.(String(data.content || ''))
+      if (event.event === 'done') handlers.onDone?.(data as Parameters<NonNullable<AssistantStreamHandlers['onDone']>>[0])
+      if (event.event === 'error') {
+        const message = String(data.message || '本次回答失败，可重试')
+        handlers.onError?.(message)
+        throw new Error(message)
+      }
+    }
+  }
 }
 
 export const apiClient = {
@@ -395,6 +489,9 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     })
+  },
+  streamAssistantChat(payload: AssistantChatPayload, handlers?: AssistantStreamHandlers) {
+    return requestAssistantStream(payload, handlers)
   },
   markMessageRead(messageId: number) {
     return requestJson<SuccessResponse>('/api/messages/read', {

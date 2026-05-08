@@ -665,6 +665,21 @@ export type AssistantChatResponse = {
   messages: AssistantMessage[]
 }
 
+export type AssistantStreamMeta = {
+  conversation_id: string
+  context_summary: string
+  model_code: string
+}
+
+export type AssistantStreamDone = AssistantChatResponse
+
+export type AssistantStreamHandlers = {
+  onMeta?: (payload: AssistantStreamMeta) => void
+  onDelta?: (content: string) => void
+  onDone?: (payload: AssistantStreamDone) => void
+  onError?: (message: string) => void
+}
+
 export type AssistantModelListResponse = {
   models: AssistantModel[]
 }
