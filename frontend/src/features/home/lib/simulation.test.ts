@@ -364,6 +364,45 @@ describe('simulation helpers', () => {
     expect(matches[0].prizes).toEqual([{ level: '直选', count: 1 }])
   })
 
+  it('calculates and matches pl3 group_sum bets without leopard numbers', () => {
+    const selection: SimulationSelection = {
+      lotteryCode: 'pl3',
+      playType: 'group_sum',
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      groupNumbers: [],
+      sumValues: ['03'],
+    }
+
+    expect(calculateBetCount(selection)).toBe(2)
+    expect(calculateAmount(selection)).toBe(4)
+
+    const matches = buildSimulationMatches(
+      selection,
+      [
+        { period: '26004', date: '2026-01-04', red_balls: ['00', '00', '03'], blue_balls: [] },
+        { period: '26005', date: '2026-01-05', red_balls: ['00', '01', '02'], blue_balls: [] },
+        { period: '26006', date: '2026-01-06', red_balls: ['01', '01', '01'], blue_balls: [] },
+      ],
+      30,
+    )
+    expect(matches[0].topPrizeLevel).toBe('组选3')
+    expect(matches[0].prizes).toEqual([{ level: '组选3', count: 1 }])
+    expect(matches[1].topPrizeLevel).toBe('组选6')
+    expect(matches[1].prizes).toEqual([{ level: '组选6', count: 1 }])
+    expect(matches[2].topPrizeLevel).toBe('未中奖')
+    expect(matches[2].totalWinningBets).toBe(0)
+  })
+
   it('calculates qxc compound bets and matches second prize', () => {
     const selection: SimulationSelection = {
       lotteryCode: 'qxc',

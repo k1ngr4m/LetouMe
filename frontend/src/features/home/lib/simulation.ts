@@ -1,7 +1,7 @@
 import type { LotteryCode, LotteryDraw, PrizeBreakdownItem, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
-export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'qxc_compound'
+export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
 export type PrizeLevel =
   | '一等奖'
   | '二等奖'
@@ -101,6 +101,22 @@ const PL3_DIRECT_SUM_BET_COUNTS: Record<string, number> = {
   '20': 36, '21': 28, '22': 21, '23': 15, '24': 10, '25': 6, '26': 3, '27': 1,
 }
 
+function buildPl3GroupSumBetCounts() {
+  const counts: Record<string, number> = Object.fromEntries(Array.from({ length: 28 }, (_, index) => [padBall(index), 0]))
+  for (let first = 0; first <= 9; first += 1) {
+    for (let second = first; second <= 9; second += 1) {
+      for (let third = second; third <= 9; third += 1) {
+        if (first === second && second === third) continue
+        const sumValue = padBall(first + second + third)
+        counts[sumValue] = (counts[sumValue] || 0) + 1
+      }
+    }
+  }
+  return counts
+}
+
+const PL3_GROUP_SUM_BET_COUNTS = buildPl3GroupSumBetCounts()
+
 export const pl3SumOptions = Array.from({ length: 28 }, (_, index) => padBall(index))
 
 export function buildBallRange(limit: number, start = 1) {
@@ -182,6 +198,9 @@ export function calculateBetCount(selection: SimulationSelection) {
   }
   if (selection.playType === 'direct_sum') {
     return selection.sumValues.reduce((sum, value) => sum + Number(PL3_DIRECT_SUM_BET_COUNTS[padBall(value)] || 0), 0)
+  }
+  if (selection.playType === 'group_sum') {
+    return selection.sumValues.reduce((sum, value) => sum + Number(PL3_GROUP_SUM_BET_COUNTS[padBall(value)] || 0), 0)
   }
   return 0
 }
@@ -322,7 +341,7 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     }
   }
 
-  if (playType === 'direct_sum') {
+  if (playType === 'direct_sum' || playType === 'group_sum') {
     return {
       lotteryCode,
       playType,
@@ -706,6 +725,15 @@ function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits
     const actualSum = actualDigits.reduce((sum, digit) => sum + Number(digit), 0)
     const normalizedSum = padBall(actualSum)
     return selection.sumValues.includes(normalizedSum) ? [{ level: '直选', count: 1 }] : []
+  }
+
+  if (selection.playType === 'group_sum') {
+    const actualSet = new Set(actualDigits)
+    if (actualSet.size < 2) return []
+    const actualSum = actualDigits.reduce((sum, digit) => sum + Number(digit), 0)
+    const normalizedSum = padBall(actualSum)
+    if (!selection.sumValues.includes(normalizedSum)) return []
+    return [{ level: actualSet.size === 2 ? '组选3' : '组选6', count: 1 }]
   }
 
   const actualSet = new Set(actualDigits)

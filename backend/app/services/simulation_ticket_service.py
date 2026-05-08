@@ -9,6 +9,17 @@ from backend.app.services.prediction_service import PredictionService
 from backend.app.time_utils import ensure_timestamp
 
 
+def build_pl3_group_sum_bet_counts() -> dict[int, int]:
+    counts = {sum_value: 0 for sum_value in range(28)}
+    for first in range(10):
+        for second in range(first, 10):
+            for third in range(second, 10):
+                if first == second == third:
+                    continue
+                counts[first + second + third] += 1
+    return counts
+
+
 class SimulationTicketService:
     FRONT_RANGE = range(1, 36)
     BACK_RANGE = range(1, 13)
@@ -17,6 +28,7 @@ class SimulationTicketService:
     PL3_DIRECT_SUM_BET_COUNTS = {
         int(sum_value): int(cost / 2) for sum_value, cost in PredictionService.PL3_DIRECT_SUM_COST_RULES.items()
     }
+    PL3_GROUP_SUM_BET_COUNTS = build_pl3_group_sum_bet_counts()
 
     def __init__(self, repository: SimulationTicketRepository | None = None) -> None:
         self.repository = repository or SimulationTicketRepository()
@@ -173,8 +185,8 @@ class SimulationTicketService:
 
     def _build_pl3_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6", "direct_sum", "pl3_dantuo"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / pl3_dantuo")
+        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum", "pl3_dantuo"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum / pl3_dantuo")
 
         if play_type == "direct":
             hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
@@ -224,15 +236,16 @@ class SimulationTicketService:
                 "amount": bet_count * 2,
             }
 
-        if play_type == "direct_sum":
+        if play_type in {"direct_sum", "group_sum"}:
             sum_values = self._normalize_sum_values(payload.get("sum_values"))
             if not sum_values:
                 raise ValueError("和值至少选择 1 个号码")
-            bet_count = sum(int(self.PL3_DIRECT_SUM_BET_COUNTS.get(int(value), 0)) for value in sum_values)
+            bet_count_map = self.PL3_DIRECT_SUM_BET_COUNTS if play_type == "direct_sum" else self.PL3_GROUP_SUM_BET_COUNTS
+            bet_count = sum(int(bet_count_map.get(int(value), 0)) for value in sum_values)
             if bet_count <= 0:
                 raise ValueError("和值投注注数计算失败")
             return {
-                "play_type": "direct_sum",
+                "play_type": play_type,
                 "front_numbers": "",
                 "back_numbers": "",
                 "direct_ten_thousands": None,

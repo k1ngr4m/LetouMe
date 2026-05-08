@@ -248,6 +248,7 @@ class SimulationTicketRecordResponse(BaseModel):
     direct_units_dan: list[str] = Field(default_factory=list)
     direct_units_tuo: list[str] = Field(default_factory=list)
     group_numbers: list[str] = Field(default_factory=list)
+    sum_values: list[str] = Field(default_factory=list)
     position_selections: list[list[str]] = Field(default_factory=list)
     bet_count: int = 0
     amount: int = 0

@@ -1116,6 +1116,11 @@ beforeEach(() => {
         '10': 63, '11': 69, '12': 73, '13': 75, '14': 75, '15': 73, '16': 69, '17': 63, '18': 55, '19': 45,
         '20': 36, '21': 28, '22': 21, '23': 15, '24': 10, '25': 6, '26': 3, '27': 1,
       }
+      const pl3GroupSumBetCounts: Record<string, number> = {
+        '00': 0, '01': 1, '02': 2, '03': 2, '04': 4, '05': 5, '06': 6, '07': 8, '08': 10, '09': 11,
+        '10': 13, '11': 14, '12': 14, '13': 15, '14': 15, '15': 14, '16': 14, '17': 13, '18': 11, '19': 10,
+        '20': 8, '21': 6, '22': 5, '23': 4, '24': 2, '25': 2, '26': 1, '27': 0,
+      }
       if (playType === 'direct') {
         const hundreds = Array.isArray(payload.direct_hundreds) ? payload.direct_hundreds.length : 0
         const tens = Array.isArray(payload.direct_tens) ? payload.direct_tens.length : 0
@@ -1126,6 +1131,11 @@ beforeEach(() => {
       if (playType === 'direct_sum') {
         const sumValues = Array.isArray(payload.sum_values) ? payload.sum_values.map((item) => String(item).padStart(2, '0')) : []
         const betCount = sumValues.reduce((sum, value) => sum + Number(pl3DirectSumBetCounts[value] || 0), 0)
+        return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
+      }
+      if (playType === 'group_sum') {
+        const sumValues = Array.isArray(payload.sum_values) ? payload.sum_values.map((item) => String(item).padStart(2, '0')) : []
+        const betCount = sumValues.reduce((sum, value) => sum + Number(pl3GroupSumBetCounts[value] || 0), 0)
         return { lottery_code: 'pl3', play_type: playType, bet_count: betCount, amount: betCount * 2 }
       }
       const groupCount = Array.isArray(payload.group_numbers) ? payload.group_numbers.length : 0
@@ -2282,13 +2292,13 @@ describe('HomePage dashboard sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: '排列3' }))
     await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
     const pl3ModeSwitch = screen.getByRole('tablist', { name: '排列3玩法切换' })
-    await userEvent.click(within(pl3ModeSwitch).getByRole('button', { name: '和值' }))
+    await userEvent.click(within(pl3ModeSwitch).getByRole('button', { name: '直选和值' }))
 
-    expect(screen.getByRole('button', { name: '和值 10' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '直选和值 10' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '百位 00' })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '和值 10' }))
-    await userEvent.click(screen.getByRole('button', { name: '和值 11' }))
+    await userEvent.click(screen.getByRole('button', { name: '直选和值 10' }))
+    await userEvent.click(screen.getByRole('button', { name: '直选和值 11' }))
 
     expect(screen.getByText('已选 132 注，共 264 元')).toBeInTheDocument()
 
@@ -2305,7 +2315,54 @@ describe('HomePage dashboard sidebar', () => {
     })
 
     expect(await screen.findByText('方案 #21')).toBeInTheDocument()
-    expect(screen.getByText('和值 · 132 注')).toBeInTheDocument()
+    expect(screen.getByText('直选和值 · 132 注')).toBeInTheDocument()
+  })
+
+  it('supports pl3 group_sum mode in simulation tab', async () => {
+    getSimulationTickets
+      .mockResolvedValueOnce({ tickets: [] })
+      .mockResolvedValueOnce({
+        tickets: [
+          {
+            id: 22,
+            lottery_code: 'pl3',
+            play_type: 'group_sum',
+            sum_values: ['03'],
+            bet_count: 2,
+            amount: 4,
+            created_at: '2026-03-18T00:00:00Z',
+          },
+        ],
+      })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getByRole('button', { name: '模拟试玩' }))
+    const pl3ModeSwitch = screen.getByRole('tablist', { name: '排列3玩法切换' })
+    await userEvent.click(within(pl3ModeSwitch).getByRole('button', { name: '组选和值' }))
+
+    expect(screen.getByRole('button', { name: '组选和值 03' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '百位 00' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '组选和值 03' }))
+
+    expect(screen.getByText('已选 2 注，共 4 元')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存方案' }))
+
+    await waitFor(() => {
+      expect(createSimulationTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lottery_code: 'pl3',
+          play_type: 'group_sum',
+          sum_values: ['03'],
+        }),
+      )
+    })
+
+    expect(await screen.findByText('方案 #22')).toBeInTheDocument()
+    expect(screen.getByText('组选和值 · 2 注')).toBeInTheDocument()
   })
 
   it('shows dedicated qxc simulation picker, summary and saved ticket layout', async () => {
