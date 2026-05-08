@@ -1,10 +1,10 @@
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, ChartColumnIncreasing, CircleDollarSign, History, Sparkles, WalletCards } from 'lucide-react'
+import { BookOpen, ChartColumnIncreasing, CircleDollarSign, Gauge, History, Sparkles, WalletCards } from 'lucide-react'
 import { HOME_RULES_PATH, getDashboardPath } from './navigation'
 
-type DashboardActiveTab = 'prediction' | 'simulation' | 'charts' | 'history' | 'my-bets' | 'rules'
+type DashboardActiveTab = 'prediction' | 'simulation' | 'charts' | 'backtest' | 'history' | 'my-bets' | 'rules'
 
 export function HomeDashboardTabStrip({
   activeTab,
@@ -112,6 +112,12 @@ export function HomeDashboardTabStrip({
       label: '图表中心',
       icon: ChartColumnIncreasing,
       onClick: () => guardedNavigate(() => navigate(getDashboardPath('charts'))),
+    },
+    {
+      key: 'backtest',
+      label: '回测',
+      icon: Gauge,
+      onClick: () => guardedNavigate(() => navigate(getDashboardPath('backtest'))),
     },
     {
       key: 'history',

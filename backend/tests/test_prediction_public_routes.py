@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.api import routes
 from backend.app.main import create_app
-from backend.app.schemas.requests import PaginationPayload, PredictionsHistoryListPayload
+from backend.app.schemas.requests import PaginationPayload, PredictionBacktestSummaryPayload, PredictionsHistoryListPayload
 
 
 class PredictionPublicRoutesTests(unittest.TestCase):
@@ -16,6 +16,35 @@ class PredictionPublicRoutesTests(unittest.TestCase):
         payload = PredictionsHistoryListPayload(play_type_filters=["dlt_compound"])
 
         self.assertEqual(payload.play_type_filters, ["dlt_compound"])
+
+    def test_backtest_payload_accepts_qxc_compound_filter(self) -> None:
+        payload = PredictionBacktestSummaryPayload(play_type_filters=["qxc_compound"])
+
+        self.assertEqual(payload.play_type_filters, ["qxc_compound"])
+
+    def test_get_prediction_backtest_summary_hides_inactive_models(self) -> None:
+        with patch.object(routes.prediction_service, "get_backtest_summary_payload") as mocked_get_backtest:
+            mocked_get_backtest.return_value = {
+                "lottery_code": "dlt",
+                "recent_period_count": 20,
+                "overview": {},
+                "model_rankings": [],
+                "periods": [],
+                "strategy_breakdown": [],
+                "strategy_options": [],
+            }
+
+            response = routes.get_prediction_backtest_summary(PredictionBacktestSummaryPayload(), {})
+
+        mocked_get_backtest.assert_called_once_with(
+            lottery_code="dlt",
+            recent_period_count=20,
+            model_codes=[],
+            play_type_filters=[],
+            strategy_filters=[],
+            include_inactive_models=False,
+        )
+        self.assertEqual(response["lottery_code"], "dlt")
 
     def test_get_current_predictions_hides_inactive_models(self) -> None:
         with patch.object(routes.prediction_service, "get_current_payload") as mocked_get_current:

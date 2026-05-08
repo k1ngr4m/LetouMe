@@ -83,6 +83,7 @@ from backend.app.schemas.requests import (
     PasswordChangePayload,
     PaginationPayload,
     PermissionUpdatePayload,
+    PredictionBacktestSummaryPayload,
     PredictionGenerationTaskPayload,
     PredictionsHistoryListPayload,
     ProfileUpdatePayload,
@@ -115,6 +116,7 @@ from backend.app.schemas.responses import (
     MyBetOCRDraftResponse,
     MyBetOCRImageUploadResponse,
     MyBetRecordUpdateResponse,
+    PredictionBacktestSummaryResponse,
     PredictionGenerationTaskResponse,
     ExpertCurrentDetailResponse,
     ExpertHistoryDetailResponse,
@@ -397,6 +399,18 @@ def get_predictions_history_detail(payload: PredictionHistoryDetailPayload, _: d
         raise HTTPException(status_code=404, detail="历史记录不存在")
     score_profiles = prediction_service._build_score_profiles([record])
     return {"predictions_history": [record], "total_count": 1, "model_stats": prediction_service._build_model_stats([record], score_profiles)}
+
+
+@router.post("/predictions/backtest/summary", response_model=PredictionBacktestSummaryResponse)
+def get_prediction_backtest_summary(payload: PredictionBacktestSummaryPayload, _: dict = Depends(require_current_user)) -> dict:
+    return prediction_service.get_backtest_summary_payload(
+        lottery_code=payload.lottery_code,
+        recent_period_count=payload.recent_period_count,
+        model_codes=payload.model_codes,
+        play_type_filters=payload.play_type_filters,
+        strategy_filters=payload.strategy_filters,
+        include_inactive_models=False,
+    )
 
 
 @router.post("/experts/list", response_model=ExpertPublicListResponse)

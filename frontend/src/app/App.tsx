@@ -32,6 +32,7 @@ const HomeSmartPredictionPage = lazy(() =>
 const HomeExpertPredictionPage = lazy(() =>
   import('../features/home/HomeExpertPredictionPage').then((module) => ({ default: module.HomeExpertPredictionPage })),
 )
+const HomeBacktestPage = lazy(() => import('../features/home/HomeBacktestPage').then((module) => ({ default: module.HomeBacktestPage })))
 const MessageCenterPage = lazy(() => import('../features/messages/MessageCenterPage').then((module) => ({ default: module.MessageCenterPage })))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 const ExpertsSettingsPage = lazy(() => import('../features/settings/ExpertsSettingsPage').then((module) => ({ default: module.ExpertsSettingsPage })))
@@ -91,6 +92,16 @@ export function App() {
                 <ProtectedRoute>
                   <AppShell>
                     <HomePage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={HOME_TAB_PATHS.backtest}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <HomeBacktestPage />
                   </AppShell>
                 </ProtectedRoute>
               }

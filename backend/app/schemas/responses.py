@@ -26,6 +26,16 @@ class PredictionsHistoryResponse(BaseModel):
     model_stats: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class PredictionBacktestSummaryResponse(BaseModel):
+    lottery_code: str = "dlt"
+    recent_period_count: int | None = None
+    overview: dict[str, Any] = Field(default_factory=dict)
+    model_rankings: list[dict[str, Any]] = Field(default_factory=list)
+    periods: list[dict[str, Any]] = Field(default_factory=list)
+    strategy_breakdown: list[dict[str, Any]] = Field(default_factory=list)
+    strategy_options: list[str] = Field(default_factory=list)
+
+
 class PredictionGenerationTaskResponse(BaseModel):
     lottery_code: str = "dlt"
     task_id: str

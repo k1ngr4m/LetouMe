@@ -1899,14 +1899,14 @@ export function HomePage() {
           <div className="page-stack chart-center-page">
             <StatusCard title={activeChartMeta.title} subtitle={activeChartMeta.subtitle}>
               <div className="chart-center-toolbar" aria-label="图表分析筛选">
-                <div className="chart-center-toolbar__section">
+                <div className="chart-center-toolbar__section chart-center-toolbar__section--presets">
                   <span className="chart-center-toolbar__label">时间维度</span>
-                  <div className="filter-chip-group chart-center-toolbar__chips">
+                  <div className="filter-chip-group chart-center-toolbar__chips chart-center-toolbar__chips--segmented">
                     {CHART_TIME_PRESET_OPTIONS.map((periodCount) => (
                       <button
                         key={`chart-time-preset-${periodCount}`}
                         type="button"
-                        className={clsx('filter-chip', chartTimePreset === periodCount ? 'is-active' : 'is-inactive')}
+                        className={clsx('filter-chip', 'chart-center-control-chip', chartTimePreset === periodCount ? 'is-active' : 'is-inactive')}
                         onClick={() => setChartTimePreset(periodCount)}
                       >
                         近 {periodCount} 期
@@ -1915,7 +1915,7 @@ export function HomePage() {
                   </div>
                 </div>
 
-                <div className="chart-center-toolbar__row chart-center-toolbar__row--time">
+                <div className="chart-center-toolbar__row chart-center-toolbar__row--time chart-center-toolbar__row--panel">
                   <label className="chart-center-toolbar__field">
                     <span className="chart-center-toolbar__label">开始日期</span>
                     <input
@@ -1937,7 +1937,7 @@ export function HomePage() {
                   <div className="chart-center-toolbar__field chart-center-toolbar__field--action">
                     <span className="chart-center-toolbar__label">快捷操作</span>
                     <button
-                      className="ghost-button ghost-button--compact"
+                      className="ghost-button ghost-button--compact chart-center-action-button"
                       type="button"
                       onClick={clearChartDateRange}
                       disabled={!chartDateStart && !chartDateEnd}
@@ -1949,15 +1949,15 @@ export function HomePage() {
 
                 {isChartBacktestView ? (
                   <>
-                    <div className="chart-center-toolbar__section">
+                    <div className="chart-center-toolbar__section chart-center-toolbar__section--chips">
                       <span className="chart-center-toolbar__label">模型</span>
-                      <div className="filter-chip-group chart-center-toolbar__chips">
+                      <div className="filter-chip-group chart-center-toolbar__chips chart-center-toolbar__chips--scroll">
                         {historyVisibleModels.map((model) => {
                           const isActive = chartCenterHistoryVisibleModelIds.includes(model.model_id)
                           return (
                             <button
                               key={`chart-history-model-${model.model_id}`}
-                              className={clsx('filter-chip', isActive ? 'is-active' : 'is-inactive')}
+                              className={clsx('filter-chip', 'chart-center-control-chip', isActive ? 'is-active' : 'is-inactive')}
                               type="button"
                               onClick={() => toggleChartHistoryModel(model.model_id)}
                             >
@@ -1966,14 +1966,14 @@ export function HomePage() {
                           )
                         })}
                         {chartHistoryModelIds.length ? (
-                          <button className="ghost-button ghost-button--compact" type="button" onClick={() => setChartHistoryModelIds([])}>
+                          <button className="ghost-button ghost-button--compact chart-center-action-button" type="button" onClick={() => setChartHistoryModelIds([])}>
                             全部模型
                           </button>
                         ) : null}
                       </div>
                     </div>
 
-                    <div className="chart-center-toolbar__row">
+                    <div className="chart-center-toolbar__row chart-center-toolbar__row--panel">
                       <label className="chart-center-toolbar__field">
                         <span className="chart-center-toolbar__label">期号</span>
                         <input
@@ -2000,15 +2000,15 @@ export function HomePage() {
                       </div>
                     </div>
 
-                    <div className="chart-center-toolbar__section">
+                    <div className="chart-center-toolbar__section chart-center-toolbar__section--chips">
                       <span className="chart-center-toolbar__label">方案</span>
                       {showHistoryStrategyFilters ? (
                         historyStrategyOptions.length ? (
-                          <div className="filter-chip-group chart-center-toolbar__chips">
+                          <div className="filter-chip-group chart-center-toolbar__chips chart-center-toolbar__chips--scroll">
                             {historyStrategyOptions.map((strategy) => (
                               <button
                                 key={`chart-history-strategy-${strategy}`}
-                                className={clsx('filter-chip', historyStrategyFilters.includes(strategy) && 'is-active')}
+                                className={clsx('filter-chip', 'chart-center-control-chip', historyStrategyFilters.includes(strategy) ? 'is-active' : 'is-inactive')}
                                 type="button"
                                 onClick={() => toggleHistoryStrategyFilter(strategy)}
                               >
@@ -2016,7 +2016,7 @@ export function HomePage() {
                               </button>
                             ))}
                             {historyStrategyFilters.length ? (
-                              <button className="ghost-button ghost-button--compact" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
+                              <button className="ghost-button ghost-button--compact chart-center-action-button" type="button" onClick={() => updateHistoryStrategyFilters(() => [])}>
                                 清空方案
                               </button>
                             ) : null}

@@ -335,6 +335,64 @@ class PredictionService:
         )
         return payload
 
+    def get_backtest_summary_payload(
+        self,
+        *,
+        lottery_code: str = "dlt",
+        recent_period_count: int | None = 20,
+        model_codes: list[str] | None = None,
+        play_type_filters: list[str] | None = None,
+        strategy_filters: list[str] | None = None,
+        include_inactive_models: bool = True,
+    ) -> dict[str, Any]:
+        normalized_code = normalize_lottery_code(lottery_code)
+        normalized_model_codes = {
+            str(model_code or "").strip()
+            for model_code in (model_codes or [])
+            if str(model_code or "").strip()
+        }
+        normalized_play_type_filters = self._normalize_play_type_filters(play_type_filters)
+        normalized_strategy_filters = self._normalize_strategy_filters(strategy_filters)
+        if normalized_code in {"pl3", "pl5"}:
+            normalized_strategy_filters = []
+
+        records, strategy_options = self._load_backtest_records(
+            lottery_code=normalized_code,
+            recent_period_count=recent_period_count,
+            model_codes=normalized_model_codes,
+            play_type_filters=normalized_play_type_filters,
+            strategy_filters=normalized_strategy_filters,
+            include_inactive_models=include_inactive_models,
+        )
+        score_profiles = self._build_score_profiles(records)
+        model_rankings = self._build_backtest_model_rankings(records, score_profiles)
+        overview = self._build_backtest_overview(records, model_rankings)
+        strategy_breakdown = []
+        if strategy_options and normalized_code not in {"pl3", "pl5"}:
+            selected_strategy_options = normalized_strategy_filters or strategy_options
+            strategy_breakdown = [
+                self._build_strategy_backtest_summary(
+                    strategy,
+                    lottery_code=normalized_code,
+                    recent_period_count=recent_period_count,
+                    model_codes=normalized_model_codes,
+                    play_type_filters=normalized_play_type_filters,
+                    include_inactive_models=include_inactive_models,
+                )
+                for strategy in selected_strategy_options
+            ]
+            strategy_breakdown = [item for item in strategy_breakdown if int(item.get("period_count") or 0) > 0]
+
+        return {
+            "lottery_code": normalized_code,
+            "recent_period_count": recent_period_count,
+            "overview": overview,
+            "model_rankings": model_rankings,
+            "periods": self._build_backtest_periods(records),
+            "strategy_breakdown": strategy_breakdown,
+            "strategy_options": strategy_options,
+        }
+
     def get_current_detail_payload(self, target_period: str, lottery_code: str = "dlt") -> dict[str, Any] | None:
         payload = self.get_current_payload_by_period(target_period, lottery_code=lottery_code)
         if not payload.get("target_period") or payload.get("target_period") != target_period:
@@ -1164,6 +1222,164 @@ class PredictionService:
             },
         )
         return payload
+
+    def _load_backtest_records(
+        self,
+        *,
+        lottery_code: str,
+        recent_period_count: int | None,
+        model_codes: set[str],
+        play_type_filters: list[str],
+        strategy_filters: list[str],
+        include_inactive_models: bool,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        payload = self._build_history_list_payload(
+            limit=recent_period_count,
+            offset=0,
+            lottery_code=lottery_code,
+            strategy_filters=strategy_filters,
+            play_type_filters=play_type_filters,
+            strategy_match_mode="all",
+            include_inactive_models=include_inactive_models,
+        )
+        records = []
+        for record in payload.get("predictions_history", []):
+            models = [
+                model
+                for model in record.get("models", [])
+                if not model_codes or str(model.get("model_id") or "") in model_codes
+            ]
+            if not models:
+                continue
+            records.append({**record, "models": models})
+        return records, [str(item) for item in payload.get("strategy_options", [])]
+
+    def _build_backtest_overview(self, records: list[dict[str, Any]], model_rankings: list[dict[str, Any]]) -> dict[str, Any]:
+        total_bet_count = sum(int(model.get("bet_count") or 0) for record in records for model in record.get("models", []))
+        total_cost_amount = sum(int(model.get("cost_amount") or 0) for record in records for model in record.get("models", []))
+        total_prize_amount = sum(int(model.get("prize_amount") or 0) for record in records for model in record.get("models", []))
+        winning_period_count = sum(
+            1
+            for record in records
+            if any(bool(model.get("hit_period_win")) for model in record.get("models", []))
+        )
+        winning_bet_count = sum(int(model.get("winning_bet_count") or 0) for record in records for model in record.get("models", []))
+        period_count = len(records)
+        model_count = len({self._build_model_identity_key(model) for record in records for model in record.get("models", []) if self._build_model_identity_key(model)})
+        overall_score = round(
+            sum(int(model.get("overall_score") or 0) for model in model_rankings) / len(model_rankings),
+            2,
+        ) if model_rankings else 0
+        return {
+            "period_count": period_count,
+            "model_count": model_count,
+            "total_bet_count": total_bet_count,
+            "winning_bet_count": winning_bet_count,
+            "total_cost_amount": total_cost_amount,
+            "total_prize_amount": total_prize_amount,
+            "net_profit": total_prize_amount - total_cost_amount,
+            "roi": round(((total_prize_amount - total_cost_amount) / total_cost_amount) if total_cost_amount else 0, 4),
+            "winning_period_count": winning_period_count,
+            "win_rate_by_period": round((winning_period_count / period_count) if period_count else 0, 4),
+            "overall_score": overall_score,
+            "top_model": model_rankings[0] if model_rankings else None,
+        }
+
+    def _build_backtest_model_rankings(
+        self,
+        records: list[dict[str, Any]],
+        score_profiles: dict[str, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        rankings = []
+        for stat in self._build_model_stats(records, score_profiles):
+            cost_amount = int(stat.get("cost_amount") or 0)
+            prize_amount = int(stat.get("prize_amount") or 0)
+            score_profile = stat.get("score_profile") or self._empty_score_profile()
+            rankings.append(
+                {
+                    **stat,
+                    "overall_score": int(score_profile.get("overall_score") or 0),
+                    "net_profit": prize_amount - cost_amount,
+                    "roi": round(((prize_amount - cost_amount) / cost_amount) if cost_amount else 0, 4),
+                    "best_period": score_profile.get("best_period_snapshot") or {},
+                    "worst_period": score_profile.get("worst_period_snapshot") or {},
+                    "sample_size_periods": int(score_profile.get("sample_size_periods") or stat.get("periods") or 0),
+                    "sample_size_bets": int(score_profile.get("sample_size_bets") or stat.get("bet_count") or 0),
+                }
+            )
+        rankings.sort(
+            key=lambda item: (
+                int(item.get("overall_score") or 0),
+                int(item.get("net_profit") or 0),
+                float(item.get("win_rate_by_period") or 0),
+                str(item.get("model_name") or ""),
+            ),
+            reverse=True,
+        )
+        return rankings
+
+    def _build_backtest_periods(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                "lottery_code": record.get("lottery_code"),
+                "target_period": record.get("target_period", ""),
+                "prediction_date": self.serialize_prediction_date(record.get("prediction_date")),
+                "actual_result": record.get("actual_result"),
+                "summary": record.get("period_summary") or self._empty_period_summary(),
+                "models": [
+                    {
+                        "model_id": model.get("model_id"),
+                        "prediction_play_mode": self._infer_prediction_play_mode(model),
+                        "model_name": model.get("model_name"),
+                        "model_provider": model.get("model_provider"),
+                        "best_group": model.get("best_group"),
+                        "best_hit_count": int(model.get("best_hit_count") or 0),
+                        "bet_count": int(model.get("bet_count") or 0),
+                        "winning_bet_count": int(model.get("winning_bet_count") or 0),
+                        "cost_amount": int(model.get("cost_amount") or 0),
+                        "prize_amount": int(model.get("prize_amount") or 0),
+                        "net_profit": int(model.get("prize_amount") or 0) - int(model.get("cost_amount") or 0),
+                        "hit_period_win": bool(model.get("hit_period_win")),
+                    }
+                    for model in record.get("models", [])
+                ],
+            }
+            for record in records
+        ]
+
+    def _build_strategy_backtest_summary(
+        self,
+        strategy: str,
+        *,
+        lottery_code: str,
+        recent_period_count: int | None,
+        model_codes: set[str],
+        play_type_filters: list[str],
+        include_inactive_models: bool,
+    ) -> dict[str, Any]:
+        records, _ = self._load_backtest_records(
+            lottery_code=lottery_code,
+            recent_period_count=recent_period_count,
+            model_codes=model_codes,
+            play_type_filters=play_type_filters,
+            strategy_filters=[strategy],
+            include_inactive_models=include_inactive_models,
+        )
+        rankings = self._build_backtest_model_rankings(records, self._build_score_profiles(records))
+        overview = self._build_backtest_overview(records, rankings)
+        return {
+            "strategy": strategy,
+            "period_count": overview["period_count"],
+            "model_count": overview["model_count"],
+            "total_bet_count": overview["total_bet_count"],
+            "winning_bet_count": overview["winning_bet_count"],
+            "total_cost_amount": overview["total_cost_amount"],
+            "total_prize_amount": overview["total_prize_amount"],
+            "net_profit": overview["net_profit"],
+            "roi": overview["roi"],
+            "win_rate_by_period": overview["win_rate_by_period"],
+            "overall_score": overview["overall_score"],
+        }
 
     def _merge_active_models_into_history_stats(
         self,

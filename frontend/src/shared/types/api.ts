@@ -229,6 +229,79 @@ export type PredictionsHistoryResponse = {
   model_stats?: PredictionHistoryModelStat[]
 }
 
+export type BacktestOverview = {
+  period_count: number
+  model_count: number
+  total_bet_count: number
+  winning_bet_count: number
+  total_cost_amount: number
+  total_prize_amount: number
+  net_profit: number
+  roi: number
+  winning_period_count: number
+  win_rate_by_period: number
+  overall_score: number
+  top_model?: BacktestModelRanking | null
+}
+
+export type BacktestModelRanking = PredictionHistoryModelStat & {
+  overall_score: number
+  net_profit: number
+  roi: number
+  best_period?: ScoreSnapshot
+  worst_period?: ScoreSnapshot
+  sample_size_periods: number
+  sample_size_bets: number
+}
+
+export type BacktestPeriodModel = {
+  model_id: string
+  prediction_play_mode?: PredictionPlayMode
+  model_name: string
+  model_provider?: string
+  best_group?: number | null
+  best_hit_count: number
+  bet_count: number
+  winning_bet_count: number
+  cost_amount: number
+  prize_amount: number
+  net_profit: number
+  hit_period_win: boolean
+}
+
+export type BacktestPeriod = {
+  lottery_code?: LotteryCode
+  target_period: string
+  prediction_date: string
+  actual_result: LotteryDraw | null
+  summary: PredictionHistoryPeriodSummary
+  models: BacktestPeriodModel[]
+}
+
+export type BacktestStrategyBreakdown = {
+  strategy: string
+  period_count: number
+  model_count: number
+  total_bet_count: number
+  winning_bet_count: number
+  total_cost_amount: number
+  total_prize_amount: number
+  net_profit: number
+  roi: number
+  win_rate_by_period: number
+  overall_score: number
+}
+
+export type BacktestSummaryResponse = {
+  lottery_code: LotteryCode
+  recent_period_count: number | null
+  overview: BacktestOverview
+  model_rankings: BacktestModelRanking[]
+  periods: BacktestPeriod[]
+  strategy_breakdown: BacktestStrategyBreakdown[]
+  strategy_options: string[]
+}
+
 export type SimulationTicketPayload = {
   lottery_code?: LotteryCode
   play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'qxc_compound'

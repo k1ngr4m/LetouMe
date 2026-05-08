@@ -2,6 +2,7 @@ import type {
   AdminUserCreatePayload,
   AdminUserResetPasswordPayload,
   AdminUserUpdatePayload,
+  BacktestSummaryResponse,
   BulkGenerateSettingsModelPredictionsPayload,
   BulkModelActionResult,
   BulkSettingsModelActionPayload,
@@ -253,6 +254,18 @@ export const apiClient = {
     return requestJson<PredictionsHistoryResponse>('/api/predictions/history/detail', {
       method: 'POST',
       body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod }),
+    })
+  },
+  getPredictionBacktestSummary(payload?: {
+    lottery_code?: LotteryCode
+    recent_period_count?: number | null
+    model_codes?: string[]
+    play_type_filters?: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_dantuo' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'>
+    strategy_filters?: string[]
+  }) {
+    return requestJson<BacktestSummaryResponse>('/api/predictions/backtest/summary', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
     })
   },
   getExpertsList(lotteryCode: LotteryCode = 'dlt') {
