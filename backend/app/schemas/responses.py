@@ -384,6 +384,28 @@ class SiteMessageUnreadCountResponse(BaseModel):
     unread_count: int = 0
 
 
+class AssistantChatResponse(BaseModel):
+    conversation_id: str
+    answer: str
+    context_summary: str = ""
+    model_code: str = ""
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AssistantModelListResponse(BaseModel):
+    models: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AssistantConversationListResponse(BaseModel):
+    conversations: list[dict[str, Any]] = Field(default_factory=list)
+    total_count: int = 0
+
+
+class AssistantConversationDetailResponse(BaseModel):
+    conversation: dict[str, Any]
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class SuccessResponse(BaseModel):
     success: bool = True
 

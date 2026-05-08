@@ -597,6 +597,80 @@ export type SiteMessageUnreadCountResponse = {
   unread_count: number
 }
 
+export type AssistantContext = {
+  lottery_code: LotteryCode
+  page_title: string
+  route_path: string
+  target_period?: string
+  chips: string[]
+}
+
+export type AssistantChatPayload = {
+  message: string
+  model_code: string
+  context: AssistantContext
+  conversation_id?: string | null
+}
+
+export type AssistantModel = {
+  model_code: string
+  display_name: string
+  provider: string
+  api_format?: string
+  api_model_name: string
+  version?: string | null
+  tags?: string[]
+  lottery_codes: LotteryCode[]
+}
+
+export type AssistantMessage = {
+  id: number | string
+  role: 'user' | 'assistant'
+  content: string
+  model_code: string
+  context?: Record<string, unknown>
+  status: 'success' | 'error'
+  error_message?: string | null
+  created_at: number
+}
+
+export type AssistantConversation = {
+  id: number
+  conversation_id: string
+  user_id: number
+  model_code: string
+  lottery_code: LotteryCode
+  title: string
+  context_summary: string
+  context?: Record<string, unknown>
+  last_active_at: number
+  deleted_at?: number | null
+  created_at: number
+  updated_at: number
+}
+
+export type AssistantChatResponse = {
+  conversation_id: string
+  answer: string
+  context_summary: string
+  model_code: string
+  messages: AssistantMessage[]
+}
+
+export type AssistantModelListResponse = {
+  models: AssistantModel[]
+}
+
+export type AssistantConversationListResponse = {
+  conversations: AssistantConversation[]
+  total_count: number
+}
+
+export type AssistantConversationDetailResponse = {
+  conversation: AssistantConversation
+  messages: AssistantMessage[]
+}
+
 export type SuccessResponse = {
   success: boolean
 }

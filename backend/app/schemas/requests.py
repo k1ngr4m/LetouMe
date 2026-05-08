@@ -363,6 +363,27 @@ class MessageDeletePayload(BaseModel):
     message_id: int = Field(ge=1)
 
 
+class AssistantChatPayload(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    model_code: str
+    context: dict[str, Any] = Field(default_factory=dict)
+    conversation_id: str | None = None
+
+
+class AssistantModelsPayload(BaseModel):
+    lottery_code: str = "dlt"
+
+
+class AssistantConversationListPayload(BaseModel):
+    lottery_code: str | None = None
+    limit: int = Field(default=30, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+class AssistantConversationPayload(BaseModel):
+    conversation_id: str
+
+
 class ProfileUpdatePayload(BaseModel):
     nickname: str
 

@@ -2,6 +2,11 @@ import type {
   AdminUserCreatePayload,
   AdminUserResetPasswordPayload,
   AdminUserUpdatePayload,
+  AssistantChatPayload,
+  AssistantChatResponse,
+  AssistantConversationDetailResponse,
+  AssistantConversationListResponse,
+  AssistantModelListResponse,
   BacktestSummaryResponse,
   BulkGenerateSettingsModelPredictionsPayload,
   BulkModelActionResult,
@@ -359,6 +364,36 @@ export const apiClient = {
     return requestJson<SiteMessageUnreadCountResponse>('/api/messages/unread-count', {
       method: 'POST',
       body: JSON.stringify(payload || {}),
+    })
+  },
+  getAssistantModels(payload?: { lottery_code?: LotteryCode }) {
+    return requestJson<AssistantModelListResponse>('/api/assistant/models', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getAssistantConversations(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
+    return requestJson<AssistantConversationListResponse>('/api/assistant/conversations/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getAssistantConversationDetail(conversationId: string) {
+    return requestJson<AssistantConversationDetailResponse>('/api/assistant/conversations/detail', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: conversationId }),
+    })
+  },
+  deleteAssistantConversation(conversationId: string) {
+    return requestJson<SuccessResponse>('/api/assistant/conversations/delete', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: conversationId }),
+    })
+  },
+  chatWithAssistant(payload: AssistantChatPayload) {
+    return requestJson<AssistantChatResponse>('/api/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
   markMessageRead(messageId: number) {

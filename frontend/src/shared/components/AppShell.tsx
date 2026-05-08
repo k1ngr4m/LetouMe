@@ -25,11 +25,12 @@ import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { SiteDisclaimer } from './SiteDisclaimer'
 import { UserAvatar } from './UserAvatar'
+import { AssistantDrawer } from './AssistantDrawer'
 import { HOME_EXPERT_PREDICTION_PATH, HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import { apiClient } from '../api/client'
-import type { LotteryCode, MessageStatusFilter } from '../types/api'
+import type { AssistantContext, LotteryCode, MessageStatusFilter } from '../types/api'
 
 const SETTINGS_PATHS = {
   profile: '/settings/profile',
@@ -115,6 +116,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const [isLotteryMenuOpen, setIsLotteryMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsePreference())
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false)
   const [isPredictionSubmenuOpen, setIsPredictionSubmenuOpen] = useState(true)
   const [isChartNumberMenuOpen, setIsChartNumberMenuOpen] = useState(true)
   const [isChartBacktestMenuOpen, setIsChartBacktestMenuOpen] = useState(true)
@@ -185,6 +187,23 @@ export function AppShell({ children }: PropsWithChildren) {
     if (location.pathname === MESSAGE_CENTER_PATH) return '开奖通知与站内信'
     return '预测工作台'
   }, [location.pathname])
+
+  const assistantContext = useMemo<AssistantContext>(() => {
+    const routeSearchParams = new URLSearchParams(location.search)
+    const targetPeriod = routeSearchParams.get('target_period') || routeSearchParams.get('period') || ''
+    const chips = [
+      selectedLotteryLabel,
+      pageTitle,
+      location.hash ? location.hash.replace(/^#/, '') : '',
+    ].filter(Boolean)
+    return {
+      lottery_code: selectedLottery,
+      page_title: pageTitle,
+      route_path: `${location.pathname}${location.search}${location.hash}`,
+      target_period: targetPeriod,
+      chips,
+    }
+  }, [location.hash, location.pathname, location.search, pageTitle, selectedLottery, selectedLotteryLabel])
 
   const onNavigate = () => {
     setIsSidebarOpen(false)
@@ -733,6 +752,16 @@ export function AppShell({ children }: PropsWithChildren) {
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button
+              className={clsx('crm-topbar__icon-btn', isAssistantOpen && 'is-active')}
+              type="button"
+              aria-label="AI 助手"
+              title="AI 助手"
+              aria-expanded={isAssistantOpen}
+              onClick={() => setIsAssistantOpen((current) => !current)}
+            >
+              <Sparkles size={16} aria-hidden="true" />
+            </button>
+            <button
               className={clsx('crm-topbar__icon-btn crm-topbar__icon-btn--with-badge', location.pathname === MESSAGE_CENTER_PATH && 'is-active')}
               type="button"
               aria-label="消息中心"
@@ -789,6 +818,7 @@ export function AppShell({ children }: PropsWithChildren) {
           {children}
         </main>
       </div>
+      <AssistantDrawer isOpen={isAssistantOpen} context={assistantContext} onClose={() => setIsAssistantOpen(false)} />
     </div>
   )
 }

@@ -48,8 +48,12 @@ from backend.app.schemas.model_settings import (
     ProviderListResponse,
 )
 from backend.app.schemas.requests import (
+    AssistantConversationListPayload,
+    AssistantConversationPayload,
     BulkGenerateModelPredictionsPayload,
     BulkModelActionPayload,
+    AssistantChatPayload,
+    AssistantModelsPayload,
     GenerateModelPredictionsPayload,
     MessageDeletePayload,
     MessageListPayload,
@@ -106,7 +110,11 @@ from backend.app.schemas.requests import (
     RolePayload,
 )
 from backend.app.schemas.responses import (
+    AssistantConversationDetailResponse,
+    AssistantConversationListResponse,
     BulkModelActionResponse,
+    AssistantChatResponse,
+    AssistantModelListResponse,
     CurrentPredictionsResponse,
     MaintenanceRunLogListResponse,
     LotteryFetchTaskResponse,
@@ -153,6 +161,7 @@ from backend.app.services.prediction_service import PredictionService
 from backend.app.services.schedule_service import schedule_service
 from backend.app.services.message_service import MessageService
 from backend.app.services.my_bet_service import MyBetService
+from backend.app.services.assistant_service import assistant_service
 from backend.app.services.simulation_ticket_service import SimulationTicketService
 from backend.app.services.smart_prediction_service import smart_prediction_service
 from backend.app.services.ticket_ocr_service import TicketOCRService
@@ -659,6 +668,67 @@ def delete_message(payload: MessageDeletePayload, current_user: dict = Depends(r
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="消息不存在") from exc
     return {"success": True}
+
+
+@router.post("/assistant/models", response_model=AssistantModelListResponse)
+def list_assistant_models(payload: AssistantModelsPayload, _: dict = Depends(require_current_user)) -> dict:
+    try:
+        return assistant_service.list_models(lottery_code=payload.lottery_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/assistant/conversations/list", response_model=AssistantConversationListResponse)
+def list_assistant_conversations(payload: AssistantConversationListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return assistant_service.list_conversations(
+            user_id=int(current_user["id"]),
+            lottery_code=payload.lottery_code,
+            limit=payload.limit,
+            offset=payload.offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/assistant/conversations/detail", response_model=AssistantConversationDetailResponse)
+def get_assistant_conversation_detail(payload: AssistantConversationPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return assistant_service.get_conversation_detail(
+            user_id=int(current_user["id"]),
+            conversation_id=payload.conversation_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="对话不存在") from exc
+
+
+@router.post("/assistant/conversations/delete", response_model=SuccessResponse)
+def delete_assistant_conversation(payload: AssistantConversationPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        assistant_service.delete_conversation(user_id=int(current_user["id"]), conversation_id=payload.conversation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="对话不存在") from exc
+    return {"success": True}
+
+
+@router.post("/assistant/chat", response_model=AssistantChatResponse)
+def chat_with_assistant(payload: AssistantChatPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return assistant_service.chat(
+            user_id=int(current_user["id"]),
+            message=payload.message,
+            model_code=payload.model_code,
+            context=payload.context,
+            conversation_id=payload.conversation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="对话不存在") from exc
+    except EnvironmentError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AI 服务暂不可用: {exc}") from exc
 
 
 @router.post("/settings/profile/update", response_model=CurrentUserResponse)

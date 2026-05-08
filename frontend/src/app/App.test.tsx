@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
@@ -91,6 +92,15 @@ describe('App routing', () => {
   it('renders message center route', async () => {
     renderApp(['/dashboard/messages'])
     expect(await screen.findByText('Message Center Page Mock')).toBeInTheDocument()
+  })
+
+  it('opens the context assistant drawer from the topbar', async () => {
+    renderApp(['/dashboard/prediction'])
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 助手' }))
+    const drawer = screen.getByRole('complementary', { name: 'AI 助手' })
+    expect(drawer).toHaveClass('is-open')
+    expect(screen.getByText('内容由 AI 生成，仅供参考，请仔细甄别。')).toBeInTheDocument()
+    expect(within(drawer).getByText('预测总览')).toBeInTheDocument()
   })
 
   it('redirects settings route to profile route', async () => {

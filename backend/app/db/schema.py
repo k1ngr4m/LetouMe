@@ -462,6 +462,40 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS assistant_conversation (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversation_id VARCHAR(64) NOT NULL UNIQUE,
+        user_id BIGINT NOT NULL,
+        model_code VARCHAR(128) NOT NULL,
+        lottery_code VARCHAR(16) NOT NULL DEFAULT 'dlt',
+        title VARCHAR(255) NOT NULL,
+        context_summary VARCHAR(512) NULL,
+        context_json JSON NULL,
+        last_active_at BIGINT NOT NULL DEFAULT 0,
+        deleted_at BIGINT NULL,
+        created_at BIGINT NOT NULL DEFAULT 0,
+        updated_at BIGINT NOT NULL DEFAULT 0,
+        CONSTRAINT fk_assistant_conversation_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        INDEX idx_assistant_conversation_user_active (user_id, deleted_at, last_active_at),
+        INDEX idx_assistant_conversation_model (model_code, lottery_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS assistant_message (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversation_id BIGINT NOT NULL,
+        role VARCHAR(16) NOT NULL,
+        content MEDIUMTEXT NOT NULL,
+        model_code VARCHAR(128) NOT NULL,
+        context_json JSON NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'success',
+        error_message TEXT NULL,
+        created_at BIGINT NOT NULL DEFAULT 0,
+        CONSTRAINT fk_assistant_message_conversation FOREIGN KEY (conversation_id) REFERENCES assistant_conversation(id) ON DELETE CASCADE,
+        INDEX idx_assistant_message_conversation_created (conversation_id, created_at, id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS app_role (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         role_code VARCHAR(64) NOT NULL UNIQUE,
