@@ -603,6 +603,14 @@ export type AssistantContext = {
   route_path: string
   target_period?: string
   chips: string[]
+  my_bets?: {
+    lottery_code: LotteryCode
+    target_period: string
+    record_count: number
+    total_bet_count: number
+    total_amount: number
+    records: Array<Record<string, unknown>>
+  }
 }
 
 export type AssistantChatPayload = {

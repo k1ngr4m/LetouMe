@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import uuid
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from backend.app.lotteries import normalize_lottery_code
@@ -16,6 +19,17 @@ LOTTERY_LABELS = {
     "qxc": "七星彩",
 }
 MAX_CONTEXT_MESSAGES = 20
+MAX_MY_BETS_CONTEXT_CHARS = 6000
+
+
+@dataclass
+class AssistantChatSession:
+    normalized_message: str
+    normalized_context: dict[str, Any]
+    model_def: ModelDefinition
+    context_summary: str
+    conversation: dict[str, Any]
+    history: list[dict[str, Any]]
 
 
 class AssistantService:
@@ -61,6 +75,88 @@ class AssistantService:
         context: dict[str, Any] | None = None,
         conversation_id: str | None = None,
     ) -> dict[str, Any]:
+        session = self._prepare_chat_session(
+            user_id=user_id,
+            message=message,
+            model_code=model_code,
+            context=context,
+            conversation_id=conversation_id,
+        )
+        try:
+            answer = self._ask_model(session.model_def, session.normalized_message, session.normalized_context, session.history)
+            self._add_assistant_message(session=session, content=answer, status="success")
+        except Exception as exc:
+            self._add_assistant_message(session=session, content="本次回答失败，可重试。", status="error", error_message=str(exc))
+            raise
+
+        detail = self.get_conversation_detail(user_id=user_id, conversation_id=str(session.conversation["conversation_id"]))
+        return {
+            "conversation_id": str(session.conversation["conversation_id"]),
+            "answer": answer,
+            "context_summary": session.context_summary,
+            "model_code": session.model_def.id,
+            "messages": detail["messages"],
+        }
+
+    def stream_chat_events(
+        self,
+        *,
+        user_id: int,
+        message: str,
+        model_code: str,
+        context: dict[str, Any] | None = None,
+        conversation_id: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        session = self._prepare_chat_session(
+            user_id=user_id,
+            message=message,
+            model_code=model_code,
+            context=context,
+            conversation_id=conversation_id,
+        )
+        yield {
+            "event": "meta",
+            "conversation_id": str(session.conversation["conversation_id"]),
+            "context_summary": session.context_summary,
+            "model_code": session.model_def.id,
+        }
+        chunks: list[str] = []
+        try:
+            for delta in self._ask_model_stream(session.model_def, session.normalized_message, session.normalized_context, session.history):
+                if not delta:
+                    continue
+                chunks.append(delta)
+                yield {"event": "delta", "content": delta}
+            answer = "".join(chunks).strip()
+            if not answer:
+                raise ValueError("AI 暂未返回内容，请稍后重试")
+            if "仅供参考" not in answer:
+                disclaimer = "\n\n仅供参考，彩票结果具有随机性，请理性决策。"
+                answer = f"{answer}{disclaimer}"
+                yield {"event": "delta", "content": disclaimer}
+            self._add_assistant_message(session=session, content=answer, status="success")
+            detail = self.get_conversation_detail(user_id=user_id, conversation_id=str(session.conversation["conversation_id"]))
+            yield {
+                "event": "done",
+                "conversation_id": str(session.conversation["conversation_id"]),
+                "answer": answer,
+                "context_summary": session.context_summary,
+                "model_code": session.model_def.id,
+                "messages": detail["messages"],
+            }
+        except Exception as exc:
+            self._add_assistant_message(session=session, content="本次回答失败，可重试。", status="error", error_message=str(exc))
+            yield {"event": "error", "message": str(exc) or "本次回答失败，可重试"}
+
+    def _prepare_chat_session(
+        self,
+        *,
+        user_id: int,
+        message: str,
+        model_code: str,
+        context: dict[str, Any] | None,
+        conversation_id: str | None,
+    ) -> AssistantChatSession:
         normalized_message = str(message or "").strip()
         if not normalized_message:
             raise ValueError("问题不能为空")
@@ -88,40 +184,34 @@ class AssistantService:
                 "context": normalized_context,
             }
         )
-        try:
-            answer = self._ask_model(model_def, normalized_message, normalized_context, history)
-            self.repository.add_message(
-                {
-                    "conversation_db_id": int(conversation["id"]),
-                    "role": "assistant",
-                    "content": answer,
-                    "model_code": model_def.id,
-                    "context": normalized_context,
-                    "status": "success",
-                }
-            )
-        except Exception as exc:
-            self.repository.add_message(
-                {
-                    "conversation_db_id": int(conversation["id"]),
-                    "role": "assistant",
-                    "content": "本次回答失败，可重试。",
-                    "model_code": model_def.id,
-                    "context": normalized_context,
-                    "status": "error",
-                    "error_message": str(exc),
-                }
-            )
-            raise
+        return AssistantChatSession(
+            normalized_message=normalized_message,
+            normalized_context=normalized_context,
+            model_def=model_def,
+            context_summary=context_summary,
+            conversation=conversation,
+            history=history,
+        )
 
-        detail = self.get_conversation_detail(user_id=user_id, conversation_id=str(conversation["conversation_id"]))
-        return {
-            "conversation_id": str(conversation["conversation_id"]),
-            "answer": answer,
-            "context_summary": context_summary,
-            "model_code": model_def.id,
-            "messages": detail["messages"],
-        }
+    def _add_assistant_message(
+        self,
+        *,
+        session: AssistantChatSession,
+        content: str,
+        status: str,
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
+        return self.repository.add_message(
+            {
+                "conversation_db_id": int(session.conversation["id"]),
+                "role": "assistant",
+                "content": content,
+                "model_code": session.model_def.id,
+                "context": session.normalized_context,
+                "status": status,
+                "error_message": error_message,
+            }
+        )
 
     def _resolve_conversation(
         self,
@@ -185,13 +275,35 @@ class AssistantService:
         route_path = str(context.get("route_path") or "").strip()
         target_period = str(context.get("target_period") or "").strip()
         chips = [str(item).strip() for item in context.get("chips") or [] if str(item).strip()]
-        return {
+        normalized = {
             "lottery_code": lottery_code,
             "lottery_label": LOTTERY_LABELS.get(lottery_code, lottery_code),
             "page_title": page_title,
             "route_path": route_path,
             "target_period": target_period,
             "chips": chips[:8],
+        }
+        my_bets = AssistantService._normalize_my_bets_context(context.get("my_bets"), lottery_code=lottery_code)
+        if my_bets is not None:
+            normalized["my_bets"] = my_bets
+        return normalized
+
+    @staticmethod
+    def _normalize_my_bets_context(value: Any, *, lottery_code: str) -> dict[str, Any] | None:
+        if not isinstance(value, dict):
+            return None
+        records = value.get("records")
+        if not isinstance(records, list):
+            records = []
+        target_period = str(value.get("target_period") or "").strip()
+        normalized_records = [item for item in records[:20] if isinstance(item, dict)]
+        return {
+            "lottery_code": normalize_lottery_code(value.get("lottery_code") or lottery_code),
+            "target_period": target_period,
+            "record_count": max(0, int(value.get("record_count") or len(normalized_records))),
+            "total_bet_count": max(0, int(value.get("total_bet_count") or 0)),
+            "total_amount": float(value.get("total_amount") or 0),
+            "records": normalized_records,
         }
 
     @staticmethod
@@ -231,11 +343,52 @@ class AssistantService:
             answer = f"{answer}\n\n仅供参考，彩票结果具有随机性，请理性决策。"
         return answer
 
+    def _ask_model_stream(
+        self,
+        model_def: ModelDefinition,
+        message: str,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+    ) -> Iterator[str]:
+        model = ModelFactory().create(model_def)
+        messages: list[dict[str, str]] = [{"role": "system", "content": self._build_system_prompt(context)}]
+        for item in history[-MAX_CONTEXT_MESSAGES:]:
+            role = str(item.get("role") or "").strip()
+            content = str(item.get("content") or "").strip()
+            if role in {"user", "assistant"} and content and str(item.get("status") or "success") == "success":
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": message})
+        stream = model.client.chat.completions.create(
+            model=model_def.api_model,
+            messages=messages,
+            stream=True,
+            **model.request_kwargs(),
+        )
+        for chunk in stream:
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            content = getattr(delta, "content", None)
+            if content:
+                yield str(content)
+
     @staticmethod
     def _build_system_prompt(context: dict[str, Any]) -> str:
         context_summary = AssistantService._build_context_summary(context)
         route_path = str(context.get("route_path") or "").strip() or "未知页面"
         chips = "、".join(context.get("chips") or []) or "无"
+        my_bets = context.get("my_bets") if isinstance(context.get("my_bets"), dict) else None
+        my_bets_prompt = ""
+        if my_bets is not None:
+            my_bets_json = json.dumps(my_bets, ensure_ascii=False, default=str)
+            if len(my_bets_json) > MAX_MY_BETS_CONTEXT_CHARS:
+                my_bets_json = f"{my_bets_json[:MAX_MY_BETS_CONTEXT_CHARS]}...(已截断)"
+            my_bets_prompt = (
+                "\n我的投注上下文："
+                f"{my_bets_json}"
+                "\n当用户要求分析我的投注时，只能基于上述投注上下文分析；如果 records 为空，必须明确说明本期暂无我的投注数据，不要编造号码或投注记录。"
+            )
         return (
             "你是 LetouMe 的页面上下文 AI 助手，帮助用户理解彩票预测、图表、投注记录和开奖回溯。"
             "回答要使用中文，简洁、可操作，可以使用 Markdown、表格和分点。"
@@ -244,6 +397,7 @@ class AssistantService:
             f"\n当前上下文：{context_summary}"
             f"\n当前路由：{route_path}"
             f"\n上下文标签：{chips}"
+            f"{my_bets_prompt}"
         )
 
     @staticmethod

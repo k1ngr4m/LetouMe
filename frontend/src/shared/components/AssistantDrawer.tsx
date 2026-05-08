@@ -8,6 +8,8 @@ import type {
   AssistantConversation,
   AssistantMessage,
   AssistantModel,
+  MyBetLine,
+  MyBetRecord,
 } from '../types/api'
 
 type AssistantStatus = 'connected' | 'thinking' | 'unavailable'
@@ -18,7 +20,29 @@ type AssistantDrawerProps = {
   onClose: () => void
 }
 
-const QUICK_PROMPTS = ['解释当前预测', '分析我的投注', '给我保守方案', '本期风险点']
+type QuickPrompt = {
+  key: 'random-pick' | 'analyze-my-bets' | 'risk-points'
+  label: string
+  message: string
+}
+
+const QUICK_PROMPTS: QuickPrompt[] = [
+  {
+    key: 'random-pick',
+    label: '随机来一注',
+    message: '请按当前彩种随机生成一注号码，只输出号码、简短说明和“随机娱乐、理性投入”的提醒，不要保存或创建投注记录。',
+  },
+  {
+    key: 'analyze-my-bets',
+    label: '分析我的投注',
+    message: '请基于我本期该彩种的投注数据，分析号码分布、投入金额、风险点和需要注意的地方。如果没有投注数据，请明确说明本期暂无我的投注数据。',
+  },
+  {
+    key: 'risk-points',
+    label: '本期风险点',
+    message: '请结合当前彩种给出本期需要注意的风险点，使用 Markdown 分点说明，并提醒彩票结果具有随机性。',
+  },
+]
 const WELCOME_MESSAGE: AssistantMessage = {
   id: 'welcome',
   role: 'assistant',
@@ -43,6 +67,64 @@ function formatTime(timestamp: number) {
     }).format(new Date(timestamp * 1000))
   } catch {
     return ''
+  }
+}
+
+function pickNumbersPayload(line: MyBetLine | MyBetRecord) {
+  return {
+    front_numbers: line.front_numbers || [],
+    back_numbers: line.back_numbers || [],
+    front_dan: line.front_dan || [],
+    front_tuo: line.front_tuo || [],
+    back_dan: line.back_dan || [],
+    back_tuo: line.back_tuo || [],
+    direct_ten_thousands: line.direct_ten_thousands || [],
+    direct_thousands: line.direct_thousands || [],
+    direct_hundreds: line.direct_hundreds || [],
+    direct_tens: line.direct_tens || [],
+    direct_units: line.direct_units || [],
+    direct_hundreds_dan: line.direct_hundreds_dan || [],
+    direct_hundreds_tuo: line.direct_hundreds_tuo || [],
+    direct_tens_dan: line.direct_tens_dan || [],
+    direct_tens_tuo: line.direct_tens_tuo || [],
+    direct_units_dan: line.direct_units_dan || [],
+    direct_units_tuo: line.direct_units_tuo || [],
+    group_numbers: line.group_numbers || [],
+    sum_values: line.sum_values || [],
+    position_selections: line.position_selections || [],
+  }
+}
+
+function buildMyBetsAssistantContext(lotteryCode: AssistantContext['lottery_code'], targetPeriod: string, records: MyBetRecord[]): AssistantContext['my_bets'] {
+  const totalBetCount = records.reduce((sum, record) => sum + Number(record.bet_count || 0), 0)
+  const totalAmount = records.reduce((sum, record) => sum + Number(record.net_amount || record.amount || 0), 0)
+  return {
+    lottery_code: lotteryCode,
+    target_period: targetPeriod,
+    record_count: records.length,
+    total_bet_count: totalBetCount,
+    total_amount: totalAmount,
+    records: records.slice(0, 20).map((record) => ({
+      id: record.id,
+      play_type: record.play_type,
+      multiplier: record.multiplier,
+      is_append: record.is_append,
+      source_type: record.source_type,
+      bet_count: record.bet_count,
+      amount: record.amount,
+      discount_amount: record.discount_amount,
+      net_amount: record.net_amount,
+      numbers: pickNumbersPayload(record),
+      lines: (record.lines || []).slice(0, 20).map((line) => ({
+        line_no: line.line_no,
+        play_type: line.play_type,
+        multiplier: line.multiplier,
+        is_append: line.is_append,
+        bet_count: line.bet_count,
+        amount: line.amount,
+        numbers: pickNumbersPayload(line),
+      })),
+    })),
   }
 }
 
@@ -393,9 +475,10 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
     return models.find((model) => model.model_code === modelCode)?.display_name || modelCode
   }
 
-  async function submitMessage(nextMessage?: string) {
+  async function submitMessage(nextMessage?: string, contextOverride?: AssistantContext) {
     const content = String(nextMessage ?? draft).trim()
     if (!content || isComposerDisabled) return
+    const requestContext = contextOverride || context
     const userMessage: AssistantMessage = {
       id: makeMessageId(),
       role: 'user',
@@ -412,7 +495,7 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
       const response: AssistantChatResponse = await apiClient.chatWithAssistant({
         message: content,
         model_code: selectedModelCode,
-        context,
+        context: requestContext,
         conversation_id: conversationId,
       })
       setConversationId(response.conversation_id)
@@ -424,6 +507,24 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
       setDraft(content)
       setErrorMessage(error instanceof Error ? error.message : '本次回答失败，可重试')
     }
+  }
+
+  async function submitQuickPrompt(prompt: QuickPrompt) {
+    if (prompt.key !== 'analyze-my-bets') {
+      await submitMessage(prompt.message)
+      return
+    }
+
+    const currentPrediction = await apiClient.getCurrentPredictions(context.lottery_code)
+    const targetPeriod = String(currentPrediction.target_period || '').trim()
+    const myBets = await apiClient.getMyBets(context.lottery_code)
+    const records = (myBets.records || []).filter((record) => String(record.target_period || '').trim() === targetPeriod)
+    await submitMessage(prompt.message, {
+      ...context,
+      target_period: targetPeriod,
+      chips: Array.from(new Set([...context.chips, targetPeriod ? `第 ${targetPeriod} 期` : '当前期', '我的投注'])),
+      my_bets: buildMyBetsAssistantContext(context.lottery_code, targetPeriod, records),
+    })
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -524,7 +625,7 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
             <article className="assistant-message assistant-message--assistant">
               <div className="assistant-message__bubble assistant-message__bubble--thinking">
                 <LoaderCircle size={15} aria-hidden="true" />
-                <span>正在结合当前页面和历史对话思考...</span>
+                <span>正在思考...</span>
               </div>
             </article>
           ) : null}
@@ -533,8 +634,8 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
         <form className="assistant-composer" onSubmit={handleSubmit}>
           <div className="assistant-composer__quick">
             {QUICK_PROMPTS.map((prompt) => (
-              <button key={prompt} type="button" onClick={() => void submitMessage(prompt)} disabled={isComposerDisabled}>
-                {prompt}
+              <button key={prompt.key} type="button" onClick={() => void submitQuickPrompt(prompt)} disabled={isComposerDisabled}>
+                {prompt.label}
               </button>
             ))}
           </div>
