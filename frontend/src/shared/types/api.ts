@@ -609,6 +609,12 @@ export type AssistantContext = {
     record_count: number
     total_bet_count: number
     total_amount: number
+    total_gross_amount?: number
+    total_net_amount?: number
+    has_append?: boolean
+    append_line_count?: number
+    append_bet_count?: number
+    append_amount?: number
     records: Array<Record<string, unknown>>
   }
 }

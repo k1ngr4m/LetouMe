@@ -96,13 +96,25 @@ function pickNumbersPayload(line: MyBetLine | MyBetRecord) {
 
 function buildMyBetsAssistantContext(lotteryCode: AssistantContext['lottery_code'], targetPeriod: string, records: MyBetRecord[]): AssistantContext['my_bets'] {
   const totalBetCount = records.reduce((sum, record) => sum + Number(record.bet_count || 0), 0)
-  const totalAmount = records.reduce((sum, record) => sum + Number(record.net_amount || record.amount || 0), 0)
+  const totalGrossAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0)
+  const totalNetAmount = records.reduce((sum, record) => sum + Number(record.net_amount || record.amount || 0), 0)
+  const lines = records.flatMap((record) => record.lines || [])
+  const appendLines = lines.filter((line) => Boolean(line.is_append))
+  const appendLineCount = appendLines.length
+  const appendBetCount = appendLines.reduce((sum, line) => sum + Number(line.bet_count || 0), 0)
+  const appendAmount = appendLines.reduce((sum, line) => sum + Number(line.amount || 0), 0)
   return {
     lottery_code: lotteryCode,
     target_period: targetPeriod,
     record_count: records.length,
     total_bet_count: totalBetCount,
-    total_amount: totalAmount,
+    total_amount: totalNetAmount,
+    total_gross_amount: totalGrossAmount,
+    total_net_amount: totalNetAmount,
+    has_append: appendLineCount > 0,
+    append_line_count: appendLineCount,
+    append_bet_count: appendBetCount,
+    append_amount: appendAmount,
     records: records.slice(0, 20).map((record) => ({
       id: record.id,
       play_type: record.play_type,

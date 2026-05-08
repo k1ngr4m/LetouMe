@@ -303,6 +303,12 @@ class AssistantService:
             "record_count": max(0, int(value.get("record_count") or len(normalized_records))),
             "total_bet_count": max(0, int(value.get("total_bet_count") or 0)),
             "total_amount": float(value.get("total_amount") or 0),
+            "total_gross_amount": float(value.get("total_gross_amount") or value.get("total_amount") or 0),
+            "total_net_amount": float(value.get("total_net_amount") or value.get("total_amount") or 0),
+            "has_append": bool(value.get("has_append")),
+            "append_line_count": max(0, int(value.get("append_line_count") or 0)),
+            "append_bet_count": max(0, int(value.get("append_bet_count") or 0)),
+            "append_amount": float(value.get("append_amount") or 0),
             "records": normalized_records,
         }
 
@@ -388,6 +394,7 @@ class AssistantService:
                 "\n我的投注上下文："
                 f"{my_bets_json}"
                 "\n当用户要求分析我的投注时，只能基于上述投注上下文分析；如果 records 为空，必须明确说明本期暂无我的投注数据，不要编造号码或投注记录。"
+                "\n判断大乐透是否追加时，以 my_bets.has_append、append_line_count 以及每条 records[].lines[].is_append 为准；不要只看记录级 records[].is_append，因为一张记录可能包含混合子注单。"
             )
         return (
             "你是 LetouMe 的页面上下文 AI 助手，帮助用户理解彩票预测、图表、投注记录和开奖回溯。"

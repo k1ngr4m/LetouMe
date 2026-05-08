@@ -18,6 +18,12 @@ class AssistantServiceContextTests(unittest.TestCase):
                     "record_count": 1,
                     "total_bet_count": 3,
                     "total_amount": 6,
+                    "total_gross_amount": 9,
+                    "total_net_amount": 6,
+                    "has_append": True,
+                    "append_line_count": 1,
+                    "append_bet_count": 1,
+                    "append_amount": 3,
                     "records": [{"id": 12, "play_type": "dlt"}],
                 },
             }
@@ -25,6 +31,10 @@ class AssistantServiceContextTests(unittest.TestCase):
 
         self.assertEqual(context["my_bets"]["target_period"], "26001")
         self.assertEqual(context["my_bets"]["record_count"], 1)
+        self.assertEqual(context["my_bets"]["total_gross_amount"], 9)
+        self.assertEqual(context["my_bets"]["total_net_amount"], 6)
+        self.assertTrue(context["my_bets"]["has_append"])
+        self.assertEqual(context["my_bets"]["append_line_count"], 1)
         self.assertEqual(context["my_bets"]["records"][0]["id"], 12)
 
     def test_build_system_prompt_includes_my_bets_context(self) -> None:
@@ -42,12 +52,16 @@ class AssistantServiceContextTests(unittest.TestCase):
                     "record_count": 0,
                     "total_bet_count": 0,
                     "total_amount": 0,
+                    "has_append": True,
+                    "append_line_count": 5,
                     "records": [],
                 },
             }
         )
 
         self.assertIn("我的投注上下文", prompt)
+        self.assertIn('"append_line_count": 5', prompt)
+        self.assertIn("records[].lines[].is_append", prompt)
         self.assertIn('"records": []', prompt)
         self.assertIn("不要编造号码或投注记录", prompt)
 
