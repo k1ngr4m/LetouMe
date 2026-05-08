@@ -100,7 +100,20 @@ describe('App routing', () => {
     const drawer = screen.getByRole('complementary', { name: 'AI 助手' })
     expect(drawer).toHaveClass('is-open')
     expect(screen.getByText('内容由 AI 生成，仅供参考，请仔细甄别。')).toBeInTheDocument()
-    expect(within(drawer).getByText('预测总览')).toBeInTheDocument()
+    expect(within(drawer).getAllByText('AI 助手').length).toBeGreaterThan(0)
+    expect(within(drawer).getByText('大乐透')).toBeInTheDocument()
+    expect(within(drawer).queryByText('预测总览')).not.toBeInTheDocument()
+    expect(within(drawer).getByRole('button', { name: '历史对话' })).toBeInTheDocument()
+    expect(within(drawer).getByRole('region', { name: '历史对话' })).toBeInTheDocument()
+  })
+
+  it('places the assistant button to the right of the user menu', async () => {
+    renderApp(['/dashboard/prediction'])
+    await screen.findByText('Home Page Mock')
+    const topbarActions = screen.getByLabelText('快捷入口')
+    const userMenuButton = within(topbarActions).getByRole('button', { name: '用户菜单' })
+    const assistantButton = within(topbarActions).getByRole('button', { name: 'AI 助手' })
+    expect(userMenuButton.compareDocumentPosition(assistantButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('redirects settings route to profile route', async () => {

@@ -189,21 +189,14 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [location.pathname])
 
   const assistantContext = useMemo<AssistantContext>(() => {
-    const routeSearchParams = new URLSearchParams(location.search)
-    const targetPeriod = routeSearchParams.get('target_period') || routeSearchParams.get('period') || ''
-    const chips = [
-      selectedLotteryLabel,
-      pageTitle,
-      location.hash ? location.hash.replace(/^#/, '') : '',
-    ].filter(Boolean)
     return {
       lottery_code: selectedLottery,
-      page_title: pageTitle,
-      route_path: `${location.pathname}${location.search}${location.hash}`,
-      target_period: targetPeriod,
-      chips,
+      page_title: 'AI 助手',
+      route_path: '',
+      target_period: '',
+      chips: ['AI 助手', selectedLotteryLabel],
     }
-  }, [location.hash, location.pathname, location.search, pageTitle, selectedLottery, selectedLotteryLabel])
+  }, [selectedLottery, selectedLotteryLabel])
 
   const onNavigate = () => {
     setIsSidebarOpen(false)
@@ -752,16 +745,6 @@ export function AppShell({ children }: PropsWithChildren) {
 
           <nav className="crm-topbar__actions" aria-label="快捷入口">
             <button
-              className={clsx('crm-topbar__icon-btn', isAssistantOpen && 'is-active')}
-              type="button"
-              aria-label="AI 助手"
-              title="AI 助手"
-              aria-expanded={isAssistantOpen}
-              onClick={() => setIsAssistantOpen((current) => !current)}
-            >
-              <Sparkles size={16} aria-hidden="true" />
-            </button>
-            <button
               className={clsx('crm-topbar__icon-btn crm-topbar__icon-btn--with-badge', location.pathname === MESSAGE_CENTER_PATH && 'is-active')}
               type="button"
               aria-label="消息中心"
@@ -810,6 +793,16 @@ export function AppShell({ children }: PropsWithChildren) {
                 </div>
               ) : null}
             </div>
+            <button
+              className={clsx('crm-topbar__icon-btn', isAssistantOpen && 'is-active')}
+              type="button"
+              aria-label="AI 助手"
+              title="AI 助手"
+              aria-expanded={isAssistantOpen}
+              onClick={() => setIsAssistantOpen((current) => !current)}
+            >
+              <Sparkles size={16} aria-hidden="true" />
+            </button>
           </nav>
         </header>
 

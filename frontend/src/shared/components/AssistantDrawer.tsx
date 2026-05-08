@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { Copy, History, LoaderCircle, Plus, Send, Sparkles, Trash2, X } from 'lucide-react'
 import { apiClient } from '../api/client'
@@ -46,30 +46,197 @@ function formatTime(timestamp: number) {
   }
 }
 
-function MarkdownLite({ content }: { content: string }) {
-  const blocks = useMemo(() => content.trim().split(/\n{2,}/).filter(Boolean), [content])
+type MarkdownBlock =
+  | { type: 'heading'; level: 1 | 2 | 3 | 4; text: string }
+  | { type: 'paragraph'; text: string }
+  | { type: 'blockquote'; text: string }
+  | { type: 'list'; ordered: boolean; items: string[] }
+  | { type: 'code'; language: string; code: string }
+  | { type: 'table'; head: string[]; body: string[][] }
+
+function isTableDivider(line: string) {
+  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line)
+}
+
+function splitTableRow(line: string) {
+  return line
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+}
+
+function isBlockStart(line: string, nextLine = '') {
   return (
-    <>
+    /^```/.test(line) ||
+    /^#{1,4}\s+/.test(line) ||
+    /^>\s?/.test(line) ||
+    /^[-*+]\s+/.test(line) ||
+    /^\d+[.)]\s+/.test(line) ||
+    (line.includes('|') && isTableDivider(nextLine))
+  )
+}
+
+function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const lines = content.replace(/\r\n/g, '\n').trim().split('\n')
+  const blocks: MarkdownBlock[] = []
+  let index = 0
+
+  while (index < lines.length) {
+    const line = lines[index] || ''
+    const trimmed = line.trim()
+    if (!trimmed) {
+      index += 1
+      continue
+    }
+
+    const fenceMatch = trimmed.match(/^```([\w-]+)?\s*$/)
+    if (fenceMatch) {
+      const codeLines: string[] = []
+      index += 1
+      while (index < lines.length && !/^```\s*$/.test((lines[index] || '').trim())) {
+        codeLines.push(lines[index] || '')
+        index += 1
+      }
+      if (index < lines.length) index += 1
+      blocks.push({ type: 'code', language: fenceMatch[1] || '', code: codeLines.join('\n') })
+      continue
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/)
+    if (headingMatch) {
+      blocks.push({ type: 'heading', level: headingMatch[1].length as 1 | 2 | 3 | 4, text: headingMatch[2].trim() })
+      index += 1
+      continue
+    }
+
+    if (trimmed.includes('|') && isTableDivider(lines[index + 1] || '')) {
+      const head = splitTableRow(trimmed)
+      const body: string[][] = []
+      index += 2
+      while (index < lines.length && (lines[index] || '').trim().includes('|')) {
+        body.push(splitTableRow((lines[index] || '').trim()))
+        index += 1
+      }
+      blocks.push({ type: 'table', head, body })
+      continue
+    }
+
+    if (/^>\s?/.test(trimmed)) {
+      const quoteLines: string[] = []
+      while (index < lines.length && /^>\s?/.test((lines[index] || '').trim())) {
+        quoteLines.push((lines[index] || '').trim().replace(/^>\s?/, ''))
+        index += 1
+      }
+      blocks.push({ type: 'blockquote', text: quoteLines.join('\n') })
+      continue
+    }
+
+    if (/^[-*+]\s+/.test(trimmed) || /^\d+[.)]\s+/.test(trimmed)) {
+      const ordered = /^\d+[.)]\s+/.test(trimmed)
+      const markerPattern = ordered ? /^\d+[.)]\s+/ : /^[-*+]\s+/
+      const items: string[] = []
+      while (index < lines.length && markerPattern.test((lines[index] || '').trim())) {
+        items.push((lines[index] || '').trim().replace(markerPattern, ''))
+        index += 1
+      }
+      blocks.push({ type: 'list', ordered, items })
+      continue
+    }
+
+    const paragraphLines: string[] = []
+    while (index < lines.length) {
+      const paragraphLine = lines[index] || ''
+      if (!paragraphLine.trim()) break
+      if (paragraphLines.length > 0 && isBlockStart(paragraphLine.trim(), lines[index + 1] || '')) break
+      paragraphLines.push(paragraphLine.trim())
+      index += 1
+    }
+    blocks.push({ type: 'paragraph', text: paragraphLines.join('\n') })
+  }
+
+  return blocks
+}
+
+function normalizeMarkdownHref(href: string) {
+  const value = href.trim()
+  if (/^(https?:|mailto:)/i.test(value)) return value
+  return ''
+}
+
+function parseInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const pattern = /(`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index))
+    }
+    const token = match[0]
+    const key = `${keyPrefix}-${match.index}`
+    if (token.startsWith('`')) {
+      nodes.push(<code className="assistant-markdown__inline-code" key={key}>{token.slice(1, -1)}</code>)
+    } else if (token.startsWith('[')) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+      const href = linkMatch ? normalizeMarkdownHref(linkMatch[2]) : ''
+      nodes.push(
+        href ? (
+          <a className="assistant-markdown__link" href={href} target="_blank" rel="noreferrer" key={key}>
+            {linkMatch?.[1]}
+          </a>
+        ) : token,
+      )
+    } else if (token.startsWith('**')) {
+      nodes.push(<strong key={key}>{parseInlineMarkdown(token.slice(2, -2), key)}</strong>)
+    } else {
+      nodes.push(<em key={key}>{parseInlineMarkdown(token.slice(1, -1), key)}</em>)
+    }
+    lastIndex = pattern.lastIndex
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex))
+  }
+  return nodes
+}
+
+function renderInlineWithBreaks(text: string, keyPrefix: string) {
+  return text.split('\n').flatMap((line, lineIndex) => {
+    const lineNodes = parseInlineMarkdown(line, `${keyPrefix}-${lineIndex}`)
+    return lineIndex === 0 ? lineNodes : [<br key={`${keyPrefix}-br-${lineIndex}`} />, ...lineNodes]
+  })
+}
+
+function MarkdownLite({ content }: { content: string }) {
+  const blocks = useMemo(() => parseMarkdownBlocks(content), [content])
+  return (
+    <div className="assistant-markdown">
       {blocks.map((block, index) => {
-        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean)
-        const isTable = lines.length >= 2 && lines.every((line) => line.startsWith('|') && line.endsWith('|'))
-        if (isTable) {
-          const rows = lines
-            .filter((line) => !/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line))
-            .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
-          const [head, ...body] = rows
+        if (block.type === 'heading') {
+          const HeadingTag = `h${block.level}` as 'h1' | 'h2' | 'h3' | 'h4'
+          return <HeadingTag className="assistant-markdown__heading" key={`${block.type}-${index}`}>{renderInlineWithBreaks(block.text, `heading-${index}`)}</HeadingTag>
+        }
+        if (block.type === 'code') {
           return (
-            <div className="assistant-markdown__table-wrap" key={`${block}-${index}`}>
+            <pre className="assistant-markdown__code-block" key={`${block.type}-${index}`}>
+              {block.language ? <span className="assistant-markdown__code-language">{block.language}</span> : null}
+              <code>{block.code}</code>
+            </pre>
+          )
+        }
+        if (block.type === 'table') {
+          return (
+            <div className="assistant-markdown__table-wrap" key={`${block.type}-${index}`}>
               <table className="assistant-markdown__table">
-                {head ? (
-                  <thead>
-                    <tr>{head.map((cell) => <th key={cell}>{cell}</th>)}</tr>
-                  </thead>
-                ) : null}
+                <thead>
+                  <tr>{block.head.map((cell, cellIndex) => <th key={`${cell}-${cellIndex}`}>{renderInlineWithBreaks(cell, `th-${index}-${cellIndex}`)}</th>)}</tr>
+                </thead>
                 <tbody>
-                  {body.map((row, rowIndex) => (
+                  {block.body.map((row, rowIndex) => (
                     <tr key={`${row.join('-')}-${rowIndex}`}>
-                      {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`}>{cell}</td>)}
+                      {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`}>{renderInlineWithBreaks(cell, `td-${index}-${rowIndex}-${cellIndex}`)}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -77,25 +244,20 @@ function MarkdownLite({ content }: { content: string }) {
             </div>
           )
         }
-        if (lines.every((line) => /^[-*]\s+/.test(line))) {
-          return (
-            <ul className="assistant-markdown__list" key={`${block}-${index}`}>
-              {lines.map((line) => <li key={line}>{line.replace(/^[-*]\s+/, '')}</li>)}
-            </ul>
-          )
+        if (block.type === 'list') {
+          const ListTag = block.ordered ? 'ol' : 'ul'
+          return <ListTag className="assistant-markdown__list" key={`${block.type}-${index}`}>{block.items.map((item, itemIndex) => <li key={`${item}-${itemIndex}`}>{renderInlineWithBreaks(item, `li-${index}-${itemIndex}`)}</li>)}</ListTag>
+        }
+        if (block.type === 'blockquote') {
+          return <blockquote className="assistant-markdown__blockquote" key={`${block.type}-${index}`}>{renderInlineWithBreaks(block.text, `quote-${index}`)}</blockquote>
         }
         return (
-          <p className="assistant-markdown__paragraph" key={`${block}-${index}`}>
-            {lines.map((line, lineIndex) => (
-              <span key={`${line}-${lineIndex}`}>
-                {line.replace(/^#{1,4}\s+/, '')}
-                {lineIndex < lines.length - 1 ? <br /> : null}
-              </span>
-            ))}
+          <p className="assistant-markdown__paragraph" key={`${block.type}-${index}`}>
+            {renderInlineWithBreaks(block.text, `paragraph-${index}`)}
           </p>
         )
       })}
-    </>
+    </div>
   )
 }
 
@@ -106,7 +268,6 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [draft, setDraft] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [status, setStatus] = useState<AssistantStatus>('connected')
   const [errorMessage, setErrorMessage] = useState('')
   const messageListRef = useRef<HTMLDivElement | null>(null)
@@ -213,7 +374,6 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
       setConversationId(response.conversation.conversation_id)
       setSelectedModelCode(response.conversation.model_code)
       setMessages(response.messages)
-      setIsHistoryOpen(false)
       setStatus('connected')
     } catch (error) {
       setStatus('unavailable')
@@ -286,6 +446,29 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
     <>
       <div className={clsx('assistant-drawer-overlay', isOpen && 'is-open')} onClick={onClose} aria-hidden="true" />
       <aside className={clsx('assistant-drawer', isOpen && 'is-open')} aria-label="AI 助手" aria-hidden={!isOpen}>
+        <div className="assistant-history-rail">
+          <button className="assistant-history-rail__trigger" type="button" aria-label="历史对话" title="历史对话">
+            <History size={18} aria-hidden="true" />
+          </button>
+          <section className="assistant-history" aria-label="历史对话">
+            <div className="assistant-history__header">
+              <strong>历史记录</strong>
+              <span>最近 30 条</span>
+            </div>
+            {conversations.length > 0 ? conversations.map((conversation) => (
+              <article className={clsx('assistant-history__item', conversation.conversation_id === conversationId && 'is-active')} key={conversation.conversation_id}>
+                <button type="button" onClick={() => void loadConversation(conversation.conversation_id)}>
+                  <strong>{conversation.title || '新的对话'}</strong>
+                  <span>{getModelLabel(conversation.model_code)} · {conversation.context_summary || conversation.lottery_code}</span>
+                  <small>{formatTime(conversation.last_active_at)}</small>
+                </button>
+                <button type="button" onClick={() => void deleteConversation(conversation.conversation_id)} aria-label="删除历史对话" title="删除">
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </article>
+            )) : <p className="assistant-history__empty">暂无历史对话</p>}
+          </section>
+        </div>
         <header className="assistant-drawer__header">
           <div className="assistant-drawer__title-group">
             <span className="assistant-drawer__mark"><Sparkles size={17} aria-hidden="true" /></span>
@@ -299,15 +482,6 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
           <div className="assistant-drawer__header-actions">
             <button className="assistant-drawer__icon-action" type="button" onClick={() => startNewConversation()} aria-label="新建对话" title="新建对话">
               <Plus size={17} aria-hidden="true" />
-            </button>
-            <button
-              className={clsx('assistant-drawer__icon-action', isHistoryOpen && 'is-active')}
-              type="button"
-              onClick={() => setIsHistoryOpen((current) => !current)}
-              aria-label="历史对话"
-              title="历史对话"
-            >
-              <History size={17} aria-hidden="true" />
             </button>
             <button className="assistant-drawer__close" type="button" onClick={onClose} aria-label="关闭 AI 助手" title="关闭 AI 助手">
               <X size={18} aria-hidden="true" />
@@ -332,23 +506,6 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
         <div className="assistant-drawer__context" aria-label="当前上下文">
           {contextChips.length > 0 ? contextChips.map((chip) => <span key={chip}>{chip}</span>) : <span>当前页面暂无可引用数据</span>}
         </div>
-
-        {isHistoryOpen ? (
-          <section className="assistant-history" aria-label="历史对话">
-            {conversations.length > 0 ? conversations.map((conversation) => (
-              <article className={clsx('assistant-history__item', conversation.conversation_id === conversationId && 'is-active')} key={conversation.conversation_id}>
-                <button type="button" onClick={() => void loadConversation(conversation.conversation_id)}>
-                  <strong>{conversation.title || '新的对话'}</strong>
-                  <span>{getModelLabel(conversation.model_code)} · {conversation.context_summary || conversation.lottery_code}</span>
-                  <small>{formatTime(conversation.last_active_at)}</small>
-                </button>
-                <button type="button" onClick={() => void deleteConversation(conversation.conversation_id)} aria-label="删除历史对话" title="删除">
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
-              </article>
-            )) : <p className="assistant-history__empty">暂无历史对话</p>}
-          </section>
-        ) : null}
 
         <div className="assistant-drawer__messages" ref={messageListRef}>
           {displayMessages.map((message) => (
