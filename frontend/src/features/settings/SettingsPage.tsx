@@ -207,16 +207,22 @@ const LOTTERY_FETCH_LIMIT_DEFAULT = 30
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
 type MotionPreferenceOption = 'system' | 'minimal' | 'normal' | 'enhanced'
-type ManagedProviderCode = 'deepseek' | 'aimixhub'
+type ManagedProviderTemplate = 'deepseek' | 'aimixhub'
+type ManagedProvider = SettingsProvider & {
+  template: ManagedProviderTemplate
+  isDraft?: boolean
+}
 type ProviderSaveRequest = {
   payload: SettingsProviderPayload
   mode?: 'create' | 'edit'
   providerCode?: string
+  draftCode?: string
+  fetchAfterSave?: boolean
 }
 
-const MANAGED_PROVIDER_CODES: ManagedProviderCode[] = ['deepseek', 'aimixhub']
+const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aimixhub']
 const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
-const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderCode, SettingsProvider> = {
+const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvider> = {
   deepseek: {
     code: 'deepseek',
     name: 'DeepSeek',
@@ -241,20 +247,52 @@ const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderCode, SettingsProvider> =
   },
 }
 
-function isManagedProviderCode(value: string): value is ManagedProviderCode {
-  return MANAGED_PROVIDER_CODES.includes(value as ManagedProviderCode)
+function getProviderTemplate(providerCode: string): ManagedProviderTemplate | null {
+  if (providerCode === 'deepseek' || providerCode.startsWith('deepseek_')) return 'deepseek'
+  if (providerCode === 'aimixhub' || providerCode.startsWith('aimixhub_')) return 'aimixhub'
+  return null
 }
 
 function getProviderDisplayName(providerCode: string, fallback?: string) {
-  if (providerCode === 'deepseek') return 'DeepSeek'
-  if (providerCode === 'aimixhub') return 'AIHubMix'
+  const template = getProviderTemplate(providerCode)
+  if (template === 'deepseek') return fallback || (providerCode === 'deepseek' ? 'DeepSeek' : providerCode)
+  if (template === 'aimixhub') return fallback || (providerCode === 'aimixhub' ? 'AIHubMix' : providerCode)
   return fallback || providerCode
 }
 
 function getProviderLogoLabel(providerCode: string) {
-  if (providerCode === 'deepseek') return 'DS'
-  if (providerCode === 'aimixhub') return 'AI'
+  const template = getProviderTemplate(providerCode)
+  if (template === 'deepseek') return 'DS'
+  if (template === 'aimixhub') return 'AI'
   return (providerCode || 'P').slice(0, 2).toUpperCase()
+}
+
+function getProviderTemplateDisplayName(template: ManagedProviderTemplate) {
+  return template === 'deepseek' ? 'DeepSeek' : 'AIHubMix'
+}
+
+function createProviderFromTemplate(code: string, template: ManagedProviderTemplate, isDraft = false): ManagedProvider {
+  const base = DEFAULT_MANAGED_PROVIDERS[template]
+  return {
+    ...base,
+    code,
+    name: code,
+    model_configs: [],
+    is_system_preset: code === template,
+    isDraft,
+    template,
+  }
+}
+
+function buildProviderSourceCode(template: ManagedProviderTemplate, providers: Array<{ code: string }>) {
+  const usedCodes = new Set(providers.map((provider) => provider.code))
+  let suffix = 1
+  let code = `${template}_${suffix}`
+  while (usedCodes.has(code)) {
+    suffix += 1
+    code = `${template}_${suffix}`
+  }
+  return code
 }
 
 function formatModelNumber(value?: number | null) {
@@ -814,7 +852,7 @@ export function SettingsPage() {
   const { showToast } = useToast()
   const { motionPreference, setMotionPreference } = useMotion()
   const activeTab = getSettingsTabFromPath(location.pathname)
-  const [modelStatusFilter, setModelStatusFilter] = useState<ModelStatusFilter>('all')
+  const [modelStatusFilter, setModelStatusFilter] = useState<ModelStatusFilter>('active')
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [profileNickname, setProfileNickname] = useState(user?.nickname || '')
@@ -824,7 +862,9 @@ export function SettingsPage() {
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
   const [lmStudioDiscoveredModels, setLmStudioDiscoveredModels] = useState<SettingsProviderDiscoveredModel[]>([])
-  const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState<ManagedProviderCode>('deepseek')
+  const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState('deepseek')
+  const [providerSourceDrafts, setProviderSourceDrafts] = useState<ManagedProvider[]>([])
+  const [providerSourceMenuOpen, setProviderSourceMenuOpen] = useState(false)
   const [providerDraft, setProviderDraft] = useState({
     api_key: '',
     base_url: '',
@@ -1000,6 +1040,13 @@ export function SettingsPage() {
     showToast(message, messageType)
     setMessage(null)
   }, [message, messageType, showToast])
+
+  useEffect(() => {
+    if (!providerSourceMenuOpen) return undefined
+    const closeMenu = () => setProviderSourceMenuOpen(false)
+    window.addEventListener('click', closeMenu)
+    return () => window.removeEventListener('click', closeMenu)
+  }, [providerSourceMenuOpen])
 
   useEffect(
     () => () => {
@@ -1203,14 +1250,32 @@ export function SettingsPage() {
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
-  const managedProviders = useMemo(() => (
-    MANAGED_PROVIDER_CODES
-      .map((code) => {
-        const provider = providers.find((item) => item.code === code) || DEFAULT_MANAGED_PROVIDERS[code]
-        return { ...provider, name: getProviderDisplayName(code, provider.name) }
+  const managedProviders = useMemo<ManagedProvider[]>(() => {
+    const persistedProviders = providers
+      .map((provider): ManagedProvider | null => {
+        const template = getProviderTemplate(provider.code)
+        if (!template) return null
+        return {
+          ...provider,
+          name: getProviderDisplayName(provider.code, provider.name),
+          template,
+          isDraft: false,
+        }
       })
-  ), [providers])
+      .filter((provider): provider is ManagedProvider => Boolean(provider))
+    const persistedCodes = new Set(persistedProviders.map((provider) => provider.code))
+    const missingDefaults = MANAGED_PROVIDER_TEMPLATES
+      .filter((template) => !persistedCodes.has(template))
+      .map((template) => createProviderFromTemplate(template, template, false))
+    const pendingDrafts = providerSourceDrafts.filter((provider) => !persistedCodes.has(provider.code))
+    return [...persistedProviders, ...missingDefaults, ...pendingDrafts]
+  }, [providerSourceDrafts, providers])
   const activeManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || managedProviders[0] || null
+  useEffect(() => {
+    if (!providers.length) return
+    setProviderSourceDrafts((previous) => previous.filter((draft) => !providers.some((provider) => provider.code === draft.code)))
+  }, [providers])
+
   useEffect(() => {
     if (!activeManagedProvider) return
     const extraOptions = activeManagedProvider.extra_options || {}
@@ -1345,7 +1410,10 @@ export function SettingsPage() {
     [modelStatusFilter, providerModels],
   )
   const providerConfiguredModelIds = useMemo(() => new Set(providerModels.map((model) => model.api_model_name)), [providerModels])
-  const currentDiscoveredModels = providerDiscoveredModels[selectedManagedProviderCode] || []
+  const currentDiscoveredModels = useMemo(
+    () => providerDiscoveredModels[selectedManagedProviderCode] || [],
+    [providerDiscoveredModels, selectedManagedProviderCode],
+  )
   const filteredConfiguredModels = useMemo(() => {
     const keyword = providerModelSearch.trim().toLowerCase()
     if (!keyword) return visibleModels
@@ -1496,17 +1564,19 @@ export function SettingsPage() {
     },
   })
   const discoverManagedProviderModelsMutation = useMutation({
-    mutationFn: () => apiClient.discoverSettingsProviderModels({
-      provider: selectedManagedProviderCode,
-      base_url: providerDraft.base_url.trim(),
-      api_key: providerDraft.api_key.trim(),
-    }),
-    onSuccess: (result) => {
+    mutationFn: (override?: { provider: string; base_url: string; api_key: string }) =>
+      apiClient.discoverSettingsProviderModels(override || {
+        provider: selectedManagedProviderCode,
+        base_url: providerDraft.base_url.trim(),
+        api_key: providerDraft.api_key.trim(),
+      }),
+    onSuccess: (result, variables) => {
+      const providerCode = variables?.provider || selectedManagedProviderCode
       setProviderDiscoveredModels((previous) => ({
         ...previous,
-        [selectedManagedProviderCode]: result.models || [],
+        [providerCode]: result.models || [],
       }))
-      setMessage(`已获取 ${getProviderDisplayName(selectedManagedProviderCode)} 的 ${result.models.length} 个模型`)
+      setMessage(`已获取 ${getProviderDisplayName(providerCode)} 的 ${result.models.length} 个模型`)
       setMessageType('success')
     },
     onError: (error) => {
@@ -1516,7 +1586,7 @@ export function SettingsPage() {
   })
 
   const saveProviderMutation = useMutation({
-    mutationFn: ({ payload, mode, providerCode }: ProviderSaveRequest) => {
+    mutationFn: async ({ payload, mode, providerCode }: ProviderSaveRequest) => {
       const saveMode = mode || providerMode
       return saveMode === 'create'
         ? apiClient.createSettingsProvider(payload)
@@ -1527,7 +1597,15 @@ export function SettingsPage() {
       setMessage(saveMode === 'create' ? '供应商已创建。' : '供应商已更新。')
       setMessageType('success')
       setProviderModalOpen(false)
+      if (variables.draftCode) setSelectedManagedProviderCode(variables.payload.code || variables.draftCode)
       void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
+      if (variables.fetchAfterSave) {
+        discoverManagedProviderModelsMutation.mutate({
+          provider: variables.payload.code || selectedManagedProviderCode,
+          base_url: variables.payload.base_url,
+          api_key: variables.payload.api_key,
+        })
+      }
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '供应商保存失败')
@@ -1864,11 +1942,49 @@ export function SettingsPage() {
     })
   }
 
-  function openCreateProvider() {
-    setProviderMode('create')
-    setSelectedProviderCode(null)
-    applyProviderPreset('custom')
-    setProviderModalOpen(true)
+  function addProviderSourceDraft(template: ManagedProviderTemplate) {
+    const code = buildProviderSourceCode(template, [...providers, ...providerSourceDrafts])
+    const draft = createProviderFromTemplate(code, template, true)
+    setProviderSourceDrafts((previous) => [...previous, draft])
+    setProviderDiscoveredModels((previous) => ({ ...previous, [code]: [] }))
+    setSelectedManagedProviderCode(code)
+    setProviderSourceMenuOpen(false)
+  }
+
+  function removeProviderSourceDraft(providerCode: string) {
+    setProviderSourceDrafts((previous) => previous.filter((provider) => provider.code !== providerCode))
+    setProviderDiscoveredModels((previous) => {
+      const next = { ...previous }
+      delete next[providerCode]
+      return next
+    })
+    if (selectedManagedProviderCode === providerCode) {
+      const fallbackProvider = managedProviders.find((provider) => provider.code !== providerCode)
+      setSelectedManagedProviderCode(fallbackProvider?.code || 'deepseek')
+    }
+  }
+
+  function deleteProviderSource(provider: ManagedProvider) {
+    if (provider.isDraft) {
+      removeProviderSourceDraft(provider.code)
+      return
+    }
+    const confirmed = window.confirm(`确认删除供应商源“${getProviderDisplayName(provider.code, provider.name)}”吗？该供应商下的预设模型配置也会被删除。`)
+    if (!confirmed) return
+    apiClient.deleteSettingsProvider(provider.code)
+      .then(() => {
+        setMessage('供应商已删除。')
+        setMessageType('success')
+        if (selectedManagedProviderCode === provider.code) {
+          const fallbackProvider = managedProviders.find((item) => item.code !== provider.code)
+          setSelectedManagedProviderCode(fallbackProvider?.code || 'deepseek')
+        }
+        void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
+      })
+      .catch((error) => {
+        setMessage(error instanceof Error ? error.message : '删除供应商失败')
+        setMessageType('error')
+      })
   }
 
   function openEditProvider(provider: SettingsProvider) {
@@ -1923,7 +2039,7 @@ export function SettingsPage() {
     saveProviderMutation.mutate({ payload })
   }
 
-  function saveActiveProvider() {
+  function buildActiveProviderPayload() {
     if (!activeManagedProvider) return
     let customHeaders: unknown = providerDraft.custom_headers.trim()
     if (providerDraft.custom_headers.trim()) {
@@ -1943,12 +2059,13 @@ export function SettingsPage() {
       setMessageType('error')
       return
     }
-    saveProviderMutation.mutate({
-      mode: 'edit',
-      providerCode: activeManagedProvider.code,
+    return {
+      mode: activeManagedProvider.isDraft ? 'create' : 'edit',
+      providerCode: activeManagedProvider.isDraft ? undefined : activeManagedProvider.code,
+      draftCode: activeManagedProvider.isDraft ? activeManagedProvider.code : undefined,
       payload: {
         code: activeManagedProvider.code,
-        name: getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name),
+        name: activeManagedProvider.name || activeManagedProvider.code,
         api_format: activeManagedProvider.api_format || 'openai_compatible',
         remark: activeManagedProvider.remark || '',
         website_url: activeManagedProvider.website_url || '',
@@ -1962,49 +2079,19 @@ export function SettingsPage() {
         },
         model_configs: activeManagedProvider.model_configs || [],
       },
-    })
+    } satisfies ProviderSaveRequest
+  }
+
+  function saveActiveProvider() {
+    const request = buildActiveProviderPayload()
+    if (!request) return
+    saveProviderMutation.mutate(request)
   }
 
   function saveAndFetchActiveProviderModels() {
-    if (!activeManagedProvider) return
-    let customHeaders: unknown = {}
-    if (providerDraft.custom_headers.trim()) {
-      try {
-        customHeaders = JSON.parse(providerDraft.custom_headers)
-      } catch {
-        setMessage('自定义请求头必须是合法 JSON')
-        setMessageType('error')
-        return
-      }
-    }
-    const timeout = Number(providerDraft.timeout.trim())
-    if (!Number.isFinite(timeout) || timeout <= 0) {
-      setMessage('超时时间必须是大于 0 的数字')
-      setMessageType('error')
-      return
-    }
-    saveProviderMutation.mutate({
-      mode: 'edit',
-      providerCode: activeManagedProvider.code,
-      payload: {
-        code: activeManagedProvider.code,
-        name: getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name),
-        api_format: activeManagedProvider.api_format || 'openai_compatible',
-        remark: activeManagedProvider.remark || '',
-        website_url: activeManagedProvider.website_url || '',
-        api_key: providerDraft.api_key.trim(),
-        base_url: providerDraft.base_url.trim(),
-        extra_options: {
-          ...(activeManagedProvider.extra_options || {}),
-          timeout,
-          proxy_url: providerDraft.proxy_url.trim(),
-          custom_headers: customHeaders,
-        },
-        model_configs: activeManagedProvider.model_configs || [],
-      },
-    }, {
-      onSuccess: () => discoverManagedProviderModelsMutation.mutate(),
-    })
+    const request = buildActiveProviderPayload()
+    if (!request) return
+    saveProviderMutation.mutate({ ...request, fetchAfterSave: true })
   }
 
   function addDiscoveredModel(model: SettingsProviderDiscoveredModel) {
@@ -2764,34 +2851,67 @@ export function SettingsPage() {
                 <aside className="provider-model-center__sidebar" aria-label="供应商">
                   <div className="provider-model-center__sidebar-header">
                     <strong>提供商源</strong>
-                    <button className="ghost-button provider-model-center__add-provider" type="button" onClick={openCreateProvider}>
-                      <PlusIcon />
-                      <span>新增</span>
-                    </button>
+                    <div className="provider-source-add" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        className="ghost-button provider-model-center__add-provider"
+                        type="button"
+                        onClick={() => setProviderSourceMenuOpen((open) => !open)}
+                        aria-haspopup="menu"
+                        aria-expanded={providerSourceMenuOpen}
+                      >
+                        <PlusIcon />
+                        <span>新增</span>
+                      </button>
+                      {providerSourceMenuOpen ? (
+                        <div className="provider-source-add__menu" role="menu">
+                          {MANAGED_PROVIDER_TEMPLATES.map((template) => (
+                            <button key={template} type="button" role="menuitem" onClick={() => addProviderSourceDraft(template)}>
+                              <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${template}`)}>
+                                {getProviderLogoLabel(template)}
+                              </span>
+                              <span>{getProviderTemplateDisplayName(template)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="provider-source-list">
                     {managedProviders.map((provider) => {
                       const providerModelCount = models.filter((model) => model.provider === provider.code && !model.is_deleted).length
+                      const canDeleteProvider = Boolean(provider.isDraft || provider.code !== provider.template)
                       return (
-                        <button
+                        <div
                           key={provider.code}
-                          type="button"
                           className={clsx('provider-source-item', provider.code === selectedManagedProviderCode && 'is-active')}
-                          onClick={() => {
-                            if (isManagedProviderCode(provider.code)) {
-                              setSelectedManagedProviderCode(provider.code)
-                            }
-                          }}
                         >
-                          <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${provider.code}`)}>
-                            {getProviderLogoLabel(provider.code)}
-                          </span>
-                          <span className="provider-source-item__body">
-                            <strong>{getProviderDisplayName(provider.code, provider.name)}</strong>
-                            <small>{provider.base_url || '未配置 Base URL'}</small>
-                          </span>
-                          <span className="provider-source-item__count">{providerModelCount}</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="provider-source-item__select"
+                            onClick={() => setSelectedManagedProviderCode(provider.code)}
+                          >
+                            <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${provider.template}`)}>
+                              {getProviderLogoLabel(provider.code)}
+                            </span>
+                            <span className="provider-source-item__body">
+                              <strong>{getProviderDisplayName(provider.code, provider.name)}</strong>
+                              <small>{provider.base_url || '未配置 Base URL'}</small>
+                            </span>
+                          </button>
+                          {canDeleteProvider ? (
+                            <button
+                              className="provider-source-item__delete"
+                              type="button"
+                              aria-label={`删除供应商源 ${getProviderDisplayName(provider.code, provider.name)}`}
+                              title="删除"
+                              onClick={() => deleteProviderSource(provider)}
+                            >
+                              <MoreIcon />
+                            </button>
+                          ) : (
+                            <span className="provider-source-item__count">{providerModelCount}</span>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -2903,7 +3023,7 @@ export function SettingsPage() {
                             <button
                               className="ghost-button"
                               type="button"
-                              onClick={() => discoverManagedProviderModelsMutation.mutate()}
+                              onClick={() => discoverManagedProviderModelsMutation.mutate(undefined)}
                               disabled={discoverManagedProviderModelsMutation.isPending}
                             >
                               {discoverManagedProviderModelsMutation.isPending ? '获取中...' : '获取模型列表'}

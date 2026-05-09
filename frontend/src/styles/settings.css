@@ -682,6 +682,51 @@
   height: 0.9rem;
 }
 
+.provider-source-add {
+  position: relative;
+  display: inline-flex;
+}
+
+.provider-source-add__menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.25rem;
+  min-width: 13rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border-1);
+  border-radius: 0.8rem;
+  background: var(--surface-0);
+  box-shadow: 0 18px 44px rgb(15 23 42 / 16%);
+}
+
+.provider-source-add__menu button {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.55rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-source-add__menu button:hover {
+  background: var(--surface-1);
+}
+
+.provider-source-add__menu .provider-source-item__logo {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+
 .provider-source-list {
   display: grid;
   gap: 0.45rem;
@@ -689,9 +734,9 @@
 
 .provider-source-item {
   display: grid;
-  grid-template-columns: 2.35rem minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.35rem;
   width: 100%;
   min-height: 4.6rem;
   padding: 0.72rem;
@@ -702,6 +747,43 @@
   text-align: left;
   cursor: pointer;
   transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.provider-source-item__select {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-source-item__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.provider-source-item__delete:hover {
+  background: color-mix(in srgb, #ff6b6b 14%, transparent);
+  color: #c24141;
+}
+
+.provider-source-item__delete svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .provider-source-item:hover {

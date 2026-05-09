@@ -120,9 +120,10 @@ class ModelService:
         provider = str(payload.get("provider") or "").strip().lower()
         if not provider:
             raise ValueError("Provider cannot be empty")
-        if provider == "deepseek":
+        provider_family = self._provider_family(provider)
+        if provider_family == "deepseek":
             return self._discover_deepseek_models(api_key=str(payload.get("api_key") or "").strip())
-        if provider == "aimixhub":
+        if provider_family == "aimixhub":
             return self._discover_aihubmix_models()
 
         client = self._build_openai_client(
@@ -141,6 +142,15 @@ class ModelService:
         if not discovered:
             raise ValueError("No available models were found")
         return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
+    @staticmethod
+    def _provider_family(provider: str) -> str:
+        normalized = str(provider or "").strip().lower()
+        if normalized == "deepseek" or normalized.startswith("deepseek_"):
+            return "deepseek"
+        if normalized == "aimixhub" or normalized.startswith("aimixhub_"):
+            return "aimixhub"
+        return normalized
 
     @staticmethod
     def _discover_deepseek_models(*, api_key: str) -> dict[str, Any]:

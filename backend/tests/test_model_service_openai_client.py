@@ -53,6 +53,20 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
         self.assertEqual([item["model_id"] for item in result["models"]], ["deepseek-chat", "deepseek-reasoner"])
         self.assertEqual(result["models"][0]["owner"], "deepseek")
 
+    def test_discover_deepseek_provider_alias_uses_deepseek_endpoint(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get") as get:
+            get.return_value.json.return_value = {
+                "object": "list",
+                "data": [{"id": "deepseek-chat", "object": "model", "owned_by": "deepseek"}],
+            }
+
+            result = service.discover_provider_models({"provider": "deepseek_1", "api_key": "sk-test"})
+
+        get.assert_called_once()
+        self.assertEqual(get.call_args.args[0], "https://api.deepseek.com/models")
+        self.assertEqual(result["models"][0]["model_id"], "deepseek-chat")
+
     def test_discover_aihubmix_models_normalizes_extended_fields(self) -> None:
         service = ModelService()
         with patch("backend.app.services.model_service.requests.get") as get:
@@ -81,6 +95,20 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
         self.assertEqual(model["description"], "Flagship model")
         self.assertEqual(model["context_length"], 400000)
         self.assertEqual(model["pricing"]["input"], 1.25)
+
+    def test_discover_aihubmix_provider_alias_uses_aihubmix_endpoint(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get") as get:
+            get.return_value.json.return_value = {
+                "success": True,
+                "data": [{"model_id": "gpt-5-mini", "desc": "Mini", "pricing": {}}],
+            }
+
+            result = service.discover_provider_models({"provider": "aimixhub_1"})
+
+        get.assert_called_once()
+        self.assertEqual(get.call_args.args[0], "https://aihubmix.com/api/v1/models")
+        self.assertEqual(result["models"][0]["model_id"], "gpt-5-mini")
 
     def test_discover_provider_models_rejects_empty_model_list(self) -> None:
         service = ModelService()

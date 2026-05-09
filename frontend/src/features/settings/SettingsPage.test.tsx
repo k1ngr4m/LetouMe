@@ -42,6 +42,9 @@ const { apiClientMock } = vi.hoisted(() => ({
     updatePermission: vi.fn(),
     deleteRole: vi.fn(),
     getSettingsModel: vi.fn(),
+    createSettingsProvider: vi.fn(),
+    updateSettingsProvider: vi.fn(),
+    deleteSettingsProvider: vi.fn(),
     listScheduleTasks: vi.fn(),
     createScheduleTask: vi.fn(),
     updateScheduleTask: vi.fn(),
@@ -273,13 +276,18 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     expect(screen.getByText('EnabledModel')).toBeInTheDocument()
-    expect(screen.getByText('InactiveModel')).toBeInTheDocument()
-    expect(screen.getByText('DeletedModel')).toBeInTheDocument()
+    expect(screen.queryByText('InactiveModel')).not.toBeInTheDocument()
+    expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '未启用' }))
     expect(screen.queryByText('EnabledModel')).not.toBeInTheDocument()
     expect(screen.getByText('InactiveModel')).toBeInTheDocument()
     expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '全部' }))
+    expect(screen.getByText('EnabledModel')).toBeInTheDocument()
+    expect(screen.getByText('InactiveModel')).toBeInTheDocument()
+    expect(screen.getByText('DeletedModel')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '启用' }))
     expect(screen.getByText('EnabledModel')).toBeInTheDocument()
@@ -326,6 +334,108 @@ describe('SettingsPage model management view switch', () => {
     confirmSpy.mockReturnValueOnce(true)
     await userEvent.click(screen.getByRole('button', { name: '删除模型 DeepSeek V4 Flash' }))
     await waitFor(() => expect(apiClientMock.deleteSettingsModel).toHaveBeenCalledWith('deepseek-v4-flash'))
+    confirmSpy.mockRestore()
+  })
+
+  it('adds provider source drafts from the sidebar menu and saves them', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'deepseek_1', name: 'deepseek_1', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'openrouter', name: 'OpenRouter', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://openrouter.ai/api/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createSettingsProvider.mockResolvedValue({
+      code: 'deepseek_2',
+      name: 'deepseek_2',
+      is_system_preset: false,
+      api_format: 'openai_compatible',
+      base_url: 'https://api.deepseek.com',
+      extra_options: {},
+      model_configs: [],
+    })
+
+    renderPage('/settings/models')
+
+    expect(await screen.findByText('deepseek_1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /OpenRouter/ })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    expect(screen.getByRole('menuitem', { name: /DeepSeek/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /AIHubMix/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
+
+    expect(await screen.findByRole('heading', { name: 'deepseek_2' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('deepseek_2')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://api.deepseek.com')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
+    await waitFor(() =>
+      expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({
+        code: 'deepseek_2',
+        name: 'deepseek_2',
+        base_url: 'https://api.deepseek.com',
+        api_format: 'openai_compatible',
+      })),
+    )
+    expect(apiClientMock.updateSettingsProvider).not.toHaveBeenCalled()
+  })
+
+  it('creates an AIHubMix draft before fetching models and confirms saved provider deletion', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aimixhub_1', name: 'aimixhub_1', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createSettingsProvider.mockResolvedValue({
+      code: 'aimixhub_2',
+      name: 'aimixhub_2',
+      is_system_preset: false,
+      api_format: 'openai_compatible',
+      base_url: 'https://aihubmix.com/v1',
+      extra_options: {},
+      model_configs: [],
+    })
+    apiClientMock.discoverSettingsProviderModels.mockResolvedValue({
+      models: [{ model_id: 'gpt-5-mini', display_name: 'gpt-5-mini' }],
+    })
+    apiClientMock.deleteSettingsProvider.mockResolvedValue({ success: true })
+
+    renderPage('/settings/models')
+
+    expect(await screen.findByText('aimixhub_1')).toBeInTheDocument()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
+    await userEvent.click(screen.getByRole('button', { name: '删除供应商源 aimixhub_1' }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(apiClientMock.deleteSettingsProvider).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /AIHubMix/ }))
+    expect(await screen.findByRole('heading', { name: 'aimixhub_2' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('aimixhub_2')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存并获取模型' }))
+    await waitFor(() => expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({ code: 'aimixhub_2' })))
+    await waitFor(() =>
+      expect(apiClientMock.discoverSettingsProviderModels).toHaveBeenCalledWith({
+        provider: 'aimixhub_2',
+        base_url: 'https://aihubmix.com/v1',
+        api_key: '',
+      }),
+    )
     confirmSpy.mockRestore()
   })
 
