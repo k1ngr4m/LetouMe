@@ -1356,7 +1356,7 @@ export function MyBetsPanel({
                     <input value={form.sourceType === 'ocr' ? 'OCR识别' : '手动录入'} disabled />
                   </label>
                   <label className="my-bets-modal__field">
-                    购票时间（北京时间）
+                    购票时间
                     <input
                       type="datetime-local"
                       step={60}

@@ -3832,7 +3832,7 @@ export function SettingsPage() {
                                 <ColumnResizeHandle label="调整规则列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'rule')} />
                               </th>
                               <th className="settings-schedule-table__col-next-run is-resizable" style={{ width: scheduleColumnWidths.next_run, minWidth: scheduleColumnWidths.next_run }}>
-                                下次执行（北京时间）
+                                下次执行
                                 <ColumnResizeHandle label="调整下次执行列宽" onMouseDown={(event) => startScheduleColumnResize(event, 'next_run')} />
                               </th>
                               <th className="settings-schedule-table__col-status is-resizable" style={{ width: scheduleColumnWidths.status, minWidth: scheduleColumnWidths.status }}>
@@ -4869,8 +4869,8 @@ export function SettingsPage() {
 
       {scheduleModalOpen ? (
         <div className="modal-shell" role="presentation" onClick={closeScheduleModal}>
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <form className="settings-form-grid" onSubmit={submitScheduleForm}>
+          <div className="modal-card modal-card--form settings-schedule-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <form className="settings-form-grid settings-schedule-form" onSubmit={submitScheduleForm}>
               <div className="modal-card__header">
                 <div>
                   <p className="modal-card__eyebrow">定时任务</p>
@@ -4879,226 +4879,269 @@ export function SettingsPage() {
                 </div>
                 <button className="ghost-button" type="button" onClick={closeScheduleModal}>关闭</button>
               </div>
-              <label className="field">
-                <span>任务名称</span>
-                <input
-                  value={scheduleForm.task_name}
-                  onChange={(event) => setScheduleForm((previous) => ({ ...previous, task_name: event.target.value }))}
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>任务类型</span>
-                <select
-                  aria-label="任务类型"
-                  value={scheduleForm.task_type}
-                  onChange={(event) =>
-                    setScheduleForm((previous) => ({
-                      ...previous,
-                      task_type: event.target.value as ScheduleTaskType,
-                      model_codes: event.target.value === 'prediction_generate' ? previous.model_codes : [],
-                    }))
-                  }
-                >
-                  <option value="lottery_fetch">开奖抓取</option>
-                  <option value="prediction_generate">预测生成</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>彩种</span>
-                <select
-                  aria-label="彩种"
-                  value={scheduleForm.lottery_code}
-                  onChange={(event) => {
-                    const nextLottery = event.target.value as LotteryCode
-                    setScheduleForm((previous) => ({
-                      ...previous,
-                      lottery_code: nextLottery,
-                      prediction_play_mode: normalizePredictionPlayModeForLottery(nextLottery, previous.prediction_play_mode),
-                      model_codes: [],
-                    }))
-                  }}
-                >
-                  <option value="dlt">大乐透</option>
-                  <option value="pl3">排列3</option>
-                  <option value="pl5">排列5</option>
-                  <option value="qxc">七星彩</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>规则模式</span>
-                <select
-                  aria-label="规则模式"
-                  value={scheduleForm.schedule_mode}
-                  onChange={(event) => setScheduleForm((previous) => ({ ...previous, schedule_mode: event.target.value as ScheduleMode }))}
-                >
-                  <option value="preset">固定时间表</option>
-                  <option value="cron">Cron 表达式</option>
-                </select>
-              </label>
-              {scheduleForm.task_type === 'prediction_generate' ? (
-                <>
-                  {scheduleForm.lottery_code === 'pl3' || scheduleForm.lottery_code === 'dlt' || scheduleForm.lottery_code === 'qxc' ? (
-                    <label className="field">
-                      <span>预测玩法</span>
-                      <select
-                        aria-label="预测玩法"
-                        value={scheduleForm.prediction_play_mode}
-                        onChange={(event) =>
-                          setScheduleForm((previous) => ({ ...previous, prediction_play_mode: event.target.value as ModelPredictionPlayMode }))
-                        }
-                      >
-                        {scheduleForm.lottery_code === 'pl3' ? (
-                          <>
-                            <option value="direct">直选</option>
-                            <option value="direct_sum">和值</option>
-                          </>
-                        ) : scheduleForm.lottery_code === 'qxc' ? (
-                          <>
-                            <option value="direct">直选</option>
-                            <option value="compound">复式</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="direct">普通</option>
-                            <option value="compound">复式</option>
-                            <option value="dantuo">胆拖</option>
-                          </>
-                        )}
-                      </select>
-                    </label>
-                  ) : null}
-                  <div className="field field--full">
-                    <span>预测模型</span>
-                    <div className="settings-schedule-model-picker" role="group" aria-label="预测模型">
-                      {selectedLotteryModels.length ? (
-                        selectedLotteryModels.map((model) => (
-                          <label
-                            key={model.model_code}
-                            className={clsx('settings-schedule-model-option', scheduleForm.model_codes.includes(model.model_code) && 'is-selected')}
-                          >
-                            <input
-                              type="checkbox"
-                              aria-label={model.display_name}
-                              checked={scheduleForm.model_codes.includes(model.model_code)}
-                              onChange={(event) =>
-                                setScheduleForm((previous) => ({
-                                  ...previous,
-                                  model_codes: event.target.checked
-                                    ? [...previous.model_codes, model.model_code]
-                                    : previous.model_codes.filter((code) => code !== model.model_code),
-                                }))
-                              }
-                            />
-                            <span className="settings-schedule-model-option__content">
-                              <strong>{model.display_name}</strong>
-                              <small>{model.api_model_name || model.model_code}</small>
-                            </span>
-                            <span className="settings-schedule-model-option__meta">
-                              <span className="settings-model-table__chip settings-model-table__tag-compact">
-                                {getScheduleModelProviderLabel(model, providers)}
-                              </span>
-                            </span>
-                          </label>
-                        ))
-                      ) : (
-                        <span className="settings-inline-hint">当前彩种暂无可选启用模型。</span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : null}
-              {scheduleForm.task_type === 'lottery_fetch' ? (
-                <label className="field">
-                  <span>抓取期数</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    step={1}
-                    list="lottery-fetch-limit-presets"
-                    value={scheduleForm.fetch_limit}
-                    onChange={(event) =>
-                      setScheduleForm((previous) => ({
-                        ...previous,
-                        fetch_limit: normalizeFetchLimit(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-              ) : null}
-              {scheduleForm.schedule_mode === 'preset' ? (
-                <>
-                  <label className="field">
-                    <span>执行频率</span>
-                    <select
-                      aria-label="执行频率"
-                      value={scheduleForm.preset_type || 'daily'}
-                      onChange={(event) => setScheduleForm((previous) => ({ ...previous, preset_type: event.target.value as SchedulePresetType }))}
-                    >
-                      <option value="daily">每天</option>
-                      <option value="weekly">每周</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>执行时间</span>
+              <section className="settings-schedule-form__section settings-schedule-form__section--config">
+                <div className="settings-schedule-form__section-title">
+                  <strong>任务配置</strong>
+                  <span>先定义任务类型、彩种与执行规则。</span>
+                </div>
+                <div className="settings-schedule-form__grid">
+                  <label className="field field--full settings-schedule-form__field settings-schedule-form__field--full">
+                    <span>任务名称</span>
                     <input
-                      aria-label="执行时间"
-                      type="time"
-                      value={scheduleForm.time_of_day || '09:00'}
-                      onChange={(event) => setScheduleForm((previous) => ({ ...previous, time_of_day: event.target.value }))}
+                      value={scheduleForm.task_name}
+                      onChange={(event) => setScheduleForm((previous) => ({ ...previous, task_name: event.target.value }))}
                       required
                     />
                   </label>
+                  <label className="field settings-schedule-form__field">
+                    <span>任务类型</span>
+                    <select
+                      aria-label="任务类型"
+                      value={scheduleForm.task_type}
+                      onChange={(event) =>
+                        setScheduleForm((previous) => ({
+                          ...previous,
+                          task_type: event.target.value as ScheduleTaskType,
+                          model_codes: event.target.value === 'prediction_generate' ? previous.model_codes : [],
+                        }))
+                      }
+                    >
+                      <option value="lottery_fetch">开奖抓取</option>
+                      <option value="prediction_generate">预测生成</option>
+                    </select>
+                  </label>
+                  <label className="field settings-schedule-form__field">
+                    <span>彩种</span>
+                    <select
+                      aria-label="彩种"
+                      value={scheduleForm.lottery_code}
+                      onChange={(event) => {
+                        const nextLottery = event.target.value as LotteryCode
+                        setScheduleForm((previous) => ({
+                          ...previous,
+                          lottery_code: nextLottery,
+                          prediction_play_mode: normalizePredictionPlayModeForLottery(nextLottery, previous.prediction_play_mode),
+                          model_codes: [],
+                        }))
+                      }}
+                    >
+                      <option value="dlt">大乐透</option>
+                      <option value="pl3">排列3</option>
+                      <option value="pl5">排列5</option>
+                      <option value="qxc">七星彩</option>
+                    </select>
+                  </label>
+                  <label className="field settings-schedule-form__field">
+                    <span>规则模式</span>
+                    <select
+                      aria-label="规则模式"
+                      value={scheduleForm.schedule_mode}
+                      onChange={(event) => setScheduleForm((previous) => ({ ...previous, schedule_mode: event.target.value as ScheduleMode }))}
+                    >
+                      <option value="preset">固定时间表</option>
+                      <option value="cron">Cron 表达式</option>
+                    </select>
+                  </label>
                   {scheduleForm.task_type === 'prediction_generate' ? (
-                    <label className="toggle-chip">
+                    <>
+                      {scheduleForm.lottery_code === 'pl3' || scheduleForm.lottery_code === 'dlt' || scheduleForm.lottery_code === 'qxc' ? (
+                        <label className="field settings-schedule-form__field">
+                          <span>预测玩法</span>
+                          <select
+                            aria-label="预测玩法"
+                            value={scheduleForm.prediction_play_mode}
+                            onChange={(event) =>
+                              setScheduleForm((previous) => ({ ...previous, prediction_play_mode: event.target.value as ModelPredictionPlayMode }))
+                            }
+                          >
+                            {scheduleForm.lottery_code === 'pl3' ? (
+                              <>
+                                <option value="direct">直选</option>
+                                <option value="direct_sum">和值</option>
+                              </>
+                            ) : scheduleForm.lottery_code === 'qxc' ? (
+                              <>
+                                <option value="direct">直选</option>
+                                <option value="compound">复式</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="direct">普通</option>
+                                <option value="compound">复式</option>
+                                <option value="dantuo">胆拖</option>
+                              </>
+                            )}
+                          </select>
+                        </label>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {scheduleForm.task_type === 'lottery_fetch' ? (
+                    <label className="field settings-schedule-form__field">
+                      <span>抓取期数</span>
                       <input
-                        type="checkbox"
-                        checked={scheduleForm.overwrite_existing}
-                        onChange={(event) => setScheduleForm((previous) => ({ ...previous, overwrite_existing: event.target.checked }))}
+                        type="number"
+                        min={1}
+                        max={500}
+                        step={1}
+                        list="lottery-fetch-limit-presets"
+                        value={scheduleForm.fetch_limit}
+                        onChange={(event) =>
+                          setScheduleForm((previous) => ({
+                            ...previous,
+                            fetch_limit: normalizeFetchLimit(event.target.value),
+                          }))
+                        }
                       />
-                      <span>覆盖已有预测</span>
                     </label>
                   ) : null}
-                  {scheduleForm.preset_type === 'weekly' ? (
-                    <div className="field field--full">
-                      <span>执行日</span>
-                      <div className="filter-chip-group">
-                        {WEEKDAY_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className={clsx('filter-chip', scheduleForm.weekdays.includes(option.value) && 'is-active')}
-                            onClick={() => toggleScheduleWeekday(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                </div>
+              </section>
+              {scheduleForm.task_type === 'prediction_generate' ? (
+                <section className="settings-schedule-form__section settings-schedule-form__section--models">
+                  <div className="settings-schedule-form__section-title settings-schedule-form__section-title--inline">
+                    <div>
+                      <strong>预测模型</strong>
+                      <span>按彩种选择参与执行的模型，可多选。</span>
+                    </div>
+                  </div>
+                  <div className="settings-schedule-model-picker" role="group" aria-label="预测模型">
+                    {selectedLotteryModels.length ? (
+                      selectedLotteryModels.map((model) => (
+                        <label
+                          key={model.model_code}
+                          className={clsx('settings-schedule-model-option', scheduleForm.model_codes.includes(model.model_code) && 'is-selected')}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={model.display_name}
+                            checked={scheduleForm.model_codes.includes(model.model_code)}
+                            onChange={(event) =>
+                              setScheduleForm((previous) => ({
+                                ...previous,
+                                model_codes: event.target.checked
+                                  ? [...previous.model_codes, model.model_code]
+                                  : previous.model_codes.filter((code) => code !== model.model_code),
+                              }))
+                            }
+                          />
+                          <span className="settings-schedule-model-option__content">
+                            <strong>{model.display_name}</strong>
+                            <small title={model.api_model_name || model.model_code}>{model.api_model_name || model.model_code}</small>
+                          </span>
+                          <span className="settings-schedule-model-option__meta">
+                            <span className="settings-model-table__chip settings-model-table__tag-compact">
+                              {getScheduleModelProviderLabel(model, providers)}
+                            </span>
+                          </span>
+                        </label>
+                      ))
+                    ) : (
+                      <span className="settings-inline-hint">当前彩种暂无可选启用模型。</span>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+              <section className="settings-schedule-form__section settings-schedule-form__section--schedule">
+                <div className="settings-schedule-form__section-title">
+                  <strong>执行规则</strong>
+                  <span>设置时间频率、启用状态与覆盖策略。</span>
+                </div>
+                <div className="settings-schedule-form__grid">
+                  {scheduleForm.schedule_mode === 'preset' ? (
+                    <>
+                      <label className="field settings-schedule-form__field">
+                        <span>执行频率</span>
+                        <select
+                          aria-label="执行频率"
+                          value={scheduleForm.preset_type || 'daily'}
+                          onChange={(event) => setScheduleForm((previous) => ({ ...previous, preset_type: event.target.value as SchedulePresetType }))}
+                        >
+                          <option value="daily">每天</option>
+                          <option value="weekly">每周</option>
+                        </select>
+                      </label>
+                      <label className="field settings-schedule-form__field">
+                        <span>执行时间</span>
+                        <input
+                          aria-label="执行时间"
+                          type="time"
+                          value={scheduleForm.time_of_day || '09:00'}
+                          onChange={(event) => setScheduleForm((previous) => ({ ...previous, time_of_day: event.target.value }))}
+                          required
+                        />
+                      </label>
+                      {scheduleForm.preset_type === 'weekly' ? (
+                        <div className="field field--full settings-schedule-form__field settings-schedule-form__field--full">
+                          <span>执行日</span>
+                          <div className="filter-chip-group">
+                            {WEEKDAY_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                className={clsx('filter-chip', scheduleForm.weekdays.includes(option.value) && 'is-active')}
+                                onClick={() => toggleScheduleWeekday(option.value)}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <label className="field field--full settings-schedule-form__field settings-schedule-form__field--full">
+                      <span>Cron 表达式</span>
+                      <input
+                        aria-label="Cron 表达式"
+                        value={scheduleForm.cron_expression || ''}
+                        onChange={(event) => setScheduleForm((previous) => ({ ...previous, cron_expression: event.target.value }))}
+                        placeholder="例如 30 9 * * 1,3,5"
+                        required
+                      />
+                    </label>
+                  )}
+                  {scheduleForm.task_type === 'prediction_generate' ? (
+                    <div className="settings-schedule-form__toggle-row settings-schedule-form__field settings-schedule-form__field--full">
+                      <div className="field settings-schedule-form__field settings-schedule-form__field--toggle">
+                        <span>执行选项</span>
+                        <label className="toggle-chip settings-schedule-form__toggle">
+                          <input
+                            type="checkbox"
+                            checked={scheduleForm.overwrite_existing}
+                            onChange={(event) => setScheduleForm((previous) => ({ ...previous, overwrite_existing: event.target.checked }))}
+                          />
+                          <span>覆盖已有预测</span>
+                        </label>
+                      </div>
+                      <div className="field settings-schedule-form__field settings-schedule-form__field--toggle settings-schedule-form__field--toggle-subtle">
+                        <span>任务状态</span>
+                        <label className="toggle-chip settings-schedule-form__toggle">
+                          <input
+                            type="checkbox"
+                            checked={scheduleForm.is_active}
+                            onChange={(event) => setScheduleForm((previous) => ({ ...previous, is_active: event.target.checked }))}
+                          />
+                          <span>创建后立即启用</span>
+                        </label>
                       </div>
                     </div>
-                  ) : null}
-                </>
-              ) : (
-                <label className="field field--full">
-                  <span>Cron 表达式</span>
-                  <input
-                    aria-label="Cron 表达式"
-                    value={scheduleForm.cron_expression || ''}
-                    onChange={(event) => setScheduleForm((previous) => ({ ...previous, cron_expression: event.target.value }))}
-                    placeholder="例如 30 9 * * 1,3,5"
-                    required
-                  />
-                </label>
-              )}
-              <label className="toggle-chip">
-                <input
-                  type="checkbox"
-                  checked={scheduleForm.is_active}
-                  onChange={(event) => setScheduleForm((previous) => ({ ...previous, is_active: event.target.checked }))}
-                />
-                <span>创建后立即启用</span>
-              </label>
-              <div className="form-actions">
+                  ) : (
+                    <div className="field field--full settings-schedule-form__field settings-schedule-form__field--full settings-schedule-form__field--toggle settings-schedule-form__field--toggle-subtle">
+                      <span>任务状态</span>
+                      <label className="toggle-chip settings-schedule-form__toggle">
+                        <input
+                          type="checkbox"
+                          checked={scheduleForm.is_active}
+                          onChange={(event) => setScheduleForm((previous) => ({ ...previous, is_active: event.target.checked }))}
+                        />
+                        <span>创建后立即启用</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </section>
+              <div className="form-actions settings-schedule-form__actions">
                 <button className="primary-button" type="submit" disabled={saveScheduleTaskMutation.isPending}>
                   {selectedScheduleTask ? '保存任务' : '创建任务'}
                 </button>

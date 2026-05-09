@@ -397,14 +397,14 @@ class ScheduleService:
 
     def _build_rule_summary(self, task: dict[str, Any]) -> str:
         if task.get("schedule_mode") == "cron":
-            summary = f"Cron（北京时间）· {task.get('cron_expression') or '-'}"
+            summary = f"Cron· {task.get('cron_expression') or '-'}"
             return self._append_prediction_play_mode(summary, task)
         time_of_day = task.get("time_of_day") or "--:--"
         if task.get("preset_type") == "weekly":
             weekdays = [WEEKDAY_LABELS.get(int(value), str(value)) for value in task.get("weekdays") or []]
-            summary = f"每周 {' / '.join(weekdays)} {time_of_day}（北京时间）"
+            summary = f"每周 {' / '.join(weekdays)} {time_of_day}"
             return self._append_prediction_play_mode(summary, task)
-        summary = f"每日 {time_of_day}（北京时间）"
+        summary = f"每日 {time_of_day}"
         return self._append_prediction_play_mode(summary, task)
 
     @staticmethod
