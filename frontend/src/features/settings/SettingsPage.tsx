@@ -60,6 +60,30 @@ type CustomBodyParamDraft = {
   type: CustomBodyParamType
   value: string
 }
+type KeyValuePreset = {
+  key: string
+  type: CustomBodyParamType
+  value: string
+}
+type KeyValueEditorModalProps = {
+  eyebrow: string
+  title: string
+  drafts: CustomBodyParamDraft[]
+  error: string | null
+  presets?: KeyValuePreset[]
+  emptyText: string
+  addLabel: string
+  keyLabel: string
+  keyPlaceholder: string
+  valueLabel: string
+  valuePlaceholder: string
+  showTypeSelector?: boolean
+  onClose: () => void
+  onAdd: (key?: string, type?: CustomBodyParamType, value?: string) => void
+  onUpdate: (id: string, patch: Partial<CustomBodyParamDraft>) => void
+  onRemove: (id: string) => void
+  onSave: () => void
+}
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type ScheduleListView = 'list' | 'calendar'
 type MaintenanceLogFilter = 'all' | LotteryCode
@@ -133,6 +157,34 @@ function parseCustomBodyParamDraft(draft: CustomBodyParamDraft): unknown {
   return draft.value
 }
 
+function normalizeCustomHeaderRecord(value: unknown): Record<string, string> {
+  let parsed = value
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!text) return {}
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return {}
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+  return Object.fromEntries(
+    Object.entries(parsed)
+      .filter(([key, headerValue]) => key.trim() && typeof headerValue === 'string')
+      .map(([key, headerValue]) => [key.trim(), headerValue as string]),
+  )
+}
+
+function customHeadersToDrafts(headers: Record<string, string>): CustomBodyParamDraft[] {
+  return Object.entries(headers).map(([key, value], index) => ({
+    id: `header-${key}-${index}`,
+    key,
+    type: 'string',
+    value,
+  }))
+}
+
 function normalizeJsonText(value: unknown): string {
   if (typeof value === 'string') {
     const text = value.trim()
@@ -144,6 +196,104 @@ function normalizeJsonText(value: unknown): string {
     }
   }
   return JSON.stringify(value || {})
+}
+
+function KeyValueEditorModal({
+  eyebrow,
+  title,
+  drafts,
+  error,
+  presets = [],
+  emptyText,
+  addLabel,
+  keyLabel,
+  keyPlaceholder,
+  valueLabel,
+  valuePlaceholder,
+  showTypeSelector = false,
+  onClose,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onSave,
+}: KeyValueEditorModalProps) {
+  return (
+    <div className="modal-shell" role="presentation" onClick={onClose}>
+      <div className="modal-card modal-card--form custom-body-param-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-card__header">
+          <div>
+            <p className="modal-card__eyebrow">{eyebrow}</p>
+            <h3>{title}</h3>
+          </div>
+          <button className="ghost-button" type="button" onClick={onClose}>关闭</button>
+        </div>
+        {presets.length ? (
+          <div className="custom-body-param-modal__presets">
+            {presets.map((preset) => (
+              <button
+                key={preset.key}
+                className="ghost-button"
+                type="button"
+                onClick={() => onAdd(preset.key, preset.type, preset.value)}
+                disabled={drafts.some((draft) => draft.key.trim() === preset.key)}
+              >
+                {preset.key}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="custom-body-param-modal__rows">
+          {drafts.length ? drafts.map((draft) => (
+            <div className={clsx('custom-body-param-modal__row', !showTypeSelector && 'custom-body-param-modal__row--strings')} key={draft.id}>
+              <label className="field">
+                <span>{keyLabel}</span>
+                <input value={draft.key} onChange={(event) => onUpdate(draft.id, { key: event.target.value })} placeholder={keyPlaceholder} />
+              </label>
+              {showTypeSelector ? (
+                <label className="field">
+                  <span>类型</span>
+                  <select value={draft.type} onChange={(event) => onUpdate(draft.id, { type: event.target.value as CustomBodyParamType, value: event.target.value === 'null' ? '' : draft.value })}>
+                    <option value="string">string</option>
+                    <option value="number">number</option>
+                    <option value="boolean">boolean</option>
+                    <option value="null">null</option>
+                  </select>
+                </label>
+              ) : null}
+              {showTypeSelector && draft.type === 'boolean' ? (
+                <label className="field">
+                  <span>{valueLabel}</span>
+                  <select value={draft.value || 'true'} onChange={(event) => onUpdate(draft.id, { value: event.target.value })}>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                </label>
+              ) : (
+                <label className="field">
+                  <span>{valueLabel}</span>
+                  <input
+                    value={draft.value}
+                    disabled={showTypeSelector && draft.type === 'null'}
+                    onChange={(event) => onUpdate(draft.id, { value: event.target.value })}
+                    placeholder={showTypeSelector && draft.type === 'null' ? 'null' : valuePlaceholder}
+                  />
+                </label>
+              )}
+              <button className="ghost-button custom-body-param-modal__remove" type="button" onClick={() => onRemove(draft.id)}>删除</button>
+            </div>
+          )) : (
+            <div className="custom-body-param-modal__empty">{emptyText}</div>
+          )}
+        </div>
+        {error ? <p className="custom-body-param-modal__error">{error}</p> : null}
+        <div className="form-actions">
+          <button className="ghost-button" type="button" onClick={() => onAdd()}>{addLabel}</button>
+          <button className="ghost-button" type="button" onClick={onClose}>取消</button>
+          <button className="primary-button" type="button" onClick={onSave}>保存</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
@@ -275,7 +425,7 @@ const LOTTERY_FETCH_LIMIT_DEFAULT = 30
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
 type MotionPreferenceOption = 'system' | 'minimal' | 'normal' | 'enhanced'
-type ManagedProviderTemplate = 'deepseek' | 'aihubmix'
+type ManagedProviderTemplate = 'deepseek' | 'aihubmix' | 'xiaomi_token_plan'
 type ManagedProvider = SettingsProvider & {
   template: ManagedProviderTemplate
   isDraft?: boolean
@@ -288,8 +438,12 @@ type ProviderSaveRequest = {
   fetchAfterSave?: boolean
 }
 
-const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix']
+const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix', 'xiaomi_token_plan']
 const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
+const XIAOMI_TOKEN_PLAN_MODELS: SettingsProviderDiscoveredModel[] = [
+  { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
+  { model_id: 'mimo-v2.5', display_name: 'MiMo-V2.5' },
+]
 const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvider> = {
   deepseek: {
     code: 'deepseek',
@@ -313,6 +467,17 @@ const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvide
     is_system_preset: true,
     model_configs: [],
   },
+  xiaomi_token_plan: {
+    code: 'xiaomi_token_plan',
+    name: 'XiaoMi Token Plan',
+    api_format: 'openai_compatible',
+    website_url: 'https://token-plan-cn.xiaomimimo.com',
+    base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+    api_key: '',
+    extra_options: {},
+    is_system_preset: true,
+    model_configs: [],
+  },
 }
 
 function getProviderTemplate(providerCode: string): ManagedProviderTemplate | null {
@@ -323,6 +488,12 @@ function getProviderTemplate(providerCode: string): ManagedProviderTemplate | nu
     providerCode === 'aimixhub' ||
     providerCode.startsWith('aimixhub_')
   ) return 'aihubmix'
+  if (
+    providerCode === 'xiaomi_token_plan' ||
+    providerCode.startsWith('xiaomi_token_plan_') ||
+    providerCode === 'xiaomi' ||
+    providerCode.startsWith('xiaomi_')
+  ) return 'xiaomi_token_plan'
   return null
 }
 
@@ -330,6 +501,7 @@ function getProviderDisplayName(providerCode: string, fallback?: string) {
   const template = getProviderTemplate(providerCode)
   if (template === 'deepseek') return fallback || (providerCode === 'deepseek' ? 'DeepSeek' : providerCode)
   if (template === 'aihubmix') return fallback || (providerCode === 'aihubmix' ? 'AIHubMix' : providerCode)
+  if (template === 'xiaomi_token_plan') return fallback || (providerCode === 'xiaomi_token_plan' ? 'XiaoMi Token Plan' : providerCode)
   return fallback || providerCode
 }
 
@@ -337,11 +509,29 @@ function getProviderLogoLabel(providerCode: string) {
   const template = getProviderTemplate(providerCode)
   if (template === 'deepseek') return 'DS'
   if (template === 'aihubmix') return 'AI'
+  if (template === 'xiaomi_token_plan') return 'MI'
   return (providerCode || 'P').slice(0, 2).toUpperCase()
 }
 
 function getProviderTemplateDisplayName(template: ManagedProviderTemplate) {
-  return template === 'deepseek' ? 'DeepSeek' : 'AIHubMix'
+  if (template === 'deepseek') return 'DeepSeek'
+  if (template === 'aihubmix') return 'AIHubMix'
+  return 'XiaoMi Token Plan'
+}
+
+function getProviderTemplateDiscoveredModels(template: ManagedProviderTemplate): SettingsProviderDiscoveredModel[] {
+  if (template === 'xiaomi_token_plan') return XIAOMI_TOKEN_PLAN_MODELS.map((model) => ({ ...model }))
+  return []
+}
+
+function getProviderTemplateModelConfigs(template: ManagedProviderTemplate): SettingsProviderPayload['model_configs'] {
+  if (template === 'xiaomi_token_plan') {
+    return XIAOMI_TOKEN_PLAN_MODELS.map((model) => ({
+      model_id: model.model_id,
+      display_name: model.display_name,
+    }))
+  }
+  return []
 }
 
 function createProviderFromTemplate(code: string, template: ManagedProviderTemplate, isDraft = false): ManagedProvider {
@@ -948,6 +1138,9 @@ export function SettingsPage() {
   const [customBodyParamEditorOpen, setCustomBodyParamEditorOpen] = useState(false)
   const [customBodyParamDrafts, setCustomBodyParamDrafts] = useState<CustomBodyParamDraft[]>([])
   const [customBodyParamError, setCustomBodyParamError] = useState<string | null>(null)
+  const [customHeaderEditorOpen, setCustomHeaderEditorOpen] = useState(false)
+  const [customHeaderDrafts, setCustomHeaderDrafts] = useState<CustomBodyParamDraft[]>([])
+  const [customHeaderError, setCustomHeaderError] = useState<string | null>(null)
   const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState('deepseek')
   const [providerSourceDrafts, setProviderSourceDrafts] = useState<ManagedProvider[]>([])
   const [providerSourceMenuOpen, setProviderSourceMenuOpen] = useState(false)
@@ -1385,29 +1578,33 @@ export function SettingsPage() {
       base_url: activeManagedProvider.base_url || '',
       timeout: String(extraOptions.timeout || PROVIDER_TIMEOUT_DEFAULT_SECONDS),
       proxy_url: String(extraOptions.proxy_url || ''),
-      custom_headers: typeof customHeaders === 'string'
-        ? customHeaders
-        : JSON.stringify(customHeaders || {}, null, 2),
+      custom_headers: JSON.stringify(normalizeCustomHeaderRecord(customHeaders), null, 2),
     })
     setProviderModelSearch('')
     setSelectedModelCodes([])
+    setCustomHeaderEditorOpen(false)
+    setCustomHeaderError(null)
   }, [activeManagedProvider?.code, activeManagedProvider?.api_key, activeManagedProvider?.base_url, activeManagedProvider?.extra_options])
 
   const createModeProviders = useMemo(() => {
     const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
     const lmStudioProvider = providers.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
     const aiMixHubProvider = providers.find((provider) => provider.code === 'aihubmix')
-    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aihubmix' && provider.code !== LMSTUDIO_PROVIDER_CODE)
+    const xiaomiTokenPlanProvider = providers.find((provider) => getProviderTemplate(provider.code) === 'xiaomi_token_plan')
+    const customProvider = providers.find((provider) => !provider.is_system_preset && !getProviderTemplate(provider.code) && provider.code !== LMSTUDIO_PROVIDER_CODE)
     const result: Array<SettingsProvider & { display_name: string }> = []
     if (customProvider) result.push({ ...customProvider, display_name: '自定义供应商' })
     if (lmStudioProvider) result.push({ ...lmStudioProvider, display_name: 'LM Studio' })
     if (deepseekProvider) result.push({ ...deepseekProvider, display_name: 'DeepSeek' })
     if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AIHubMix' })
+    if (xiaomiTokenPlanProvider) result.push({ ...xiaomiTokenPlanProvider, display_name: 'XiaoMi Token Plan' })
     return result
   }, [providers])
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
   const modelCustomBodyParams = getCustomBodyParams(modelForm.extra_options)
   const modelCustomBodyParamKeys = Object.keys(modelCustomBodyParams)
+  const providerCustomHeaders = useMemo(() => normalizeCustomHeaderRecord(providerDraft.custom_headers), [providerDraft.custom_headers])
+  const providerCustomHeaderKeys = Object.keys(providerCustomHeaders)
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -1505,10 +1702,11 @@ export function SettingsPage() {
     [modelStatusFilter, providerModels],
   )
   const providerConfiguredModelIds = useMemo(() => new Set(providerModels.map((model) => model.api_model_name)), [providerModels])
-  const currentDiscoveredModels = useMemo(
-    () => providerDiscoveredModels[selectedManagedProviderCode] || [],
-    [providerDiscoveredModels, selectedManagedProviderCode],
-  )
+  const currentDiscoveredModels = useMemo(() => {
+    const discoveredModels = providerDiscoveredModels[selectedManagedProviderCode]
+    if (discoveredModels?.length) return discoveredModels
+    return activeManagedProvider ? getProviderTemplateDiscoveredModels(activeManagedProvider.template) : []
+  }, [activeManagedProvider, providerDiscoveredModels, selectedManagedProviderCode])
   const filteredConfiguredModels = useMemo(() => {
     const keyword = providerModelSearch.trim().toLowerCase()
     if (!keyword) return visibleModels
@@ -1991,7 +2189,7 @@ export function SettingsPage() {
     setModelModalOpen(true)
   }
 
-  function applyProviderPreset(preset: 'custom' | 'deepseek' | 'aihubmix') {
+  function applyProviderPreset(preset: 'custom' | ManagedProviderTemplate) {
     if (preset === 'custom') {
       setProviderForm({
         ...EMPTY_PROVIDER_FORM,
@@ -2018,6 +2216,18 @@ export function SettingsPage() {
       })
       return
     }
+    if (preset === 'xiaomi_token_plan') {
+      setProviderForm({
+        ...EMPTY_PROVIDER_FORM,
+        code: 'xiaomi_token_plan',
+        name: 'XiaoMi Token Plan',
+        website_url: 'https://token-plan-cn.xiaomimimo.com',
+        api_format: 'openai_compatible',
+        base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+        model_configs: getProviderTemplateModelConfigs('xiaomi_token_plan'),
+      })
+      return
+    }
     setProviderForm({
       ...EMPTY_PROVIDER_FORM,
       code: 'aihubmix',
@@ -2036,7 +2246,7 @@ export function SettingsPage() {
     const code = buildProviderSourceCode(template, [...providers, ...providerSourceDrafts])
     const draft = createProviderFromTemplate(code, template, true)
     setProviderSourceDrafts((previous) => [...previous, draft])
-    setProviderDiscoveredModels((previous) => ({ ...previous, [code]: [] }))
+    setProviderDiscoveredModels((previous) => ({ ...previous, [code]: getProviderTemplateDiscoveredModels(template) }))
     setSelectedManagedProviderCode(code)
     setProviderSourceMenuOpen(false)
   }
@@ -2131,17 +2341,33 @@ export function SettingsPage() {
 
   function buildActiveProviderPayload() {
     if (!activeManagedProvider) return
-    let customHeaders: unknown = providerDraft.custom_headers.trim()
+    let customHeaders: Record<string, string> = {}
     if (providerDraft.custom_headers.trim()) {
       try {
-        customHeaders = JSON.parse(providerDraft.custom_headers)
+        const parsedHeaders = JSON.parse(providerDraft.custom_headers)
+        if (!parsedHeaders || typeof parsedHeaders !== 'object' || Array.isArray(parsedHeaders)) {
+          setMessage('自定义请求头必须是键值对象')
+          setMessageType('error')
+          return
+        }
+        const emptyKeyEntry = Object.entries(parsedHeaders).find(([key]) => !key.trim())
+        if (emptyKeyEntry) {
+          setMessage('自定义请求头名称不能为空')
+          setMessageType('error')
+          return
+        }
+        const invalidValueEntry = Object.entries(parsedHeaders).find(([, value]) => typeof value !== 'string')
+        if (invalidValueEntry) {
+          setMessage(`自定义请求头“${invalidValueEntry[0]}”的值必须是字符串`)
+          setMessageType('error')
+          return
+        }
+        customHeaders = normalizeCustomHeaderRecord(parsedHeaders)
       } catch {
         setMessage('自定义请求头必须是合法 JSON')
         setMessageType('error')
         return
       }
-    } else {
-      customHeaders = {}
     }
     const timeout = Number(providerDraft.timeout.trim())
     if (!Number.isFinite(timeout) || timeout <= 0) {
@@ -2167,7 +2393,9 @@ export function SettingsPage() {
           proxy_url: providerDraft.proxy_url.trim(),
           custom_headers: customHeaders,
         },
-        model_configs: activeManagedProvider.model_configs || [],
+        model_configs: activeManagedProvider.model_configs?.length
+          ? activeManagedProvider.model_configs
+          : getProviderTemplateModelConfigs(activeManagedProvider.template),
       },
     } satisfies ProviderSaveRequest
   }
@@ -2379,6 +2607,52 @@ export function SettingsPage() {
     }))
     setCustomBodyParamEditorOpen(false)
     setCustomBodyParamError(null)
+  }
+
+  function openCustomHeaderEditor() {
+    setCustomHeaderDrafts(customHeadersToDrafts(providerCustomHeaders))
+    setCustomHeaderError(null)
+    setCustomHeaderEditorOpen(true)
+  }
+
+  function addCustomHeader(key = '', _type: CustomBodyParamType = 'string', value = '') {
+    setCustomHeaderDrafts((previous) => [
+      ...previous,
+      { id: `header-${Date.now()}-${previous.length}`, key, type: 'string', value },
+    ])
+    setCustomHeaderError(null)
+  }
+
+  function updateCustomHeaderDraft(id: string, patch: Partial<CustomBodyParamDraft>) {
+    setCustomHeaderDrafts((previous) => previous.map((draft) => (draft.id === id ? { ...draft, ...patch, type: 'string' } : draft)))
+    setCustomHeaderError(null)
+  }
+
+  function removeCustomHeaderDraft(id: string) {
+    setCustomHeaderDrafts((previous) => previous.filter((draft) => draft.id !== id))
+    setCustomHeaderError(null)
+  }
+
+  function saveCustomHeaders() {
+    const nextHeaders: Record<string, string> = {}
+    for (const draft of customHeaderDrafts) {
+      const key = draft.key.trim()
+      if (!key) {
+        setCustomHeaderError('请求头名称不能为空')
+        return
+      }
+      if (Object.prototype.hasOwnProperty.call(nextHeaders, key)) {
+        setCustomHeaderError(`请求头名称重复：${key}`)
+        return
+      }
+      nextHeaders[key] = draft.value
+    }
+    setProviderDraft((previous) => ({
+      ...previous,
+      custom_headers: JSON.stringify(nextHeaders, null, 2),
+    }))
+    setCustomHeaderEditorOpen(false)
+    setCustomHeaderError(null)
   }
 
   function selectRole(role: RoleItem) {
@@ -3093,13 +3367,16 @@ export function SettingsPage() {
                             </span>
                             <input value={providerDraft.proxy_url} onChange={(event) => setProviderDraft((previous) => ({ ...previous, proxy_url: event.target.value }))} />
                           </label>
-                          <label className="provider-config-field provider-config-field--textarea">
+                          <div className="provider-config-field provider-config-field--summary">
                             <span>
                               <strong>自定义请求头</strong>
-                              <small>JSON 对象，会合并到默认请求头。</small>
+                              <small>此处添加的键值对将被合并到 OpenAI SDK 的 default_headers 中。</small>
                             </span>
-                            <textarea value={providerDraft.custom_headers} onChange={(event) => setProviderDraft((previous) => ({ ...previous, custom_headers: event.target.value }))} rows={3} />
-                          </label>
+                            <div className="provider-config-summary">
+                              <span>{providerCustomHeaderKeys.length ? providerCustomHeaderKeys.join('、') : '暂无项目'}</span>
+                              <button className="ghost-button" type="button" onClick={openCustomHeaderEditor}>修改</button>
+                            </div>
+                          </div>
                         </div>
                       </section>
 
@@ -3241,7 +3518,7 @@ export function SettingsPage() {
                       </section>
                     </>
                   ) : (
-                    <div className="state-shell">暂无可管理供应商，请先创建 DeepSeek 或 AIHubMix。</div>
+                    <div className="state-shell">暂无可管理供应商，请先创建 DeepSeek、AIHubMix 或 XiaoMi Token Plan。</div>
                   )}
                 </section>
               </section>
@@ -4304,81 +4581,49 @@ export function SettingsPage() {
       ) : null}
 
       {customBodyParamEditorOpen ? (
-        <div className="modal-shell" role="presentation" onClick={() => setCustomBodyParamEditorOpen(false)}>
-          <div className="modal-card modal-card--form custom-body-param-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-card__header">
-              <div>
-                <p className="modal-card__eyebrow">请求体参数</p>
-                <h3>修改键值对</h3>
-              </div>
-              <button className="ghost-button" type="button" onClick={() => setCustomBodyParamEditorOpen(false)}>关闭</button>
-            </div>
-            <div className="custom-body-param-modal__presets">
-              {[
-                { key: 'temperature', type: 'number' as CustomBodyParamType, value: '0.3' },
-                { key: 'top_p', type: 'number' as CustomBodyParamType, value: '1' },
-                { key: 'max_tokens', type: 'number' as CustomBodyParamType, value: '1024' },
-              ].map((preset) => (
-                <button
-                  key={preset.key}
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => addCustomBodyParam(preset.key, preset.type, preset.value)}
-                  disabled={customBodyParamDrafts.some((draft) => draft.key.trim() === preset.key)}
-                >
-                  {preset.key}
-                </button>
-              ))}
-            </div>
-            <div className="custom-body-param-modal__rows">
-              {customBodyParamDrafts.length ? customBodyParamDrafts.map((draft) => (
-                <div className="custom-body-param-modal__row" key={draft.id}>
-                  <label className="field">
-                    <span>参数名</span>
-                    <input value={draft.key} onChange={(event) => updateCustomBodyParamDraft(draft.id, { key: event.target.value })} placeholder="temperature" />
-                  </label>
-                  <label className="field">
-                    <span>类型</span>
-                    <select value={draft.type} onChange={(event) => updateCustomBodyParamDraft(draft.id, { type: event.target.value as CustomBodyParamType, value: event.target.value === 'null' ? '' : draft.value })}>
-                      <option value="string">string</option>
-                      <option value="number">number</option>
-                      <option value="boolean">boolean</option>
-                      <option value="null">null</option>
-                    </select>
-                  </label>
-                  {draft.type === 'boolean' ? (
-                    <label className="field">
-                      <span>参数值</span>
-                      <select value={draft.value || 'true'} onChange={(event) => updateCustomBodyParamDraft(draft.id, { value: event.target.value })}>
-                        <option value="true">true</option>
-                        <option value="false">false</option>
-                      </select>
-                    </label>
-                  ) : (
-                    <label className="field">
-                      <span>参数值</span>
-                      <input
-                        value={draft.value}
-                        disabled={draft.type === 'null'}
-                        onChange={(event) => updateCustomBodyParamDraft(draft.id, { value: event.target.value })}
-                        placeholder={draft.type === 'null' ? 'null' : '请输入值'}
-                      />
-                    </label>
-                  )}
-                  <button className="ghost-button custom-body-param-modal__remove" type="button" onClick={() => removeCustomBodyParamDraft(draft.id)}>删除</button>
-                </div>
-              )) : (
-                <div className="custom-body-param-modal__empty">暂无自定义请求体参数。</div>
-              )}
-            </div>
-            {customBodyParamError ? <p className="custom-body-param-modal__error">{customBodyParamError}</p> : null}
-            <div className="form-actions">
-              <button className="ghost-button" type="button" onClick={() => addCustomBodyParam()}>新增参数</button>
-              <button className="ghost-button" type="button" onClick={() => setCustomBodyParamEditorOpen(false)}>取消</button>
-              <button className="primary-button" type="button" onClick={saveCustomBodyParams}>保存</button>
-            </div>
-          </div>
-        </div>
+        <KeyValueEditorModal
+          eyebrow="请求体参数"
+          title="修改键值对"
+          drafts={customBodyParamDrafts}
+          error={customBodyParamError}
+          presets={[
+            { key: 'temperature', type: 'number', value: '0.3' },
+            { key: 'top_p', type: 'number', value: '1' },
+            { key: 'max_tokens', type: 'number', value: '1024' },
+          ]}
+          emptyText="暂无自定义请求体参数。"
+          addLabel="新增参数"
+          keyLabel="参数名"
+          keyPlaceholder="temperature"
+          valueLabel="参数值"
+          valuePlaceholder="请输入值"
+          showTypeSelector
+          onClose={() => setCustomBodyParamEditorOpen(false)}
+          onAdd={addCustomBodyParam}
+          onUpdate={updateCustomBodyParamDraft}
+          onRemove={removeCustomBodyParamDraft}
+          onSave={saveCustomBodyParams}
+        />
+      ) : null}
+
+      {customHeaderEditorOpen ? (
+        <KeyValueEditorModal
+          eyebrow="请求头"
+          title="修改键值对"
+          drafts={customHeaderDrafts}
+          error={customHeaderError}
+          emptyText="暂无自定义请求头。"
+          addLabel="新增请求头"
+          keyLabel="请求头"
+          keyPlaceholder="X-Request-ID"
+          valueLabel="请求头值"
+          valuePlaceholder="请输入请求头值"
+          onClose={() => setCustomHeaderEditorOpen(false)}
+          onAdd={addCustomHeader}
+          onUpdate={updateCustomHeaderDraft}
+          onRemove={removeCustomHeaderDraft}
+          onSave={saveCustomHeaders}
+        />
       ) : null}
 
       {avatarCropModalOpen ? (
@@ -4450,6 +4695,7 @@ export function SettingsPage() {
                 <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('custom')}>自定义供应商</button>
                 <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('deepseek')}>DeepSeek</button>
                 <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('aihubmix')}>AIHubMix</button>
+                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('xiaomi_token_plan')}>XiaoMi Token Plan</button>
               </div>
 
               <label className="field">

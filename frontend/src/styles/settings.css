@@ -818,6 +818,10 @@
   background: #1677ff;
 }
 
+.provider-source-item__logo--xiaomi_token_plan {
+  background: #ff6900;
+}
+
 .provider-source-item__body {
   display: grid;
   gap: 0.15rem;
@@ -947,6 +951,26 @@
 
 .provider-config-field--textarea {
   align-items: start;
+}
+
+.provider-config-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.provider-config-summary span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-config-summary .ghost-button {
+  flex-shrink: 0;
 }
 
 .provider-model-section {
@@ -1333,6 +1357,10 @@
   border-radius: 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
+}
+
+.custom-body-param-modal__row--strings {
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1.2fr) auto;
 }
 
 .custom-body-param-modal__remove {

@@ -125,6 +125,20 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
         self.assertEqual(get.call_args.args[0], "https://aihubmix.com/api/v1/models")
         self.assertEqual(result["models"][0]["model_id"], "gpt-5-mini")
 
+    def test_discover_xiaomi_token_plan_models_returns_static_catalog(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.ModelFactory.build_openai_client") as build_openai_client:
+            result = service.discover_provider_models({"provider": "xiaomi_token_plan_1"})
+
+        build_openai_client.assert_not_called()
+        self.assertEqual(
+            result["models"],
+            [
+                {"model_id": "mimo-v2.5-pro", "display_name": "MiMo-V2.5-Pro"},
+                {"model_id": "mimo-v2.5", "display_name": "MiMo-V2.5"},
+            ],
+        )
+
     def test_discover_provider_models_rejects_empty_model_list(self) -> None:
         service = ModelService()
         with patch("backend.app.services.model_service.requests.get") as get:

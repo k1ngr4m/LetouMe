@@ -127,6 +127,8 @@ class ModelService:
             return self._discover_deepseek_models(api_key=str(payload.get("api_key") or "").strip())
         if provider_family == "aihubmix":
             return self._discover_aihubmix_models()
+        if provider_family == "xiaomi_token_plan":
+            return self._discover_xiaomi_token_plan_models()
 
         client = self._build_openai_client(
             provider=provider,
@@ -152,6 +154,8 @@ class ModelService:
             return "deepseek"
         if normalized in {"aihubmix", "aimixhub"} or normalized.startswith("aihubmix_") or normalized.startswith("aimixhub_"):
             return "aihubmix"
+        if normalized in {"xiaomi_token_plan", "xiaomi"} or normalized.startswith("xiaomi_token_plan_") or normalized.startswith("xiaomi_"):
+            return "xiaomi_token_plan"
         return normalized
 
     @staticmethod
@@ -216,6 +220,15 @@ class ModelService:
         if not discovered:
             raise ValueError("No available models were found")
         return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
+    @staticmethod
+    def _discover_xiaomi_token_plan_models() -> dict[str, Any]:
+        return {
+            "models": [
+                {"model_id": "mimo-v2.5-pro", "display_name": "MiMo-V2.5-Pro"},
+                {"model_id": "mimo-v2.5", "display_name": "MiMo-V2.5"},
+            ],
+        }
 
     @staticmethod
     def _request_provider_json(url: str, *, headers: dict[str, str] | None = None) -> dict[str, Any]:

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
@@ -371,6 +371,7 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     expect(screen.getByRole('menuitem', { name: /DeepSeek/ })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /AIHubMix/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
 
     expect(await screen.findByRole('heading', { name: 'deepseek_2' })).toBeInTheDocument()
@@ -442,6 +443,148 @@ describe('SettingsPage model management view switch', () => {
       }),
     )
     confirmSpy.mockRestore()
+  })
+
+  it('adds XiaoMi Token Plan provider source with default models', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createSettingsProvider.mockResolvedValue({
+      code: 'xiaomi_token_plan_1',
+      name: 'xiaomi_token_plan_1',
+      is_system_preset: false,
+      api_format: 'openai_compatible',
+      base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+      extra_options: {},
+      model_configs: [],
+    })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('heading', { name: 'DeepSeek' })
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ }))
+
+    expect(await screen.findByRole('heading', { name: 'xiaomi_token_plan_1' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://token-plan-cn.xiaomimimo.com/v1')).toBeInTheDocument()
+    expect(screen.getByText('MiMo-V2.5-Pro')).toBeInTheDocument()
+    expect(screen.getByText('MiMo-V2.5')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
+    await waitFor(() =>
+      expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({
+        code: 'xiaomi_token_plan_1',
+        name: 'xiaomi_token_plan_1',
+        base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+        api_format: 'openai_compatible',
+        model_configs: [
+          { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
+          { model_id: 'mimo-v2.5', display_name: 'MiMo-V2.5' },
+        ],
+      })),
+    )
+  })
+
+  it('edits provider custom headers through the reusable key-value dialog', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        {
+          code: 'deepseek',
+          name: 'DeepSeek',
+          is_system_preset: true,
+          api_format: 'openai_compatible',
+          base_url: 'https://api.deepseek.com',
+          extra_options: { timeout: 30, custom_headers: { 'X-Trace': 'old' } },
+        },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.updateSettingsProvider.mockResolvedValue({
+      code: 'deepseek',
+      name: 'DeepSeek',
+      is_system_preset: true,
+      api_format: 'openai_compatible',
+      base_url: 'https://api.deepseek.com',
+      extra_options: {},
+      model_configs: [],
+    })
+
+    renderPage('/settings/models')
+
+    expect(await screen.findByText('X-Trace')).toBeInTheDocument()
+    const headerField = screen.getByText('自定义请求头').closest('.provider-config-field') as HTMLElement
+    await userEvent.click(within(headerField).getByRole('button', { name: '修改' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: '修改键值对' })).toBeInTheDocument()
+    await userEvent.clear(within(dialog).getByDisplayValue('old'))
+    await userEvent.type(within(dialog).getByPlaceholderText('请输入请求头值'), 'trace-1')
+    await userEvent.click(within(dialog).getByRole('button', { name: '新增请求头' }))
+    const keyInputs = within(dialog).getAllByPlaceholderText('X-Request-ID')
+    const valueInputs = within(dialog).getAllByPlaceholderText('请输入请求头值')
+    await userEvent.type(keyInputs[1], 'X-App')
+    await userEvent.type(valueInputs[1], 'letoume')
+    await userEvent.click(within(dialog).getByRole('button', { name: '保存' }))
+    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.updateSettingsProvider).toHaveBeenCalledWith(
+        'deepseek',
+        expect.objectContaining({
+          extra_options: expect.objectContaining({
+            custom_headers: { 'X-Trace': 'trace-1', 'X-App': 'letoume' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('validates provider custom header keys inside the dialog', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com', extra_options: {} },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('heading', { name: 'DeepSeek' })
+    const headerField = screen.getByText('自定义请求头').closest('.provider-config-field') as HTMLElement
+    await userEvent.click(within(headerField).getByRole('button', { name: '修改' }))
+
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: '新增请求头' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: '保存' }))
+    expect(within(dialog).getByText('请求头名称不能为空')).toBeInTheDocument()
+
+    await userEvent.type(within(dialog).getByPlaceholderText('X-Request-ID'), 'X-App')
+    await userEvent.type(within(dialog).getByPlaceholderText('请输入请求头值'), 'one')
+    await userEvent.click(within(dialog).getByRole('button', { name: '新增请求头' }))
+    const keyInputs = within(dialog).getAllByPlaceholderText('X-Request-ID')
+    const valueInputs = within(dialog).getAllByPlaceholderText('请输入请求头值')
+    await userEvent.type(keyInputs[1], 'X-App')
+    await userEvent.type(valueInputs[1], 'two')
+    await userEvent.click(within(dialog).getByRole('button', { name: '保存' }))
+
+    expect(within(dialog).getByText('请求头名称重复：X-App')).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: '修改键值对' })).toBeInTheDocument()
   })
 
   it('renders profile route by default', async () => {
@@ -978,7 +1121,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByText('自定义请求体参数')).toBeInTheDocument()
     expect(screen.getByText('temperature')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '修改' }))
+    const paramSummary = screen.getByText('自定义请求体参数').closest('.model-config-modal__param-summary') as HTMLElement
+    await userEvent.click(within(paramSummary).getByRole('button', { name: '修改' }))
     expect(screen.getByRole('heading', { name: '修改键值对' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('temperature')).toBeInTheDocument()
   })
@@ -1000,7 +1144,8 @@ describe('SettingsPage model management view switch', () => {
 
     await screen.findByRole('button', { name: '自定义模型' })
     await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
-    await userEvent.click(screen.getByRole('button', { name: '修改' }))
+    const paramSummary = screen.getByText('自定义请求体参数').closest('.model-config-modal__param-summary') as HTMLElement
+    await userEvent.click(within(paramSummary).getByRole('button', { name: '修改' }))
     await userEvent.clear(screen.getByDisplayValue('0.3'))
     await userEvent.type(screen.getByPlaceholderText('请输入值'), '0.9')
     await userEvent.click(screen.getByRole('button', { name: '保存' }))

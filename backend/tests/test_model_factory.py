@@ -43,6 +43,53 @@ class ModelFactoryTests(unittest.TestCase):
         self.assertIsInstance(model, OpenAICompatibleModel)
         self.assertEqual(model.provider_name(), "openai_compatible")
 
+    def test_create_passes_custom_headers_to_openai_client(self) -> None:
+        definition = ModelDefinition(
+            id="custom-openai",
+            name="Custom OpenAI",
+            provider="openai_compatible",
+            model_id="custom-openai",
+            api_model="custom-model",
+            api_key_value="test-key",
+            base_url_value="https://example.com/v1",
+            extra={
+                "headers": {"X-Old": "old"},
+                "custom_headers": {"X-App": "demo", "X-Count": 3, "": "blank"},
+            },
+        )
+        sentinel_client = object()
+
+        with patch("backend.core.model_factory.OpenAI", return_value=sentinel_client) as openai_client:
+            model = ModelFactory().create(definition)
+
+        self.assertIs(model.client, sentinel_client)
+        openai_client.assert_called_once_with(
+            api_key="test-key",
+            base_url="https://example.com/v1",
+            default_headers={"X-App": "demo"},
+        )
+
+    def test_create_supports_legacy_headers_option(self) -> None:
+        definition = ModelDefinition(
+            id="legacy-openai",
+            name="Legacy OpenAI",
+            provider="openai_compatible",
+            model_id="legacy-openai",
+            api_model="legacy-model",
+            api_key_value="test-key",
+            base_url_value="https://example.com/v1",
+            extra={"headers": {"X-App": "demo", "X-Count": 3, " ": "blank"}},
+        )
+
+        with patch("backend.core.model_factory.OpenAI") as openai_client:
+            ModelFactory().create(definition)
+
+        openai_client.assert_called_once_with(
+            api_key="test-key",
+            base_url="https://example.com/v1",
+            default_headers={"X-App": "demo"},
+        )
+
     def test_build_openai_client_disables_trust_env_for_lmstudio(self) -> None:
         with (
             patch("backend.core.model_factory.httpx.Client") as httpx_client,
