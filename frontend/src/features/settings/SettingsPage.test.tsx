@@ -232,7 +232,8 @@ describe('SettingsPage model management view switch', () => {
     renderPage('/settings/models')
 
     expect(await screen.findByText('暂无提供商源')).toBeInTheDocument()
-    expect(screen.getAllByText(/DeepSeek、AIHubMix 或 XiaoMi Token Plan/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { name: '全部模型' })).toBeInTheDocument()
+    expect(screen.getByText('暂无已配置的模型。')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     expect(screen.getByRole('menuitem', { name: /DeepSeek/ })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /AIHubMix/ })).toBeInTheDocument()
@@ -313,12 +314,139 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(screen.getByRole('button', { name: '全部' }))
     expect(screen.getByText('EnabledModel')).toBeInTheDocument()
     expect(screen.getByText('InactiveModel')).toBeInTheDocument()
-    expect(screen.getByText('DeletedModel')).toBeInTheDocument()
+    expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '启用' }))
     expect(screen.getByText('EnabledModel')).toBeInTheDocument()
     expect(screen.queryByText('InactiveModel')).not.toBeInTheDocument()
     expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
+  })
+
+  it('renders the all provider aggregate page and excludes inactive models from bulk generation', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-active',
+          display_name: 'DeepSeek Active',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'aihubmix-active',
+          display_name: 'AIHubMix Active',
+          provider: 'aihubmix',
+          api_model_name: 'gpt-5-mini',
+          version: '1',
+          tags: [],
+          base_url: 'https://aihubmix.com/v1',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:01:00',
+        },
+        {
+          model_code: 'inactive-model',
+          display_name: 'Inactive Aggregate Model',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: false,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:02:00',
+        },
+        {
+          model_code: 'deleted-model',
+          display_name: 'Deleted Aggregate Model',
+          provider: 'deepseek',
+          api_model_name: 'deleted',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: false,
+          is_deleted: true,
+          updated_at: '2026-03-16 12:03:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        DEEPSEEK_PROVIDER_FIXTURE,
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.bulkGenerateSettingsModelPredictions.mockResolvedValue({
+      task_id: 'bulk-task-1',
+      status: 'queued',
+      mode: 'current',
+      model_code: 'bulk',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: 'bulk',
+        selected_count: 2,
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('heading', { name: 'DeepSeek' })
+    const providerSidebar = screen.getByLabelText('供应商')
+    await userEvent.click(within(providerSidebar).getByRole('button', { name: /ALL全部所有已配置模型/ }))
+    expect(screen.getByRole('heading', { name: '全部模型' })).toBeInTheDocument()
+    expect(screen.getByText('已配置 3 个 · 启用 2 个 · 停用 1 个')).toBeInTheDocument()
+    expect(screen.queryByText('API Key')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '获取模型列表' })).not.toBeInTheDocument()
+    expect(screen.getByText('DeepSeek Active')).toBeInTheDocument()
+    expect(screen.getByText('AIHubMix Active')).toBeInTheDocument()
+    expect(screen.getByText('Inactive Aggregate Model')).toBeInTheDocument()
+    expect(screen.queryByText('Deleted Aggregate Model')).not.toBeInTheDocument()
+    expect(screen.getAllByText('DeepSeek').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('AIHubMix').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: '生成预测数据：Inactive Aggregate Model' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByLabelText('全选模型'))
+    await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
+    expect(await screen.findByText('已自动跳过 1 个停用模型。')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+    await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
+    const bulkPayload = apiClientMock.bulkGenerateSettingsModelPredictions.mock.calls[0][0]
+    expect(bulkPayload.model_codes).toHaveLength(2)
+    expect(bulkPayload.model_codes).toEqual(expect.arrayContaining(['aihubmix-active', 'deepseek-active']))
+    expect(bulkPayload.model_codes).not.toContain('inactive-model')
   })
 
   it('asks for confirmation before deleting a model', async () => {
@@ -1069,11 +1197,8 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
     expect(screen.getByText('已选 2')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '批量编辑' })).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: '批量编辑' }))
-    await userEvent.click(screen.getByRole('checkbox', { name: /Provider/ }))
-    await userEvent.click(screen.getByRole('button', { name: '保存批量修改' }))
+    expect(screen.queryByRole('button', { name: '批量编辑' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '批量停用' }))
     await waitFor(() => expect(apiClientMock.bulkUpdateSettingsModels).toHaveBeenCalled())
 
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))

@@ -439,6 +439,7 @@ type ProviderSaveRequest = {
 }
 
 const PROVIDER_SOURCE_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix', 'xiaomi_token_plan']
+const ALL_PROVIDER_CODE = '__all__'
 const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
 const XIAOMI_TOKEN_PLAN_MODELS: SettingsProviderDiscoveredModel[] = [
   { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
@@ -1546,7 +1547,9 @@ export function SettingsPage() {
     const pendingDrafts = providerSourceDrafts.filter((provider) => !persistedCodes.has(provider.code))
     return [...persistedProviders, ...pendingDrafts]
   }, [providerSourceDrafts, providers])
-  const activeManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || managedProviders[0] || null
+  const selectedManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || null
+  const isAllProvidersSelected = selectedManagedProviderCode === ALL_PROVIDER_CODE || (!selectedManagedProvider && !managedProviders.length)
+  const activeManagedProvider = isAllProvidersSelected ? null : selectedManagedProvider || managedProviders[0] || null
   const providerSettingsDirty = useMemo(() => {
     if (!activeManagedProvider) return false
     if (activeManagedProvider.isDraft) return true
@@ -1567,6 +1570,13 @@ export function SettingsPage() {
   }, [providers])
 
   useEffect(() => {
+    if (isAllProvidersSelected) {
+      setProviderModelSearch('')
+      setSelectedModelCodes([])
+      setCustomHeaderEditorOpen(false)
+      setCustomHeaderError(null)
+      return
+    }
     if (!activeManagedProvider) return
     const extraOptions = activeManagedProvider.extra_options || {}
     const customHeaders = extraOptions.custom_headers
@@ -1581,7 +1591,7 @@ export function SettingsPage() {
     setSelectedModelCodes([])
     setCustomHeaderEditorOpen(false)
     setCustomHeaderError(null)
-  }, [activeManagedProvider?.code, activeManagedProvider?.api_key, activeManagedProvider?.base_url, activeManagedProvider?.extra_options])
+  }, [activeManagedProvider?.code, activeManagedProvider?.api_key, activeManagedProvider?.base_url, activeManagedProvider?.extra_options, isAllProvidersSelected])
 
   const createModeProviders = useMemo(() => {
     const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
@@ -1685,25 +1695,30 @@ export function SettingsPage() {
     })
     return items
   }, [models])
+  const configuredModels = useMemo(() => sortedModels.filter((model) => !model.is_deleted), [sortedModels])
+  const configuredModelCount = configuredModels.length
+  const activeConfiguredModelCount = configuredModels.filter((model) => model.is_active).length
+  const inactiveConfiguredModelCount = configuredModelCount - activeConfiguredModelCount
   const providerModels = useMemo(
-    () => sortedModels.filter((model) => model.provider === selectedManagedProviderCode),
-    [selectedManagedProviderCode, sortedModels],
+    () => (isAllProvidersSelected ? configuredModels : sortedModels.filter((model) => model.provider === selectedManagedProviderCode)),
+    [configuredModels, isAllProvidersSelected, selectedManagedProviderCode, sortedModels],
   )
   const visibleModels = useMemo(
     () =>
       providerModels.filter((model) => {
         if (modelStatusFilter === 'active') return model.is_active && !model.is_deleted
         if (modelStatusFilter === 'inactive') return !model.is_active && !model.is_deleted
-        return true
+        return !model.is_deleted
       }),
     [modelStatusFilter, providerModels],
   )
   const providerConfiguredModelIds = useMemo(() => new Set(providerModels.map((model) => model.api_model_name)), [providerModels])
   const currentDiscoveredModels = useMemo(() => {
+    if (isAllProvidersSelected) return []
     const discoveredModels = providerDiscoveredModels[selectedManagedProviderCode]
     if (discoveredModels?.length) return discoveredModels
     return activeManagedProvider ? getProviderTemplateDiscoveredModels(activeManagedProvider.template) : []
-  }, [activeManagedProvider, providerDiscoveredModels, selectedManagedProviderCode])
+  }, [activeManagedProvider, isAllProvidersSelected, providerDiscoveredModels, selectedManagedProviderCode])
   const filteredConfiguredModels = useMemo(() => {
     const keyword = providerModelSearch.trim().toLowerCase()
     if (!keyword) return visibleModels
@@ -1722,6 +1737,13 @@ export function SettingsPage() {
     })
   }, [currentDiscoveredModels, providerConfiguredModelIds, providerModelSearch])
   const selectedVisibleCount = visibleModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
+  const selectedActiveModelCodes = useMemo(() => {
+    const modelMap = new Map(models.map((model) => [model.model_code, model]))
+    return selectedModelCodes.filter((code) => {
+      const model = modelMap.get(code)
+      return Boolean(model?.is_active && !model.is_deleted)
+    })
+  }, [models, selectedModelCodes])
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
   const modelNameMap = useMemo(
     () => Object.fromEntries(models.map((model) => [model.model_code, model.display_name])),
@@ -2476,16 +2498,26 @@ export function SettingsPage() {
   }
 
   function openBulkGenerateModels() {
-    const sourceModelCodes = selectedModelCodes
+    const sourceModelCodes = selectedActiveModelCodes
+    const skippedInactiveCount = selectedModelCodes.length - sourceModelCodes.length
+    if (!sourceModelCodes.length) {
+      setMessage('已选模型中没有启用中的模型。')
+      setMessageType('error')
+      return
+    }
     const nextLottery = DEFAULT_SETTINGS_LOTTERY
     const nextModelCodes = sourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationTask(null)
     setGenerationSourceModelCodes(sourceModelCodes)
-    setGenerationFilterNotice(sourceModelCodes.length > nextModelCodes.length ? `已移除 ${sourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null)
+    const notices = [
+      skippedInactiveCount > 0 ? `已自动跳过 ${skippedInactiveCount} 个停用模型。` : '',
+      sourceModelCodes.length > nextModelCodes.length ? `已移除 ${sourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : '',
+    ].filter(Boolean)
+    setGenerationFilterNotice(notices.length ? notices.join(' ') : null)
     setGenerationForm({
       lotteryCode: nextLottery,
       modelCodes: nextModelCodes,
-      displayName: `已选 ${selectedModelCodes.length} 个模型`,
+      displayName: `已选 ${sourceModelCodes.length} 个模型`,
       mode: 'current',
       predictionPlayMode: 'direct',
       historyRangeMode: 'custom',
@@ -2508,11 +2540,6 @@ export function SettingsPage() {
     setSelectedModelCodes((previous) =>
       previous.includes(modelCode) ? previous.filter((item) => item !== modelCode) : [...previous, modelCode],
     )
-  }
-
-  function openBulkEditModels() {
-    setBulkEditForm(EMPTY_BULK_EDIT_FORM)
-    setBulkEditModalOpen(true)
   }
 
   function stopMenuEvent(event: MouseEvent<HTMLElement>) {
@@ -2795,6 +2822,15 @@ export function SettingsPage() {
   const generationDisplayName = generationSourceModelCodes.length > 1
     ? `已选 ${generationForm.modelCodes.length} 个模型`
     : generationForm.displayName || generationForm.modelCodes.join(', ')
+  const configuredModelEmptyText = isAllProvidersSelected
+    ? '暂无已配置的模型。'
+    : '暂无已配置的模型，点击上方的“获取模型列表”添加'
+  const providerHeroTitle = isAllProvidersSelected
+    ? '全部模型'
+    : activeManagedProvider ? getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name) : ''
+  const providerHeroSubtitle = isAllProvidersSelected
+    ? `已配置 ${configuredModelCount} 个 · 启用 ${activeConfiguredModelCount} 个 · 停用 ${inactiveConfiguredModelCount} 个`
+    : activeManagedProvider ? providerDraft.base_url || activeManagedProvider.base_url || '未配置 API Base URL' : ''
 
   function toggleScheduleWeekday(weekday: number) {
     setScheduleForm((previous) => ({
@@ -3259,6 +3295,25 @@ export function SettingsPage() {
                     </div>
                   </div>
                   <div className="provider-source-list">
+                    <div
+                      className={clsx('provider-source-item provider-source-item--all', isAllProvidersSelected && 'is-active')}
+                    >
+                      <button
+                        type="button"
+                        className="provider-source-item__select"
+                        onClick={() => {
+                          setSelectedManagedProviderCode(ALL_PROVIDER_CODE)
+                          setModelStatusFilter('all')
+                        }}
+                      >
+                        <span className="provider-source-item__logo provider-source-item__logo--all">ALL</span>
+                        <span className="provider-source-item__body">
+                          <strong>全部</strong>
+                          <small>所有已配置模型</small>
+                        </span>
+                      </button>
+                      <span className="provider-source-item__count">{configuredModelCount}</span>
+                    </div>
                     {managedProviders.length ? managedProviders.map((provider) => {
                       const providerModelCount = models.filter((model) => model.provider === provider.code && !model.is_deleted).length
                       const canDeleteProvider = true
@@ -3270,7 +3325,10 @@ export function SettingsPage() {
                           <button
                             type="button"
                             className="provider-source-item__select"
-                            onClick={() => setSelectedManagedProviderCode(provider.code)}
+                            onClick={() => {
+                              setSelectedManagedProviderCode(provider.code)
+                              setModelStatusFilter('active')
+                            }}
                           >
                             <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${provider.template}`)}>
                               {getProviderLogoLabel(provider.code)}
@@ -3305,12 +3363,12 @@ export function SettingsPage() {
                 </aside>
 
                 <section className="provider-model-center__main">
-                  {activeManagedProvider ? (
+                  {isAllProvidersSelected || activeManagedProvider ? (
                     <>
                       <header className="provider-model-center__hero">
                         <div>
-                          <h2>{getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name)}</h2>
-                          <p>{providerDraft.base_url || activeManagedProvider.base_url || '未配置 API Base URL'}</p>
+                          <h2>{providerHeroTitle}</h2>
+                          <p>{providerHeroSubtitle}</p>
                         </div>
                         <div className="provider-model-center__hero-actions">
                           {generationTask && !generationModalOpen ? (
@@ -3319,13 +3377,15 @@ export function SettingsPage() {
                               <span className="settings-model-toolbar__resume-task-status">{getTaskStatusLabel(generationTask.status)}</span>
                             </button>
                           ) : null}
-                          <button className="primary-button" type="button" onClick={saveActiveProvider} disabled={saveProviderMutation.isPending}>
-                            保存配置
-                          </button>
+                          {!isAllProvidersSelected ? (
+                            <button className="primary-button" type="button" onClick={saveActiveProvider} disabled={saveProviderMutation.isPending}>
+                              保存配置
+                            </button>
+                          ) : null}
                         </div>
                       </header>
 
-                      <section className="provider-config-panel" aria-label="供应商设置">
+                      {!isAllProvidersSelected && activeManagedProvider ? <section className="provider-config-panel" aria-label="供应商设置">
                         <h3>设置</h3>
                         <div className="provider-config-grid">
                           <label className="provider-config-field">
@@ -3350,9 +3410,9 @@ export function SettingsPage() {
                             <input value={providerDraft.base_url} onChange={(event) => setProviderDraft((previous) => ({ ...previous, base_url: event.target.value }))} />
                           </label>
                         </div>
-                      </section>
+                      </section> : null}
 
-                      <section className="provider-config-panel provider-config-panel--advanced" aria-label="高级配置">
+                      {!isAllProvidersSelected && activeManagedProvider ? <section className="provider-config-panel provider-config-panel--advanced" aria-label="高级配置">
                         <h3>高级配置...</h3>
                         <div className="provider-config-grid">
                           <label className="provider-config-field">
@@ -3380,15 +3440,15 @@ export function SettingsPage() {
                             </div>
                           </div>
                         </div>
-                      </section>
+                      </section> : null}
 
                       <section className="provider-model-section">
                         <div className="provider-model-section__header">
                           <div>
                             <h3>模型</h3>
-                            <p>可用模型 {availableProviderModels.length}</p>
+                            <p>{isAllProvidersSelected ? `已配置 ${filteredConfiguredModels.length}` : `可用模型 ${availableProviderModels.length}`}</p>
                           </div>
-                        <div className="provider-model-section__tools">
+                          <div className="provider-model-section__tools">
                             <div className="filter-chip-group" role="group" aria-label="模型状态筛选">
                               {MODEL_STATUS_FILTER_META.map((option) => (
                                 <button
@@ -3410,17 +3470,21 @@ export function SettingsPage() {
                                 aria-label="搜索模型或 ID"
                               />
                             </label>
-                            <button
-                              className={providerSettingsDirty ? 'primary-button' : 'ghost-button'}
-                              type="button"
-                              onClick={handleFetchProviderModels}
-                              disabled={saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending}
-                            >
-                              {saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending
-                                ? '处理中...'
-                                : providerSettingsDirty ? '保存并获取模型' : '获取模型列表'}
-                            </button>
-                            <button className="ghost-button" type="button" onClick={openCreateModel}>自定义模型</button>
+                            {!isAllProvidersSelected ? (
+                              <>
+                                <button
+                                  className={providerSettingsDirty ? 'primary-button' : 'ghost-button'}
+                                  type="button"
+                                  onClick={handleFetchProviderModels}
+                                  disabled={saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending}
+                                >
+                                  {saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending
+                                    ? '处理中...'
+                                    : providerSettingsDirty ? '保存并获取模型' : '获取模型列表'}
+                                </button>
+                                <button className="ghost-button" type="button" onClick={openCreateModel}>自定义模型</button>
+                              </>
+                            ) : null}
                           </div>
                         </div>
 
@@ -3430,7 +3494,6 @@ export function SettingsPage() {
                             <button className="ghost-button" type="button" onClick={openBulkGenerateModels}>批量生成预测</button>
                             <button className="ghost-button" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })}>批量启用</button>
                             <button className="ghost-button" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })}>批量停用</button>
-                            <button className="ghost-button" type="button" onClick={openBulkEditModels}>批量编辑</button>
                           </div>
                         ) : null}
 
@@ -3460,6 +3523,9 @@ export function SettingsPage() {
                                   <div className="provider-model-row__main">
                                     <strong>{model.display_name}</strong>
                                     <span>{model.api_model_name}</span>
+                                    {isAllProvidersSelected ? (
+                                      <small>{getScheduleModelProviderLabel(model, providers)}</small>
+                                    ) : null}
                                     <small>{(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map(getLotteryLabel).join(' / ')}</small>
                                   </div>
                                   <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
@@ -3474,7 +3540,9 @@ export function SettingsPage() {
                                           icon={<ToggleIcon active={model.is_active} />}
                                           onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
                                         />
-                                        <IconButton label={`生成预测数据：${model.display_name}`} icon={<SortIcon />} onClick={() => openGenerateModel(model.model_code, model.display_name)} />
+                                        {model.is_active ? (
+                                          <IconButton label={`生成预测数据：${model.display_name}`} icon={<SortIcon />} onClick={() => openGenerateModel(model.model_code, model.display_name)} />
+                                        ) : null}
                                         <IconButton label={`删除模型 ${model.display_name}`} icon={<TrashIcon />} danger onClick={() => confirmDeleteModel(model.model_code, model.display_name)} />
                                       </>
                                     ) : (
@@ -3485,11 +3553,11 @@ export function SettingsPage() {
                               ))}
                             </div>
                           ) : (
-                            <div className="provider-model-empty">暂无已配置的模型，点击上方的“获取模型列表”添加</div>
+                            <div className="provider-model-empty">{configuredModelEmptyText}</div>
                           )}
                         </div>
 
-                        <div className="provider-model-list-block">
+                        {!isAllProvidersSelected ? <div className="provider-model-list-block">
                           <div className="provider-model-list-block__title">
                             <strong>可用模型</strong>
                             <span>{availableProviderModels.length}</span>
@@ -3516,7 +3584,7 @@ export function SettingsPage() {
                           ) : (
                             <div className="provider-model-empty">暂无可用模型。获取模型列表后，未配置的模型会显示在这里。</div>
                           )}
-                        </div>
+                        </div> : null}
                       </section>
                     </>
                   ) : (

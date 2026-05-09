@@ -1075,6 +1075,11 @@
   background: #ff6900;
 }
 
+.provider-source-item__logo--all {
+  font-size: 0.66rem;
+  background: linear-gradient(135deg, #263447, #3d8df5);
+}
+
 .provider-source-item__body {
   display: grid;
   gap: 0.15rem;
@@ -1241,6 +1246,16 @@
   justify-content: flex-end;
 }
 
+.provider-model-section__tools .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.4rem;
+  min-height: 2.7rem;
+  padding: 0 1rem;
+  line-height: 1;
+}
+
 .provider-model-search {
   display: inline-grid;
   grid-template-columns: auto minmax(10rem, 16rem);
@@ -1266,6 +1281,24 @@
   border: 1px solid var(--border-1);
   border-radius: 0.9rem;
   background: var(--surface-0);
+}
+
+.provider-model-bulk-bar .status-pill,
+.provider-model-bulk-bar .ghost-button {
+  min-height: 3.1rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.provider-model-bulk-bar .status-pill {
+  min-width: 4.9rem;
+  font-size: 0.9rem;
+}
+
+.provider-model-bulk-bar .ghost-button {
+  min-width: 10.4rem;
 }
 
 .provider-model-list-block {
