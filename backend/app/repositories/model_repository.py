@@ -36,15 +36,15 @@ PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
     },
     "aimixhub": {
-        "provider_name": "AiMixHub",
+        "provider_name": "AIHubMix",
         "website_url": "https://aihubmix.com",
-        "api_format": "anthropic",
+        "api_format": "openai_compatible",
         "base_url": "https://aihubmix.com/v1",
         "remark": "",
         "is_system_preset": True,
         "model_configs": [
-            {"model_id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6"},
-            {"model_id": "claude-opus-4-6", "display_name": "Claude Opus 4.6"},
+            {"model_id": "gpt-5", "display_name": "GPT-5"},
+            {"model_id": "gpt-5-mini", "display_name": "GPT-5 Mini"},
         ],
     },
     "lmstudio": {

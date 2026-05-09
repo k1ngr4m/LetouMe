@@ -56,6 +56,15 @@ class ModelConnectivityTestResponse(BaseModel):
 class ProviderDiscoveredModelResponse(BaseModel):
     model_id: str
     display_name: str
+    description: str = ""
+    owner: str = ""
+    object: str = "model"
+    types: str = ""
+    features: str = ""
+    input_modalities: str = ""
+    max_output: int | None = None
+    context_length: int | None = None
+    pricing: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderModelDiscoveryResponse(BaseModel):

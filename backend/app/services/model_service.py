@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import requests
 from time import perf_counter
 from typing import Any
 
@@ -119,6 +120,10 @@ class ModelService:
         provider = str(payload.get("provider") or "").strip().lower()
         if not provider:
             raise ValueError("Provider cannot be empty")
+        if provider == "deepseek":
+            return self._discover_deepseek_models(api_key=str(payload.get("api_key") or "").strip())
+        if provider == "aimixhub":
+            return self._discover_aihubmix_models()
 
         client = self._build_openai_client(
             provider=provider,
@@ -136,6 +141,92 @@ class ModelService:
         if not discovered:
             raise ValueError("No available models were found")
         return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
+    @staticmethod
+    def _discover_deepseek_models(*, api_key: str) -> dict[str, Any]:
+        headers = {"Accept": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        payload = ModelService._request_provider_json("https://api.deepseek.com/models", headers=headers)
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list):
+            raise ValueError("Provider returned an invalid model list")
+        discovered: dict[str, dict[str, Any]] = {}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("id") or "").strip()
+            if not model_id:
+                continue
+            discovered[model_id] = {
+                "model_id": model_id,
+                "display_name": model_id,
+                "description": "",
+                "owner": str(item.get("owned_by") or "").strip(),
+                "object": str(item.get("object") or "model").strip() or "model",
+                "types": "",
+                "features": "",
+                "input_modalities": "",
+                "max_output": None,
+                "context_length": None,
+                "pricing": {},
+            }
+        if not discovered:
+            raise ValueError("No available models were found")
+        return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
+    @staticmethod
+    def _discover_aihubmix_models() -> dict[str, Any]:
+        payload = ModelService._request_provider_json("https://aihubmix.com/api/v1/models", headers={"Accept": "application/json"})
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list):
+            raise ValueError("Provider returned an invalid model list")
+        discovered: dict[str, dict[str, Any]] = {}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("model_id") or "").strip()
+            if not model_id:
+                continue
+            discovered[model_id] = {
+                "model_id": model_id,
+                "display_name": model_id,
+                "description": str(item.get("desc") or "").strip(),
+                "owner": "AIHubMix",
+                "object": "model",
+                "types": str(item.get("types") or "").strip(),
+                "features": str(item.get("features") or "").strip(),
+                "input_modalities": str(item.get("input_modalities") or "").strip(),
+                "max_output": ModelService._optional_int(item.get("max_output")),
+                "context_length": ModelService._optional_int(item.get("context_length")),
+                "pricing": item.get("pricing") if isinstance(item.get("pricing"), dict) else {},
+            }
+        if not discovered:
+            raise ValueError("No available models were found")
+        return {"models": sorted(discovered.values(), key=lambda item: item["display_name"].lower())}
+
+    @staticmethod
+    def _request_provider_json(url: str, *, headers: dict[str, str] | None = None) -> dict[str, Any]:
+        try:
+            response = requests.get(url, headers=headers or {}, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+        except requests.RequestException as exc:
+            raise ValueError(f"Provider model list request failed: {exc}") from exc
+        except ValueError as exc:
+            raise ValueError("Provider returned invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Provider returned an invalid response")
+        return payload
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        if value is None or str(value).strip() == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def bulk_action(self, model_codes: list[str], action: str, updates: dict[str, Any] | None = None) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]

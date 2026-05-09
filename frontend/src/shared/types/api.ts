@@ -759,6 +759,15 @@ export type SettingsProviderModelDiscoveryPayload = {
 export type SettingsProviderDiscoveredModel = {
   model_id: string
   display_name: string
+  description?: string
+  owner?: string
+  object?: string
+  types?: string
+  features?: string
+  input_modalities?: string
+  max_output?: number | null
+  context_length?: number | null
+  pricing?: Record<string, number>
 }
 
 export type SettingsProviderModelDiscoveryResponse = {

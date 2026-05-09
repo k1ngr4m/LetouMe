@@ -47,13 +47,11 @@ import {
 } from './lib/scheduleCalendar'
 
 type SettingsTab = 'profile' | 'account' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
-type ModelManagementView = 'list' | 'card'
 type ModelPredictionMode = 'current' | 'history'
 type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
 type GenerationHistoryRangeMode = 'custom' | 'recent'
 type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type GenerationPromptHistoryPeriodCount = '30' | '50' | '100'
-type ModelSortOption = 'updated_desc' | 'updated_asc' | 'name_asc' | 'name_desc'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type ScheduleListView = 'list' | 'calendar'
@@ -187,12 +185,6 @@ const WEEKDAY_OPTIONS = [
 ]
 const CALENDAR_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
-const MODEL_SORT_META: Record<ModelSortOption, { label: string; hint: string }> = {
-  updated_desc: { label: '最近更新', hint: '按更新时间从新到旧排序' },
-  updated_asc: { label: '最早更新', hint: '按更新时间从旧到新排序' },
-  name_asc: { label: '名称 A-Z', hint: '按名称正序排序' },
-  name_desc: { label: '名称 Z-A', hint: '按名称倒序排序' },
-}
 const MODEL_STATUS_FILTER_META: Array<{ value: ModelStatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'active', label: '启用' },
@@ -215,6 +207,70 @@ const LOTTERY_FETCH_LIMIT_DEFAULT = 30
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
 type MotionPreferenceOption = 'system' | 'minimal' | 'normal' | 'enhanced'
+type ManagedProviderCode = 'deepseek' | 'aimixhub'
+type ProviderSaveRequest = {
+  payload: SettingsProviderPayload
+  mode?: 'create' | 'edit'
+  providerCode?: string
+}
+
+const MANAGED_PROVIDER_CODES: ManagedProviderCode[] = ['deepseek', 'aimixhub']
+const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
+const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderCode, SettingsProvider> = {
+  deepseek: {
+    code: 'deepseek',
+    name: 'DeepSeek',
+    api_format: 'openai_compatible',
+    website_url: 'https://platform.deepseek.com',
+    base_url: 'https://api.deepseek.com',
+    api_key: '',
+    extra_options: {},
+    is_system_preset: true,
+    model_configs: [],
+  },
+  aimixhub: {
+    code: 'aimixhub',
+    name: 'AIHubMix',
+    api_format: 'openai_compatible',
+    website_url: 'https://aihubmix.com',
+    base_url: 'https://aihubmix.com/v1',
+    api_key: '',
+    extra_options: {},
+    is_system_preset: true,
+    model_configs: [],
+  },
+}
+
+function isManagedProviderCode(value: string): value is ManagedProviderCode {
+  return MANAGED_PROVIDER_CODES.includes(value as ManagedProviderCode)
+}
+
+function getProviderDisplayName(providerCode: string, fallback?: string) {
+  if (providerCode === 'deepseek') return 'DeepSeek'
+  if (providerCode === 'aimixhub') return 'AIHubMix'
+  return fallback || providerCode
+}
+
+function getProviderLogoLabel(providerCode: string) {
+  if (providerCode === 'deepseek') return 'DS'
+  if (providerCode === 'aimixhub') return 'AI'
+  return (providerCode || 'P').slice(0, 2).toUpperCase()
+}
+
+function formatModelNumber(value?: number | null) {
+  if (!value) return ''
+  return new Intl.NumberFormat('zh-CN').format(value)
+}
+
+function formatProviderModelDescription(model: SettingsProviderDiscoveredModel) {
+  const parts = [
+    model.types,
+    model.input_modalities ? `输入 ${model.input_modalities}` : '',
+    model.context_length ? `上下文 ${formatModelNumber(model.context_length)}` : '',
+    model.max_output ? `输出 ${formatModelNumber(model.max_output)}` : '',
+  ].filter(Boolean)
+  return parts.join(' · ')
+}
 
 const SCHEDULE_COLUMN_DEFAULT_WIDTHS: Record<ScheduleColumnKey, number> = {
   name: 260,
@@ -387,17 +443,6 @@ function ListIcon() {
     <SvgIcon>
       <path d="M7 5.5h8.5M7 10h8.5M7 14.5h8.5" />
       <path d="M3.8 5.5h.4M3.8 10h.4M3.8 14.5h.4" />
-    </SvgIcon>
-  )
-}
-
-function GridIcon() {
-  return (
-    <SvgIcon>
-      <rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" />
-      <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
-      <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
-      <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
     </SvgIcon>
   )
 }
@@ -769,8 +814,6 @@ export function SettingsPage() {
   const { showToast } = useToast()
   const { motionPreference, setMotionPreference } = useMotion()
   const activeTab = getSettingsTabFromPath(location.pathname)
-  const [modelManagementView, setModelManagementView] = useState<ModelManagementView>('list')
-  const [modelSortOption, setModelSortOption] = useState<ModelSortOption>('updated_desc')
   const [modelStatusFilter, setModelStatusFilter] = useState<ModelStatusFilter>('all')
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
@@ -781,6 +824,16 @@ export function SettingsPage() {
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
   const [lmStudioDiscoveredModels, setLmStudioDiscoveredModels] = useState<SettingsProviderDiscoveredModel[]>([])
+  const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState<ManagedProviderCode>('deepseek')
+  const [providerDraft, setProviderDraft] = useState({
+    api_key: '',
+    base_url: '',
+    timeout: String(PROVIDER_TIMEOUT_DEFAULT_SECONDS),
+    proxy_url: '',
+    custom_headers: '',
+  })
+  const [providerModelSearch, setProviderModelSearch] = useState('')
+  const [providerDiscoveredModels, setProviderDiscoveredModels] = useState<Record<string, SettingsProviderDiscoveredModel[]>>({})
   const [selectedModelCode, setSelectedModelCode] = useState<string | null>(null)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [modelMode, setModelMode] = useState<'create' | 'edit'>('create')
@@ -831,9 +884,6 @@ export function SettingsPage() {
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<number, string>>({})
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
   const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null)
-  const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false)
-  const [sortMenuOpen, setSortMenuOpen] = useState(false)
-  const [modelActionMenu, setModelActionMenu] = useState<string | null>(null)
   const [scheduleActionMenu, setScheduleActionMenu] = useState<string | null>(null)
   const [avatarCropModalOpen, setAvatarCropModalOpen] = useState(false)
   const [profileAvatarSourceFile, setProfileAvatarSourceFile] = useState<File | null>(null)
@@ -1002,16 +1052,13 @@ export function SettingsPage() {
   }, [lotteryFetchLimitInputs])
 
   useEffect(() => {
-    if (!toolbarMenuOpen && !sortMenuOpen && !modelActionMenu && !scheduleActionMenu) return undefined
+    if (!scheduleActionMenu) return undefined
     const closeMenus = () => {
-      setToolbarMenuOpen(false)
-      setSortMenuOpen(false)
-      setModelActionMenu(null)
       setScheduleActionMenu(null)
     }
     window.addEventListener('click', closeMenus)
     return () => window.removeEventListener('click', closeMenus)
-  }, [modelActionMenu, scheduleActionMenu, sortMenuOpen, toolbarMenuOpen])
+  }, [scheduleActionMenu])
 
   useEffect(() => {
     if (!generationTask || !['queued', 'running'].includes(generationTask.status)) return undefined
@@ -1156,6 +1203,31 @@ export function SettingsPage() {
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
+  const managedProviders = useMemo(() => (
+    MANAGED_PROVIDER_CODES
+      .map((code) => {
+        const provider = providers.find((item) => item.code === code) || DEFAULT_MANAGED_PROVIDERS[code]
+        return { ...provider, name: getProviderDisplayName(code, provider.name) }
+      })
+  ), [providers])
+  const activeManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || managedProviders[0] || null
+  useEffect(() => {
+    if (!activeManagedProvider) return
+    const extraOptions = activeManagedProvider.extra_options || {}
+    const customHeaders = extraOptions.custom_headers
+    setProviderDraft({
+      api_key: activeManagedProvider.api_key || '',
+      base_url: activeManagedProvider.base_url || '',
+      timeout: String(extraOptions.timeout || PROVIDER_TIMEOUT_DEFAULT_SECONDS),
+      proxy_url: String(extraOptions.proxy_url || ''),
+      custom_headers: typeof customHeaders === 'string'
+        ? customHeaders
+        : JSON.stringify(customHeaders || {}, null, 2),
+    })
+    setProviderModelSearch('')
+    setSelectedModelCodes([])
+  }, [activeManagedProvider?.code, activeManagedProvider?.api_key, activeManagedProvider?.base_url, activeManagedProvider?.extra_options])
+
   const createModeProviders = useMemo(() => {
     const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
     const lmStudioProvider = providers.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
@@ -1165,7 +1237,7 @@ export function SettingsPage() {
     if (customProvider) result.push({ ...customProvider, display_name: '自定义供应商' })
     if (lmStudioProvider) result.push({ ...lmStudioProvider, display_name: 'LM Studio' })
     if (deepseekProvider) result.push({ ...deepseekProvider, display_name: 'DeepSeek' })
-    if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AiMixHub' })
+    if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AIHubMix' })
     return result
   }, [providers])
   const modelFormProviders = createModeProviders.length
@@ -1255,32 +1327,44 @@ export function SettingsPage() {
   const sortedModels = useMemo(() => {
     const items = [...models]
     items.sort((left, right) => {
-      if (modelSortOption === 'updated_desc') {
-        return (right.updated_at || 0) - (left.updated_at || 0)
-      }
-      if (modelSortOption === 'updated_asc') {
-        return (left.updated_at || 0) - (right.updated_at || 0)
-      }
-      if (modelSortOption === 'name_asc') {
-        return left.display_name.localeCompare(right.display_name)
-      }
-      return right.display_name.localeCompare(left.display_name)
+      return (right.updated_at || 0) - (left.updated_at || 0)
     })
     return items
-  }, [modelSortOption, models])
+  }, [models])
+  const providerModels = useMemo(
+    () => sortedModels.filter((model) => model.provider === selectedManagedProviderCode),
+    [selectedManagedProviderCode, sortedModels],
+  )
   const visibleModels = useMemo(
     () =>
-      sortedModels.filter((model) => {
+      providerModels.filter((model) => {
         if (modelStatusFilter === 'active') return model.is_active && !model.is_deleted
         if (modelStatusFilter === 'inactive') return !model.is_active && !model.is_deleted
         return true
       }),
-    [modelStatusFilter, sortedModels],
+    [modelStatusFilter, providerModels],
   )
+  const providerConfiguredModelIds = useMemo(() => new Set(providerModels.map((model) => model.api_model_name)), [providerModels])
+  const currentDiscoveredModels = providerDiscoveredModels[selectedManagedProviderCode] || []
+  const filteredConfiguredModels = useMemo(() => {
+    const keyword = providerModelSearch.trim().toLowerCase()
+    if (!keyword) return visibleModels
+    return visibleModels.filter((model) =>
+      [model.display_name, model.model_code, model.api_model_name]
+        .some((value) => String(value || '').toLowerCase().includes(keyword)),
+    )
+  }, [providerModelSearch, visibleModels])
+  const availableProviderModels = useMemo(() => {
+    const keyword = providerModelSearch.trim().toLowerCase()
+    return currentDiscoveredModels.filter((model) => {
+      if (providerConfiguredModelIds.has(model.model_id)) return false
+      if (!keyword) return true
+      return [model.display_name, model.model_id, model.description, model.features, model.types]
+        .some((value) => String(value || '').toLowerCase().includes(keyword))
+    })
+  }, [currentDiscoveredModels, providerConfiguredModelIds, providerModelSearch])
   const selectedVisibleCount = visibleModels.filter((model) => selectedModelCodes.includes(model.model_code)).length
-  const allVisibleModelsSelected = visibleModels.length > 0 && selectedVisibleCount === visibleModels.length
   const selectedRoleProtectionHint = getRoleProtectionHint(selectedRole)
-  const currentSortMeta = MODEL_SORT_META[modelSortOption]
   const modelNameMap = useMemo(
     () => Object.fromEntries(models.map((model) => [model.model_code, model.display_name])),
     [models],
@@ -1411,14 +1495,36 @@ export function SettingsPage() {
       setMessageType('error')
     },
   })
+  const discoverManagedProviderModelsMutation = useMutation({
+    mutationFn: () => apiClient.discoverSettingsProviderModels({
+      provider: selectedManagedProviderCode,
+      base_url: providerDraft.base_url.trim(),
+      api_key: providerDraft.api_key.trim(),
+    }),
+    onSuccess: (result) => {
+      setProviderDiscoveredModels((previous) => ({
+        ...previous,
+        [selectedManagedProviderCode]: result.models || [],
+      }))
+      setMessage(`已获取 ${getProviderDisplayName(selectedManagedProviderCode)} 的 ${result.models.length} 个模型`)
+      setMessageType('success')
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '获取模型列表失败')
+      setMessageType('error')
+    },
+  })
 
   const saveProviderMutation = useMutation({
-    mutationFn: (payload: SettingsProviderPayload) =>
-      providerMode === 'create'
+    mutationFn: ({ payload, mode, providerCode }: ProviderSaveRequest) => {
+      const saveMode = mode || providerMode
+      return saveMode === 'create'
         ? apiClient.createSettingsProvider(payload)
-        : apiClient.updateSettingsProvider(selectedProviderCode || '', payload),
-    onSuccess: () => {
-      setMessage(providerMode === 'create' ? '供应商已创建。' : '供应商已更新。')
+        : apiClient.updateSettingsProvider(providerCode || selectedProviderCode || payload.code || '', payload)
+    },
+    onSuccess: (_, variables) => {
+      const saveMode = variables.mode || providerMode
+      setMessage(saveMode === 'create' ? '供应商已创建。' : '供应商已更新。')
       setMessageType('success')
       setProviderModalOpen(false)
       void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
@@ -1747,13 +1853,13 @@ export function SettingsPage() {
     setProviderForm({
       ...EMPTY_PROVIDER_FORM,
       code: 'aimixhub',
-      name: 'AiMixHub',
+      name: 'AIHubMix',
       website_url: 'https://aihubmix.com',
-      api_format: 'anthropic',
+      api_format: 'openai_compatible',
       base_url: 'https://aihubmix.com/v1',
       model_configs: [
-        { model_id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6' },
-        { model_id: 'claude-opus-4-6', display_name: 'Claude Opus 4.6' },
+        { model_id: 'gpt-5', display_name: 'GPT-5' },
+        { model_id: 'gpt-5-mini', display_name: 'GPT-5 Mini' },
       ],
     })
   }
@@ -1814,7 +1920,118 @@ export function SettingsPage() {
         }))
         .filter((model) => model.model_id),
     }
-    saveProviderMutation.mutate(payload)
+    saveProviderMutation.mutate({ payload })
+  }
+
+  function saveActiveProvider() {
+    if (!activeManagedProvider) return
+    let customHeaders: unknown = providerDraft.custom_headers.trim()
+    if (providerDraft.custom_headers.trim()) {
+      try {
+        customHeaders = JSON.parse(providerDraft.custom_headers)
+      } catch {
+        setMessage('自定义请求头必须是合法 JSON')
+        setMessageType('error')
+        return
+      }
+    } else {
+      customHeaders = {}
+    }
+    const timeout = Number(providerDraft.timeout.trim())
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      setMessage('超时时间必须是大于 0 的数字')
+      setMessageType('error')
+      return
+    }
+    saveProviderMutation.mutate({
+      mode: 'edit',
+      providerCode: activeManagedProvider.code,
+      payload: {
+        code: activeManagedProvider.code,
+        name: getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name),
+        api_format: activeManagedProvider.api_format || 'openai_compatible',
+        remark: activeManagedProvider.remark || '',
+        website_url: activeManagedProvider.website_url || '',
+        api_key: providerDraft.api_key.trim(),
+        base_url: providerDraft.base_url.trim(),
+        extra_options: {
+          ...(activeManagedProvider.extra_options || {}),
+          timeout,
+          proxy_url: providerDraft.proxy_url.trim(),
+          custom_headers: customHeaders,
+        },
+        model_configs: activeManagedProvider.model_configs || [],
+      },
+    })
+  }
+
+  function saveAndFetchActiveProviderModels() {
+    if (!activeManagedProvider) return
+    let customHeaders: unknown = {}
+    if (providerDraft.custom_headers.trim()) {
+      try {
+        customHeaders = JSON.parse(providerDraft.custom_headers)
+      } catch {
+        setMessage('自定义请求头必须是合法 JSON')
+        setMessageType('error')
+        return
+      }
+    }
+    const timeout = Number(providerDraft.timeout.trim())
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      setMessage('超时时间必须是大于 0 的数字')
+      setMessageType('error')
+      return
+    }
+    saveProviderMutation.mutate({
+      mode: 'edit',
+      providerCode: activeManagedProvider.code,
+      payload: {
+        code: activeManagedProvider.code,
+        name: getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name),
+        api_format: activeManagedProvider.api_format || 'openai_compatible',
+        remark: activeManagedProvider.remark || '',
+        website_url: activeManagedProvider.website_url || '',
+        api_key: providerDraft.api_key.trim(),
+        base_url: providerDraft.base_url.trim(),
+        extra_options: {
+          ...(activeManagedProvider.extra_options || {}),
+          timeout,
+          proxy_url: providerDraft.proxy_url.trim(),
+          custom_headers: customHeaders,
+        },
+        model_configs: activeManagedProvider.model_configs || [],
+      },
+    }, {
+      onSuccess: () => discoverManagedProviderModelsMutation.mutate(),
+    })
+  }
+
+  function addDiscoveredModel(model: SettingsProviderDiscoveredModel) {
+    const provider = activeManagedProvider
+    if (!provider) return
+    const modelId = model.model_id.trim()
+    if (!modelId) return
+    saveModelMutation.mutate({
+      ...EMPTY_MODEL_FORM,
+      model_code: `${provider.code}-${modelId}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-_.]+/g, '-')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, ''),
+      display_name: model.display_name || modelId,
+      provider: provider.code,
+      provider_model_id: null,
+      provider_model_name: modelId,
+      api_format: provider.api_format || 'openai_compatible',
+      api_model_name: modelId,
+      base_url: provider.base_url || providerDraft.base_url,
+      api_key: provider.api_key || providerDraft.api_key,
+      app_code: '',
+      temperature: 0.3,
+      is_active: true,
+      lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
+    })
   }
 
   function openGenerateModel(modelCode: string, displayName: string) {
@@ -1876,10 +2093,6 @@ export function SettingsPage() {
     )
   }
 
-  function toggleSelectAllModels(checked: boolean) {
-    setSelectedModelCodes(checked ? visibleModels.map((model) => model.model_code) : [])
-  }
-
   function openBulkEditModels() {
     setBulkEditForm(EMPTY_BULK_EDIT_FORM)
     setBulkEditModalOpen(true)
@@ -1889,41 +2102,9 @@ export function SettingsPage() {
     event.stopPropagation()
   }
 
-  function toggleToolbarMenu(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation()
-    setSortMenuOpen(false)
-    setModelActionMenu(null)
-    setScheduleActionMenu(null)
-    setToolbarMenuOpen((previous) => !previous)
-  }
-
-  function toggleSortMenu(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation()
-    setToolbarMenuOpen(false)
-    setModelActionMenu(null)
-    setScheduleActionMenu(null)
-    setSortMenuOpen((previous) => !previous)
-  }
-
-  function toggleModelMenu(menuId: string, event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation()
-    setToolbarMenuOpen(false)
-    setSortMenuOpen(false)
-    setScheduleActionMenu(null)
-    setModelActionMenu((previous) => (previous === menuId ? null : menuId))
-  }
-
   function toggleScheduleMenu(menuId: string, event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
-    setToolbarMenuOpen(false)
-    setSortMenuOpen(false)
-    setModelActionMenu(null)
     setScheduleActionMenu((previous) => (previous === menuId ? null : menuId))
-  }
-
-  function selectSortOption(option: ModelSortOption) {
-    setModelSortOption(option)
-    setSortMenuOpen(false)
   }
 
   async function openEditModel(modelCode: string) {
@@ -2573,307 +2754,266 @@ export function SettingsPage() {
 
           {activeTab === 'models' ? (
             <div className="page-section">
-              <StatusCard
-                title="模型管理"
-                // subtitle="统一管理全部模型目录、彩种覆盖、Provider 连接与运行状态。"
-                actions={
-                  <div className="toolbar-inline settings-model-toolbar">
-                    <div className="settings-model-toolbar__actions">
-                        <div className="view-switch settings-model-toolbar__view-switch" role="tablist" aria-label="模型管理视图切换">
-                          <IconButton
-                            label="列表视图"
-                            icon={<ListIcon />}
-                            active={modelManagementView === 'list'}
-                            onClick={() => setModelManagementView('list')}
-                          />
-                          <IconButton
-                            label="卡片视图"
-                            icon={<GridIcon />}
-                            active={modelManagementView === 'card'}
-                            onClick={() => setModelManagementView('card')}
-                          />
+              <section className="provider-model-center">
+                <aside className="provider-model-center__sidebar" aria-label="供应商">
+                  <div className="provider-model-center__sidebar-header">
+                    <strong>提供商源</strong>
+                    <button className="ghost-button provider-model-center__add-provider" type="button" onClick={openCreateProvider}>
+                      <PlusIcon />
+                      <span>新增</span>
+                    </button>
+                  </div>
+                  <div className="provider-source-list">
+                    {managedProviders.map((provider) => {
+                      const providerModelCount = models.filter((model) => model.provider === provider.code && !model.is_deleted).length
+                      return (
+                        <button
+                          key={provider.code}
+                          type="button"
+                          className={clsx('provider-source-item', provider.code === selectedManagedProviderCode && 'is-active')}
+                          onClick={() => {
+                            if (isManagedProviderCode(provider.code)) {
+                              setSelectedManagedProviderCode(provider.code)
+                            }
+                          }}
+                        >
+                          <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${provider.code}`)}>
+                            {getProviderLogoLabel(provider.code)}
+                          </span>
+                          <span className="provider-source-item__body">
+                            <strong>{getProviderDisplayName(provider.code, provider.name)}</strong>
+                            <small>{provider.base_url || '未配置 Base URL'}</small>
+                          </span>
+                          <span className="provider-source-item__count">{providerModelCount}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </aside>
+
+                <section className="provider-model-center__main">
+                  {activeManagedProvider ? (
+                    <>
+                      <header className="provider-model-center__hero">
+                        <div>
+                          <h2>{getProviderDisplayName(activeManagedProvider.code, activeManagedProvider.name)}</h2>
+                          <p>{providerDraft.base_url || activeManagedProvider.base_url || '未配置 API Base URL'}</p>
                         </div>
+                        <div className="provider-model-center__hero-actions">
                           {generationTask && !generationModalOpen ? (
-                          <button
-                            className="ghost-button settings-model-toolbar__resume-task"
-                            type="button"
-                            onClick={reopenGenerationTaskModal}
-                          >
-                            <span>查看进度</span>
-                            <span className="settings-model-toolbar__resume-task-status">{getTaskStatusLabel(generationTask.status)}</span>
-                          </button>
-                        ) : null}
-                        <button className="primary-button settings-model-toolbar__create settings-model-toolbar__create--compact" onClick={openCreateModel} aria-label="新增模型">
-                          <PlusIcon />
-                          <span>新增</span>
-                        </button>
-                        <button className="ghost-button settings-model-toolbar__create--compact" type="button" onClick={openCreateProvider}>
-                          供应商管理
-                        </button>
-                        {modelManagementView === 'list' && selectedModelCodes.length > 0 ? (
-                          <>
-                            <span className="status-pill">已选 {selectedVisibleCount}</span>
-                            <div className="action-menu" onClick={stopMenuEvent}>
-                              <button
-                                className="ghost-button settings-menu-trigger"
-                                type="button"
-                                onClick={toggleToolbarMenu}
-                                aria-expanded={toolbarMenuOpen}
-                              >
-                                <MoreIcon />
-                                <span>批量操作</span>
-                              </button>
-                              {toolbarMenuOpen ? (
-                                <div className="action-menu__panel settings-action-menu__panel">
-                                  <button className="action-menu__item" type="button" onClick={openBulkEditModels}>批量编辑</button>
-                                  <button className="action-menu__item" type="button" onClick={openBulkGenerateModels}>批量生成预测</button>
-                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })}>批量启用</button>
-                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })}>批量停用</button>
-                                  <button className="action-menu__item" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'restore' })}>批量恢复</button>
-                                  <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'delete' })}>批量删除</button>
-                                </div>
-                              ) : null}
-                            </div>
-                          </>
-                        ) : null}
-                        <div className="filter-chip-group" role="group" aria-label="模型状态筛选">
-                          {MODEL_STATUS_FILTER_META.map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              className={clsx('filter-chip', modelStatusFilter === option.value && 'is-active')}
-                              onClick={() => setModelStatusFilter(option.value)}
-                            >
-                              {option.label}
+                            <button className="ghost-button settings-model-toolbar__resume-task" type="button" onClick={reopenGenerationTaskModal}>
+                              <span>查看进度</span>
+                              <span className="settings-model-toolbar__resume-task-status">{getTaskStatusLabel(generationTask.status)}</span>
                             </button>
-                          ))}
-                        </div>
-                        <div className="action-menu" onClick={stopMenuEvent}>
-                          <button
-                            className={clsx('icon-button settings-sort-trigger', sortMenuOpen && 'is-active')}
-                            type="button"
-                            onClick={toggleSortMenu}
-                            aria-expanded={sortMenuOpen}
-                            aria-label={`排序：${currentSortMeta.label}`}
-                            title={currentSortMeta.hint}
-                          >
-                            <SortIcon />
+                          ) : null}
+                          <button className="primary-button" type="button" onClick={saveActiveProvider} disabled={saveProviderMutation.isPending}>
+                            保存配置
                           </button>
-                          {sortMenuOpen ? (
-                            <div className="action-menu__panel settings-action-menu__panel settings-sort-menu">
-                              {(Object.entries(MODEL_SORT_META) as Array<[ModelSortOption, { label: string; hint: string }]>).map(([option, meta]) => (
+                        </div>
+                      </header>
+
+                      <section className="provider-config-panel" aria-label="供应商设置">
+                        <h3>设置</h3>
+                        <div className="provider-config-grid">
+                          <label className="provider-config-field">
+                            <span>
+                              <strong>ID</strong>
+                              <small>提供商源唯一 ID（不是提供商 ID）</small>
+                            </span>
+                            <input value={activeManagedProvider.code} readOnly />
+                          </label>
+                          <label className="provider-config-field">
+                            <span>
+                              <strong>API Key</strong>
+                              <small>API 密钥</small>
+                            </span>
+                            <input value={providerDraft.api_key} onChange={(event) => setProviderDraft((previous) => ({ ...previous, api_key: event.target.value }))} />
+                          </label>
+                          <label className="provider-config-field">
+                            <span>
+                              <strong>API Base URL</strong>
+                              <small>自定义 API 端点 URL</small>
+                            </span>
+                            <input value={providerDraft.base_url} onChange={(event) => setProviderDraft((previous) => ({ ...previous, base_url: event.target.value }))} />
+                          </label>
+                        </div>
+                      </section>
+
+                      <section className="provider-config-panel provider-config-panel--advanced" aria-label="高级配置">
+                        <h3>高级配置...</h3>
+                        <div className="provider-config-grid">
+                          <label className="provider-config-field">
+                            <span>
+                              <strong>超时时间</strong>
+                              <small>超时时间，单位为秒。</small>
+                            </span>
+                            <input type="number" min={1} value={providerDraft.timeout} onChange={(event) => setProviderDraft((previous) => ({ ...previous, timeout: event.target.value }))} />
+                          </label>
+                          <label className="provider-config-field">
+                            <span>
+                              <strong>代理地址</strong>
+                              <small>HTTP/HTTPS 代理地址，仅对该提供商的 API 请求生效。</small>
+                            </span>
+                            <input value={providerDraft.proxy_url} onChange={(event) => setProviderDraft((previous) => ({ ...previous, proxy_url: event.target.value }))} />
+                          </label>
+                          <label className="provider-config-field provider-config-field--textarea">
+                            <span>
+                              <strong>自定义请求头</strong>
+                              <small>JSON 对象，会合并到默认请求头。</small>
+                            </span>
+                            <textarea value={providerDraft.custom_headers} onChange={(event) => setProviderDraft((previous) => ({ ...previous, custom_headers: event.target.value }))} rows={3} />
+                          </label>
+                        </div>
+                      </section>
+
+                      <section className="provider-model-section">
+                        <div className="provider-model-section__header">
+                          <div>
+                            <h3>模型</h3>
+                            <p>可用模型 {availableProviderModels.length}</p>
+                          </div>
+                        <div className="provider-model-section__tools">
+                            <div className="filter-chip-group" role="group" aria-label="模型状态筛选">
+                              {MODEL_STATUS_FILTER_META.map((option) => (
                                 <button
-                                  key={option}
-                                  className={clsx('action-menu__item', option === modelSortOption && 'is-active')}
+                                  key={option.value}
                                   type="button"
-                                  onClick={() => selectSortOption(option)}
+                                  className={clsx('filter-chip', modelStatusFilter === option.value && 'is-active')}
+                                  onClick={() => setModelStatusFilter(option.value)}
                                 >
-                                  <span>{meta.label}</span>
-                                  <small>{meta.hint}</small>
+                                  {option.label}
                                 </button>
                               ))}
                             </div>
-                          ) : null}
-                        </div>
-                      </div>
-                  </div>
-                }
-              >
-                {modelManagementView === 'list' ? (
-                  <div className="table-shell settings-model-table-shell">
-                    <table className="history-table settings-model-table">
-                      <thead>
-                        <tr>
-                          <th className="settings-model-table__select-head">
-                            <input
-                              type="checkbox"
-                              aria-label="全选模型"
-                              checked={allVisibleModelsSelected}
-                              onChange={(event) => toggleSelectAllModels(event.target.checked)}
-                            />
-                          </th>
-                          <th>模型名称</th>
-                          <th className="settings-model-table__compact-head">彩种</th>
-                          <th className="settings-model-table__compact-head">Provider</th>
-                          <th className="settings-model-table__compact-head">接口模型</th>
-                          <th>状态</th>
-                          <th>更新时间</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleModels.length ? (
-                          visibleModels.map((model) => (
-                            <tr
-                              key={model.model_code}
-                              className={clsx(modelActionMenu === `list:${model.model_code}` && 'is-menu-open')}
-                            >
-                              <td className="settings-model-table__select-cell">
-                                <input
-                                  type="checkbox"
-                                  aria-label={`选择模型 ${model.display_name}`}
-                                  checked={selectedModelCodes.includes(model.model_code)}
-                                  onChange={() => toggleModelSelection(model.model_code)}
-                                />
-                              </td>
-                              <td>
-                                <div className="settings-model-table__title">
-                                  <strong>{model.display_name}</strong>
-                                  <span>{model.model_code}</span>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="settings-model-table__tags">
-                                  {(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map((code) => (
-                                    <span key={`${model.model_code}-${code}`} className="tag tag--muted settings-model-table__tag-compact">
-                                      {getLotteryLabel(code)}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td>
-                                <span className="settings-model-table__chip">{model.provider}</span>
-                              </td>
-                              <td>
-                                <div className="settings-model-table__api">
-                                  <strong>{model.api_model_name}</strong>
-                                </div>
-                              </td>
-                              <td>
-                                <span className={clsx('status-pill settings-model-table__status', model.is_active ? 'is-active' : 'is-muted')}>
-                                  {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
-                                </span>
-                              </td>
-                              <td>
-                                <time className="settings-model-table__time" dateTime={String(model.updated_at || '')}>
-                                  {formatDateTimeLocal(model.updated_at)}
-                                </time>
-                              </td>
-                              <td>
-                                <div className="settings-model-table__actions">
-                                  <IconButton
-                                    label={`编辑模型 ${model.display_name}`}
-                                    icon={<EditIcon />}
-                                    onClick={() => void openEditModel(model.model_code)}
-                                  />
-                                  {!model.is_deleted ? (
-                                    <>
-                                      <IconButton
-                                        label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
-                                        icon={<ToggleIcon active={model.is_active} />}
-                                        onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
-                                      />
-                                      <div className="action-menu" onClick={stopMenuEvent}>
-                                        <IconButton
-                                          label={`更多操作：${model.display_name}`}
-                                          icon={<MoreIcon />}
-                                          onClick={(event) => toggleModelMenu(`list:${model.model_code}`, event)}
-                                          expanded={modelActionMenu === `list:${model.model_code}`}
-                                        />
-                                        {modelActionMenu === `list:${model.model_code}` ? (
-                                          <div className="action-menu__panel settings-action-menu__panel">
-                                            <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
-                                              生成预测数据
-                                            </button>
-                                            <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
-                                              删除模型
-                                            </button>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="action-menu" onClick={stopMenuEvent}>
-                                      <IconButton
-                                        label={`恢复模型 ${model.display_name}`}
-                                        icon={<RestoreIcon />}
-                                        onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={8}>
-                              <div className="state-shell">当前筛选下暂无模型。</div>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  ) : (
-                  <div className="settings-grid-react">
-                    {visibleModels.map((model) => (
-                      <article key={model.model_code} className="settings-model-card-react">
-                        <div className="settings-model-card-react__header">
-                          <div>
-                            <p className="settings-model-card-react__provider">{model.provider}</p>
-                            <h3>{model.display_name}</h3>
-                          </div>
-                          <div className="settings-model-card-react__header-actions">
-                            <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
-                              {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
-                            </span>
-                            <div className="settings-model-card-react__action-strip">
-                              <IconButton
-                                label={`编辑模型 ${model.display_name}`}
-                                icon={<EditIcon />}
-                                onClick={() => void openEditModel(model.model_code)}
+                            <label className="provider-model-search">
+                              <span aria-hidden="true">⌕</span>
+                              <input
+                                value={providerModelSearch}
+                                onChange={(event) => setProviderModelSearch(event.target.value)}
+                                placeholder="搜索模型或 ID"
+                                aria-label="搜索模型或 ID"
                               />
-                              {!model.is_deleted ? (
-                                <>
-                                  <IconButton
-                                    label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
-                                    icon={<ToggleIcon active={model.is_active} />}
-                                    onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
-                                  />
-                                  <div className="action-menu" onClick={stopMenuEvent}>
-                                    <IconButton
-                                      label={`更多操作：${model.display_name}`}
-                                      icon={<MoreIcon />}
-                                      onClick={(event) => toggleModelMenu(`card:${model.model_code}`, event)}
-                                      expanded={modelActionMenu === `card:${model.model_code}`}
-                                    />
-                                    {modelActionMenu === `card:${model.model_code}` ? (
-                                      <div className="action-menu__panel settings-action-menu__panel">
-                                        <button className="action-menu__item" type="button" onClick={() => openGenerateModel(model.model_code, model.display_name)}>
-                                          生成预测数据
-                                        </button>
-                                        <button className="action-menu__item action-menu__item--danger" type="button" onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })}>
-                                          删除模型
-                                        </button>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </>
-                              ) : (
-                                <IconButton
-                                  label={`恢复模型 ${model.display_name}`}
-                                  icon={<RestoreIcon />}
-                                  onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })}
-                                />
-                              )}
-                            </div>
+                            </label>
+                            <button
+                              className="ghost-button"
+                              type="button"
+                              onClick={() => discoverManagedProviderModelsMutation.mutate()}
+                              disabled={discoverManagedProviderModelsMutation.isPending}
+                            >
+                              {discoverManagedProviderModelsMutation.isPending ? '获取中...' : '获取模型列表'}
+                            </button>
+                            <button
+                              className="primary-button"
+                              type="button"
+                              onClick={saveAndFetchActiveProviderModels}
+                              disabled={saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending}
+                            >
+                              保存并获取模型
+                            </button>
+                            <button className="ghost-button" type="button" onClick={openCreateModel}>自定义模型</button>
                           </div>
                         </div>
-                        <p className="settings-model-card-react__meta">{model.api_model_name}</p>
-                        <div className="settings-model-card-react__facts">
-                          <span>{(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map(getLotteryLabel).join(' / ')}</span>
-                          <span>{model.base_url}</span>
-                          <span>{formatDateTimeLocal(model.updated_at)}</span>
+
+                        {selectedModelCodes.length > 0 ? (
+                          <div className="provider-model-bulk-bar">
+                            <span className="status-pill">已选 {selectedVisibleCount}</span>
+                            <button className="ghost-button" type="button" onClick={openBulkGenerateModels}>批量生成预测</button>
+                            <button className="ghost-button" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'enable' })}>批量启用</button>
+                            <button className="ghost-button" type="button" onClick={() => bulkModelActionMutation.mutate({ action: 'disable' })}>批量停用</button>
+                            <button className="ghost-button" type="button" onClick={openBulkEditModels}>批量编辑</button>
+                          </div>
+                        ) : null}
+
+                        <div className="provider-model-list-block">
+                          <div className="provider-model-list-block__title">
+                            <label className="provider-model-select-all">
+                              <input
+                                type="checkbox"
+                                aria-label="全选模型"
+                                checked={filteredConfiguredModels.length > 0 && filteredConfiguredModels.every((model) => selectedModelCodes.includes(model.model_code))}
+                                onChange={(event) => setSelectedModelCodes(event.target.checked ? filteredConfiguredModels.map((model) => model.model_code) : [])}
+                              />
+                              <strong>已配置的模型</strong>
+                            </label>
+                            <span>{filteredConfiguredModels.length}</span>
+                          </div>
+                          {filteredConfiguredModels.length ? (
+                            <div className="provider-model-list">
+                              {filteredConfiguredModels.map((model) => (
+                                <article key={model.model_code} className="provider-model-row">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`选择模型 ${model.display_name}`}
+                                    checked={selectedModelCodes.includes(model.model_code)}
+                                    onChange={() => toggleModelSelection(model.model_code)}
+                                  />
+                                  <div className="provider-model-row__main">
+                                    <strong>{model.display_name}</strong>
+                                    <span>{model.api_model_name}</span>
+                                    <small>{(model.lottery_codes?.length ? model.lottery_codes : [DEFAULT_SETTINGS_LOTTERY]).map(getLotteryLabel).join(' / ')}</small>
+                                  </div>
+                                  <span className={clsx('status-pill', model.is_active ? 'is-active' : 'is-muted')}>
+                                    {model.is_deleted ? '已删除' : model.is_active ? '启用中' : '已停用'}
+                                  </span>
+                                  <div className="provider-model-row__actions">
+                                    <IconButton label={`编辑模型 ${model.display_name}`} icon={<EditIcon />} onClick={() => void openEditModel(model.model_code)} />
+                                    {!model.is_deleted ? (
+                                      <>
+                                        <IconButton
+                                          label={`${model.is_active ? '停用' : '启用'}模型 ${model.display_name}`}
+                                          icon={<ToggleIcon active={model.is_active} />}
+                                          onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
+                                        />
+                                        <IconButton label={`生成预测数据：${model.display_name}`} icon={<SortIcon />} onClick={() => openGenerateModel(model.model_code, model.display_name)} />
+                                        <IconButton label={`删除模型 ${model.display_name}`} icon={<MoreIcon />} danger onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })} />
+                                      </>
+                                    ) : (
+                                      <IconButton label={`恢复模型 ${model.display_name}`} icon={<RestoreIcon />} onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })} />
+                                    )}
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="provider-model-empty">暂无已配置的模型，点击上方的“获取模型列表”添加</div>
+                          )}
                         </div>
-                      </article>
-                    ))}
-                    {visibleModels.length === 0 ? (
-                      <div className="state-shell">当前筛选下暂无模型。</div>
-                    ) : null}
-                  </div>
-                )}
-              </StatusCard>
+
+                        <div className="provider-model-list-block">
+                          <div className="provider-model-list-block__title">
+                            <strong>可用模型</strong>
+                            <span>{availableProviderModels.length}</span>
+                          </div>
+                          {availableProviderModels.length ? (
+                            <div className="provider-model-list">
+                              {availableProviderModels.map((model) => {
+                                const modelMeta = formatProviderModelDescription(model)
+                                return (
+                                  <article key={model.model_id} className="provider-model-row provider-model-row--available">
+                                    <div className="provider-model-row__main">
+                                      <strong>{model.display_name}</strong>
+                                      <span>{model.model_id}</span>
+                                      {model.description ? <p title={model.description}>{model.description}</p> : null}
+                                      {modelMeta ? <small>{modelMeta}</small> : null}
+                                    </div>
+                                    <button className="ghost-button" type="button" onClick={() => addDiscoveredModel(model)}>
+                                      添加
+                                    </button>
+                                  </article>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="provider-model-empty">暂无可用模型。获取模型列表后，未配置的模型会显示在这里。</div>
+                          )}
+                        </div>
+                      </section>
+                    </>
+                  ) : (
+                    <div className="state-shell">暂无可管理供应商，请先创建 DeepSeek 或 AIHubMix。</div>
+                  )}
+                </section>
+              </section>
             </div>
           ) : null}
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+import requests
+
 from backend.app.services.model_service import ModelService
 
 
@@ -32,6 +34,67 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
                 base_url="https://api.deepseek.com",
                 api_key="",
             )
+
+    def test_discover_deepseek_models_normalizes_response(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get") as get:
+            get.return_value.json.return_value = {
+                "object": "list",
+                "data": [
+                    {"id": "deepseek-chat", "object": "model", "owned_by": "deepseek"},
+                    {"id": "deepseek-reasoner", "object": "model", "owned_by": "deepseek"},
+                ],
+            }
+
+            result = service.discover_provider_models({"provider": "deepseek", "api_key": "sk-test"})
+
+        get.assert_called_once()
+        self.assertEqual(get.call_args.kwargs["headers"]["Authorization"], "Bearer sk-test")
+        self.assertEqual([item["model_id"] for item in result["models"]], ["deepseek-chat", "deepseek-reasoner"])
+        self.assertEqual(result["models"][0]["owner"], "deepseek")
+
+    def test_discover_aihubmix_models_normalizes_extended_fields(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get") as get:
+            get.return_value.json.return_value = {
+                "success": True,
+                "data": [
+                    {
+                        "model_id": "gpt-5",
+                        "desc": "Flagship model",
+                        "types": "llm",
+                        "features": "thinking,tools",
+                        "input_modalities": "text,image",
+                        "max_output": 128000,
+                        "context_length": 400000,
+                        "pricing": {"input": 1.25, "output": 10},
+                    }
+                ],
+            }
+
+            result = service.discover_provider_models({"provider": "aimixhub"})
+
+        get.assert_called_once()
+        self.assertEqual(get.call_args.args[0], "https://aihubmix.com/api/v1/models")
+        model = result["models"][0]
+        self.assertEqual(model["model_id"], "gpt-5")
+        self.assertEqual(model["description"], "Flagship model")
+        self.assertEqual(model["context_length"], 400000)
+        self.assertEqual(model["pricing"]["input"], 1.25)
+
+    def test_discover_provider_models_rejects_empty_model_list(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get") as get:
+            get.return_value.json.return_value = {"data": []}
+
+            with self.assertRaisesRegex(ValueError, "No available models"):
+                service.discover_provider_models({"provider": "deepseek"})
+
+    def test_discover_provider_models_reports_request_failure(self) -> None:
+        service = ModelService()
+        with patch("backend.app.services.model_service.requests.get", side_effect=requests.Timeout("slow")):
+            with self.assertRaisesRegex(ValueError, "Provider model list request failed"):
+                service.discover_provider_models({"provider": "aimixhub"})
 
 
 if __name__ == "__main__":

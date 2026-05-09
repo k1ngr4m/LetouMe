@@ -60,6 +60,14 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         providers = response.json()["providers"]
         self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
+        self.assertTrue(
+            any(
+                provider["code"] == "aimixhub"
+                and provider["name"] == "AIHubMix"
+                and provider["base_url"] == "https://aihubmix.com/v1"
+                for provider in providers
+            )
+        )
         self.assertTrue(any(provider["code"] == "lmstudio" and provider["name"] == "LM Studio" for provider in providers))
 
     def test_discover_provider_models_endpoint_returns_result(self) -> None:

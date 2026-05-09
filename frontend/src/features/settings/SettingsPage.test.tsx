@@ -105,7 +105,7 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.listMaintenanceRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
   })
 
-  it('defaults to list view and can switch to card view', async () => {
+  it('renders provider-first model management and switches managed providers', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [
         {
@@ -127,8 +127,8 @@ describe('SettingsPage model management view switch', () => {
         {
           model_code: 'claude-sonnet-4.6',
           display_name: 'Claude-4.6',
-          provider: 'anthropic',
-          api_model_name: 'claude-sonnet-4-6',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
           version: '1',
           tags: ['reasoning'],
           base_url: 'https://example.test',
@@ -142,7 +142,12 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -191,27 +196,18 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByTestId('location-display')).toHaveTextContent('/settings/models')
     expect(screen.queryByRole('button', { name: '预测记录' })).not.toBeInTheDocument()
     expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: '列表视图' })).toHaveClass('is-active')
-    expect(screen.getByRole('columnheader', { name: '模型名称' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: '彩种' })).toBeInTheDocument()
+    expect(await screen.findByText('提供商源')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'DeepSeek' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /AIHubMix/ })).toBeInTheDocument()
     expect(screen.getByText('DeepSeek-V3.2')).toBeInTheDocument()
-    expect(screen.getByText('排列3')).toBeInTheDocument()
-    expect(screen.queryByText('https://api.deepseek.com')).not.toBeInTheDocument()
-    const titleCells = screen.getAllByRole('row').slice(1).map((row) => row.textContent || '')
-    expect(titleCells.join('')).toContain('Claude-4.6')
-    expect(titleCells.join('')).toContain('DeepSeek-V3.2')
+    expect(screen.getByText((content) => content.includes('大乐透 / 排列3'))).toBeInTheDocument()
+    expect(screen.getByText('Claude-4.6')).toBeInTheDocument()
+    expect(screen.getAllByText('https://api.deepseek.com').length).toBeGreaterThan(0)
     expect(screen.queryByText('2026-03-16T15:39:25Z')).not.toBeInTheDocument()
-    expect(screen.getAllByText((content) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(content)).length).toBeGreaterThan(1)
 
-    await userEvent.click(screen.getByRole('button', { name: '排序：最近更新' }))
-    await userEvent.click(screen.getByRole('button', { name: /名称 Z-A/ }))
-    const nameDescRows = screen.getAllByRole('row').slice(1).map((row) => row.textContent || '')
-    expect(nameDescRows[0]).toContain('DeepSeek-V3.2')
-
-    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
-
-    expect(screen.getByRole('button', { name: '卡片视图' })).toHaveClass('is-active')
-    expect(screen.getByText('https://api.deepseek.com')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /AIHubMix/ }))
+    expect(screen.getByRole('heading', { name: 'AIHubMix' })).toBeInTheDocument()
+    expect(screen.queryByText('DeepSeek-V3.2')).not.toBeInTheDocument()
   })
 
   it('supports filtering models by enabled status', async () => {
@@ -236,8 +232,8 @@ describe('SettingsPage model management view switch', () => {
         {
           model_code: 'inactive-model',
           display_name: 'InactiveModel',
-          provider: 'anthropic',
-          api_model_name: 'claude-sonnet',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
           version: '1',
           tags: [],
           base_url: 'https://example.test',
@@ -252,8 +248,8 @@ describe('SettingsPage model management view switch', () => {
         {
           model_code: 'deleted-model',
           display_name: 'DeletedModel',
-          provider: 'openai_compatible',
-          api_model_name: 'gpt-4.1',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-v4-flash',
           version: '1',
           tags: [],
           base_url: 'https://example.test',
@@ -394,8 +390,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
-    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据：DeepSeek-V3.2' }))
 
     expect(screen.getByRole('heading', { name: 'DeepSeek-V3.2' })).toBeInTheDocument()
     expect(screen.getByLabelText('生成模式')).toHaveValue('current')
@@ -454,8 +449,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
-    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据：DeepSeek-V3.2' }))
     await userEvent.selectOptions(screen.getByLabelText('生成彩种'), 'pl3')
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
 
@@ -521,8 +515,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
-    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据：DeepSeek-V3.2' }))
     await userEvent.selectOptions(screen.getByLabelText('生成模式'), 'history')
     await userEvent.clear(screen.getByLabelText('并发线程数'))
     await userEvent.type(screen.getByLabelText('并发线程数'), '5')
@@ -597,8 +590,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
-    await userEvent.click(screen.getByRole('button', { name: '更多操作：DeepSeek-V3.2' }))
-    await userEvent.click(screen.getByRole('button', { name: '生成预测数据' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据：DeepSeek-V3.2' }))
     await userEvent.selectOptions(screen.getByLabelText('生成模式'), 'history')
     await userEvent.selectOptions(screen.getByLabelText('历史范围'), '10')
 
@@ -737,8 +729,8 @@ describe('SettingsPage model management view switch', () => {
         {
           model_code: 'claude-sonnet-4.6',
           display_name: 'Claude-4.6',
-          provider: 'anthropic',
-          api_model_name: 'claude-sonnet-4-6',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-reasoner',
           version: '1',
           tags: ['reasoning'],
           base_url: 'https://example.test',
@@ -789,16 +781,14 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
     expect(screen.getByText('已选 2')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '批量操作' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '批量编辑' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
     await userEvent.click(screen.getByRole('button', { name: '批量编辑' }))
     await userEvent.click(screen.getByRole('checkbox', { name: /Provider/ }))
     await userEvent.click(screen.getByRole('button', { name: '保存批量修改' }))
     await waitFor(() => expect(apiClientMock.bulkUpdateSettingsModels).toHaveBeenCalled())
 
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
-    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
     await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
     expect(screen.getByRole('heading', { name: '已选 2 个模型' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
@@ -821,8 +811,8 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    await screen.findByRole('button', { name: '新增模型' })
-    await userEvent.click(screen.getByRole('button', { name: '新增模型' }))
+    await screen.findByRole('button', { name: '自定义模型' })
+    await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
 
     expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Temperature')).toHaveValue(0.3)
@@ -849,8 +839,8 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    await screen.findByRole('button', { name: '新增模型' })
-    await userEvent.click(screen.getByRole('button', { name: '新增模型' }))
+    await screen.findByRole('button', { name: '自定义模型' })
+    await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
     await userEvent.type(screen.getByLabelText('API 模型名'), 'deepseek-chat')
     await userEvent.clear(screen.getByLabelText('Temperature'))
     await userEvent.type(screen.getByLabelText('Temperature'), '0.9')
@@ -928,7 +918,6 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
     await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
-    await userEvent.click(screen.getByRole('button', { name: '批量操作' }))
     await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
 
     expect(screen.getByText('已移除 1 个不支持大乐透的模型。')).toBeInTheDocument()
