@@ -2034,6 +2034,12 @@ export function SettingsPage() {
     })
   }
 
+  function confirmDeleteModel(modelCode: string, displayName: string) {
+    const confirmed = window.confirm(`确认删除模型“${displayName}”吗？删除后模型会被停用，可在已删除状态下恢复。`)
+    if (!confirmed) return
+    modelActionMutation.mutate({ type: 'delete', modelCode })
+  }
+
   function openGenerateModel(modelCode: string, displayName: string) {
     const sourceModelCodes = [modelCode]
     const nextLottery = DEFAULT_SETTINGS_LOTTERY
@@ -2965,7 +2971,7 @@ export function SettingsPage() {
                                           onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
                                         />
                                         <IconButton label={`生成预测数据：${model.display_name}`} icon={<SortIcon />} onClick={() => openGenerateModel(model.model_code, model.display_name)} />
-                                        <IconButton label={`删除模型 ${model.display_name}`} icon={<MoreIcon />} danger onClick={() => modelActionMutation.mutate({ type: 'delete', modelCode: model.model_code })} />
+                                        <IconButton label={`删除模型 ${model.display_name}`} icon={<MoreIcon />} danger onClick={() => confirmDeleteModel(model.model_code, model.display_name)} />
                                       </>
                                     ) : (
                                       <IconButton label={`恢复模型 ${model.display_name}`} icon={<RestoreIcon />} onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })} />

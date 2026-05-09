@@ -287,6 +287,48 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
   })
 
+  it('asks for confirmation before deleting a model', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'deepseek-v4-flash',
+          display_name: 'DeepSeek V4 Flash',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-v4-flash',
+          version: '1',
+          tags: [],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.deleteSettingsModel.mockResolvedValue({ model_code: 'deepseek-v4-flash', is_deleted: true })
+
+    renderPage('/settings/models')
+
+    await screen.findByText('DeepSeek V4 Flash')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
+    await userEvent.click(screen.getByRole('button', { name: '删除模型 DeepSeek V4 Flash' }))
+    expect(confirmSpy).toHaveBeenCalledWith('确认删除模型“DeepSeek V4 Flash”吗？删除后模型会被停用，可在已删除状态下恢复。')
+    expect(apiClientMock.deleteSettingsModel).not.toHaveBeenCalled()
+
+    confirmSpy.mockReturnValueOnce(true)
+    await userEvent.click(screen.getByRole('button', { name: '删除模型 DeepSeek V4 Flash' }))
+    await waitFor(() => expect(apiClientMock.deleteSettingsModel).toHaveBeenCalledWith('deepseek-v4-flash'))
+    confirmSpy.mockRestore()
+  })
+
   it('renders profile route by default', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
