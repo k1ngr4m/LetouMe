@@ -35,6 +35,21 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
                 api_key="",
             )
 
+    def test_create_provider_allows_underscored_provider_codes(self) -> None:
+        service = ModelService()
+        with patch.object(service.repository, "create_provider", return_value={"code": "aihubmix_1"}) as create_provider:
+            result = service.create_provider({
+                "code": "aihubmix_1",
+                "name": "aihubmix_1",
+                "api_format": "openai_compatible",
+                "base_url": "https://aihubmix.com/v1",
+                "extra_options": {},
+                "model_configs": [],
+            })
+
+        self.assertEqual(result["code"], "aihubmix_1")
+        create_provider.assert_called_once()
+
     def test_discover_deepseek_models_normalizes_response(self) -> None:
         service = ModelService()
         with patch("backend.app.services.model_service.requests.get") as get:
@@ -86,7 +101,7 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
                 ],
             }
 
-            result = service.discover_provider_models({"provider": "aimixhub"})
+            result = service.discover_provider_models({"provider": "aihubmix"})
 
         get.assert_called_once()
         self.assertEqual(get.call_args.args[0], "https://aihubmix.com/api/v1/models")
@@ -104,7 +119,7 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
                 "data": [{"model_id": "gpt-5-mini", "desc": "Mini", "pricing": {}}],
             }
 
-            result = service.discover_provider_models({"provider": "aimixhub_1"})
+            result = service.discover_provider_models({"provider": "aihubmix_1"})
 
         get.assert_called_once()
         self.assertEqual(get.call_args.args[0], "https://aihubmix.com/api/v1/models")
@@ -122,7 +137,7 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
         service = ModelService()
         with patch("backend.app.services.model_service.requests.get", side_effect=requests.Timeout("slow")):
             with self.assertRaisesRegex(ValueError, "Provider model list request failed"):
-                service.discover_provider_models({"provider": "aimixhub"})
+                service.discover_provider_models({"provider": "aihubmix"})
 
 
 if __name__ == "__main__":

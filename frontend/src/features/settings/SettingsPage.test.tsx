@@ -148,7 +148,7 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
         { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
-        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
       ],
     })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
@@ -343,7 +343,7 @@ describe('SettingsPage model management view switch', () => {
       providers: [
         { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
         { code: 'deepseek_1', name: 'deepseek_1', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
-        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
         { code: 'openrouter', name: 'OpenRouter', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://openrouter.ai/api/v1' },
       ],
     })
@@ -392,8 +392,8 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
         { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
-        { code: 'aimixhub', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
-        { code: 'aimixhub_1', name: 'aimixhub_1', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aihubmix_1', name: 'aihubmix_1', is_system_preset: false, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
       ],
     })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
@@ -401,8 +401,8 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
     apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
     apiClientMock.createSettingsProvider.mockResolvedValue({
-      code: 'aimixhub_2',
-      name: 'aimixhub_2',
+      code: 'aihubmix_2',
+      name: 'aihubmix_2',
       is_system_preset: false,
       api_format: 'openai_compatible',
       base_url: 'https://aihubmix.com/v1',
@@ -416,22 +416,22 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    expect(await screen.findByText('aimixhub_1')).toBeInTheDocument()
+    expect(await screen.findByText('aihubmix_1')).toBeInTheDocument()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
-    await userEvent.click(screen.getByRole('button', { name: '删除供应商源 aimixhub_1' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除供应商源 aihubmix_1' }))
     expect(confirmSpy).toHaveBeenCalled()
     expect(apiClientMock.deleteSettingsProvider).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /AIHubMix/ }))
-    expect(await screen.findByRole('heading', { name: 'aimixhub_2' })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('aimixhub_2')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'aihubmix_2' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('aihubmix_2')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '保存并获取模型' }))
-    await waitFor(() => expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({ code: 'aimixhub_2' })))
+    await waitFor(() => expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({ code: 'aihubmix_2' })))
     await waitFor(() =>
       expect(apiClientMock.discoverSettingsProviderModels).toHaveBeenCalledWith({
-        provider: 'aimixhub_2',
+        provider: 'aihubmix_2',
         base_url: 'https://aihubmix.com/v1',
         api_key: '',
       }),
@@ -947,13 +947,13 @@ describe('SettingsPage model management view switch', () => {
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
   })
 
-  it('shows APP Code only for AiMixHub provider in model modal', async () => {
+  it('shows APP Code only for AIHubMix provider in model modal', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
         { code: 'custom-provider', name: 'My Provider', is_system_preset: false, api_format: 'openai_compatible', base_url: '' },
         { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
-        { code: 'aimixhub', name: 'AiMixHub', is_system_preset: true, api_format: 'anthropic', base_url: 'https://aihubmix.com/v1' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'anthropic', base_url: 'https://aihubmix.com/v1' },
       ],
     })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
@@ -969,7 +969,7 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Temperature')).toHaveValue(0.3)
 
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'aimixhub')
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'aihubmix')
     expect(screen.getByLabelText('APP Code')).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'deepseek')

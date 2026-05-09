@@ -123,7 +123,7 @@ class ModelService:
         provider_family = self._provider_family(provider)
         if provider_family == "deepseek":
             return self._discover_deepseek_models(api_key=str(payload.get("api_key") or "").strip())
-        if provider_family == "aimixhub":
+        if provider_family == "aihubmix":
             return self._discover_aihubmix_models()
 
         client = self._build_openai_client(
@@ -148,8 +148,8 @@ class ModelService:
         normalized = str(provider or "").strip().lower()
         if normalized == "deepseek" or normalized.startswith("deepseek_"):
             return "deepseek"
-        if normalized == "aimixhub" or normalized.startswith("aimixhub_"):
-            return "aimixhub"
+        if normalized in {"aihubmix", "aimixhub"} or normalized.startswith("aihubmix_") or normalized.startswith("aimixhub_"):
+            return "aihubmix"
         return normalized
 
     @staticmethod

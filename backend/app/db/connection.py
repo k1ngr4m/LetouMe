@@ -263,6 +263,52 @@ def _release_raw_mysql_connection(settings: Settings, connection) -> None:
         _connection_pool.append(connection)
 
 
+def _run_data_migrations(cursor) -> None:
+    cursor.execute(
+        """
+        SELECT id
+        FROM model_provider
+        WHERE provider_code = ?
+        LIMIT 1
+        """,
+        ("aimixhub",),
+    )
+    legacy_provider = cursor.fetchone()
+    if not legacy_provider:
+        return
+    cursor.execute(
+        """
+        SELECT id
+        FROM model_provider
+        WHERE provider_code = ?
+        LIMIT 1
+        """,
+        ("aihubmix",),
+    )
+    target_provider = cursor.fetchone()
+    if target_provider:
+        cursor.execute(
+            """
+            UPDATE model_provider
+            SET is_deleted = 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE provider_code = ?
+            """,
+            ("aimixhub",),
+        )
+        return
+    cursor.execute(
+        """
+        UPDATE model_provider
+        SET provider_code = ?,
+            provider_name = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE provider_code = ?
+        """,
+        ("aihubmix", "AIHubMix", "aimixhub"),
+    )
+
+
 @contextmanager
 def get_connection() -> Iterator[MySQLConnectionAdapter]:
     settings = load_settings()
@@ -330,4 +376,5 @@ def ensure_schema() -> None:
                         if index_name in existing_indexes:
                             cursor.execute(statement)
                             existing_indexes.discard(index_name)
+                _run_data_migrations(cursor)
         _schema_ready = True

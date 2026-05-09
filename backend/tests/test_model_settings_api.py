@@ -62,7 +62,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
         self.assertTrue(
             any(
-                provider["code"] == "aimixhub"
+                provider["code"] == "aihubmix"
                 and provider["name"] == "AIHubMix"
                 and provider["base_url"] == "https://aihubmix.com/v1"
                 for provider in providers

@@ -207,7 +207,7 @@ const LOTTERY_FETCH_LIMIT_DEFAULT = 30
 type ScheduleColumnKey = 'name' | 'type' | 'lottery' | 'models' | 'rule' | 'next_run' | 'status' | 'enabled' | 'actions'
 type MaintenanceColumnKey = 'lottery' | 'status' | 'fetched' | 'saved' | 'period' | 'created' | 'actions'
 type MotionPreferenceOption = 'system' | 'minimal' | 'normal' | 'enhanced'
-type ManagedProviderTemplate = 'deepseek' | 'aimixhub'
+type ManagedProviderTemplate = 'deepseek' | 'aihubmix'
 type ManagedProvider = SettingsProvider & {
   template: ManagedProviderTemplate
   isDraft?: boolean
@@ -220,7 +220,7 @@ type ProviderSaveRequest = {
   fetchAfterSave?: boolean
 }
 
-const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aimixhub']
+const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix']
 const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
 const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvider> = {
   deepseek: {
@@ -234,8 +234,8 @@ const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvide
     is_system_preset: true,
     model_configs: [],
   },
-  aimixhub: {
-    code: 'aimixhub',
+  aihubmix: {
+    code: 'aihubmix',
     name: 'AIHubMix',
     api_format: 'openai_compatible',
     website_url: 'https://aihubmix.com',
@@ -249,21 +249,26 @@ const DEFAULT_MANAGED_PROVIDERS: Record<ManagedProviderTemplate, SettingsProvide
 
 function getProviderTemplate(providerCode: string): ManagedProviderTemplate | null {
   if (providerCode === 'deepseek' || providerCode.startsWith('deepseek_')) return 'deepseek'
-  if (providerCode === 'aimixhub' || providerCode.startsWith('aimixhub_')) return 'aimixhub'
+  if (
+    providerCode === 'aihubmix' ||
+    providerCode.startsWith('aihubmix_') ||
+    providerCode === 'aimixhub' ||
+    providerCode.startsWith('aimixhub_')
+  ) return 'aihubmix'
   return null
 }
 
 function getProviderDisplayName(providerCode: string, fallback?: string) {
   const template = getProviderTemplate(providerCode)
   if (template === 'deepseek') return fallback || (providerCode === 'deepseek' ? 'DeepSeek' : providerCode)
-  if (template === 'aimixhub') return fallback || (providerCode === 'aimixhub' ? 'AIHubMix' : providerCode)
+  if (template === 'aihubmix') return fallback || (providerCode === 'aihubmix' ? 'AIHubMix' : providerCode)
   return fallback || providerCode
 }
 
 function getProviderLogoLabel(providerCode: string) {
   const template = getProviderTemplate(providerCode)
   if (template === 'deepseek') return 'DS'
-  if (template === 'aimixhub') return 'AI'
+  if (template === 'aihubmix') return 'AI'
   return (providerCode || 'P').slice(0, 2).toUpperCase()
 }
 
@@ -1068,8 +1073,8 @@ export function SettingsPage() {
       if (previous.provider) return previous
       const deepseekProvider = providerList.find((provider) => provider.code === 'deepseek')
       const lmStudioProvider = providerList.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
-      const aiMixHubProvider = providerList.find((provider) => provider.code === 'aimixhub')
-      const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub' && provider.code !== LMSTUDIO_PROVIDER_CODE)
+      const aiMixHubProvider = providerList.find((provider) => provider.code === 'aihubmix')
+      const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aihubmix' && provider.code !== LMSTUDIO_PROVIDER_CODE)
       const firstProvider = customProvider || lmStudioProvider || deepseekProvider || aiMixHubProvider || providerList[0]
       return {
         ...previous,
@@ -1296,8 +1301,8 @@ export function SettingsPage() {
   const createModeProviders = useMemo(() => {
     const deepseekProvider = providers.find((provider) => provider.code === 'deepseek')
     const lmStudioProvider = providers.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
-    const aiMixHubProvider = providers.find((provider) => provider.code === 'aimixhub')
-    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aimixhub' && provider.code !== LMSTUDIO_PROVIDER_CODE)
+    const aiMixHubProvider = providers.find((provider) => provider.code === 'aihubmix')
+    const customProvider = providers.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aihubmix' && provider.code !== LMSTUDIO_PROVIDER_CODE)
     const result: Array<SettingsProvider & { display_name: string }> = []
     if (customProvider) result.push({ ...customProvider, display_name: '自定义供应商' })
     if (lmStudioProvider) result.push({ ...lmStudioProvider, display_name: 'LM Studio' })
@@ -1312,7 +1317,7 @@ export function SettingsPage() {
   const selectedProvider = providerMap[modelForm.provider]
   const isLmStudioProvider = modelForm.provider === LMSTUDIO_PROVIDER_CODE
   const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
-  const shouldShowModelAppCode = modelForm.provider === 'aimixhub'
+  const shouldShowModelAppCode = getProviderTemplate(modelForm.provider) === 'aihubmix'
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -1901,7 +1906,7 @@ export function SettingsPage() {
     setModelModalOpen(true)
   }
 
-  function applyProviderPreset(preset: 'custom' | 'deepseek' | 'aimixhub') {
+  function applyProviderPreset(preset: 'custom' | 'deepseek' | 'aihubmix') {
     if (preset === 'custom') {
       setProviderForm({
         ...EMPTY_PROVIDER_FORM,
@@ -1930,7 +1935,7 @@ export function SettingsPage() {
     }
     setProviderForm({
       ...EMPTY_PROVIDER_FORM,
-      code: 'aimixhub',
+      code: 'aihubmix',
       name: 'AIHubMix',
       website_url: 'https://aihubmix.com',
       api_format: 'openai_compatible',
@@ -4382,7 +4387,7 @@ export function SettingsPage() {
               <div className="toolbar-inline provider-config-modal__preset-group">
                 <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('custom')}>自定义供应商</button>
                 <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('deepseek')}>DeepSeek</button>
-                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('aimixhub')}>AiMixHub</button>
+                <button className="ghost-button provider-config-modal__preset-button" type="button" onClick={() => applyProviderPreset('aihubmix')}>AIHubMix</button>
               </div>
 
               <label className="field">

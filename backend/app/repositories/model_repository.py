@@ -18,7 +18,7 @@ PROVIDER_LABELS = {
     "lmstudio": "LM Studio",
     "openai_compatible": "OpenAI Compatible",
 }
-PROVIDER_CODE_PATTERN = re.compile(r"^[a-z0-9-]+$")
+PROVIDER_CODE_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 
 PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
     "deepseek": {
@@ -35,7 +35,7 @@ PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
             {"model_id": "deepseek-reasoner", "display_name": "DeepSeek Reasoner (legacy alias)"},
         ],
     },
-    "aimixhub": {
+    "aihubmix": {
         "provider_name": "AIHubMix",
         "website_url": "https://aihubmix.com",
         "api_format": "openai_compatible",
@@ -678,7 +678,7 @@ class ModelRepository:
             if not code:
                 raise ValueError("供应商标识不能为空")
             if not PROVIDER_CODE_PATTERN.match(code):
-                raise ValueError("供应商标识只能包含小写字母、数字和连字符")
+                raise ValueError("供应商标识只能包含小写字母、数字、下划线和连字符")
         name = str(payload.get("name") or "").strip()
         if not name:
             raise ValueError("供应商名称不能为空")
