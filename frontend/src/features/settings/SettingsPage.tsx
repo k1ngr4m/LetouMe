@@ -53,6 +53,13 @@ type GenerationHistoryRangeMode = 'custom' | 'recent'
 type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type GenerationPromptHistoryPeriodCount = '30' | '50' | '100'
 type ModelStatusFilter = 'all' | 'active' | 'inactive'
+type CustomBodyParamType = 'string' | 'number' | 'boolean' | 'null'
+type CustomBodyParamDraft = {
+  id: string
+  key: string
+  type: CustomBodyParamType
+  value: string
+}
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type ScheduleListView = 'list' | 'calendar'
 type MaintenanceLogFilter = 'all' | LotteryCode
@@ -83,6 +90,62 @@ function getSettingsTabFromPath(pathname: string): SettingsTab {
   return matchedTab?.[0] || 'profile'
 }
 
+function getCustomBodyParams(extraOptions: Record<string, unknown> | undefined): Record<string, unknown> {
+  const params = extraOptions?.custom_body_params
+  return params && typeof params === 'object' && !Array.isArray(params) ? { ...(params as Record<string, unknown>) } : {}
+}
+
+function mergeCustomBodyParams(extraOptions: Record<string, unknown> | undefined, params: Record<string, unknown>) {
+  return {
+    ...(extraOptions || {}),
+    custom_body_params: params,
+  }
+}
+
+function ensureTemperatureParam(extraOptions: Record<string, unknown> | undefined, temperature?: number | null) {
+  const params = getCustomBodyParams(extraOptions)
+  if (params.temperature === undefined && temperature !== null && temperature !== undefined) {
+    params.temperature = temperature
+  }
+  return mergeCustomBodyParams(extraOptions, params)
+}
+
+function detectCustomBodyParamType(value: unknown): CustomBodyParamType {
+  if (value === null) return 'null'
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  return 'string'
+}
+
+function customBodyParamsToDrafts(params: Record<string, unknown>): CustomBodyParamDraft[] {
+  return Object.entries(params).map(([key, value], index) => ({
+    id: `${key}-${index}`,
+    key,
+    type: detectCustomBodyParamType(value),
+    value: value === null ? '' : String(value),
+  }))
+}
+
+function parseCustomBodyParamDraft(draft: CustomBodyParamDraft): unknown {
+  if (draft.type === 'number') return Number(draft.value)
+  if (draft.type === 'boolean') return draft.value === 'true'
+  if (draft.type === 'null') return null
+  return draft.value
+}
+
+function normalizeJsonText(value: unknown): string {
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!text) return '{}'
+    try {
+      return JSON.stringify(JSON.parse(text))
+    } catch {
+      return text
+    }
+  }
+  return JSON.stringify(value || {})
+}
+
 const EMPTY_MODEL_FORM: SettingsModelPayload = {
   model_code: '',
   display_name: '',
@@ -94,7 +157,12 @@ const EMPTY_MODEL_FORM: SettingsModelPayload = {
   base_url: '',
   api_key: '',
   app_code: '',
-  temperature: 0.3,
+  temperature: null,
+  extra_options: {
+    custom_body_params: {
+      temperature: 0.3,
+    },
+  },
   is_active: true,
   lottery_codes: ['dlt'],
 }
@@ -520,6 +588,17 @@ function MoreIcon() {
   )
 }
 
+function TrashIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4.2 6.2h11.6" />
+      <path d="M8 6.2V4.6h4v1.6" />
+      <path d="M6.1 6.2 6.8 16h6.4l.7-9.8" />
+      <path d="M8.7 9v4.2M11.3 9v4.2" />
+    </SvgIcon>
+  )
+}
+
 function EditIcon() {
   return (
     <SvgIcon>
@@ -866,7 +945,9 @@ export function SettingsPage() {
   const [isPasswordEditorOpen, setIsPasswordEditorOpen] = useState(false)
   const [modelForm, setModelForm] = useState<SettingsModelPayload>({ ...EMPTY_MODEL_FORM, lottery_codes: [DEFAULT_SETTINGS_LOTTERY] })
   const [modelConnectivityResult, setModelConnectivityResult] = useState<{ status: 'success' | 'error'; message: string; durationMs?: number } | null>(null)
-  const [lmStudioDiscoveredModels, setLmStudioDiscoveredModels] = useState<SettingsProviderDiscoveredModel[]>([])
+  const [customBodyParamEditorOpen, setCustomBodyParamEditorOpen] = useState(false)
+  const [customBodyParamDrafts, setCustomBodyParamDrafts] = useState<CustomBodyParamDraft[]>([])
+  const [customBodyParamError, setCustomBodyParamError] = useState<string | null>(null)
   const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState('deepseek')
   const [providerSourceDrafts, setProviderSourceDrafts] = useState<ManagedProvider[]>([])
   const [providerSourceMenuOpen, setProviderSourceMenuOpen] = useState(false)
@@ -1276,6 +1357,20 @@ export function SettingsPage() {
     return [...persistedProviders, ...missingDefaults, ...pendingDrafts]
   }, [providerSourceDrafts, providers])
   const activeManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || managedProviders[0] || null
+  const providerSettingsDirty = useMemo(() => {
+    if (!activeManagedProvider) return false
+    if (activeManagedProvider.isDraft) return true
+    const extraOptions = activeManagedProvider.extra_options || {}
+    const savedTimeout = String(extraOptions.timeout || PROVIDER_TIMEOUT_DEFAULT_SECONDS)
+    const savedProxyUrl = String(extraOptions.proxy_url || '')
+    return (
+      providerDraft.api_key.trim() !== (activeManagedProvider.api_key || '') ||
+      providerDraft.base_url.trim() !== (activeManagedProvider.base_url || '') ||
+      providerDraft.timeout.trim() !== savedTimeout ||
+      providerDraft.proxy_url.trim() !== savedProxyUrl ||
+      normalizeJsonText(providerDraft.custom_headers) !== normalizeJsonText(extraOptions.custom_headers || {})
+    )
+  }, [activeManagedProvider, providerDraft])
   useEffect(() => {
     if (!providers.length) return
     setProviderSourceDrafts((previous) => previous.filter((draft) => !providers.some((provider) => provider.code === draft.code)))
@@ -1310,14 +1405,9 @@ export function SettingsPage() {
     if (aiMixHubProvider) result.push({ ...aiMixHubProvider, display_name: 'AIHubMix' })
     return result
   }, [providers])
-  const modelFormProviders = createModeProviders.length
-    ? createModeProviders
-    : providers.map((provider) => ({ ...provider, display_name: provider.name }))
   const providerMap = useMemo(() => Object.fromEntries(providers.map((provider) => [provider.code, provider])), [providers])
-  const selectedProvider = providerMap[modelForm.provider]
-  const isLmStudioProvider = modelForm.provider === LMSTUDIO_PROVIDER_CODE
-  const selectedProviderModelConfigs = selectedProvider?.model_configs ?? []
-  const shouldShowModelAppCode = getProviderTemplate(modelForm.provider) === 'aihubmix'
+  const modelCustomBodyParams = getCustomBodyParams(modelForm.extra_options)
+  const modelCustomBodyParamKeys = Object.keys(modelCustomBodyParams)
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -1535,7 +1625,7 @@ export function SettingsPage() {
       base_url: string
       api_key: string
       app_code: string
-      temperature: number
+      extra_options?: Record<string, unknown>
     }) =>
       apiClient.testSettingsModelConnectivity(payload),
     onSuccess: (result) => {
@@ -1550,22 +1640,6 @@ export function SettingsPage() {
         status: 'error',
         message: error instanceof Error ? error.message : '连通性测试失败',
       })
-    },
-  })
-  const discoverLmStudioModelsMutation = useMutation({
-    mutationFn: () => apiClient.discoverSettingsProviderModels({
-      provider: modelForm.provider.trim(),
-      base_url: modelForm.base_url.trim(),
-      api_key: modelForm.api_key.trim(),
-    }),
-    onSuccess: (result) => {
-      setLmStudioDiscoveredModels(result.models || [])
-      setMessage(`已从 LM Studio 拉取 ${result.models.length} 个模型`)
-      setMessageType('success')
-    },
-    onError: (error) => {
-      setMessage(error instanceof Error ? error.message : '拉取 LM Studio 模型失败')
-      setMessageType('error')
     },
   })
   const discoverManagedProviderModelsMutation = useMutation({
@@ -1893,13 +1967,24 @@ export function SettingsPage() {
     setModelMode('create')
     setSelectedModelCode(null)
     const defaultProvider = createModeProviders[0] || providers[0]
-    setLmStudioDiscoveredModels([])
+    const defaultProviderModel = defaultProvider?.model_configs?.[0]
+    const defaultModelName = defaultProviderModel?.model_id || 'custom-model'
     setModelForm({
       ...EMPTY_MODEL_FORM,
+      model_code: `${defaultProvider?.code || 'model'}-${defaultModelName}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-_.]+/g, '-')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, ''),
+      display_name: defaultProviderModel?.display_name || defaultModelName,
       provider: defaultProvider?.code || '',
+      provider_model_id: defaultProviderModel?.id ?? null,
+      provider_model_name: defaultProviderModel?.model_id || '',
       api_format: defaultProvider?.api_format || 'openai_compatible',
+      api_model_name: defaultModelName,
       base_url: defaultProvider?.code === LMSTUDIO_PROVIDER_CODE ? (defaultProvider?.base_url || LMSTUDIO_DEFAULT_BASE_URL) : (defaultProvider?.base_url || ''),
-      temperature: 0.3,
+      temperature: null,
+      extra_options: ensureTemperatureParam(EMPTY_MODEL_FORM.extra_options, 0.3),
       lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
     })
     setModelConnectivityResult(null)
@@ -2099,6 +2184,14 @@ export function SettingsPage() {
     saveProviderMutation.mutate({ ...request, fetchAfterSave: true })
   }
 
+  function handleFetchProviderModels() {
+    if (providerSettingsDirty) {
+      saveAndFetchActiveProviderModels()
+      return
+    }
+    discoverManagedProviderModelsMutation.mutate(undefined)
+  }
+
   function addDiscoveredModel(model: SettingsProviderDiscoveredModel) {
     const provider = activeManagedProvider
     if (!provider) return
@@ -2120,7 +2213,8 @@ export function SettingsPage() {
       base_url: provider.base_url || providerDraft.base_url,
       api_key: provider.api_key || providerDraft.api_key,
       app_code: '',
-      temperature: 0.3,
+      temperature: null,
+      extra_options: ensureTemperatureParam(EMPTY_MODEL_FORM.extra_options, 0.3),
       is_active: true,
       lottery_codes: [DEFAULT_SETTINGS_LOTTERY],
     })
@@ -2209,10 +2303,6 @@ export function SettingsPage() {
     const model = await apiClient.getSettingsModel(modelCode)
     setModelMode('edit')
     setSelectedModelCode(modelCode)
-    setLmStudioDiscoveredModels(model.provider === LMSTUDIO_PROVIDER_CODE ? [{
-      model_id: model.api_model_name,
-      display_name: model.provider_model_name || model.api_model_name,
-    }] : [])
     setModelForm({
       model_code: model.model_code,
       display_name: model.display_name,
@@ -2224,7 +2314,8 @@ export function SettingsPage() {
       base_url: model.base_url,
       api_key: model.api_key,
       app_code: model.app_code,
-      temperature: model.temperature ?? 0.3,
+      temperature: null,
+      extra_options: ensureTemperatureParam(model.extra_options, model.temperature ?? 0.3),
       is_active: model.is_active,
       lottery_codes: model.lottery_codes,
     })
@@ -2235,7 +2326,59 @@ export function SettingsPage() {
   function closeModelModal() {
     setModelModalOpen(false)
     setModelConnectivityResult(null)
-    setLmStudioDiscoveredModels([])
+    setCustomBodyParamEditorOpen(false)
+    setCustomBodyParamError(null)
+  }
+
+  function openCustomBodyParamEditor() {
+    setCustomBodyParamDrafts(customBodyParamsToDrafts(modelCustomBodyParams))
+    setCustomBodyParamError(null)
+    setCustomBodyParamEditorOpen(true)
+  }
+
+  function addCustomBodyParam(key = '', type: CustomBodyParamType = 'string', value = '') {
+    setCustomBodyParamDrafts((previous) => [
+      ...previous,
+      { id: `custom-${Date.now()}-${previous.length}`, key, type, value },
+    ])
+    setCustomBodyParamError(null)
+  }
+
+  function updateCustomBodyParamDraft(id: string, patch: Partial<CustomBodyParamDraft>) {
+    setCustomBodyParamDrafts((previous) => previous.map((draft) => (draft.id === id ? { ...draft, ...patch } : draft)))
+    setCustomBodyParamError(null)
+  }
+
+  function removeCustomBodyParamDraft(id: string) {
+    setCustomBodyParamDrafts((previous) => previous.filter((draft) => draft.id !== id))
+    setCustomBodyParamError(null)
+  }
+
+  function saveCustomBodyParams() {
+    const nextParams: Record<string, unknown> = {}
+    for (const draft of customBodyParamDrafts) {
+      const key = draft.key.trim()
+      if (!key) {
+        setCustomBodyParamError('参数名不能为空')
+        return
+      }
+      if (Object.prototype.hasOwnProperty.call(nextParams, key)) {
+        setCustomBodyParamError(`参数名重复：${key}`)
+        return
+      }
+      if (draft.type === 'number' && !Number.isFinite(Number(draft.value))) {
+        setCustomBodyParamError(`参数“${key}”必须是数字`)
+        return
+      }
+      nextParams[key] = parseCustomBodyParamDraft(draft)
+    }
+    setModelForm((previous) => ({
+      ...previous,
+      temperature: typeof nextParams.temperature === 'number' ? nextParams.temperature : null,
+      extra_options: mergeCustomBodyParams(previous.extra_options, nextParams),
+    }))
+    setCustomBodyParamEditorOpen(false)
+    setCustomBodyParamError(null)
   }
 
   function selectRole(role: RoleItem) {
@@ -2265,7 +2408,8 @@ export function SettingsPage() {
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
       app_code: modelForm.app_code.trim(),
-      temperature: Number(modelForm.temperature ?? 0.3),
+      temperature: null,
+      extra_options: mergeCustomBodyParams(modelForm.extra_options, modelCustomBodyParams),
     })
   }
 
@@ -2278,7 +2422,7 @@ export function SettingsPage() {
       base_url: modelForm.base_url.trim(),
       api_key: modelForm.api_key.trim(),
       app_code: modelForm.app_code.trim(),
-      temperature: Number(modelForm.temperature ?? 0.3),
+      extra_options: mergeCustomBodyParams(modelForm.extra_options, modelCustomBodyParams),
     })
   }
 
@@ -2319,44 +2463,6 @@ export function SettingsPage() {
       }
     }
     generatePredictionMutation.mutate()
-  }
-
-  function handleModelProviderChange(providerCode: string) {
-    const provider = providerMap[providerCode]
-    setLmStudioDiscoveredModels([])
-    setModelForm((previous) => ({
-      ...previous,
-      provider: providerCode,
-      api_format: provider?.api_format || 'openai_compatible',
-      base_url: providerCode === LMSTUDIO_PROVIDER_CODE ? (provider?.base_url || LMSTUDIO_DEFAULT_BASE_URL) : (provider?.base_url || previous.base_url),
-      api_key: providerCode === LMSTUDIO_PROVIDER_CODE ? '' : previous.api_key,
-      provider_model_id: null,
-      provider_model_name: '',
-      api_model_name: '',
-    }))
-  }
-
-  function handleProviderModelConfigChange(providerModelIdText: string) {
-    const providerModelId = Number(providerModelIdText)
-    const modelConfig = selectedProviderModelConfigs.find((item) => item.id === providerModelId)
-    setModelForm((previous) => ({
-      ...previous,
-      provider_model_id: Number.isFinite(providerModelId) ? providerModelId : null,
-      provider_model_name: modelConfig?.model_id || '',
-      api_model_name: modelConfig?.model_id || previous.api_model_name,
-      display_name: modelMode === 'create' && !previous.display_name ? (modelConfig?.display_name || previous.display_name) : previous.display_name,
-    }))
-  }
-
-  function handleLmStudioDiscoveredModelChange(modelId: string) {
-    const modelConfig = lmStudioDiscoveredModels.find((item) => item.model_id === modelId)
-    setModelForm((previous) => ({
-      ...previous,
-      provider_model_id: null,
-      provider_model_name: modelConfig?.model_id || '',
-      api_model_name: modelConfig?.model_id || previous.api_model_name,
-      display_name: modelMode === 'create' && !previous.display_name ? (modelConfig?.display_name || previous.display_name) : previous.display_name,
-    }))
   }
 
   function handleGenerationLotteryChange(nextLottery: LotteryCode) {
@@ -2911,7 +3017,7 @@ export function SettingsPage() {
                               title="删除"
                               onClick={() => deleteProviderSource(provider)}
                             >
-                              <MoreIcon />
+                              <TrashIcon />
                             </button>
                           ) : (
                             <span className="provider-source-item__count">{providerModelCount}</span>
@@ -3026,20 +3132,14 @@ export function SettingsPage() {
                               />
                             </label>
                             <button
-                              className="ghost-button"
+                              className={providerSettingsDirty ? 'primary-button' : 'ghost-button'}
                               type="button"
-                              onClick={() => discoverManagedProviderModelsMutation.mutate(undefined)}
-                              disabled={discoverManagedProviderModelsMutation.isPending}
-                            >
-                              {discoverManagedProviderModelsMutation.isPending ? '获取中...' : '获取模型列表'}
-                            </button>
-                            <button
-                              className="primary-button"
-                              type="button"
-                              onClick={saveAndFetchActiveProviderModels}
+                              onClick={handleFetchProviderModels}
                               disabled={saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending}
                             >
-                              保存并获取模型
+                              {saveProviderMutation.isPending || discoverManagedProviderModelsMutation.isPending
+                                ? '处理中...'
+                                : providerSettingsDirty ? '保存并获取模型' : '获取模型列表'}
                             </button>
                             <button className="ghost-button" type="button" onClick={openCreateModel}>自定义模型</button>
                           </div>
@@ -3096,7 +3196,7 @@ export function SettingsPage() {
                                           onClick={() => modelActionMutation.mutate({ type: 'toggle', modelCode: model.model_code, isActive: !model.is_active })}
                                         />
                                         <IconButton label={`生成预测数据：${model.display_name}`} icon={<SortIcon />} onClick={() => openGenerateModel(model.model_code, model.display_name)} />
-                                        <IconButton label={`删除模型 ${model.display_name}`} icon={<MoreIcon />} danger onClick={() => confirmDeleteModel(model.model_code, model.display_name)} />
+                                        <IconButton label={`删除模型 ${model.display_name}`} icon={<TrashIcon />} danger onClick={() => confirmDeleteModel(model.model_code, model.display_name)} />
                                       </>
                                     ) : (
                                       <IconButton label={`恢复模型 ${model.display_name}`} icon={<RestoreIcon />} onClick={() => modelActionMutation.mutate({ type: 'restore', modelCode: model.model_code })} />
@@ -4132,124 +4232,8 @@ export function SettingsPage() {
               </div>
               <section className="model-config-modal__section">
                 <div className="model-config-modal__section-title">
-                  <strong>基础信息</strong>
-                  <span>确定模型标识、展示名称和服务提供方。</span>
-                </div>
-                <div className="model-config-modal__grid">
-                  <label className="field">
-                    <span>模型编码</span>
-                    <input value={modelForm.model_code || ''} onChange={(event) => setModelForm((previous) => ({ ...previous, model_code: event.target.value }))} required />
-                  </label>
-                  <label className="field">
-                    <span>显示名称</span>
-                    <input value={modelForm.display_name} onChange={(event) => setModelForm((previous) => ({ ...previous, display_name: event.target.value }))} required />
-                  </label>
-                  <label className="field">
-                    <span>Provider</span>
-                    <select value={modelForm.provider} onChange={(event) => handleModelProviderChange(event.target.value)}>
-                      {modelFormProviders.map((provider) => (
-                        <option key={provider.code} value={provider.code}>
-                          {provider.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>接口格式</span>
-                    <select
-                      value={modelForm.api_format || selectedProvider?.api_format || 'openai_compatible'}
-                      onChange={(event) => setModelForm((previous) => ({ ...previous, api_format: event.target.value as SettingsProviderPayload['api_format'] }))}
-                      disabled={isLmStudioProvider}
-                    >
-                      <option value="openai_responses">OpenAI Responses</option>
-                      <option value="openai_compatible">OpenAI Compatible</option>
-                      <option value="anthropic">Anthropic</option>
-                      <option value="amazon_bedrock">Amazon Bedrock</option>
-                      <option value="google_gemini">Google(Gemini)</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>供应商模型</span>
-                    <select
-                      value={modelForm.provider_model_id ? String(modelForm.provider_model_id) : ''}
-                      onChange={(event) => handleProviderModelConfigChange(event.target.value)}
-                    >
-                      <option value="">请选择供应商模型</option>
-                      {selectedProviderModelConfigs.map((modelConfig) => (
-                        <option key={modelConfig.id} value={modelConfig.id}>
-                          {modelConfig.display_name} ({modelConfig.model_id})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>API 模型名</span>
-                    <input value={modelForm.api_model_name} onChange={(event) => setModelForm((previous) => ({ ...previous, api_model_name: event.target.value }))} required />
-                  </label>
-                  {isLmStudioProvider ? (
-                    <>
-                      <label className="field">
-                        <span>LM Studio 已加载模型</span>
-                        <select
-                          aria-label="LM Studio 已加载模型"
-                          value={modelForm.provider_model_name || ''}
-                          onChange={(event) => handleLmStudioDiscoveredModelChange(event.target.value)}
-                        >
-                          <option value="">请选择已加载模型</option>
-                          {lmStudioDiscoveredModels.map((modelConfig) => (
-                            <option key={modelConfig.model_id} value={modelConfig.model_id}>
-                              {modelConfig.display_name} ({modelConfig.model_id})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="field">
-                        <span>&nbsp;</span>
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => discoverLmStudioModelsMutation.mutate()}
-                          disabled={discoverLmStudioModelsMutation.isPending}
-                        >
-                          {discoverLmStudioModelsMutation.isPending ? '加载中...' : '从 LM Studio 拉取模型'}
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              </section>
-
-              <section className="model-config-modal__section">
-                <div className="model-config-modal__section-title">
-                  <strong>连接与鉴权</strong>
-                  <span>维护接口地址和访问凭证，支持按模型独立配置。</span>
-                </div>
-                <div className="model-config-modal__grid">
-                  <label className="field model-config-modal__field--full">
-                    <span>Base URL</span>
-                    <input value={modelForm.base_url} onChange={(event) => setModelForm((previous) => ({ ...previous, base_url: event.target.value }))} />
-                  </label>
-                  <label className="field model-config-modal__field--full">
-                    <span>{isLmStudioProvider ? 'API Key（可选）' : 'API Key'}</span>
-                    <input value={modelForm.api_key} onChange={(event) => setModelForm((previous) => ({ ...previous, api_key: event.target.value }))} />
-                  </label>
-                  {isLmStudioProvider ? <div className="settings-inline-hint">LM Studio 本地服务可不填写 API Key。</div> : null}
-                  {shouldShowModelAppCode ? (
-                    <label className="field">
-                      <span>APP Code</span>
-                      <input value={modelForm.app_code} onChange={(event) => setModelForm((previous) => ({ ...previous, app_code: event.target.value }))} />
-                    </label>
-                  ) : null}
-                  <label className="field">
-                    <span>Temperature</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={modelForm.temperature ?? 0.3}
-                      onChange={(event) => setModelForm((previous) => ({ ...previous, temperature: Number(event.target.value) }))}
-                      required
-                    />
-                  </label>
+                  <strong>高级参数</strong>
+                  <span>配置模型启用状态、投放彩种与请求体参数。</span>
                 </div>
                 <div className="model-config-modal__connectivity">
                   <button
@@ -4269,13 +4253,6 @@ export function SettingsPage() {
                       {typeof modelConnectivityResult.durationMs === 'number' ? `（${modelConnectivityResult.durationMs}ms）` : ''}
                     </p>
                   ) : null}
-                </div>
-              </section>
-
-              <section className="model-config-modal__section">
-                <div className="model-config-modal__section-title">
-                  <strong>高级参数</strong>
-                  <span>配置模型启用状态与投放彩种。</span>
                 </div>
                 <div className="model-config-modal__toggles">
                   <label className="toggle-chip model-config-modal__toggle">
@@ -4308,6 +4285,13 @@ export function SettingsPage() {
                     </div>
                   </div>
                 </div>
+                <div className="model-config-modal__param-summary">
+                  <div>
+                    <strong>自定义请求体参数</strong>
+                    <span>{modelCustomBodyParamKeys.length ? modelCustomBodyParamKeys.join('、') : '暂无项目'}</span>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={openCustomBodyParamEditor}>修改</button>
+                </div>
               </section>
 
               <div className="form-actions model-config-modal__actions">
@@ -4315,6 +4299,84 @@ export function SettingsPage() {
                 <button className="primary-button" type="submit">{modelMode === 'create' ? '创建模型' : '保存修改'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {customBodyParamEditorOpen ? (
+        <div className="modal-shell" role="presentation" onClick={() => setCustomBodyParamEditorOpen(false)}>
+          <div className="modal-card modal-card--form custom-body-param-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-card__header">
+              <div>
+                <p className="modal-card__eyebrow">请求体参数</p>
+                <h3>修改键值对</h3>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setCustomBodyParamEditorOpen(false)}>关闭</button>
+            </div>
+            <div className="custom-body-param-modal__presets">
+              {[
+                { key: 'temperature', type: 'number' as CustomBodyParamType, value: '0.3' },
+                { key: 'top_p', type: 'number' as CustomBodyParamType, value: '1' },
+                { key: 'max_tokens', type: 'number' as CustomBodyParamType, value: '1024' },
+              ].map((preset) => (
+                <button
+                  key={preset.key}
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => addCustomBodyParam(preset.key, preset.type, preset.value)}
+                  disabled={customBodyParamDrafts.some((draft) => draft.key.trim() === preset.key)}
+                >
+                  {preset.key}
+                </button>
+              ))}
+            </div>
+            <div className="custom-body-param-modal__rows">
+              {customBodyParamDrafts.length ? customBodyParamDrafts.map((draft) => (
+                <div className="custom-body-param-modal__row" key={draft.id}>
+                  <label className="field">
+                    <span>参数名</span>
+                    <input value={draft.key} onChange={(event) => updateCustomBodyParamDraft(draft.id, { key: event.target.value })} placeholder="temperature" />
+                  </label>
+                  <label className="field">
+                    <span>类型</span>
+                    <select value={draft.type} onChange={(event) => updateCustomBodyParamDraft(draft.id, { type: event.target.value as CustomBodyParamType, value: event.target.value === 'null' ? '' : draft.value })}>
+                      <option value="string">string</option>
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                      <option value="null">null</option>
+                    </select>
+                  </label>
+                  {draft.type === 'boolean' ? (
+                    <label className="field">
+                      <span>参数值</span>
+                      <select value={draft.value || 'true'} onChange={(event) => updateCustomBodyParamDraft(draft.id, { value: event.target.value })}>
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="field">
+                      <span>参数值</span>
+                      <input
+                        value={draft.value}
+                        disabled={draft.type === 'null'}
+                        onChange={(event) => updateCustomBodyParamDraft(draft.id, { value: event.target.value })}
+                        placeholder={draft.type === 'null' ? 'null' : '请输入值'}
+                      />
+                    </label>
+                  )}
+                  <button className="ghost-button custom-body-param-modal__remove" type="button" onClick={() => removeCustomBodyParamDraft(draft.id)}>删除</button>
+                </div>
+              )) : (
+                <div className="custom-body-param-modal__empty">暂无自定义请求体参数。</div>
+              )}
+            </div>
+            {customBodyParamError ? <p className="custom-body-param-modal__error">{customBodyParamError}</p> : null}
+            <div className="form-actions">
+              <button className="ghost-button" type="button" onClick={() => addCustomBodyParam()}>新增参数</button>
+              <button className="ghost-button" type="button" onClick={() => setCustomBodyParamEditorOpen(false)}>取消</button>
+              <button className="primary-button" type="button" onClick={saveCustomBodyParams}>保存</button>
+            </div>
           </div>
         </div>
       ) : null}

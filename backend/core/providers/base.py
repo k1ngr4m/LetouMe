@@ -35,10 +35,11 @@ class BaseModel(ABC):
         ]
 
     def request_kwargs(self) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {}
+        custom_body_params = self.definition.extra.get("custom_body_params") if isinstance(self.definition.extra, dict) else {}
+        kwargs: dict[str, Any] = dict(custom_body_params) if isinstance(custom_body_params, dict) else {}
         if self.definition.temperature is not None:
             kwargs["temperature"] = self.definition.temperature
-        else:
+        elif "temperature" not in kwargs:
             kwargs["temperature"] = 0
         app_code = self.definition.app_code()
         if app_code and self.definition.uses_aihubmix():

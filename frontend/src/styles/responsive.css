@@ -259,6 +259,15 @@
     width: 100%;
   }
 
+  .model-config-modal__param-summary,
+  .custom-body-param-modal__row {
+    grid-template-columns: 1fr;
+  }
+
+  .model-config-modal__param-summary {
+    display: grid;
+  }
+
   .model-config-modal__actions .primary-button,
   .model-config-modal__actions .ghost-button {
     width: 100%;

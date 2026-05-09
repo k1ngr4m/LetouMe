@@ -365,6 +365,8 @@ describe('SettingsPage model management view switch', () => {
 
     expect(await screen.findByText('deepseek_1')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /OpenRouter/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '获取模型列表' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '保存并获取模型' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     expect(screen.getByRole('menuitem', { name: /DeepSeek/ })).toBeInTheDocument()
@@ -374,6 +376,8 @@ describe('SettingsPage model management view switch', () => {
     expect(await screen.findByRole('heading', { name: 'deepseek_2' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('deepseek_2')).toBeInTheDocument()
     expect(screen.getByDisplayValue('https://api.deepseek.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存并获取模型' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '获取模型列表' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
     await waitFor(() =>
@@ -426,6 +430,7 @@ describe('SettingsPage model management view switch', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /AIHubMix/ }))
     expect(await screen.findByRole('heading', { name: 'aihubmix_2' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('aihubmix_2')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '保存并获取模型' })).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('button', { name: '保存并获取模型' }))
     await waitFor(() => expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({ code: 'aihubmix_2' })))
@@ -947,7 +952,7 @@ describe('SettingsPage model management view switch', () => {
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
   })
 
-  it('shows APP Code only for AIHubMix provider in model modal', async () => {
+  it('hides basic and auth sections in model modal while keeping custom request params', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
@@ -966,17 +971,19 @@ describe('SettingsPage model management view switch', () => {
     await screen.findByRole('button', { name: '自定义模型' })
     await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
 
-    expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Temperature')).toHaveValue(0.3)
+    expect(screen.queryByText('基础信息')).not.toBeInTheDocument()
+    expect(screen.queryByText('连接与鉴权')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Temperature')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '测试连通性' })).toBeInTheDocument()
+    expect(screen.getByText('自定义请求体参数')).toBeInTheDocument()
+    expect(screen.getByText('temperature')).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'aihubmix')
-    expect(screen.getByLabelText('APP Code')).toBeInTheDocument()
-
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'deepseek')
-    expect(screen.queryByLabelText('APP Code')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '修改' }))
+    expect(screen.getByRole('heading', { name: '修改键值对' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('temperature')).toBeInTheDocument()
   })
 
-  it('passes manual temperature in model connectivity test', async () => {
+  it('passes custom request body params in model connectivity test', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
     apiClientMock.getSettingsProviders.mockResolvedValue({
       providers: [
@@ -993,14 +1000,19 @@ describe('SettingsPage model management view switch', () => {
 
     await screen.findByRole('button', { name: '自定义模型' })
     await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
-    await userEvent.type(screen.getByLabelText('API 模型名'), 'deepseek-chat')
-    await userEvent.clear(screen.getByLabelText('Temperature'))
-    await userEvent.type(screen.getByLabelText('Temperature'), '0.9')
+    await userEvent.click(screen.getByRole('button', { name: '修改' }))
+    await userEvent.clear(screen.getByDisplayValue('0.3'))
+    await userEvent.type(screen.getByPlaceholderText('请输入值'), '0.9')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
     await userEvent.click(screen.getByRole('button', { name: '测试连通性' }))
 
     await waitFor(() =>
       expect(apiClientMock.testSettingsModelConnectivity).toHaveBeenCalledWith(
-        expect.objectContaining({ temperature: 0.9 }),
+        expect.objectContaining({
+          extra_options: expect.objectContaining({
+            custom_body_params: expect.objectContaining({ temperature: 0.9 }),
+          }),
+        }),
       ),
     )
   })

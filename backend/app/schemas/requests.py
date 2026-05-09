@@ -62,7 +62,8 @@ class ModelConnectivityTestPayload(BaseModel):
     base_url: str | None = ""
     api_key: str | None = ""
     app_code: str | None = ""
-    temperature: float = 0.3
+    temperature: float | None = None
+    extra_options: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderCreatePayload(ProviderSettingsPayload):

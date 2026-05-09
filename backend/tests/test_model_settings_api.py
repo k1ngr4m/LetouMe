@@ -142,11 +142,14 @@ class ModelSettingsApiTests(unittest.TestCase):
                 "base_url": "https://example.test/v1",
                 "api_key": "secret-key",
                 "app_code": "APP-123",
+                "extra_options": {"custom_body_params": {"temperature": 0.8, "top_p": 0.9}},
                 "is_active": True,
             },
         )
         self.assertEqual(create_response.status_code, 200)
         self.assertEqual(create_response.json()["model_code"], "custom-model")
+        self.assertEqual(create_response.json()["extra_options"]["custom_body_params"]["temperature"], 0.8)
+        self.assertEqual(create_response.json()["extra_options"]["custom_body_params"]["top_p"], 0.9)
 
         update_response = self.client.post(
             "/api/settings/models/update",
@@ -159,6 +162,7 @@ class ModelSettingsApiTests(unittest.TestCase):
                 "base_url": "https://api.example.test/v1",
                 "api_key": "secret-key-2",
                 "app_code": "APP-999",
+                "extra_options": {"custom_body_params": {"max_tokens": 1024}},
                 "is_active": False,
             },
         )
@@ -167,6 +171,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(updated_payload["display_name"], "Custom Model Updated")
         self.assertEqual(updated_payload["provider"], "openai")
         self.assertFalse(updated_payload["is_active"])
+        self.assertEqual(updated_payload["extra_options"]["custom_body_params"]["max_tokens"], 1024)
 
         rename_response = self.client.post(
             "/api/settings/models/update",
@@ -185,6 +190,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         )
         self.assertEqual(rename_response.status_code, 200)
         self.assertEqual(rename_response.json()["model_code"], "custom-model-renamed")
+        self.assertEqual(rename_response.json()["extra_options"]["custom_body_params"]["temperature"], 0.3)
 
         delete_response = self.client.post("/api/settings/models/delete", json={"model_code": "custom-model-renamed"})
         self.assertEqual(delete_response.status_code, 200)

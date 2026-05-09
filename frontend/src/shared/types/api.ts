@@ -718,6 +718,7 @@ export type SettingsModel = {
   api_key: string
   app_code: string
   temperature?: number | null
+  extra_options?: Record<string, unknown>
   is_active: boolean
   is_deleted: boolean
   lottery_codes: LotteryCode[]
@@ -788,6 +789,7 @@ export type SettingsModelPayload = {
   api_key: string
   app_code: string
   temperature?: number | null
+  extra_options?: Record<string, unknown>
   is_active: boolean
   lottery_codes: LotteryCode[]
 }
@@ -800,6 +802,7 @@ export type SettingsModelConnectivityTestPayload = {
   api_key?: string
   app_code?: string
   temperature?: number
+  extra_options?: Record<string, unknown>
 }
 
 export type SettingsModelConnectivityTestResponse = {

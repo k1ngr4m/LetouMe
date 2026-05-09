@@ -16,7 +16,8 @@ class ModelSettingsPayload(BaseModel):
     base_url: str | None = ""
     api_key: str | None = ""
     app_code: str | None = ""
-    temperature: float = 0.3
+    temperature: float | None = None
+    extra_options: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = True
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])
 
@@ -37,6 +38,7 @@ class ModelResponse(BaseModel):
     api_key: str = ""
     app_code: str = ""
     temperature: float | None = 0.3
+    extra_options: dict[str, Any] = Field(default_factory=dict)
     is_active: bool
     is_deleted: bool
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt"])

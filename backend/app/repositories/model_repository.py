@@ -101,10 +101,11 @@ class ModelRepository:
                         api_key,
                         app_code,
                         temperature,
+                        extra_options_json,
                         is_deleted,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         model_code,
@@ -116,6 +117,7 @@ class ModelRepository:
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
                         float(payload.get("temperature")),
+                        self._dump_extra_options(payload.get("extra_options")),
                         0,
                         now_ts(),
                     ),
@@ -158,6 +160,7 @@ class ModelRepository:
                         api_key = ?,
                         app_code = ?,
                         temperature = ?,
+                        extra_options_json = ?,
                         updated_at = ?
                     WHERE model_code = ?
                     """,
@@ -171,6 +174,7 @@ class ModelRepository:
                         self._optional_str(payload.get("api_key")) or self._optional_str(provider_row.get("api_key")) or "",
                         self._optional_str(payload.get("app_code")) or "",
                         float(payload.get("temperature")),
+                        self._dump_extra_options(payload.get("extra_options")),
                         now_ts(),
                         model_code,
                     ),
@@ -437,6 +441,7 @@ class ModelRepository:
                 am.api_key,
                 am.app_code,
                 am.temperature,
+                am.extra_options_json,
                 am.is_active,
                 am.is_deleted,
                 am.updated_at
@@ -859,6 +864,7 @@ class ModelRepository:
             "api_key": row.get("api_key") or "",
             "app_code": row.get("app_code") or "",
             "temperature": row.get("temperature"),
+            "extra_options": ModelRepository._serialize_model_extra_options(row.get("extra_options_json"), row.get("temperature")),
             "is_active": bool(row.get("is_active")),
             "is_deleted": bool(row.get("is_deleted")),
             "lottery_codes": lottery_codes or ["dlt"],
@@ -956,6 +962,14 @@ class ModelRepository:
             float(payload.get("temperature"))
         except (TypeError, ValueError) as exc:
             raise ValueError("temperature 必须是数字") from exc
+        extra_options = payload.get("extra_options") or {}
+        if not isinstance(extra_options, dict):
+            raise ValueError("extra_options 必须是对象")
+        custom_body_params = extra_options.get("custom_body_params", {})
+        if custom_body_params is None:
+            custom_body_params = {}
+        if not isinstance(custom_body_params, dict):
+            raise ValueError("custom_body_params 必须是对象")
         lottery_codes = payload.get("lottery_codes")
         if lottery_codes is not None:
             normalized_lottery_codes = ModelRepository._normalize_lottery_codes(lottery_codes)
@@ -965,3 +979,33 @@ class ModelRepository:
                 if code not in SUPPORTED_LOTTERY_CODES:
                     raise ValueError(f"不支持的彩种: {code}")
         return
+
+    @staticmethod
+    def _dump_extra_options(extra_options: Any) -> str | None:
+        if not isinstance(extra_options, dict) or not extra_options:
+            return None
+        return json.dumps(extra_options, ensure_ascii=False, sort_keys=True)
+
+    @staticmethod
+    def _serialize_model_extra_options(value: Any, legacy_temperature: Any) -> dict[str, Any]:
+        extra_options = ModelRepository._parse_json_object(value)
+        custom_body_params = extra_options.get("custom_body_params")
+        if not isinstance(custom_body_params, dict):
+            custom_body_params = {}
+        if "temperature" not in custom_body_params and legacy_temperature is not None:
+            custom_body_params["temperature"] = legacy_temperature
+        extra_options["custom_body_params"] = custom_body_params
+        return extra_options
+
+    @staticmethod
+    def _parse_json_object(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return dict(value)
+        text = str(value or "").strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}

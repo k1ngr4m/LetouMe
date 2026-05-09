@@ -98,6 +98,7 @@ SCHEMA_STATEMENTS = [
         api_key TEXT NULL,
         app_code VARCHAR(255) NULL,
         temperature DOUBLE NULL,
+        extra_options_json JSON NULL,
         is_deleted TINYINT(1) NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at BIGINT NOT NULL DEFAULT 0,
@@ -1122,6 +1123,7 @@ SCHEMA_MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "ai_model": {
         "provider_model_id": "ALTER TABLE ai_model ADD COLUMN provider_model_id BIGINT NULL AFTER provider_id",
+        "extra_options_json": "ALTER TABLE ai_model ADD COLUMN extra_options_json JSON NULL AFTER temperature",
     },
     "app_user": {
         "email": "ALTER TABLE app_user ADD COLUMN email VARCHAR(255) NULL AFTER username",

@@ -92,7 +92,8 @@ class ModelService:
         provider = str(payload.get("provider") or "").strip()
         api_model_name = str(payload.get("api_model_name") or "").strip()
         api_format = str(payload.get("api_format") or "").strip().lower() or None
-        temperature = self._normalize_temperature(payload.get("temperature"))
+        extra_options = self._normalize_model_extra_options(payload.get("extra_options"), payload.get("temperature"))
+        temperature = self._normalize_temperature(extra_options.get("custom_body_params", {}).get("temperature"))
         if not provider:
             raise ValueError("Provider cannot be empty")
         if not api_model_name:
@@ -110,6 +111,7 @@ class ModelService:
             base_url_value=str(payload.get("base_url") or "").strip(),
             app_code_value=str(payload.get("app_code") or "").strip(),
             temperature=temperature,
+            extra=extra_options,
         )
         model = ModelFactory().create(model_definition)
         ok, message = model.health_check()
@@ -344,7 +346,10 @@ class ModelService:
         normalized["base_url"] = str(payload.get("base_url") or "").strip()
         normalized["api_key"] = str(payload.get("api_key") or "").strip()
         normalized["app_code"] = str(payload.get("app_code") or "").strip()
-        normalized["temperature"] = ModelService._normalize_temperature(payload.get("temperature"))
+        normalized["extra_options"] = ModelService._normalize_model_extra_options(payload.get("extra_options"), payload.get("temperature"))
+        normalized["temperature"] = ModelService._normalize_temperature(
+            normalized["extra_options"].get("custom_body_params", {}).get("temperature")
+        )
         normalized["lottery_codes"] = [
             normalize_lottery_code(str(item))
             for item in (payload.get("lottery_codes") or ["dlt"])
@@ -361,6 +366,19 @@ class ModelService:
             return float(value)
         except (TypeError, ValueError) as exc:
             raise ValueError("Temperature must be numeric") from exc
+
+    @staticmethod
+    def _normalize_model_extra_options(extra_options: Any, legacy_temperature: Any = None) -> dict[str, Any]:
+        normalized = dict(extra_options) if isinstance(extra_options, dict) else {}
+        custom_body_params = normalized.get("custom_body_params")
+        if not isinstance(custom_body_params, dict):
+            custom_body_params = {}
+        else:
+            custom_body_params = dict(custom_body_params)
+        if "temperature" not in custom_body_params and legacy_temperature is not None and str(legacy_temperature).strip() != "":
+            custom_body_params["temperature"] = ModelService._normalize_temperature(legacy_temperature)
+        normalized["custom_body_params"] = custom_body_params
+        return normalized
 
     @staticmethod
     def _normalize_provider_payload(payload: dict[str, Any], *, is_create: bool) -> dict[str, Any]:

@@ -307,12 +307,13 @@ def bootstrap_default_models() -> None:
                             is_active,
                             base_url,
                             api_key,
-                            app_code,
-                            temperature,
-                            is_deleted,
-                            updated_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                        app_code,
+                        temperature,
+                        extra_options_json,
+                        is_deleted,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                         """,
                         (
                             item["model_code"],
@@ -325,6 +326,7 @@ def bootstrap_default_models() -> None:
                             item.get("api_key") or "",
                             item.get("app_code") or "",
                             item.get("temperature"),
+                            json.dumps(item.get("extra_options") or {}, ensure_ascii=False) if item.get("extra_options") else None,
                             now_ts(),
                         ),
                     )
@@ -496,6 +498,7 @@ def load_model_registry(_config_path: str | None = None, *, use_cache: bool = Tr
                     am.api_key,
                     am.app_code,
                     am.temperature,
+                    am.extra_options_json,
                     am.is_active,
                     am.is_deleted
                 FROM ai_model am
@@ -532,7 +535,11 @@ def load_model_registry(_config_path: str | None = None, *, use_cache: bool = Tr
             lottery_codes=lotteries_by_code.get(model_code, ["dlt"]),
             is_active=bool(row.get("is_active")),
             is_deleted=bool(row.get("is_deleted")),
-            extra=extra_options_by_provider_id.get(int(row["provider_id"]), {}) if row.get("provider_id") is not None else {},
+            extra=_merge_model_extra_options(
+                extra_options_by_provider_id.get(int(row["provider_id"]), {}) if row.get("provider_id") is not None else {},
+                _parse_extra_options(row.get("extra_options_json")),
+                row.get("temperature"),
+            ),
         )
     registry = ModelRegistry(definitions=definitions)
     if use_cache:
@@ -617,3 +624,17 @@ def _parse_extra_options(value: Any) -> dict[str, Any]:
     except Exception:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _merge_model_extra_options(provider_extra: dict[str, Any], model_extra: dict[str, Any], legacy_temperature: Any) -> dict[str, Any]:
+    merged = dict(provider_extra or {})
+    merged.update(model_extra or {})
+    custom_body_params = merged.get("custom_body_params")
+    if not isinstance(custom_body_params, dict):
+        custom_body_params = {}
+    else:
+        custom_body_params = dict(custom_body_params)
+    if "temperature" not in custom_body_params and legacy_temperature is not None:
+        custom_body_params["temperature"] = legacy_temperature
+    merged["custom_body_params"] = custom_body_params
+    return merged

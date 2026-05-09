@@ -586,6 +586,12 @@ a {
   background: rgba(255, 255, 255, 0.86);
 }
 
+:root[data-theme='light'] .model-config-modal__param-summary,
+:root[data-theme='light'] .custom-body-param-modal__row {
+  border-color: rgba(133, 150, 178, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+}
+
 :root[data-theme='light'] .model-config-modal .field input,
 :root[data-theme='light'] .model-config-modal .field select {
   border-color: rgba(133, 150, 178, 0.24);
