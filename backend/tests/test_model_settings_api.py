@@ -131,6 +131,49 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.json()["success"])
 
+    def test_delete_provider_soft_deletes_bound_models(self) -> None:
+        create_provider_response = self.client.post(
+            "/api/settings/providers/create",
+            json={
+                "code": "deletable-provider",
+                "name": "Deletable Provider",
+                "api_format": "openai_compatible",
+                "website_url": "https://example.test",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "test-key",
+                "remark": "test",
+                "model_configs": [{"model_id": "bound-model", "display_name": "Bound Model"}],
+            },
+        )
+        self.assertEqual(create_provider_response.status_code, 200)
+
+        create_model_response = self.client.post(
+            "/api/settings/models/create",
+            json={
+                "model_code": "provider-bound-model",
+                "display_name": "Provider Bound Model",
+                "provider": "deletable-provider",
+                "api_model_name": "bound-model",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "secret-key",
+                "is_active": True,
+            },
+        )
+        self.assertEqual(create_model_response.status_code, 200)
+        self.assertTrue(create_model_response.json()["is_active"])
+
+        delete_response = self.client.post("/api/settings/providers/delete", json={"provider_code": "deletable-provider"})
+        self.assertEqual(delete_response.status_code, 200)
+
+        visible_response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
+        visible_codes = [model["model_code"] for model in visible_response.json()["models"]]
+        self.assertNotIn("provider-bound-model", visible_codes)
+
+        deleted_response = self.client.post("/api/settings/models/list", json={"include_deleted": True})
+        deleted_model = next(model for model in deleted_response.json()["models"] if model["model_code"] == "provider-bound-model")
+        self.assertTrue(deleted_model["is_deleted"])
+        self.assertFalse(deleted_model["is_active"])
+
     def test_create_update_and_soft_delete_model(self) -> None:
         create_response = self.client.post(
             "/api/settings/models/create",

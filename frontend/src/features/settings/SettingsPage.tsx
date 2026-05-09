@@ -438,7 +438,7 @@ type ProviderSaveRequest = {
   fetchAfterSave?: boolean
 }
 
-const MANAGED_PROVIDER_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix', 'xiaomi_token_plan']
+const PROVIDER_SOURCE_TEMPLATES: ManagedProviderTemplate[] = ['deepseek', 'aihubmix', 'xiaomi_token_plan']
 const PROVIDER_TIMEOUT_DEFAULT_SECONDS = 120
 const XIAOMI_TOKEN_PLAN_MODELS: SettingsProviderDiscoveredModel[] = [
   { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
@@ -1533,7 +1533,7 @@ export function SettingsPage() {
     const persistedProviders = providers
       .map((provider): ManagedProvider | null => {
         const template = getProviderTemplate(provider.code)
-        if (!template) return null
+        if (!template || !PROVIDER_SOURCE_TEMPLATES.includes(template)) return null
         return {
           ...provider,
           name: getProviderDisplayName(provider.code, provider.name),
@@ -1543,11 +1543,8 @@ export function SettingsPage() {
       })
       .filter((provider): provider is ManagedProvider => Boolean(provider))
     const persistedCodes = new Set(persistedProviders.map((provider) => provider.code))
-    const missingDefaults = MANAGED_PROVIDER_TEMPLATES
-      .filter((template) => !persistedCodes.has(template))
-      .map((template) => createProviderFromTemplate(template, template, false))
     const pendingDrafts = providerSourceDrafts.filter((provider) => !persistedCodes.has(provider.code))
-    return [...persistedProviders, ...missingDefaults, ...pendingDrafts]
+    return [...persistedProviders, ...pendingDrafts]
   }, [providerSourceDrafts, providers])
   const activeManagedProvider = managedProviders.find((provider) => provider.code === selectedManagedProviderCode) || managedProviders[0] || null
   const providerSettingsDirty = useMemo(() => {
@@ -3249,7 +3246,7 @@ export function SettingsPage() {
                       </button>
                       {providerSourceMenuOpen ? (
                         <div className="provider-source-add__menu" role="menu">
-                          {MANAGED_PROVIDER_TEMPLATES.map((template) => (
+                          {PROVIDER_SOURCE_TEMPLATES.map((template) => (
                             <button key={template} type="button" role="menuitem" onClick={() => addProviderSourceDraft(template)}>
                               <span className={clsx('provider-source-item__logo', `provider-source-item__logo--${template}`)}>
                                 {getProviderLogoLabel(template)}
@@ -3262,9 +3259,9 @@ export function SettingsPage() {
                     </div>
                   </div>
                   <div className="provider-source-list">
-                    {managedProviders.map((provider) => {
+                    {managedProviders.length ? managedProviders.map((provider) => {
                       const providerModelCount = models.filter((model) => model.provider === provider.code && !model.is_deleted).length
-                      const canDeleteProvider = Boolean(provider.isDraft || provider.code !== provider.template)
+                      const canDeleteProvider = true
                       return (
                         <div
                           key={provider.code}
@@ -3298,7 +3295,12 @@ export function SettingsPage() {
                           )}
                         </div>
                       )
-                    })}
+                    }) : (
+                      <div className="provider-source-empty">
+                        <strong>暂无提供商源</strong>
+                        <span>点击新增，从 DeepSeek、AIHubMix 或 XiaoMi Token Plan 模板创建。</span>
+                      </div>
+                    )}
                   </div>
                 </aside>
 
@@ -3518,7 +3520,7 @@ export function SettingsPage() {
                       </section>
                     </>
                   ) : (
-                    <div className="state-shell">暂无可管理供应商，请先创建 DeepSeek、AIHubMix 或 XiaoMi Token Plan。</div>
+                    <div className="state-shell">暂无提供商源，请点击左侧新增，从 DeepSeek、AIHubMix 或 XiaoMi Token Plan 模板创建。</div>
                   )}
                 </section>
               </section>

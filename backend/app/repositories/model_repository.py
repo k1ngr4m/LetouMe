@@ -391,6 +391,29 @@ class ModelRepository:
                     """,
                     (provider_id,),
                 )
+                cursor.execute(
+                    """
+                    SELECT am.model_code
+                    FROM ai_model am
+                    INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+                    WHERE pmc.provider_id = ?
+                    """,
+                    (provider_id,),
+                )
+                model_codes = [str(model_row["model_code"]) for model_row in cursor.fetchall() if model_row.get("model_code")]
+                cursor.execute(
+                    """
+                    UPDATE ai_model am
+                    INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+                    SET am.is_deleted = 1,
+                        am.is_active = 0,
+                        am.updated_at = ?
+                    WHERE pmc.provider_id = ?
+                    """,
+                    (now_ts(), provider_id),
+                )
+                for model_code in model_codes:
+                    self._remove_model_from_prediction_tasks(cursor, model_code)
         invalidate_model_registry_cache()
         return {"provider_code": provider_code, "success": True}
 

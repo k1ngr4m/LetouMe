@@ -74,6 +74,14 @@ vi.mock('../../shared/auth/AuthProvider', () => ({
   }),
 }))
 
+const DEEPSEEK_PROVIDER_FIXTURE = {
+  code: 'deepseek',
+  name: 'DeepSeek',
+  is_system_preset: true,
+  api_format: 'openai_compatible' as const,
+  base_url: 'https://api.deepseek.com',
+}
+
 function renderPage(initialEntry = '/settings/profile') {
   const client = new QueryClient({
     defaultOptions: {
@@ -201,16 +209,34 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
     expect(await screen.findByText('提供商源')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'DeepSeek' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /AIHubMix/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /AIHubMix/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('DeepSeek-V3.2')).toBeInTheDocument()
     expect(screen.getByText((content) => content.includes('大乐透 / 排列3'))).toBeInTheDocument()
     expect(screen.getByText('Claude-4.6')).toBeInTheDocument()
     expect(screen.getAllByText('https://api.deepseek.com').length).toBeGreaterThan(0)
     expect(screen.queryByText('2026-03-16T15:39:25Z')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /AIHubMix/ }))
+    await userEvent.click(screen.getAllByRole('button', { name: /AIHubMix/ })[0])
     expect(screen.getByRole('heading', { name: 'AIHubMix' })).toBeInTheDocument()
     expect(screen.queryByText('DeepSeek-V3.2')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty provider source state when no source has been added', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+
+    renderPage('/settings/models')
+
+    expect(await screen.findByText('暂无提供商源')).toBeInTheDocument()
+    expect(screen.getAllByText(/DeepSeek、AIHubMix 或 XiaoMi Token Plan/).length).toBeGreaterThan(0)
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    expect(screen.getByRole('menuitem', { name: /DeepSeek/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /AIHubMix/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ })).toBeInTheDocument()
   })
 
   it('supports filtering models by enabled status', async () => {
@@ -266,7 +292,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -316,7 +342,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -380,6 +406,12 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.getByRole('button', { name: '保存并获取模型' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '获取模型列表' })).not.toBeInTheDocument()
 
+    await userEvent.click(screen.getByRole('button', { name: '删除供应商源 deepseek_2' }))
+    expect(apiClientMock.deleteSettingsProvider).not.toHaveBeenCalled()
+    expect(screen.queryByRole('heading', { name: 'deepseek_2' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
     await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
     await waitFor(() =>
       expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({
@@ -427,6 +459,10 @@ describe('SettingsPage model management view switch', () => {
     expect(confirmSpy).toHaveBeenCalled()
     expect(apiClientMock.deleteSettingsProvider).not.toHaveBeenCalled()
 
+    confirmSpy.mockReturnValueOnce(true)
+    await userEvent.click(screen.getByRole('button', { name: '删除供应商源 aihubmix_1' }))
+    await waitFor(() => expect(apiClientMock.deleteSettingsProvider).toHaveBeenCalledWith('aihubmix_1'))
+
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /AIHubMix/ }))
     expect(await screen.findByRole('heading', { name: 'aihubmix_2' })).toBeInTheDocument()
@@ -443,54 +479,6 @@ describe('SettingsPage model management view switch', () => {
       }),
     )
     confirmSpy.mockRestore()
-  })
-
-  it('adds XiaoMi Token Plan provider source with default models', async () => {
-    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({
-      providers: [
-        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
-        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
-      ],
-    })
-    apiClientMock.listUsers.mockResolvedValue({ users: [] })
-    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
-    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
-    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
-    apiClientMock.createSettingsProvider.mockResolvedValue({
-      code: 'xiaomi_token_plan_1',
-      name: 'xiaomi_token_plan_1',
-      is_system_preset: false,
-      api_format: 'openai_compatible',
-      base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
-      extra_options: {},
-      model_configs: [],
-    })
-
-    renderPage('/settings/models')
-
-    await screen.findByRole('heading', { name: 'DeepSeek' })
-    await userEvent.click(screen.getByRole('button', { name: '新增' }))
-    await userEvent.click(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ }))
-
-    expect(await screen.findByRole('heading', { name: 'xiaomi_token_plan_1' })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('https://token-plan-cn.xiaomimimo.com/v1')).toBeInTheDocument()
-    expect(screen.getByText('MiMo-V2.5-Pro')).toBeInTheDocument()
-    expect(screen.getByText('MiMo-V2.5')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
-    await waitFor(() =>
-      expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({
-        code: 'xiaomi_token_plan_1',
-        name: 'xiaomi_token_plan_1',
-        base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
-        api_format: 'openai_compatible',
-        model_configs: [
-          { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
-          { model_id: 'mimo-v2.5', display_name: 'MiMo-V2.5' },
-        ],
-      })),
-    )
   })
 
   it('edits provider custom headers through the reusable key-value dialog', async () => {
@@ -589,7 +577,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('renders profile route by default', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -603,7 +591,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('renders profile information architecture sections', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -626,7 +614,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('renders account management sections and can expand password form', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -663,7 +651,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -722,7 +710,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -787,7 +775,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -862,7 +850,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -915,7 +903,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('shows maintenance list and starts fetch task for super admin', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -965,7 +953,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('shows prediction generation logs in maintenance table', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1199,7 +1187,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1252,7 +1240,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('shows schedule tab and renders schedule tasks', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1312,7 +1300,7 @@ describe('SettingsPage model management view switch', () => {
   it('supports schedule calendar view with day detail panel', async () => {
     const nowTs = Math.floor(Date.now() / 1000)
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1420,7 +1408,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1476,7 +1464,7 @@ describe('SettingsPage model management view switch', () => {
 
   it('shows prediction play mode in schedule list and detail for pl3 tasks', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1557,7 +1545,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1638,7 +1626,7 @@ describe('SettingsPage model management view switch', () => {
         },
       ],
     })
-    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
     apiClientMock.listUsers.mockResolvedValue({ users: [] })
     apiClientMock.listRoles.mockResolvedValue({ roles: [] })
     apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
@@ -1689,6 +1677,54 @@ describe('SettingsPage model management view switch', () => {
           model_codes: ['pl3-model-a'],
         }),
       ),
+    )
+  })
+
+  it('adds XiaoMi Token Plan provider source with default models', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        { code: 'deepseek', name: 'DeepSeek', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://api.deepseek.com' },
+        { code: 'aihubmix', name: 'AIHubMix', is_system_preset: true, api_format: 'openai_compatible', base_url: 'https://aihubmix.com/v1' },
+      ],
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.createSettingsProvider.mockResolvedValue({
+      code: 'xiaomi_token_plan_1',
+      name: 'xiaomi_token_plan_1',
+      is_system_preset: false,
+      api_format: 'openai_compatible',
+      base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+      extra_options: {},
+      model_configs: [],
+    })
+
+    renderPage('/settings/models')
+
+    await screen.findByRole('heading', { name: 'DeepSeek' })
+    await userEvent.click(screen.getByRole('button', { name: '新增' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ }))
+
+    expect(await screen.findByRole('heading', { name: 'xiaomi_token_plan_1' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://token-plan-cn.xiaomimimo.com/v1')).toBeInTheDocument()
+    expect(screen.getByText('MiMo-V2.5-Pro')).toBeInTheDocument()
+    expect(screen.getByText('MiMo-V2.5')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
+    await waitFor(() =>
+      expect(apiClientMock.createSettingsProvider).toHaveBeenCalledWith(expect.objectContaining({
+        code: 'xiaomi_token_plan_1',
+        name: 'xiaomi_token_plan_1',
+        base_url: 'https://token-plan-cn.xiaomimimo.com/v1',
+        api_format: 'openai_compatible',
+        model_configs: [
+          { model_id: 'mimo-v2.5-pro', display_name: 'MiMo-V2.5-Pro' },
+          { model_id: 'mimo-v2.5', display_name: 'MiMo-V2.5' },
+        ],
+      })),
     )
   })
 })

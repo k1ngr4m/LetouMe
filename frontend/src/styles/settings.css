@@ -732,6 +732,26 @@
   gap: 0.45rem;
 }
 
+.provider-source-empty {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem;
+  border: 1px dashed var(--border-1);
+  border-radius: 0.95rem;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--surface-1) 62%, transparent);
+}
+
+.provider-source-empty strong {
+  color: var(--text-1);
+  font-size: 0.95rem;
+}
+
+.provider-source-empty span {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .provider-source-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
