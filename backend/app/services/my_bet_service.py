@@ -1100,6 +1100,8 @@ class MyBetService:
         updated_at = ensure_timestamp(updated_at)
         ocr_recognized_at = ensure_timestamp(ocr_recognized_at, assume_beijing=True)
         ticket_purchased_at = ensure_timestamp(ticket_purchased_at, assume_beijing=True)
+        created_at = created_at or updated_at or ticket_purchased_at or ocr_recognized_at
+        updated_at = updated_at or created_at
 
         raw_lines = record.get("lines") if isinstance(record.get("lines"), list) else []
         lines = [MyBetService._serialize_line(item) for item in raw_lines]
@@ -1180,7 +1182,7 @@ class MyBetService:
             "actual_result": record.get("actual_result") if isinstance(record.get("actual_result"), dict) else None,
             "lines": lines,
             "created_at": created_at or 0,
-            "updated_at": updated_at or created_at or 0,
+            "updated_at": updated_at or 0,
         }
 
     @staticmethod

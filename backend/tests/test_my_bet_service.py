@@ -20,6 +20,41 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(payload["bet_count"], 132)
         self.assertEqual(payload["amount"], 528)
 
+    def test_serialize_record_falls_back_created_at_to_ticket_purchased_at(self) -> None:
+        result = self.service._serialize_record(
+            {
+                "id": 1,
+                "lottery_code": "dlt",
+                "target_period": "26040",
+                "play_type": "dlt",
+                "multiplier": 1,
+                "is_append": 0,
+                "bet_count": 1,
+                "amount": 2,
+                "discount_amount": 0,
+                "source_type": "manual",
+                "created_at": None,
+                "updated_at": None,
+                "ticket_purchased_at": "2026-05-11 19:26:00",
+                "lines": [
+                    {
+                        "line_no": 1,
+                        "play_type": "dlt",
+                        "front_numbers": "01,02,03,04,05",
+                        "back_numbers": "01,02",
+                        "multiplier": 1,
+                        "is_append": 0,
+                        "bet_count": 1,
+                        "amount": 2,
+                    }
+                ],
+            }
+        )
+
+        self.assertGreater(result["created_at"], 0)
+        self.assertEqual(result["created_at"], result["ticket_purchased_at"])
+        self.assertEqual(result["updated_at"], result["created_at"])
+
     def test_build_pl3_group_sum_line_payload_uses_group_sum_counts(self) -> None:
         payload = self.service._build_pl3_line_payload(
             {"play_type": "group_sum", "sum_values": ["10", "11"], "multiplier": 1},

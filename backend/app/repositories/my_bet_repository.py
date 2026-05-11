@@ -5,7 +5,7 @@ from typing import Any
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.number_codec import EMPTY_NUMBER_FIELDS, build_number_rows, with_number_fields, merge_number_rows
-from backend.app.time_utils import ensure_timestamp, format_beijing_datetime
+from backend.app.time_utils import ensure_timestamp, format_beijing_datetime, now_ts
 
 
 class MyBetRepository:
@@ -51,6 +51,7 @@ class MyBetRepository:
 
     def create_record(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = str(payload.get("lottery_code") or "dlt")
+        current_time = format_beijing_datetime(now_ts(), with_seconds=True)
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
@@ -64,8 +65,10 @@ class MyBetRepository:
                             is_append,
                             bet_count,
                             amount,
-                            discount_amount
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            discount_amount,
+                            created_at,
+                            updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
@@ -76,6 +79,8 @@ class MyBetRepository:
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
                             int(payload.get("discount_amount") or 0),
+                            current_time,
+                            current_time,
                         ),
                     )
                     record_id = int(cursor.lastrowid)
@@ -98,7 +103,8 @@ class MyBetRepository:
                             is_append = ?,
                             bet_count = ?,
                             amount = ?,
-                            discount_amount = ?
+                            discount_amount = ?,
+                            updated_at = ?
                         WHERE id = ? AND user_id = ?
                         """,
                         (
@@ -109,6 +115,7 @@ class MyBetRepository:
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
                             int(payload.get("discount_amount") or 0),
+                            format_beijing_datetime(now_ts(), with_seconds=True),
                             record_id,
                             user_id,
                         ),
