@@ -501,26 +501,26 @@
   padding: 0.28rem 0.58rem;
   border-radius: 999px;
   color: var(--text-2);
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--chip-neutral-bg);
+  border: 1px solid var(--chip-neutral-border);
   font-size: 0.74rem;
 }
 
 .model-filter-panel .filter-chip:hover {
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--soft-chip-bg);
 }
 
 .model-filter-panel .filter-chip.is-active {
-  color: #fff7ed;
-  background: rgba(241, 178, 76, 0.12);
-  border-color: rgba(241, 178, 76, 0.2);
+  color: var(--chip-warm-text);
+  background: var(--chip-warm-bg);
+  border-color: var(--chip-warm-border);
 }
 
 .model-filter-panel .filter-chip.is-inactive {
   color: var(--text-3);
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.05);
+  background: var(--surface-0);
+  border-color: var(--border-1);
   opacity: 0.75;
 }
 
