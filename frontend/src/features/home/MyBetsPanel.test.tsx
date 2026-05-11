@@ -180,6 +180,42 @@ describe('MyBetsPanel', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('paginates my-bets records and supports page size changes', async () => {
+    getMyBets.mockResolvedValueOnce({
+      records: Array.from({ length: 25 }, (_, index) =>
+        buildRecord({
+          id: index + 1,
+          target_period: String(2026032 - index),
+          prize_level: null,
+          winning_bet_count: 0,
+        }),
+      ),
+      summary: {
+        total_count: 25,
+        total_amount: 100,
+        total_discount_amount: 0,
+        total_net_amount: 100,
+        total_prize_amount: 0,
+        total_net_profit: -100,
+        settled_count: 25,
+        pending_count: 0,
+      },
+    })
+
+    renderPanel()
+    await screen.findByRole('heading', { name: '我的投注' })
+    expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
+    expect(screen.queryByText('第 2026012 期')).not.toBeInTheDocument()
+    expect(screen.getByText('共25条')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    expect(await screen.findByText('第 2026012 期')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('每页条数'), '10')
+    expect(await screen.findByText('第 2026012 期')).toBeInTheDocument()
+    expect(screen.queryByText('第 2026022 期')).not.toBeInTheDocument()
+  })
+
   it('opens the detail modal from the card detail action', async () => {
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })

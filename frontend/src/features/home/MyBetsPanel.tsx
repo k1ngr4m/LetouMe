@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, ChevronDown, ChevronUp, ChevronsUpDown, Coins, Eye, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Coins, Eye, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -58,6 +58,8 @@ type BetFormState = {
 
 type MyBetsViewMode = 'list' | 'form'
 type MyBetsDisplayMode = 'card' | 'table'
+
+const MY_BETS_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 200] as const
 
 type LineQuote = {
   betCount: number
@@ -586,6 +588,19 @@ function formatRecordLineSummary(record: MyBetRecord) {
   return `${betCount} 注 / ${multiplierText}`
 }
 
+function calculatePageForPageSize(currentPage: number, currentPageSize: number, nextPageSize: number) {
+  const currentOffset = (currentPage - 1) * currentPageSize
+  return Math.floor(currentOffset / nextPageSize) + 1
+}
+
+function buildPaginationPages(currentPage: number, totalPages: number) {
+  const visible = 7
+  const half = Math.floor(visible / 2)
+  const start = Math.max(1, Math.min(currentPage - half, totalPages - visible + 1))
+  const end = Math.min(totalPages, start + visible - 1)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
 function resolveQxcDigitColor(index: number, total: number): 'qxc-front' | 'qxc-back' {
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
@@ -841,6 +856,9 @@ export function MyBetsPanel({
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
   const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>('card')
+  const [recordsPage, setRecordsPage] = useState(1)
+  const [recordsPageSize, setRecordsPageSize] = useState<(typeof MY_BETS_PAGE_SIZE_OPTIONS)[number]>(20)
+  const [recordsPageInput, setRecordsPageInput] = useState('1')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [selectedDetailRecord, setSelectedDetailRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -974,7 +992,11 @@ export function MyBetsPanel({
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
   const hasRecords = records.length > 0
-  const allRecordsExpanded = hasRecords && records.every((record) => Boolean(expandedRecordMap[record.id]))
+  const totalRecordPages = Math.max(1, Math.ceil(records.length / recordsPageSize))
+  const normalizedRecordsPage = Math.min(recordsPage, totalRecordPages)
+  const paginatedRecords = records.slice((normalizedRecordsPage - 1) * recordsPageSize, normalizedRecordsPage * recordsPageSize)
+  const paginationPages = buildPaginationPages(normalizedRecordsPage, totalRecordPages)
+  const allRecordsExpanded = paginatedRecords.length > 0 && paginatedRecords.every((record) => Boolean(expandedRecordMap[record.id]))
   const animationsEnabled = motionLevel !== 'minimal'
   const motionScale = motionLevel === 'enhanced' ? 1.25 : 1
   const summaryEnterY = 10 * motionScale
@@ -1016,6 +1038,14 @@ export function MyBetsPanel({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedDetailRecord])
+
+  useEffect(() => {
+    setRecordsPage((currentPage) => Math.min(currentPage, totalRecordPages))
+  }, [totalRecordPages])
+
+  useEffect(() => {
+    setRecordsPageInput(String(normalizedRecordsPage))
+  }, [normalizedRecordsPage])
 
   useEffect(() => {
     onDirtyStateChange?.(shouldWarnUnsaved)
@@ -1065,6 +1095,10 @@ export function MyBetsPanel({
     }
 
     consumedFocusTokenRef.current = token
+    const targetIndex = records.findIndex((item) => item.id === targetRecordId)
+    if (targetIndex >= 0) {
+      setRecordsPage(Math.floor(targetIndex / recordsPageSize) + 1)
+    }
     setExpandedRecordMap((previous) => ({ ...previous, [targetRecordId]: true }))
     const frameId = window.requestAnimationFrame(() => {
       const targetNode = recordRefMap.current[targetRecordId]
@@ -1082,7 +1116,7 @@ export function MyBetsPanel({
     })
     onFocusHandled?.()
     return () => window.cancelAnimationFrame(frameId)
-  }, [betsQuery.isLoading, focusRecordId, focusToken, onFocusHandled, records, viewMode])
+  }, [betsQuery.isLoading, focusRecordId, focusToken, onFocusHandled, records, recordsPageSize, viewMode])
 
   function openCreateForm(sourceType: 'manual' | 'ocr' = 'manual', focusImageInput = false) {
     setMessage(null)
@@ -1181,14 +1215,38 @@ export function MyBetsPanel({
   function toggleAllRecordsExpanded() {
     const nextExpanded = !allRecordsExpanded
     const next: Record<number, boolean> = {}
-    for (const record of records) {
+    for (const record of paginatedRecords) {
       next[record.id] = nextExpanded
     }
-    setExpandedRecordMap(next)
+    setExpandedRecordMap((previous) => ({ ...previous, ...next }))
   }
 
   function openRecordDetail(record: MyBetRecord) {
     setSelectedDetailRecord(record)
+  }
+
+  function changeRecordsPageSize(nextPageSize: number) {
+    const normalizedPageSize = MY_BETS_PAGE_SIZE_OPTIONS.includes(nextPageSize as (typeof MY_BETS_PAGE_SIZE_OPTIONS)[number])
+      ? (nextPageSize as (typeof MY_BETS_PAGE_SIZE_OPTIONS)[number])
+      : 20
+    const nextPage = calculatePageForPageSize(normalizedRecordsPage, recordsPageSize, normalizedPageSize)
+    setRecordsPageSize(normalizedPageSize)
+    setRecordsPage(nextPage)
+  }
+
+  function goToRecordsPage(nextPage: number) {
+    const normalizedPage = Math.max(1, Math.min(totalRecordPages, nextPage))
+    setRecordsPage(normalizedPage)
+    setRecordsPageInput(String(normalizedPage))
+  }
+
+  function submitRecordsPageInput() {
+    const parsedPage = Number(recordsPageInput)
+    if (!Number.isFinite(parsedPage)) {
+      setRecordsPageInput(String(normalizedRecordsPage))
+      return
+    }
+    goToRecordsPage(Math.floor(parsedPage))
   }
 
   return (
@@ -1301,7 +1359,7 @@ export function MyBetsPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {records.map((record) => (
+                    {paginatedRecords.map((record) => (
                       <tr
                         key={record.id}
                         className={clsx('my-bets-table__row', highlightedRecordId === record.id && 'is-focus-highlight')}
@@ -1351,7 +1409,7 @@ export function MyBetsPanel({
               </div>
             ) : records.length ? (
               <div className="my-bets-list">
-                {records.map((record, index) => {
+                {paginatedRecords.map((record, index) => {
                   const isExpanded = Boolean(expandedRecordMap[record.id])
                   return (
                   <motion.article
@@ -1445,6 +1503,68 @@ export function MyBetsPanel({
             ) : (
               <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
             )}
+            {records.length ? (
+              <div className="my-bets-pagination" aria-label="我的投注分页">
+                <div className="my-bets-pagination__meta">{`共${records.length}条`}</div>
+                <label className="my-bets-pagination__size">
+                  <select value={recordsPageSize} onChange={(event) => changeRecordsPageSize(Number(event.target.value))} aria-label="每页条数">
+                    {MY_BETS_PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}条/页
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="my-bets-pagination__pages">
+                  <button
+                    className="my-bets-pagination__button"
+                    type="button"
+                    disabled={normalizedRecordsPage <= 1}
+                    onClick={() => goToRecordsPage(normalizedRecordsPage - 1)}
+                    aria-label="上一页"
+                  >
+                    <ChevronLeft size={16} aria-hidden="true" />
+                  </button>
+                  {paginationPages.map((page) => (
+                    <button
+                      key={page}
+                      className={clsx('my-bets-pagination__page', page === normalizedRecordsPage && 'is-active')}
+                      type="button"
+                      onClick={() => goToRecordsPage(page)}
+                      aria-current={page === normalizedRecordsPage ? 'page' : undefined}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    className="my-bets-pagination__button"
+                    type="button"
+                    disabled={normalizedRecordsPage >= totalRecordPages}
+                    onClick={() => goToRecordsPage(normalizedRecordsPage + 1)}
+                    aria-label="下一页"
+                  >
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+                </div>
+                <form
+                  className="my-bets-pagination__jump"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    submitRecordsPageInput()
+                  }}
+                >
+                  <span>前往</span>
+                  <input
+                    value={recordsPageInput}
+                    onChange={(event) => setRecordsPageInput(event.target.value.replace(/[^\d]/g, ''))}
+                    onBlur={submitRecordsPageInput}
+                    inputMode="numeric"
+                    aria-label="跳转页码"
+                  />
+                  <span>页</span>
+                </form>
+              </div>
+            ) : null}
           </>
         ) : (
           null
