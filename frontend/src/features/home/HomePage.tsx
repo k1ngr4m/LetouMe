@@ -671,7 +671,7 @@ export function HomePage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_DEFAULT_PAGE_SIZE)
   const [rollingHitWindow, setRollingHitWindow] = useState<(typeof HISTORY_ROLLING_WINDOW_OPTIONS)[number]>(10)
-  const [chartTimePreset, setChartTimePreset] = useState<(typeof CHART_TIME_PRESET_OPTIONS)[number]>(120)
+  const [chartTimePreset, setChartTimePreset] = useState<(typeof CHART_TIME_PRESET_OPTIONS)[number]>(20)
   const [chartDateStart, setChartDateStart] = useState('')
   const [chartDateEnd, setChartDateEnd] = useState('')
   const [pinnedModelIds, setPinnedModelIds] = useState<string[]>(() => loadPinnedModels(selectedLottery))

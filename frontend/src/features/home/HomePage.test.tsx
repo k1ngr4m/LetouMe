@@ -1970,7 +1970,7 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('时间维度')).toBeInTheDocument()
     expect(screen.getByText('开始日期')).toBeInTheDocument()
     expect(screen.getByText('结束日期')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '近 120 期' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '近 20 期' })).toHaveClass('is-active')
   })
 
   it('limits chart center backtest models to active current models', async () => {
