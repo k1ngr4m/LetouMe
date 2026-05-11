@@ -89,6 +89,7 @@
 
 .my-bets-record-scroll {
   flex: 1 1 auto;
+  max-width: 100%;
   min-height: 0;
   overflow: auto;
   padding-right: 0.18rem;
@@ -324,8 +325,10 @@
   margin-top: 0;
   max-width: 100%;
   min-width: 0;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   border-radius: 1.05rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .my-bets-table {

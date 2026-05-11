@@ -2099,14 +2099,12 @@
   gap: 0.45rem;
 }
 
-.chart-center-summary-grid,
 .chart-center-compare-grid {
   display: grid;
   gap: 0.9rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.chart-center-summary-card,
 .chart-center-compare-card {
   display: grid;
   gap: 0.35rem;
@@ -2116,27 +2114,12 @@
   background: color-mix(in srgb, var(--panel-card-bg) 82%, transparent);
 }
 
-.chart-center-summary-card span,
-.chart-center-summary-card small,
 .chart-center-compare-card span {
   color: var(--text-2);
 }
 
-.chart-center-summary-card strong,
 .chart-center-compare-card strong {
   font-size: 1.05rem;
-}
-
-.chart-center-summary-card--accent {
-  border-color: rgba(242, 165, 79, 0.38);
-  background: color-mix(in srgb, rgba(242, 165, 79, 0.18) 70%, var(--panel-card-bg));
-}
-
-.chart-center-summary-actions {
-  margin-top: 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
 }
 
 .prediction-summary__export-button {

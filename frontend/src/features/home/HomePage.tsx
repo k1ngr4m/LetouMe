@@ -1189,11 +1189,6 @@ export function HomePage() {
     return historyInDateRange.slice(0, chartTimePreset)
   }, [chartTimeDateRange, chartTimePreset, filteredHistory])
   const historyModelStats = buildHistoryModelStats(filteredHistory, historyVisibleModels)
-  const topHistoryModel = historyModelStats[0] || null
-  const historyHitTrend = useMemo(
-    () => buildHistoryHitTrend(filteredHistory, historyVisibleModelIds),
-    [filteredHistory, historyVisibleModelIds],
-  )
   const chartCenterHistoryVisibleModelIds = chartHistoryModelIds.length ? chartHistoryModelIds : historyVisibleModelIds
   const chartCenterHistoryVisibleModels = chartHistoryModelIds.length
     ? historyVisibleModels.filter((model) => chartHistoryModelIds.includes(model.model_id))
@@ -1243,21 +1238,6 @@ export function HomePage() {
     [chartCenterHistoryModelNameMap, chartCenterHistoryVisibleModelIds, chartCenterTimeFilteredHistory],
   )
   const totalHistoryPages = Math.max(1, Math.ceil((history?.total_count || 0) / historyPageSize))
-  const chartCenterSummary = useMemo(() => {
-    const totalNetProfit = historyModelStats.reduce((sum, item) => sum + (item.prize_amount - item.cost_amount), 0)
-    const averageWinRate =
-      historyModelStats.length > 0
-        ? historyModelStats.reduce((sum, item) => sum + item.win_rate_by_period, 0) / historyModelStats.length
-        : 0
-    const latestTrendPeriod = historyHitTrend.at(-1)?.period
-    return {
-      totalNetProfit,
-      averageWinRate,
-      latestTrendPeriod: latestTrendPeriod ? String(latestTrendPeriod) : '—',
-      topModelName: topHistoryModel?.model_name || '—',
-      topModelScore: topHistoryModel?.score_profile?.overall_score || 0,
-    }
-  }, [historyHitTrend, historyModelStats, topHistoryModel])
   const isPl3Lottery = selectedLottery === 'pl3'
   const isPl5Lottery = selectedLottery === 'pl5'
   const isQxcLottery = selectedLottery === 'qxc'
@@ -1527,10 +1507,6 @@ export function HomePage() {
   }
   const activeChartMeta = chartMetaMap[activeChartCenterItem]
 
-  function openChartCenter(targetHash: ChartCenterItemKey = CHART_CENTER_ITEMS.numberBase) {
-    navigate(`${HOME_TAB_PATHS.charts}#${targetHash}`)
-  }
-
   function openHistoryTab(targetPeriod?: string) {
     navigate(HOME_TAB_PATHS.history, {
       state: targetPeriod
@@ -1545,36 +1521,6 @@ export function HomePage() {
   return (
     <div className="page-stack">
       <HomeDashboardTabStrip activeTab={activeTab} beforeNavigate={canNavigateDashboardTab} />
-
-      {activeTab === 'prediction' ? (
-        <StatusCard title="图表中心摘要" subtitle="保留关键判断指标，详细趋势与回溯进入图表中心查看。">
-          <div className="chart-center-summary-grid">
-            <article className="chart-center-summary-card">
-              <span>历史净盈亏</span>
-              <strong>{formatCurrency(chartCenterSummary.totalNetProfit)}</strong>
-              <small>基于当前筛选模型汇总</small>
-            </article>
-            <article className="chart-center-summary-card">
-              <span>平均按期中奖率</span>
-              <strong>{formatPercent(chartCenterSummary.averageWinRate)}</strong>
-              <small>最新趋势期号 {chartCenterSummary.latestTrendPeriod}</small>
-            </article>
-            <article className="chart-center-summary-card chart-center-summary-card--accent">
-              <span>当前 Top 模型</span>
-              <strong>{chartCenterSummary.topModelName}</strong>
-              <small>综合分 {chartCenterSummary.topModelScore}</small>
-            </article>
-          </div>
-          <div className="chart-center-summary-actions">
-            <button className="ghost-button" type="button" onClick={() => openChartCenter(CHART_CENTER_ITEMS.numberBase)}>
-              进入图表中心
-            </button>
-            <button className="ghost-button ghost-button--compact" type="button" onClick={() => openHistoryTab()}>
-              查看开奖回溯
-            </button>
-          </div>
-        </StatusCard>
-      ) : null}
 
       {activeTab === 'prediction' ? (
         <>

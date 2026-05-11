@@ -61,12 +61,18 @@ type MyBetsViewMode = 'list' | 'form'
 type MyBetsDisplayMode = 'card' | 'table'
 
 const MY_BETS_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 200] as const
+const MY_BETS_COMPACT_VIEWPORT_WIDTH = 760
 
 type LineQuote = {
   betCount: number
   amount: number
   valid: boolean
   reason?: string
+}
+
+function getInitialMyBetsDisplayMode(): MyBetsDisplayMode {
+  if (typeof window === 'undefined') return 'table'
+  return window.innerWidth <= MY_BETS_COMPACT_VIEWPORT_WIDTH ? 'card' : 'table'
 }
 
 const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
@@ -857,7 +863,7 @@ export function MyBetsPanel({
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
-  const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>('table')
+  const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>(getInitialMyBetsDisplayMode)
   const [recordsPage, setRecordsPage] = useState(1)
   const [recordsPageSize, setRecordsPageSize] = useState<(typeof MY_BETS_PAGE_SIZE_OPTIONS)[number]>(20)
   const [recordsPageInput, setRecordsPageInput] = useState('1')
