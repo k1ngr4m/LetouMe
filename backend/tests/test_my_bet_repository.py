@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 from backend.app.repositories.my_bet_repository import MyBetRepository
@@ -67,6 +68,77 @@ class _ConnectionContext:
 
 
 class MyBetRepositoryTests(unittest.TestCase):
+    def test_create_record_writes_mysql_datetime_timestamps(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+        cursor.lastrowid = 24
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._replace_lines"),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._upsert_meta"),
+            patch.object(repository, "get_record", return_value={"id": 24, "target_period": "26035"}),
+            patch("backend.app.repositories.my_bet_repository.now_ts", return_value=1776074095),
+        ):
+            result = repository.create_record(
+                7,
+                {
+                    "lottery_code": "dlt",
+                    "target_period": "26035",
+                    "play_type": "dlt",
+                    "multiplier": 1,
+                    "is_append": False,
+                    "bet_count": 44,
+                    "amount": 88,
+                    "discount_amount": 0,
+                    "lines": [],
+                },
+            )
+
+        insert_sql, insert_params = next((item for item in cursor.executed if "INSERT INTO my_bet_record" in item[0]), ("", None))
+        self.assertEqual(result, {"id": 24, "target_period": "26035"})
+        self.assertIn("created_at, updated_at", insert_sql)
+        self.assertEqual(insert_params[8], "2026-04-13 17:54:55")
+        self.assertEqual(insert_params[9], "2026-04-13 17:54:55")
+        self.assertIsInstance(insert_params[8], str)
+        self.assertNotIsInstance(insert_params[8], int)
+        datetime.strptime(insert_params[8], "%Y-%m-%d %H:%M:%S")
+
+    def test_update_record_writes_mysql_datetime_updated_at(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._replace_lines"),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._upsert_meta"),
+            patch.object(repository, "get_record", return_value={"id": 24, "target_period": "26035"}),
+            patch("backend.app.repositories.my_bet_repository.now_ts", return_value=1776074095),
+        ):
+            result = repository.update_record(
+                24,
+                7,
+                {
+                    "lottery_code": "dlt",
+                    "target_period": "26035",
+                    "play_type": "dlt",
+                    "multiplier": 1,
+                    "is_append": False,
+                    "bet_count": 44,
+                    "amount": 88,
+                    "discount_amount": 0,
+                    "lines": [],
+                },
+            )
+
+        update_sql, update_params = next((item for item in cursor.executed if item[0].startswith("UPDATE my_bet_record")), ("", None))
+        self.assertEqual(result, {"id": 24, "target_period": "26035"})
+        self.assertIn("updated_at = ?", update_sql)
+        self.assertEqual(update_params[7], "2026-04-13 17:54:55")
+        self.assertIsInstance(update_params[7], str)
+        self.assertNotIsInstance(update_params[7], int)
+        datetime.strptime(update_params[7], "%Y-%m-%d %H:%M:%S")
+
     def test_normalize_datetime_value_formats_mysql_datetime(self) -> None:
         self.assertEqual(MyBetRepository._normalize_datetime_value(1776074095), "2026-04-13 17:54:55")
         self.assertEqual(MyBetRepository._normalize_datetime_value(1776074095000), "2026-04-13 17:54:55")
