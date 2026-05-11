@@ -8,6 +8,7 @@ import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { LotterySelectionProvider } from '../shared/lottery/LotterySelectionProvider'
 import { ToastProvider } from '../shared/feedback/ToastProvider'
 import { HOME_EXPERT_PREDICTION_PATH, HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
+import { SHOW_EXPERT_MANAGEMENT, SHOW_EXPERT_PREDICTION, SHOW_SMART_PREDICTION } from '../shared/config/featureFlags'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
@@ -140,21 +141,29 @@ export function App() {
             <Route
               path={HOME_SMART_PREDICTION_PATH}
               element={
-                <ProtectedRoute>
-                  <AppShell>
-                    <HomeSmartPredictionPage />
-                  </AppShell>
-                </ProtectedRoute>
+                SHOW_SMART_PREDICTION ? (
+                  <ProtectedRoute>
+                    <AppShell>
+                      <HomeSmartPredictionPage />
+                    </AppShell>
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to={HOME_TAB_PATHS.prediction} replace />
+                )
               }
             />
             <Route
               path={HOME_EXPERT_PREDICTION_PATH}
               element={
-                <ProtectedRoute>
-                  <AppShell>
-                    <HomeExpertPredictionPage />
-                  </AppShell>
-                </ProtectedRoute>
+                SHOW_EXPERT_PREDICTION ? (
+                  <ProtectedRoute>
+                    <AppShell>
+                      <HomeExpertPredictionPage />
+                    </AppShell>
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to={HOME_TAB_PATHS.prediction} replace />
+                )
               }
             />
             <Route
@@ -201,11 +210,15 @@ export function App() {
             <Route
               path="/settings/experts"
               element={
-                <ProtectedRoute requiredPermission={EXPERT_MANAGEMENT_PERMISSION}>
-                  <AppShell>
-                    <ExpertsSettingsPage />
-                  </AppShell>
-                </ProtectedRoute>
+                SHOW_EXPERT_MANAGEMENT ? (
+                  <ProtectedRoute requiredPermission={EXPERT_MANAGEMENT_PERMISSION}>
+                    <AppShell>
+                      <ExpertsSettingsPage />
+                    </AppShell>
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to="/settings/profile" replace />
+                )
               }
             />
             <Route

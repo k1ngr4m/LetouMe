@@ -30,6 +30,7 @@ import { HOME_EXPERT_PREDICTION_PATH, HOME_RULES_PATH, HOME_SMART_PREDICTION_PAT
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import { apiClient } from '../api/client'
+import { SHOW_EXPERT_MANAGEMENT, SHOW_EXPERT_PREDICTION, SHOW_SMART_PREDICTION } from '../config/featureFlags'
 import type { AssistantContext, LotteryCode, MessageStatusFilter } from '../types/api'
 
 const SETTINGS_PATHS = {
@@ -125,7 +126,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const canOpenSettings = hasPermission('basic_profile')
   const canManageModels = hasPermission('model_management')
-  const canManageExperts = hasPermission('expert_management')
+  const canManageExperts = SHOW_EXPERT_MANAGEMENT && hasPermission('expert_management')
   const canManageSchedules = hasPermission('schedule_management')
   const canManageUsers = hasPermission('user_management')
   const canManageRoles = hasPermission('role_management')
@@ -134,9 +135,9 @@ export function AppShell({ children }: PropsWithChildren) {
   const isChartCenterRoute = location.pathname === HOME_TAB_PATHS.charts
   const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
-  const isExpertPredictionRoute = location.pathname === HOME_EXPERT_PREDICTION_PATH
-  const isSmartPredictionRoute = location.pathname === HOME_SMART_PREDICTION_PATH
-  const canUseSmartPrediction = user?.role === 'super_admin'
+  const isExpertPredictionRoute = SHOW_EXPERT_PREDICTION && location.pathname === HOME_EXPERT_PREDICTION_PATH
+  const isSmartPredictionRoute = SHOW_SMART_PREDICTION && location.pathname === HOME_SMART_PREDICTION_PATH
+  const canUseSmartPrediction = SHOW_SMART_PREDICTION && user?.role === 'super_admin'
   const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
     canOpenSettings && isSettingsRoute ? 'settings' : 'workspace',
@@ -176,8 +177,8 @@ export function AppShell({ children }: PropsWithChildren) {
     if (location.pathname === HOME_TAB_PATHS.simulation) return '模拟试玩'
     if (location.pathname === HOME_TAB_PATHS['my-bets']) return '我的投注'
     if (location.pathname === HOME_RULES_PATH) return '规则说明'
-    if (location.pathname === HOME_SMART_PREDICTION_PATH) return '智能预测'
-    if (location.pathname === HOME_EXPERT_PREDICTION_PATH) return '专家预测'
+    if (SHOW_SMART_PREDICTION && location.pathname === HOME_SMART_PREDICTION_PATH) return '智能预测'
+    if (SHOW_EXPERT_PREDICTION && location.pathname === HOME_EXPERT_PREDICTION_PATH) return '专家预测'
     if (location.pathname === MESSAGE_CENTER_PATH) return '消息中心'
     return '预测总览'
   }, [location.pathname])
@@ -596,18 +597,20 @@ export function AppShell({ children }: PropsWithChildren) {
                   </NavLink>
                 </div>
               ) : null}
-              <NavLink
-                className={({ isActive }) => `crm-nav-item${isActive || isExpertPredictionRoute ? ' is-active' : ''}`}
-                to={HOME_EXPERT_PREDICTION_PATH}
-                onClick={onWorkspaceNavigate}
-                title="专家预测"
-              >
-                <UsersRound size={16} aria-hidden="true" />
-                <span>专家预测</span>
-                <em className="crm-nav-item__beta" aria-label="Beta">
-                  BETA
-                </em>
-              </NavLink>
+              {SHOW_EXPERT_PREDICTION ? (
+                <NavLink
+                  className={({ isActive }) => `crm-nav-item${isActive || isExpertPredictionRoute ? ' is-active' : ''}`}
+                  to={HOME_EXPERT_PREDICTION_PATH}
+                  onClick={onWorkspaceNavigate}
+                  title="专家预测"
+                >
+                  <UsersRound size={16} aria-hidden="true" />
+                  <span>专家预测</span>
+                  <em className="crm-nav-item__beta" aria-label="Beta">
+                    BETA
+                  </em>
+                </NavLink>
+              ) : null}
               <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
                 <CircleDollarSign size={16} aria-hidden="true" />
                 <span>模拟试玩</span>
