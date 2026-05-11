@@ -3,26 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createMyBet,
-  createSimulationTicket,
   deleteMyBet,
-  deleteSimulationTicket,
   getMyBets,
-  getPredictionsHistoryDetail,
-  getSimulationTickets,
-  quoteSimulationTicket,
   recognizeMyBetByImage,
   updateMyBet,
   uploadMyBetOCRImage,
-  simulateDltModeCoexistCurrentPredictions,
-  simulateDltCompoundCurrentPredictions,
-  simulateDltDantuoCurrentPredictions,
-  simulateDltInactiveHistoryModel,
-  simulatePl3SumCurrentPredictions,
-  simulatePl3SumHistoryMislabel,
-  simulateJackpotPoolData,
-  simulateHistoryFilterLoading,
-  homeDataArgsCapture,
-  toPng,
   renderPage,
 } from './HomePage.testUtils'
 

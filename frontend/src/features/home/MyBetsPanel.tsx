@@ -2011,7 +2011,7 @@ export function MyBetsPanel({
       ) : null}
 
       {selectedDetailRecord ? (
-        <div className="modal-shell" role="presentation" onClick={() => setSelectedDetailRecord(null)}>
+        <div className="modal-shell my-bets-detail-drawer-shell" role="presentation" onClick={() => setSelectedDetailRecord(null)}>
           <div className="modal-card my-bets-modal-card my-bets-detail-modal" role="dialog" aria-modal="true" aria-labelledby="my-bets-detail-title" onClick={(event) => event.stopPropagation()}>
             <div className="modal-card__header my-bets-detail-modal__header">
               <div>
