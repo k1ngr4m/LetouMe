@@ -166,6 +166,13 @@ describe('App routing', () => {
     expect(await screen.findByText('Message Center Page Mock')).toBeInTheDocument()
   })
 
+  it('scopes fixed-height layout to the my bets route', async () => {
+    renderApp(['/dashboard/my-bets'])
+    expect(await screen.findByText('Home Page Mock')).toBeInTheDocument()
+    expect(document.querySelector('.crm-shell')).toHaveClass('crm-shell--my-bets')
+    expect(document.querySelector('.crm-main')).toHaveClass('crm-main--my-bets')
+  })
+
   it('opens the context assistant drawer from the topbar', async () => {
     renderApp(['/dashboard/prediction'])
     await userEvent.click(await screen.findByRole('button', { name: 'AI 助手' }))

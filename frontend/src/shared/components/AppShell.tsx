@@ -135,6 +135,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const isChartCenterRoute = location.pathname === HOME_TAB_PATHS.charts
   const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
+  const isMyBetsRoute = location.pathname === HOME_TAB_PATHS['my-bets']
   const isExpertPredictionRoute = SHOW_EXPERT_PREDICTION && location.pathname === HOME_EXPERT_PREDICTION_PATH
   const isSmartPredictionRoute = SHOW_SMART_PREDICTION && location.pathname === HOME_SMART_PREDICTION_PATH
   const canUseSmartPrediction = SHOW_SMART_PREDICTION && user?.role === 'super_admin'
@@ -360,7 +361,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed')}>
+    <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed', isMyBetsRoute && 'crm-shell--my-bets')}>
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
         <div className="crm-sidebar__brand">
           <img className="crm-sidebar__brand-mark" src="/LetouMe_ico.png" alt="LetouMe 图标" />
@@ -798,7 +799,7 @@ export function AppShell({ children }: PropsWithChildren) {
           </nav>
         </header>
 
-        <main className="app-main crm-main">
+        <main className={clsx('app-main crm-main', isMyBetsRoute && 'crm-main--my-bets')}>
           <SiteDisclaimer compact />
           {children}
         </main>
