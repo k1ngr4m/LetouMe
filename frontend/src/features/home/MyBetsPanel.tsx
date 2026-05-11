@@ -1258,7 +1258,7 @@ export function MyBetsPanel({
   }
 
   return (
-    <div className={clsx('page-section my-bets-page', viewMode === 'list' && 'my-bets-page--list')}>
+    <div className={clsx('page-section my-bets-page', viewMode === 'list' ? 'my-bets-page--list' : 'my-bets-page--form')}>
       <StatusCard
         title="我的投注"
         actions={
@@ -1595,43 +1595,38 @@ export function MyBetsPanel({
                 </button>
               </div>
 
-              <section className="my-bets-modal__section my-bets-modal__section--base">
-                <div className="my-bets-modal__section-heading">
-                  <strong>基础信息</strong>
-                  <span>先确认期号和购票时间，OCR 识别后会自动回填来源。</span>
-                </div>
-                <div className="settings-form-grid my-bets-modal__grid">
-                  <label className="my-bets-modal__field">
-                    目标期号
-                    <input value={form.targetPeriod} onChange={(event) => setForm((previous) => ({ ...previous, targetPeriod: event.target.value.replace(/[^\d]/g, '') }))} required />
-                  </label>
-                  <label className="my-bets-modal__field">
-                    来源方式
-                    <input value={form.sourceType === 'ocr' ? 'OCR识别' : '手动录入'} disabled />
-                  </label>
-                  <label className="my-bets-modal__field">
-                    购票时间
-                    <input
-                      type="datetime-local"
-                      step={60}
-                      value={form.ticketPurchasedAt}
-                      onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
-                    />
-                  </label>
-                  <label className="my-bets-modal__field">
-                    优惠金额（元）
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={form.discountAmountInput}
-                      onChange={(event) =>
-                        setForm((previous) => ({ ...previous, discountAmountInput: event.target.value.replace(/[^\d]/g, '') || '0' }))
-                      }
-                    />
-                  </label>
-                </div>
-              </section>
+              <div className="my-bets-modal__scroll-body">
+                <section className="my-bets-modal__section my-bets-modal__section--base">
+                  <div className="my-bets-modal__section-heading">
+                    <strong>基础信息</strong>
+                    <span>先确认期号和购票时间，OCR 识别后会自动回填票据信息。</span>
+                  </div>
+                  <div className="settings-form-grid my-bets-modal__grid my-bets-modal__grid--base-info">
+                    <label className="my-bets-modal__field">
+                      目标期号
+                      <input value={form.targetPeriod} onChange={(event) => setForm((previous) => ({ ...previous, targetPeriod: event.target.value.replace(/[^\d]/g, '') }))} required />
+                    </label>
+                    <label className="my-bets-modal__field">
+                      优惠金额（元）
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={form.discountAmountInput}
+                        onChange={(event) => setForm((previous) => ({ ...previous, discountAmountInput: event.target.value.replace(/[^\d]/g, '') || '0' }))}
+                      />
+                    </label>
+                    <label className="my-bets-modal__field">
+                      购票时间
+                      <input
+                        type="datetime-local"
+                        step={60}
+                        value={form.ticketPurchasedAt}
+                        onChange={(event) => setForm((previous) => ({ ...previous, ticketPurchasedAt: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                </section>
 
               <section className="my-bets-modal__section my-bets-modal__section--image">
                 <div className="my-bets-image-uploader">
@@ -1753,7 +1748,7 @@ export function MyBetsPanel({
                                 }
                                 color="dlt-back"
                               />
-                              <div className="settings-form-grid my-bets-modal__grid">
+                              <div className="settings-form-grid my-bets-modal__grid my-bets-modal__grid--append-row">
                                 <label>
                                   前区胆码（逗号分隔）
                                   <input
@@ -1822,7 +1817,7 @@ export function MyBetsPanel({
                                 }
                                 color="dlt-back"
                               />
-                              <div className="settings-form-grid my-bets-modal__grid">
+                              <div className="settings-form-grid my-bets-modal__grid my-bets-modal__grid--append-row">
                                 <label>
                                   前区号码（逗号分隔）
                                   <input
@@ -2117,6 +2112,7 @@ export function MyBetsPanel({
                     </section>
                   )
                 })}
+              </div>
               </div>
 
               <div className="simulation-summary-bar my-bets-form-summary my-bets-modal__footer">

@@ -3351,9 +3351,19 @@
   }
 
   .my-bets-page__toolbar-button {
+    flex: 0 0 1.78rem;
     width: 1.78rem;
     height: 1.78rem;
+    min-width: 1.78rem;
     min-height: 1.78rem;
+  }
+
+  .my-bets-page__toolbar-button--primary {
+    flex: 0 0 2.18rem;
+    width: 2.18rem;
+    height: 2.18rem;
+    min-width: 2.18rem;
+    min-height: 2.18rem;
   }
 
   .prediction-overview-toolbar {
@@ -3524,15 +3534,15 @@
   }
 
   .my-bets-modal__header {
-    padding-bottom: 0.7rem;
+    padding: 0.56rem 0.64rem;
   }
 
   .my-bets-modal__header::before {
-    margin-bottom: 0.48rem;
+    display: none;
   }
 
   .my-bets-modal__header h2 {
-    font-size: 1.08rem;
+    font-size: 1.04rem;
   }
 
   .my-bets-modal__section,
