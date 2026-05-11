@@ -1006,10 +1006,24 @@ export function HomePage() {
     const references = new Map<string, HistoryModelRef>()
     const resolveKey = (model: { model_id: string; prediction_play_mode?: 'direct' | 'direct_sum' | 'compound' | 'dantuo' }) =>
       `${model.model_id}::${model.prediction_play_mode || 'direct'}`
+    const activeModelKeys = new Set<string>()
+    for (const model of models) {
+      const normalizedMode = normalizePredictionModelPlayMode(model)
+      const key = resolveKey({ model_id: model.model_id, prediction_play_mode: normalizedMode })
+      activeModelKeys.add(key)
+      references.set(key, {
+        model_id: model.model_id,
+        model_name: model.model_name || model.model_id,
+        prediction_play_mode: normalizedMode,
+      })
+    }
+    const shouldUseActiveModelGate = activeModelKeys.size > 0
     for (const stat of history?.model_stats || []) {
       if (!stat.model_id) continue
       const normalizedMode = normalizePredictionModelPlayMode(stat)
-      references.set(resolveKey({ model_id: stat.model_id, prediction_play_mode: normalizedMode }), {
+      const key = resolveKey({ model_id: stat.model_id, prediction_play_mode: normalizedMode })
+      if (shouldUseActiveModelGate && !activeModelKeys.has(key)) continue
+      references.set(key, {
         model_id: stat.model_id,
         model_name: stat.model_name || stat.model_id,
         prediction_play_mode: normalizedMode,
@@ -1019,7 +1033,9 @@ export function HomePage() {
       for (const model of record.models || []) {
         if (!model.model_id) continue
         const normalizedMode = normalizePredictionModelPlayMode(model)
-        references.set(resolveKey({ model_id: model.model_id, prediction_play_mode: normalizedMode }), {
+        const key = resolveKey({ model_id: model.model_id, prediction_play_mode: normalizedMode })
+        if (shouldUseActiveModelGate && !activeModelKeys.has(key)) continue
+        references.set(key, {
           model_id: model.model_id,
           model_name: model.model_name || model.model_id,
           prediction_play_mode: normalizedMode,
@@ -1027,7 +1043,7 @@ export function HomePage() {
       }
     }
     return [...references.values()]
-  }, [history])
+  }, [history, models])
   const historyFilterSignature = useMemo(
     () =>
       JSON.stringify({

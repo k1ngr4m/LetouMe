@@ -19,6 +19,7 @@ const {
   simulateDltModeCoexistCurrentPredictions,
   simulateDltCompoundCurrentPredictions,
   simulateDltDantuoCurrentPredictions,
+  simulateDltInactiveHistoryModel,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
   simulateJackpotPoolData,
@@ -41,6 +42,7 @@ const {
   simulateDltModeCoexistCurrentPredictions: { current: false },
   simulateDltCompoundCurrentPredictions: { current: false },
   simulateDltDantuoCurrentPredictions: { current: false },
+  simulateDltInactiveHistoryModel: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
   simulateJackpotPoolData: { current: false },
@@ -230,9 +232,29 @@ vi.mock('./hooks/useHomeData', () => ({
           buildHistoryRecord('2026021', '2026-02-18', 'model-a'),
           buildHistoryRecord('2026020', '2026-02-16', 'model-b'),
         ].map((record) => {
+          const recordWithInactiveHistoryModel = !isPl3 && simulateDltInactiveHistoryModel.current
+            ? {
+                ...record,
+                models: [
+                  ...(record.models || []),
+                  {
+                    model_id: 'model-disabled',
+                    model_name: '停用模型',
+                    model_provider: 'deepseek',
+                    prediction_play_mode: 'direct',
+                    best_hit_count: 4,
+                    bet_count: 5,
+                    cost_amount: 10,
+                    winning_bet_count: 2,
+                    prize_amount: 50,
+                    hit_period_win: true,
+                  },
+                ],
+              }
+            : record
           if (!isPl3 && simulateDltDantuoCurrentPredictions.current) {
             return {
-              ...record,
+              ...recordWithInactiveHistoryModel,
               models: [
                 {
                   model_id: 'model-a',
@@ -251,7 +273,7 @@ vi.mock('./hooks/useHomeData', () => ({
           }
           if (!isPl3 && simulateDltCompoundCurrentPredictions.current) {
             return {
-              ...record,
+              ...recordWithInactiveHistoryModel,
               models: [
                 {
                   model_id: 'model-a',
@@ -268,10 +290,10 @@ vi.mock('./hooks/useHomeData', () => ({
               ],
             }
           }
-          if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return record
+          if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return recordWithInactiveHistoryModel
           return {
-            ...record,
-            models: (record.models || []).map((model, index) =>
+            ...recordWithInactiveHistoryModel,
+            models: (recordWithInactiveHistoryModel.models || []).map((model, index) =>
               index === 0
                 ? {
                     ...model,
@@ -485,6 +507,37 @@ vi.mock('./hooks/useHomeData', () => ({
                   },
                 },
               },
+              ...(simulateDltInactiveHistoryModel.current
+                ? [
+                    {
+                      model_id: 'model-disabled',
+                      model_name: '停用模型',
+                      prediction_play_mode: 'direct',
+                      periods: 8,
+                      winning_periods: 7,
+                      bet_count: 40,
+                      winning_bet_count: 16,
+                      cost_amount: 80,
+                      prize_amount: 320,
+                      win_rate_by_period: 0.875,
+                      win_rate_by_bet: 0.4,
+                      score_profile: {
+                        overall_score: 99,
+                        per_bet_score: 98,
+                        per_period_score: 97,
+                        recent_score: 96,
+                        long_term_score: 95,
+                        component_scores: {
+                          profit: 99,
+                          hit_rate: 98,
+                          stability: 97,
+                          ceiling: 96,
+                          floor: 95,
+                        },
+                      },
+                    },
+                  ]
+                : []),
             ],
         predictions_history: pagedHistoryRecords,
         total_count: filteredHistoryRecords.length,
@@ -1918,6 +1971,18 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getByText('开始日期')).toBeInTheDocument()
     expect(screen.getByText('结束日期')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '近 120 期' })).toBeInTheDocument()
+  })
+
+  it('limits chart center backtest models to active current models', async () => {
+    simulateDltInactiveHistoryModel.current = true
+    renderPage('/dashboard/charts#backtest-base')
+
+    await screen.findByRole('heading', { name: '命中趋势折线' })
+    const modelFilter = screen.getByText('模型').closest('.chart-center-toolbar__section')
+    expect(modelFilter).not.toBeNull()
+    expect(within(modelFilter as HTMLElement).getByRole('button', { name: '模型A' })).toBeInTheDocument()
+    expect(within(modelFilter as HTMLElement).getByRole('button', { name: '模型B' })).toBeInTheDocument()
+    expect(within(modelFilter as HTMLElement).queryByRole('button', { name: '停用模型' })).not.toBeInTheDocument()
   })
 
   it('queries 120 history rows on chart center backtest views', async () => {
