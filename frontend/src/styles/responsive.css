@@ -838,6 +838,10 @@
     text-overflow: ellipsis;
   }
 
+  .my-bets-table th {
+    position: static;
+  }
+
   .my-bets-table th:nth-child(1),
   .my-bets-table td:nth-child(1) {
     width: 8.8rem;
