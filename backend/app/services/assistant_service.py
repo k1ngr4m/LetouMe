@@ -417,6 +417,8 @@ class AssistantService:
             "api_model_name": model_def.api_model,
             "version": model_def.version,
             "tags": list(model_def.tags or []),
+            "is_active": bool(model_def.is_active),
+            "is_deleted": bool(model_def.is_deleted),
             "lottery_codes": list(model_def.lottery_codes or ["dlt"]),
         }
 

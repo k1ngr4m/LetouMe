@@ -1251,7 +1251,7 @@ export function MyBetsPanel({
   }
 
   return (
-    <div className="page-section my-bets-page">
+    <div className={clsx('page-section my-bets-page', viewMode === 'list' && 'my-bets-page--list')}>
       <StatusCard
         title="我的投注"
         actions={
@@ -1312,104 +1312,105 @@ export function MyBetsPanel({
         }
       >
         {viewMode === 'list' ? (
-          <>
+          <div className="my-bets-list-view-shell">
             <div className="my-bets-summary-grid">
-          {summaryCards.map((item, index) => {
-            const Icon = item.icon
-            return (
-              <motion.article
-                key={item.key}
-                className={clsx('my-bets-summary-card', item.cardClassName)}
-                initial={animationsEnabled ? { opacity: 0, y: summaryEnterY } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: animationsEnabled ? 0.2 * motionScale : 0, delay: animationsEnabled ? index * 0.03 : 0 }}
-              >
-                <span className="my-bets-summary-card__label">{item.label}</span>
-                <span className="my-bets-summary-card__icon" aria-hidden="true">
-                  <Icon size={16} />
-                </span>
-                <strong className={item.valueClassName}>{item.value}</strong>
-                {item.meta ? <small>{item.meta}</small> : null}
-              </motion.article>
-            )
-          })}
+              {summaryCards.map((item, index) => {
+                const Icon = item.icon
+                return (
+                  <motion.article
+                    key={item.key}
+                    className={clsx('my-bets-summary-card', item.cardClassName)}
+                    initial={animationsEnabled ? { opacity: 0, y: summaryEnterY } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: animationsEnabled ? 0.2 * motionScale : 0, delay: animationsEnabled ? index * 0.03 : 0 }}
+                  >
+                    <span className="my-bets-summary-card__label">{item.label}</span>
+                    <span className="my-bets-summary-card__icon" aria-hidden="true">
+                      <Icon size={16} />
+                    </span>
+                    <strong className={item.valueClassName}>{item.value}</strong>
+                    {item.meta ? <small>{item.meta}</small> : null}
+                  </motion.article>
+                )
+              })}
             </div>
 
             {message ? <div className="simulation-inline-message">{message}</div> : null}
 
-            {betsQuery.isLoading ? (
-              <div className="state-shell">正在加载投注记录...</div>
-            ) : betsQuery.error instanceof Error ? (
-              <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
-            ) : records.length && displayMode === 'table' ? (
-              <div className="table-shell my-bets-table-shell">
-                <table className="history-table my-bets-table">
-                  <thead>
-                    <tr>
-                      <th>期号</th>
-                      <th>玩法</th>
-                      <th>投注时间</th>
-                      <th>注数/倍数</th>
-                      <th>总投入</th>
-                      <th>优惠</th>
-                      <th>净投入</th>
-                      <th>奖金</th>
-                      <th>盈亏</th>
-                      <th>中奖结果</th>
-                      <th className="my-bets-table__col--actions">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedRecords.map((record) => (
-                      <tr
-                        key={record.id}
-                        className={clsx('my-bets-table__row', highlightedRecordId === record.id && 'is-focus-highlight')}
-                        ref={(node) => {
-                          recordRefMap.current[record.id] = node
-                        }}
-                        onClick={() => openRecordDetail(record)}
-                      >
-                        <td>
-                          <button
-                            className="my-bets-table__record-link"
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openRecordDetail(record)
-                            }}
-                          >
-                            第 {record.target_period} 期
-                          </button>
-                        </td>
-                        <td>{formatPlayType(record.play_type)}</td>
-                        <td>{formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}</td>
-                        <td>{formatRecordLineSummary(record)}</td>
-                        <td>{formatCurrency(record.amount)}</td>
-                        <td>{formatCurrency(record.discount_amount || 0)}</td>
-                        <td>{formatCurrency(record.net_amount || Math.max(0, record.amount - (record.discount_amount || 0)))}</td>
-                        <td>{formatCurrency(record.prize_amount)}</td>
-                        <td className={clsx(record.net_profit >= 0 ? 'is-profit' : 'is-loss')}>{formatCurrency(record.net_profit)}</td>
-                        <td>{formatRecordWinSummary(record)}</td>
-                        <td className="my-bets-table__col--actions" onClick={(event) => event.stopPropagation()}>
-                          <div className="my-bets-table__actions">
-                            <button className="icon-button" type="button" onClick={() => openRecordDetail(record)} aria-label={`查看详情：第 ${record.target_period} 期`} title="查看详情">
-                              <Eye size={15} aria-hidden="true" />
-                            </button>
-                            <button className="icon-button" type="button" onClick={() => openEditForm(record)} aria-label={`编辑：第 ${record.target_period} 期`} title="编辑">
-                              <PencilLine size={15} aria-hidden="true" />
-                            </button>
-                            <button className="icon-button" type="button" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)} aria-label={`删除：第 ${record.target_period} 期`} title="删除">
-                              <Trash2 size={15} aria-hidden="true" />
-                            </button>
-                          </div>
-                        </td>
+            <div className="my-bets-record-scroll" data-testid="my-bets-record-scroll">
+              {betsQuery.isLoading ? (
+                <div className="state-shell">正在加载投注记录...</div>
+              ) : betsQuery.error instanceof Error ? (
+                <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
+              ) : records.length && displayMode === 'table' ? (
+                <div className="table-shell my-bets-table-shell">
+                  <table className="history-table my-bets-table">
+                    <thead>
+                      <tr>
+                        <th>期号</th>
+                        <th>玩法</th>
+                        <th>投注时间</th>
+                        <th>注数/倍数</th>
+                        <th>总投入</th>
+                        <th>优惠</th>
+                        <th>净投入</th>
+                        <th>奖金</th>
+                        <th>盈亏</th>
+                        <th>中奖结果</th>
+                        <th className="my-bets-table__col--actions">操作</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : records.length ? (
-              <div className="my-bets-list">
+                    </thead>
+                    <tbody>
+                      {paginatedRecords.map((record) => (
+                        <tr
+                          key={record.id}
+                          className={clsx('my-bets-table__row', highlightedRecordId === record.id && 'is-focus-highlight')}
+                          ref={(node) => {
+                            recordRefMap.current[record.id] = node
+                          }}
+                          onClick={() => openRecordDetail(record)}
+                        >
+                          <td>
+                            <button
+                              className="my-bets-table__record-link"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openRecordDetail(record)
+                              }}
+                            >
+                              第 {record.target_period} 期
+                            </button>
+                          </td>
+                          <td>{formatPlayType(record.play_type)}</td>
+                          <td>{formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}</td>
+                          <td>{formatRecordLineSummary(record)}</td>
+                          <td>{formatCurrency(record.amount)}</td>
+                          <td>{formatCurrency(record.discount_amount || 0)}</td>
+                          <td>{formatCurrency(record.net_amount || Math.max(0, record.amount - (record.discount_amount || 0)))}</td>
+                          <td>{formatCurrency(record.prize_amount)}</td>
+                          <td className={clsx(record.net_profit >= 0 ? 'is-profit' : 'is-loss')}>{formatCurrency(record.net_profit)}</td>
+                          <td>{formatRecordWinSummary(record)}</td>
+                          <td className="my-bets-table__col--actions" onClick={(event) => event.stopPropagation()}>
+                            <div className="my-bets-table__actions">
+                              <button className="icon-button" type="button" onClick={() => openRecordDetail(record)} aria-label={`查看详情：第 ${record.target_period} 期`} title="查看详情">
+                                <Eye size={15} aria-hidden="true" />
+                              </button>
+                              <button className="icon-button" type="button" onClick={() => openEditForm(record)} aria-label={`编辑：第 ${record.target_period} 期`} title="编辑">
+                                <PencilLine size={15} aria-hidden="true" />
+                              </button>
+                              <button className="icon-button" type="button" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)} aria-label={`删除：第 ${record.target_period} 期`} title="删除">
+                                <Trash2 size={15} aria-hidden="true" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : records.length ? (
+                <div className="my-bets-list">
                 {paginatedRecords.map((record, index) => {
                   const isExpanded = Boolean(expandedRecordMap[record.id])
                   return (
@@ -1500,10 +1501,11 @@ export function MyBetsPanel({
                 ) : null}
                   </motion.article>
                 )})}
-              </div>
-            ) : (
-              <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
-            )}
+                </div>
+              ) : (
+                <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
+              )}
+            </div>
             {records.length ? (
               <div className="my-bets-pagination" aria-label="我的投注分页">
                 <div className="my-bets-pagination__meta">{`共${records.length}条`}</div>
@@ -1566,7 +1568,7 @@ export function MyBetsPanel({
                 </form>
               </div>
             ) : null}
-          </>
+          </div>
         ) : (
           null
         )}

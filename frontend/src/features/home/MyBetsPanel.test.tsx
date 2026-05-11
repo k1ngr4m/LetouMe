@@ -152,6 +152,11 @@ describe('MyBetsPanel', () => {
 
     const table = document.querySelector('.my-bets-table') as HTMLElement
     expect(table).not.toBeNull()
+    const recordScroll = screen.getByTestId('my-bets-record-scroll')
+    expect(recordScroll.contains(table)).toBe(true)
+    const pagination = document.querySelector('.my-bets-pagination') as HTMLElement
+    expect(pagination).not.toBeNull()
+    expect(recordScroll.contains(pagination)).toBe(false)
     expect(within(table).queryByText('来源/状态')).not.toBeInTheDocument()
     expect(within(table).getByText('注数/倍数')).toBeInTheDocument()
     expect(within(table).getByText('1 注 / 2 倍')).toBeInTheDocument()

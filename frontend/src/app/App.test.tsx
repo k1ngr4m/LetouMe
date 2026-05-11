@@ -94,6 +94,8 @@ describe('App routing', () => {
         display_name: '助手模型',
         provider: 'openai',
         api_model_name: 'gpt-test',
+        is_active: true,
+        is_deleted: false,
         lottery_codes: ['dlt'],
       }],
     })
@@ -180,6 +182,59 @@ describe('App routing', () => {
     expect(within(drawer).getByRole('button', { name: '本期风险点' })).toBeInTheDocument()
     expect(within(drawer).queryByRole('button', { name: '解释当前预测' })).not.toBeInTheDocument()
     expect(within(drawer).queryByRole('button', { name: '给我保守方案' })).not.toBeInTheDocument()
+  })
+
+  it('only lists enabled assistant models for the current lottery', async () => {
+    vi.mocked(apiClient.getAssistantModels).mockResolvedValueOnce({
+      models: [
+        {
+          model_code: 'enabled-model',
+          display_name: '启用模型',
+          provider: 'openai',
+          api_model_name: 'enabled-api',
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['dlt'],
+        },
+        {
+          model_code: 'inactive-model',
+          display_name: '停用模型',
+          provider: 'openai',
+          api_model_name: 'inactive-api',
+          is_active: false,
+          is_deleted: false,
+          lottery_codes: ['dlt'],
+        },
+        {
+          model_code: 'deleted-model',
+          display_name: '删除模型',
+          provider: 'openai',
+          api_model_name: 'deleted-api',
+          is_active: true,
+          is_deleted: true,
+          lottery_codes: ['dlt'],
+        },
+        {
+          model_code: 'other-lottery-model',
+          display_name: '其他彩种模型',
+          provider: 'openai',
+          api_model_name: 'other-api',
+          is_active: true,
+          is_deleted: false,
+          lottery_codes: ['pl3'],
+        },
+      ],
+    })
+
+    renderApp(['/dashboard/prediction'])
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 助手' }))
+
+    const drawer = screen.getByRole('complementary', { name: 'AI 助手' })
+    const modelPicker = await within(drawer).findByRole('combobox')
+    expect(within(modelPicker).getByRole('option', { name: '启用模型' })).toBeInTheDocument()
+    expect(within(modelPicker).queryByRole('option', { name: '停用模型' })).not.toBeInTheDocument()
+    expect(within(modelPicker).queryByRole('option', { name: '删除模型' })).not.toBeInTheDocument()
+    expect(within(modelPicker).queryByRole('option', { name: '其他彩种模型' })).not.toBeInTheDocument()
   })
 
   it('sends current-period my bets context when analyzing my bets', async () => {

@@ -634,6 +634,8 @@ export type AssistantModel = {
   api_model_name: string
   version?: string | null
   tags?: string[]
+  is_active?: boolean
+  is_deleted?: boolean
   lottery_codes: LotteryCode[]
 }
 

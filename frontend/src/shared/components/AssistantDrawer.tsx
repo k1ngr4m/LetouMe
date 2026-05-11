@@ -45,7 +45,7 @@ const QUICK_PROMPTS: QuickPrompt[] = [
 const WELCOME_MESSAGE: AssistantMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: '你好，我可以结合当前页面帮你解释预测、图表和投注记录。你可以直接问，也可以点下面的快捷问题。',
+  content: '你好，我可以帮你解释预测、图表和投注记录。你可以直接问，也可以点下面的快捷问题。',
   model_code: '',
   status: 'success',
   created_at: 0,
@@ -137,6 +137,11 @@ function buildMyBetsAssistantContext(lotteryCode: AssistantContext['lottery_code
       })),
     })),
   }
+}
+
+function isEnabledAssistantModel(model: AssistantModel, lotteryCode: AssistantContext['lottery_code']) {
+  const supportsLottery = !model.lottery_codes?.length || model.lottery_codes.includes(lotteryCode)
+  return model.is_active !== false && model.is_deleted !== true && supportsLottery
 }
 
 type MarkdownBlock =
@@ -427,7 +432,7 @@ export function AssistantDrawer({ isOpen, context, onClose }: AssistantDrawerPro
   async function refreshModels() {
     try {
       const response = await apiClient.getAssistantModels({ lottery_code: context.lottery_code })
-      setModels(response.models)
+      setModels((response.models || []).filter((model) => isEnabledAssistantModel(model, context.lottery_code)))
       setStatus('connected')
     } catch (error) {
       setModels([])
