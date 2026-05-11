@@ -25,6 +25,8 @@ class _FakeCursor:
         return 1
 
     def fetchone(self):
+        if self.executed and self.executed[-1][0].startswith("SHOW COLUMNS"):
+            return {"Type": "datetime"}
         return self._fetchone_results.pop(0) if self._fetchone_results else None
 
     def fetchall(self):
@@ -40,6 +42,17 @@ class _FakeSchemaCursor:
 
     def fetchone(self):
         return {"Type": self._column_type}
+
+
+class _FakeRecordSchemaCursor(_FakeCursor):
+    def __init__(self, record_column_type: str) -> None:
+        super().__init__()
+        self.record_column_type = record_column_type
+
+    def fetchone(self):
+        if self.executed and "SHOW COLUMNS FROM my_bet_record LIKE 'created_at'" in self.executed[-1][0]:
+            return {"Type": self.record_column_type}
+        return super().fetchone()
 
 
 class _CursorContext:
@@ -70,7 +83,7 @@ class _ConnectionContext:
 class MyBetRepositoryTests(unittest.TestCase):
     def test_create_record_writes_mysql_datetime_timestamps(self) -> None:
         repository = MyBetRepository()
-        cursor = _FakeCursor()
+        cursor = _FakeRecordSchemaCursor("datetime")
         cursor.lastrowid = 24
 
         with (
@@ -104,9 +117,42 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertNotIsInstance(insert_params[8], int)
         datetime.strptime(insert_params[8], "%Y-%m-%d %H:%M:%S")
 
+    def test_create_record_writes_epoch_timestamps_when_record_column_is_integer(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeRecordSchemaCursor("bigint")
+        cursor.lastrowid = 24
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._replace_lines"),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._upsert_meta"),
+            patch.object(repository, "get_record", return_value={"id": 24, "target_period": "26035"}),
+            patch("backend.app.repositories.my_bet_repository.now_ts", return_value=1776074095),
+        ):
+            result = repository.create_record(
+                7,
+                {
+                    "lottery_code": "dlt",
+                    "target_period": "26035",
+                    "play_type": "dlt",
+                    "multiplier": 1,
+                    "is_append": False,
+                    "bet_count": 44,
+                    "amount": 88,
+                    "discount_amount": 0,
+                    "lines": [],
+                },
+            )
+
+        insert_sql, insert_params = next((item for item in cursor.executed if "INSERT INTO my_bet_record" in item[0]), ("", None))
+        self.assertEqual(result, {"id": 24, "target_period": "26035"})
+        self.assertIn("created_at, updated_at", insert_sql)
+        self.assertEqual(insert_params[8], 1776074095)
+        self.assertEqual(insert_params[9], 1776074095)
+
     def test_update_record_writes_mysql_datetime_updated_at(self) -> None:
         repository = MyBetRepository()
-        cursor = _FakeCursor()
+        cursor = _FakeRecordSchemaCursor("datetime")
 
         with (
             patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
@@ -138,6 +184,38 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertIsInstance(update_params[7], str)
         self.assertNotIsInstance(update_params[7], int)
         datetime.strptime(update_params[7], "%Y-%m-%d %H:%M:%S")
+
+    def test_update_record_writes_epoch_updated_at_when_record_column_is_integer(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeRecordSchemaCursor("int")
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._replace_lines"),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._upsert_meta"),
+            patch.object(repository, "get_record", return_value={"id": 24, "target_period": "26035"}),
+            patch("backend.app.repositories.my_bet_repository.now_ts", return_value=1776074095),
+        ):
+            result = repository.update_record(
+                24,
+                7,
+                {
+                    "lottery_code": "dlt",
+                    "target_period": "26035",
+                    "play_type": "dlt",
+                    "multiplier": 1,
+                    "is_append": False,
+                    "bet_count": 44,
+                    "amount": 88,
+                    "discount_amount": 0,
+                    "lines": [],
+                },
+            )
+
+        update_sql, update_params = next((item for item in cursor.executed if item[0].startswith("UPDATE my_bet_record")), ("", None))
+        self.assertEqual(result, {"id": 24, "target_period": "26035"})
+        self.assertIn("updated_at = ?", update_sql)
+        self.assertEqual(update_params[7], 1776074095)
 
     def test_normalize_datetime_value_formats_mysql_datetime(self) -> None:
         self.assertEqual(MyBetRepository._normalize_datetime_value(1776074095), "2026-04-13 17:54:55")

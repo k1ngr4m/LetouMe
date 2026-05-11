@@ -9,6 +9,7 @@ from backend.app.time_utils import ensure_timestamp, format_beijing_datetime, no
 
 
 class MyBetRepository:
+    _record_time_storage_mode: str | None = None
     _meta_time_storage_mode: str | None = None
 
     def list_records(self, user_id: int, lottery_code: str = "dlt") -> list[dict[str, Any]]:
@@ -51,10 +52,14 @@ class MyBetRepository:
 
     def create_record(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = str(payload.get("lottery_code") or "dlt")
-        current_time = format_beijing_datetime(now_ts(), with_seconds=True)
+        current_timestamp = now_ts()
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
+                    current_time = self._normalize_record_time_value(
+                        current_timestamp,
+                        storage_mode=self._resolve_record_time_storage_mode(cursor),
+                    )
                     cursor.execute(
                         """
                         INSERT INTO my_bet_record (
@@ -93,6 +98,10 @@ class MyBetRepository:
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
+                    current_time = self._normalize_record_time_value(
+                        now_ts(),
+                        storage_mode=self._resolve_record_time_storage_mode(cursor),
+                    )
                     cursor.execute(
                         """
                         UPDATE my_bet_record
@@ -115,7 +124,7 @@ class MyBetRepository:
                             int(payload.get("bet_count") or 0),
                             int(payload.get("amount") or 0),
                             int(payload.get("discount_amount") or 0),
-                            format_beijing_datetime(now_ts(), with_seconds=True),
+                            current_time,
                             record_id,
                             user_id,
                         ),
@@ -375,6 +384,15 @@ class MyBetRepository:
         return format_beijing_datetime(timestamp, with_seconds=True)
 
     @staticmethod
+    def _normalize_record_time_value(value: Any, *, storage_mode: str) -> int | str | None:
+        timestamp = ensure_timestamp(value, assume_beijing=True)
+        if timestamp is None:
+            return None
+        if storage_mode == "epoch":
+            return int(timestamp)
+        return format_beijing_datetime(timestamp, with_seconds=True)
+
+    @staticmethod
     def _normalize_meta_time_value(value: Any, *, storage_mode: str) -> int | str | None:
         timestamp = ensure_timestamp(value, assume_beijing=True)
         if timestamp is None:
@@ -382,6 +400,17 @@ class MyBetRepository:
         if storage_mode == "epoch":
             return int(timestamp)
         return format_beijing_datetime(timestamp, with_seconds=True)
+
+    @classmethod
+    def _resolve_record_time_storage_mode(cls, cursor: Any) -> str:
+        try:
+            cursor.execute("SHOW COLUMNS FROM my_bet_record LIKE 'created_at'")
+            row = cursor.fetchone() or {}
+            column_type = str((row.get("Type") if isinstance(row, dict) else "") or "").strip().lower()
+            cls._record_time_storage_mode = "epoch" if "int" in column_type else "datetime"
+        except Exception:
+            cls._record_time_storage_mode = "datetime"
+        return cls._record_time_storage_mode
 
     @classmethod
     def _resolve_meta_time_storage_mode(cls, cursor: Any) -> str:
