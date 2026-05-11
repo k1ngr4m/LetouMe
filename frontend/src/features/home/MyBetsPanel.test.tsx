@@ -165,6 +165,8 @@ describe('MyBetsPanel', () => {
     await userEvent.click(within(table).getByText('九等奖 · 中 1 注'))
     const dialog = await screen.findByRole('dialog', { name: /第 2026032 期/ })
     expect(within(dialog).getByText('开奖号码')).toBeInTheDocument()
+    expect(within(dialog).getByText('创建时间')).toBeInTheDocument()
+    expect(within(dialog).getByText('更新时间')).toBeInTheDocument()
     expect(within(dialog).getByText('子注单 #1 · 大乐透')).toBeInTheDocument()
     expect(within(dialog).getByText('总奖金')).toBeInTheDocument()
 

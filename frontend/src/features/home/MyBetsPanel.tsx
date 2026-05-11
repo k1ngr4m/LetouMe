@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Coins, Eye, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -2133,7 +2134,7 @@ export function MyBetsPanel({
         </section>
       ) : null}
 
-      {selectedDetailRecord ? (
+      {selectedDetailRecord ? createPortal(
         <div className="modal-shell my-bets-detail-drawer-shell" role="presentation" onClick={() => setSelectedDetailRecord(null)}>
           <div className="modal-card my-bets-modal-card my-bets-detail-modal" role="dialog" aria-modal="true" aria-labelledby="my-bets-detail-title" onClick={(event) => event.stopPropagation()}>
             <div className="modal-card__header my-bets-detail-modal__header">
@@ -2233,7 +2234,8 @@ export function MyBetsPanel({
               </section>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )
