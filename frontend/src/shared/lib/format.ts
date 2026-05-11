@@ -48,7 +48,7 @@ function parseDateTimeValue(value: string | number, timeZone: string) {
 
 function parseCompactDateTime(value: string | number, timeZone: string) {
   const text = String(value).trim()
-  if (!/^\d{8}(\d{4})?(\d{2})?$/.test(text)) return null
+  if (!/^(?:\d{8}|\d{12}|\d{14})$/.test(text)) return null
   const year = Number(text.slice(0, 4))
   const month = Number(text.slice(4, 6))
   const day = Number(text.slice(6, 8))

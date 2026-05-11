@@ -9,4 +9,9 @@ describe('formatDateTimeBeijing', () => {
   it('still supports epoch milliseconds', () => {
     expect(formatDateTimeBeijing(1770000000000)).toBe('2026-02-02 10:40')
   })
+
+  it('treats 10-digit numeric values as epoch seconds instead of compact dates', () => {
+    expect(formatDateTimeBeijing(1780031520)).toBe('2026-05-29 13:12')
+    expect(formatDateTimeBeijing('1780031520')).toBe('2026-05-29 13:12')
+  })
 })
