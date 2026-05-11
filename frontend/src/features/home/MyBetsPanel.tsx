@@ -1289,7 +1289,6 @@ export function MyBetsPanel({
                     <tr>
                       <th>期号</th>
                       <th>玩法</th>
-                      <th>来源/状态</th>
                       <th>投注时间</th>
                       <th>注数/倍数</th>
                       <th>总投入</th>
@@ -1324,12 +1323,6 @@ export function MyBetsPanel({
                           </button>
                         </td>
                         <td>{formatPlayType(record.play_type)}</td>
-                        <td>
-                          <div className="my-bets-table__status-stack">
-                            {record.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : <span className="my-bets-status">手动</span>}
-                            {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
-                          </div>
-                        </td>
                         <td>{formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}</td>
                         <td>{formatRecordLineSummary(record)}</td>
                         <td>{formatCurrency(record.amount)}</td>
