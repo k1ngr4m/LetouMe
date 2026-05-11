@@ -455,8 +455,8 @@ class MyBetServiceTests(unittest.TestCase):
 
     def test_list_records_batches_draw_lookup_for_settlement(self) -> None:
         class FakeRepository:
-            def list_records(self, user_id: int, lottery_code: str = "dlt"):
-                return [
+            def list_records(self, user_id: int, lottery_code: str = "dlt", *, limit: int | None = 20, offset: int = 0, filters=None):
+                records = [
                     {
                         "id": 1,
                         "lottery_code": lottery_code,
@@ -510,6 +510,9 @@ class MyBetServiceTests(unittest.TestCase):
                         ],
                     },
                 ]
+                if limit is None:
+                    return records
+                return records[offset : offset + limit]
 
         class FakeLotteryRepository:
             def __init__(self) -> None:
@@ -533,11 +536,114 @@ class MyBetServiceTests(unittest.TestCase):
         lottery_repository = FakeLotteryRepository()
         service = MyBetService(repository=FakeRepository(), lottery_repository=lottery_repository)
 
-        result = service.list_records(1, lottery_code="dlt")
+        result = service.list_records(1, lottery_code="dlt", limit=20, offset=0)
 
         self.assertEqual(result["summary"]["total_count"], 2)
         self.assertEqual(lottery_repository.draw_periods, [["26040", "26040"]])
         self.assertEqual(lottery_repository.previous_periods, [["26040", "26040"]])
+
+    def test_list_records_paginates_records_but_keeps_full_summary(self) -> None:
+        def make_record(record_id: int, amount: int) -> dict:
+            return {
+                "id": record_id,
+                "lottery_code": "dlt",
+                "target_period": f"2604{record_id}",
+                "play_type": "dlt",
+                "multiplier": 1,
+                "is_append": 0,
+                "bet_count": 1,
+                "amount": amount,
+                "discount_amount": 0,
+                "source_type": "manual",
+                "created_at": "2026-03-31T00:00:00Z",
+                "updated_at": "2026-03-31T00:00:00Z",
+                "lines": [
+                    {
+                        "line_no": 1,
+                        "play_type": "dlt",
+                        "front_numbers": "01,02,03,04,05",
+                        "back_numbers": "01,02",
+                        "multiplier": 1,
+                        "is_append": 0,
+                        "bet_count": 1,
+                        "amount": amount,
+                    }
+                ],
+            }
+
+        class FakeRepository:
+            def __init__(self) -> None:
+                self.records = [make_record(1, 2), make_record(2, 4), make_record(3, 6)]
+                self.calls: list[dict] = []
+
+            def list_records(self, user_id: int, lottery_code: str = "dlt", *, limit: int | None = 20, offset: int = 0, filters=None):
+                self.calls.append({"limit": limit, "offset": offset, "filters": filters})
+                if limit is None:
+                    return self.records
+                return self.records[offset : offset + limit]
+
+        class FakeLotteryRepository:
+            def list_draws_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {}
+
+            def list_previous_jackpot_pool_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {}
+
+        repository = FakeRepository()
+        service = MyBetService(repository=repository, lottery_repository=FakeLotteryRepository())
+
+        result = service.list_records(1, lottery_code="dlt", limit=1, offset=1)
+
+        self.assertEqual([item["id"] for item in result["records"]], [2])
+        self.assertEqual(result["summary"]["total_count"], 3)
+        self.assertEqual(result["summary"]["total_amount"], 12)
+        self.assertEqual(repository.calls[0]["limit"], 1)
+        self.assertEqual(repository.calls[0]["offset"], 1)
+        self.assertEqual(repository.calls[1]["limit"], None)
+        self.assertEqual(repository.calls[1]["offset"], 0)
+
+    def test_list_records_passes_filters_to_repository(self) -> None:
+        class FakeRepository:
+            def __init__(self) -> None:
+                self.calls: list[dict] = []
+
+            def list_records(self, user_id: int, lottery_code: str = "dlt", *, limit: int | None = 20, offset: int = 0, filters=None):
+                self.calls.append({"limit": limit, "offset": offset, "filters": filters})
+                return []
+
+        class FakeLotteryRepository:
+            def list_draws_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {}
+
+            def list_previous_jackpot_pool_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {}
+
+        repository = FakeRepository()
+        service = MyBetService(repository=repository, lottery_repository=FakeLotteryRepository())
+
+        service.list_records(
+            1,
+            lottery_code="dlt",
+            limit=10,
+            offset=20,
+            period_query="2603",
+            play_type_filter="dlt_dantuo",
+            settlement_status_filter="settled",
+            source_type_filter="ocr",
+            date_start="2026-04-01",
+            date_end="2026-04-30",
+        )
+
+        expected_filters = {
+            "period_query": "2603",
+            "play_type_filter": "dlt_dantuo",
+            "settlement_status_filter": "settled",
+            "source_type_filter": "ocr",
+            "date_start": "2026-04-01",
+            "date_end": "2026-04-30",
+        }
+        self.assertEqual(repository.calls[0]["filters"], expected_filters)
+        self.assertEqual(repository.calls[1]["filters"], expected_filters)
 
 
 if __name__ == "__main__":

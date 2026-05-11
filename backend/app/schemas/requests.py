@@ -268,6 +268,14 @@ class SimulationTicketDeletePayload(BaseModel):
 
 class MyBetRecordListPayload(BaseModel):
     lottery_code: str = "dlt"
+    limit: int = Field(default=20, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+    period_query: str | None = None
+    play_type_filter: str | None = None
+    settlement_status_filter: Literal["all", "pending", "settled"] = "all"
+    source_type_filter: Literal["all", "manual", "ocr"] = "all"
+    date_start: str | None = None
+    date_end: str | None = None
 
 
 class MyBetLinePayload(BaseModel):

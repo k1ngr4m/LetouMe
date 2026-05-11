@@ -5,19 +5,38 @@ from typing import Any
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.number_codec import EMPTY_NUMBER_FIELDS, build_number_rows, with_number_fields, merge_number_rows
-from backend.app.time_utils import ensure_timestamp, format_beijing_datetime, now_ts
+from backend.app.lotteries import storage_issue_no
+from backend.app.time_utils import beijing_date_end_ts, beijing_date_start_ts, ensure_timestamp, format_beijing_datetime, now_ts
 
 
 class MyBetRepository:
     _record_time_storage_mode: str | None = None
     _meta_time_storage_mode: str | None = None
 
-    def list_records(self, user_id: int, lottery_code: str = "dlt") -> list[dict[str, Any]]:
+    def list_records(
+        self,
+        user_id: int,
+        lottery_code: str = "dlt",
+        *,
+        limit: int | None = 20,
+        offset: int = 0,
+        filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         with use_lottery_table_scope(lottery_code):
             with get_connection() as connection:
                 with connection.cursor() as cursor:
+                    limit_clause = ""
+                    where_sql, params = self._build_list_where_clause(
+                        cursor,
+                        user_id,
+                        lottery_code=lottery_code,
+                        filters=filters,
+                    )
+                    if limit is not None:
+                        limit_clause = "LIMIT ? OFFSET ?"
+                        params.extend([int(limit), int(offset)])
                     cursor.execute(
-                        """
+                        f"""
                         SELECT
                             record.id,
                             record.user_id,
@@ -38,10 +57,11 @@ class MyBetRepository:
                             meta.ticket_purchased_at
                         FROM my_bet_record AS record
                         LEFT JOIN my_bet_record_meta AS meta ON meta.record_id = record.id
-                        WHERE record.user_id = ?
+                        WHERE {where_sql}
                         ORDER BY record.target_period DESC, record.created_at DESC, record.id DESC
+                        {limit_clause}
                         """,
-                        (user_id,),
+                        tuple(params),
                     )
                     records = cursor.fetchall()
                     line_map = self._list_lines_map(cursor, [int(item["id"]) for item in records])
@@ -49,6 +69,68 @@ class MyBetRepository:
                         self._compose_record_payload(item, line_map.get(int(item["id"]), []), lottery_code=lottery_code)
                         for item in records
                     ]
+
+    @staticmethod
+    def _build_list_where_clause(cursor: Any, user_id: int, *, lottery_code: str, filters: dict[str, Any] | None = None) -> tuple[str, list[Any]]:
+        normalized_filters = filters or {}
+        where_clauses = ["record.user_id = ?"]
+        params: list[Any] = [int(user_id)]
+
+        period_query = str(normalized_filters.get("period_query") or "").strip()
+        if period_query:
+            where_clauses.append("record.target_period LIKE ?")
+            params.append(f"%{storage_issue_no(lottery_code, period_query)}%")
+
+        play_type_filter = str(normalized_filters.get("play_type_filter") or "").strip().lower()
+        if play_type_filter and play_type_filter != "all":
+            where_clauses.append("record.play_type = ?")
+            params.append(play_type_filter)
+
+        source_type_filter = str(normalized_filters.get("source_type_filter") or "all").strip().lower()
+        if source_type_filter in {"manual", "ocr"}:
+            where_clauses.append("COALESCE(meta.source_type, 'manual') = ?")
+            params.append(source_type_filter)
+
+        settlement_status_filter = str(normalized_filters.get("settlement_status_filter") or "all").strip().lower()
+        if settlement_status_filter == "settled":
+            where_clauses.append(
+                "EXISTS (SELECT 1 FROM draw_issue di INNER JOIN draw_result dr ON dr.issue_id = di.id WHERE di.issue_no = record.target_period)"
+            )
+        elif settlement_status_filter == "pending":
+            where_clauses.append(
+                "NOT EXISTS (SELECT 1 FROM draw_issue di INNER JOIN draw_result dr ON dr.issue_id = di.id WHERE di.issue_no = record.target_period)"
+            )
+
+        date_start = beijing_date_start_ts(normalized_filters.get("date_start"))
+        date_end = beijing_date_end_ts(normalized_filters.get("date_end"))
+        if date_start and date_end and date_start > date_end:
+            date_start, date_end = date_end, date_start
+        if date_start is not None:
+            where_clauses.append("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?")
+            params.append(
+                MyBetRepository._normalize_filter_time_value(
+                    date_start,
+                    record_storage_mode=MyBetRepository._resolve_record_time_storage_mode(cursor),
+                    meta_storage_mode=MyBetRepository._resolve_meta_time_storage_mode(cursor),
+                )
+            )
+        if date_end is not None:
+            where_clauses.append("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?")
+            params.append(
+                MyBetRepository._normalize_filter_time_value(
+                    date_end,
+                    record_storage_mode=MyBetRepository._resolve_record_time_storage_mode(cursor),
+                    meta_storage_mode=MyBetRepository._resolve_meta_time_storage_mode(cursor),
+                )
+            )
+
+        return " AND ".join(where_clauses), params
+
+    @staticmethod
+    def _normalize_filter_time_value(value: Any, *, record_storage_mode: str, meta_storage_mode: str) -> int | str:
+        if record_storage_mode == "epoch" and meta_storage_mode == "epoch":
+            return int(value)
+        return format_beijing_datetime(value, with_seconds=True) or int(value)
 
     def create_record(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         lottery_code = str(payload.get("lottery_code") or "dlt")

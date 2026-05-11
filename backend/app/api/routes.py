@@ -551,7 +551,18 @@ def delete_simulation_ticket(payload: SimulationTicketDeletePayload, current_use
 
 @router.post("/my-bets/list", response_model=MyBetRecordListResponse)
 def list_my_bets(payload: MyBetRecordListPayload, current_user: dict = Depends(require_current_user)) -> dict:
-    return my_bet_service.list_records(int(current_user["id"]), lottery_code=payload.lottery_code)
+    return my_bet_service.list_records(
+        int(current_user["id"]),
+        lottery_code=payload.lottery_code,
+        limit=payload.limit,
+        offset=payload.offset,
+        period_query=payload.period_query,
+        play_type_filter=payload.play_type_filter,
+        settlement_status_filter=payload.settlement_status_filter,
+        source_type_filter=payload.source_type_filter,
+        date_start=payload.date_start,
+        date_end=payload.date_end,
+    )
 
 
 @router.post("/my-bets/create", response_model=MyBetRecordCreateResponse)

@@ -304,6 +304,96 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertEqual(result, {"id": 24, "target_period": "26035"})
         self.assertTrue(any("SELECT id FROM my_bet_record" in query for query, _ in cursor.executed))
 
+    def test_list_records_applies_limit_offset_and_loads_only_page_lines(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+        cursor._rows_by_query = [
+            [
+                {
+                    "id": 101,
+                    "user_id": 7,
+                    "target_period": "26035",
+                    "play_type": "dlt",
+                    "multiplier": 1,
+                    "is_append": 0,
+                    "bet_count": 1,
+                    "amount": 2,
+                    "discount_amount": 0,
+                    "created_at": "2026-04-13 17:54:55",
+                    "updated_at": "2026-04-13 17:54:55",
+                    "source_type": "manual",
+                    "ticket_image_url": None,
+                    "ocr_text": None,
+                    "ocr_provider": None,
+                    "ocr_recognized_at": None,
+                    "ticket_purchased_at": None,
+                }
+            ],
+            [],
+            [],
+        ]
+
+        def fetchall_with_rows():
+            return cursor._rows_by_query.pop(0) if cursor._rows_by_query else []
+
+        cursor.fetchall = fetchall_with_rows  # type: ignore[method-assign]
+
+        with patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)):
+            result = repository.list_records(7, lottery_code="dlt", limit=20, offset=40)
+
+        list_sql, list_params = cursor.executed[0]
+        line_sql, line_params = next((item for item in cursor.executed if "FROM my_bet_record_line" in item[0]), ("", None))
+        self.assertIn("LIMIT ? OFFSET ?", list_sql)
+        self.assertEqual(list_params, (7, 20, 40))
+        self.assertEqual(line_params, (101,))
+        self.assertEqual([item["id"] for item in result], [101])
+
+    def test_list_records_can_load_all_records_for_summary(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._list_lines_map", return_value={}),
+        ):
+            repository.list_records(7, lottery_code="dlt", limit=None)
+
+        list_sql, list_params = cursor.executed[0]
+        self.assertNotIn("LIMIT ? OFFSET ?", list_sql)
+        self.assertEqual(list_params, (7,))
+
+    def test_list_records_applies_filters_to_query(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._list_lines_map", return_value={}),
+        ):
+            repository.list_records(
+                7,
+                lottery_code="dlt",
+                limit=20,
+                offset=0,
+                filters={
+                    "period_query": "2603",
+                    "play_type_filter": "dlt_dantuo",
+                    "settlement_status_filter": "settled",
+                    "source_type_filter": "ocr",
+                    "date_start": "2026-04-01",
+                    "date_end": "2026-04-30",
+                },
+            )
+
+        list_sql, list_params = next((item for item in cursor.executed if "FROM my_bet_record AS record" in item[0]), ("", None))
+        self.assertIn("record.target_period LIKE ?", list_sql)
+        self.assertIn("record.play_type = ?", list_sql)
+        self.assertIn("COALESCE(meta.source_type, 'manual') = ?", list_sql)
+        self.assertIn("EXISTS (SELECT 1 FROM draw_issue", list_sql)
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?", list_sql)
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?", list_sql)
+        self.assertEqual(list_params, (7, "%2603%", "dlt_dantuo", "ocr", "2026-04-01 00:00:00", "2026-04-30 23:59:59", 20, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

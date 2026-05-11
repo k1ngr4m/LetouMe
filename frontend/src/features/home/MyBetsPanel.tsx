@@ -59,6 +59,8 @@ type BetFormState = {
 
 type MyBetsViewMode = 'list' | 'form'
 type MyBetsDisplayMode = 'card' | 'table'
+type MyBetsSettlementFilter = 'all' | 'pending' | 'settled'
+type MyBetsSourceFilter = 'all' | 'manual' | 'ocr'
 
 const MY_BETS_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 200] as const
 const MY_BETS_COMPACT_VIEWPORT_WIDTH = 760
@@ -82,6 +84,28 @@ const pl3PlayTypeOptions: Array<{ value: Pl3PlayType; label: string }> = [
   { value: 'direct_sum', label: '直选和值' },
   { value: 'pl3_dantuo', label: '直选组合胆拖' },
   { value: 'group_sum', label: '组选和值' },
+]
+const myBetsPlayTypeOptions = [
+  { value: 'all', label: '全部玩法' },
+  { value: 'dlt', label: '大乐透' },
+  { value: 'dlt_dantuo', label: '胆拖' },
+  { value: 'direct', label: '直选' },
+  { value: 'group3', label: '组选3' },
+  { value: 'group6', label: '组选6' },
+  { value: 'direct_sum', label: '直选和值' },
+  { value: 'group_sum', label: '组选和值' },
+  { value: 'pl3_dantuo', label: '直选组合胆拖' },
+  { value: 'qxc_compound', label: '七星彩复式' },
+] as const
+const myBetsSettlementFilterOptions: Array<{ value: MyBetsSettlementFilter; label: string }> = [
+  { value: 'all', label: '全部状态' },
+  { value: 'pending', label: '待开奖' },
+  { value: 'settled', label: '已结算' },
+]
+const myBetsSourceFilterOptions: Array<{ value: MyBetsSourceFilter; label: string }> = [
+  { value: 'all', label: '全部来源' },
+  { value: 'manual', label: '手动录入' },
+  { value: 'ocr', label: 'OCR识别' },
 ]
 const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
 const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
@@ -867,6 +891,12 @@ export function MyBetsPanel({
   const [recordsPage, setRecordsPage] = useState(1)
   const [recordsPageSize, setRecordsPageSize] = useState<(typeof MY_BETS_PAGE_SIZE_OPTIONS)[number]>(20)
   const [recordsPageInput, setRecordsPageInput] = useState('1')
+  const [periodQuery, setPeriodQuery] = useState('')
+  const [playTypeFilter, setPlayTypeFilter] = useState('all')
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState<MyBetsSettlementFilter>('all')
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<MyBetsSourceFilter>('all')
+  const [dateStartFilter, setDateStartFilter] = useState('')
+  const [dateEndFilter, setDateEndFilter] = useState('')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [selectedDetailRecord, setSelectedDetailRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -896,9 +926,42 @@ export function MyBetsPanel({
     }
   }, [form.ticketImagePreviewUrl])
 
+  const normalizedPeriodQuery = periodQuery.trim()
+  const normalizedPlayTypeFilter = playTypeFilter === 'all' ? '' : playTypeFilter
+  const hasActiveFilters = Boolean(
+    normalizedPeriodQuery ||
+      normalizedPlayTypeFilter ||
+      settlementStatusFilter !== 'all' ||
+      sourceTypeFilter !== 'all' ||
+      dateStartFilter ||
+      dateEndFilter,
+  )
+  const recordsOffset = (recordsPage - 1) * recordsPageSize
   const betsQuery = useQuery({
-    queryKey: ['my-bets', lotteryCode],
-    queryFn: async () => apiClient.getMyBets(lotteryCode),
+    queryKey: [
+      'my-bets',
+      lotteryCode,
+      recordsPage,
+      recordsPageSize,
+      normalizedPeriodQuery,
+      normalizedPlayTypeFilter,
+      settlementStatusFilter,
+      sourceTypeFilter,
+      dateStartFilter,
+      dateEndFilter,
+    ],
+    queryFn: async () =>
+      apiClient.getMyBets({
+        lottery_code: lotteryCode,
+        limit: recordsPageSize,
+        offset: recordsOffset,
+        period_query: normalizedPeriodQuery || undefined,
+        play_type_filter: normalizedPlayTypeFilter || undefined,
+        settlement_status_filter: settlementStatusFilter,
+        source_type_filter: sourceTypeFilter,
+        date_start: dateStartFilter || undefined,
+        date_end: dateEndFilter || undefined,
+      }),
   })
 
   const saveMutation = useMutation({
@@ -1000,9 +1063,10 @@ export function MyBetsPanel({
   const records = betsQuery.data?.records || []
   const summary = betsQuery.data?.summary
   const hasRecords = records.length > 0
-  const totalRecordPages = Math.max(1, Math.ceil(records.length / recordsPageSize))
+  const totalRecords = summary?.total_count || 0
+  const totalRecordPages = Math.max(1, Math.ceil(totalRecords / recordsPageSize))
   const normalizedRecordsPage = Math.min(recordsPage, totalRecordPages)
-  const paginatedRecords = records.slice((normalizedRecordsPage - 1) * recordsPageSize, normalizedRecordsPage * recordsPageSize)
+  const paginatedRecords = records
   const paginationPages = buildPaginationPages(normalizedRecordsPage, totalRecordPages)
   const allRecordsExpanded = paginatedRecords.length > 0 && paginatedRecords.every((record) => Boolean(expandedRecordMap[record.id]))
   const animationsEnabled = motionLevel !== 'minimal'
@@ -1048,8 +1112,13 @@ export function MyBetsPanel({
   }, [selectedDetailRecord])
 
   useEffect(() => {
+    if (!betsQuery.data) return
     setRecordsPage((currentPage) => Math.min(currentPage, totalRecordPages))
-  }, [totalRecordPages])
+  }, [betsQuery.data, totalRecordPages])
+
+  useEffect(() => {
+    setRecordsPage(1)
+  }, [normalizedPeriodQuery, normalizedPlayTypeFilter, settlementStatusFilter, sourceTypeFilter, dateStartFilter, dateEndFilter])
 
   useEffect(() => {
     setRecordsPageInput(String(normalizedRecordsPage))
@@ -1257,6 +1326,16 @@ export function MyBetsPanel({
     goToRecordsPage(Math.floor(parsedPage))
   }
 
+  function clearMyBetsFilters() {
+    setPeriodQuery('')
+    setPlayTypeFilter('all')
+    setSettlementStatusFilter('all')
+    setSourceTypeFilter('all')
+    setDateStartFilter('')
+    setDateEndFilter('')
+    setRecordsPage(1)
+  }
+
   return (
     <div className={clsx('page-section my-bets-page', viewMode === 'list' ? 'my-bets-page--list' : 'my-bets-page--form')}>
       <StatusCard
@@ -1343,6 +1422,60 @@ export function MyBetsPanel({
             </div>
 
             {message ? <div className="simulation-inline-message">{message}</div> : null}
+
+            <div className="my-bets-filter-panel" aria-label="我的投注筛选">
+              <label className="my-bets-filter-field my-bets-filter-field--search">
+                <span>期号</span>
+                <input
+                  value={periodQuery}
+                  onChange={(event) => setPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
+                  inputMode="numeric"
+                  placeholder="输入期号"
+                  aria-label="筛选期号"
+                />
+              </label>
+              <label className="my-bets-filter-field">
+                <span>玩法</span>
+                <select value={playTypeFilter} onChange={(event) => setPlayTypeFilter(event.target.value)}>
+                  {myBetsPlayTypeOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="my-bets-filter-field">
+                <span>状态</span>
+                <select value={settlementStatusFilter} onChange={(event) => setSettlementStatusFilter(event.target.value as MyBetsSettlementFilter)}>
+                  {myBetsSettlementFilterOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="my-bets-filter-field">
+                <span>来源</span>
+                <select value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value as MyBetsSourceFilter)}>
+                  {myBetsSourceFilterOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="my-bets-filter-field">
+                <span>开始日期</span>
+                <input type="date" value={dateStartFilter} onChange={(event) => setDateStartFilter(event.target.value)} aria-label="筛选开始日期" />
+              </label>
+              <label className="my-bets-filter-field">
+                <span>结束日期</span>
+                <input type="date" value={dateEndFilter} onChange={(event) => setDateEndFilter(event.target.value)} aria-label="筛选结束日期" />
+              </label>
+              <button className="ghost-button ghost-button--compact my-bets-filter-clear" type="button" disabled={!hasActiveFilters} onClick={clearMyBetsFilters}>
+                清空
+              </button>
+            </div>
 
             <div className="my-bets-record-scroll" data-testid="my-bets-record-scroll">
               {betsQuery.isLoading ? (
@@ -1513,9 +1646,9 @@ export function MyBetsPanel({
                 <div className="state-shell">当前彩种还没有投注记录，点击“添加投注”开始录入。</div>
               )}
             </div>
-            {records.length ? (
+            {totalRecords > 0 ? (
               <div className="my-bets-pagination" aria-label="我的投注分页">
-                <div className="my-bets-pagination__meta">{`共${records.length}条`}</div>
+                <div className="my-bets-pagination__meta">{`共${totalRecords}条`}</div>
                 <label className="my-bets-pagination__size">
                   <select value={recordsPageSize} onChange={(event) => changeRecordsPageSize(Number(event.target.value))} aria-label="每页条数">
                     {MY_BETS_PAGE_SIZE_OPTIONS.map((size) => (

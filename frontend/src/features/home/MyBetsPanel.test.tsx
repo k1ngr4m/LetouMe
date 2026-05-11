@@ -186,11 +186,11 @@ describe('MyBetsPanel', () => {
   })
 
   it('paginates my-bets records and supports page size changes', async () => {
-    getMyBets.mockResolvedValueOnce({
-      records: Array.from({ length: 25 }, (_, index) =>
+    getMyBets.mockImplementation(async ({ limit = 20, offset = 0 }) => ({
+      records: Array.from({ length: Math.min(limit, Math.max(25 - offset, 0)) }, (_, index) =>
         buildRecord({
-          id: index + 1,
-          target_period: String(2026032 - index),
+          id: offset + index + 1,
+          target_period: String(2026032 - offset - index),
           prize_level: null,
           winning_bet_count: 0,
         }),
@@ -205,20 +205,49 @@ describe('MyBetsPanel', () => {
         settled_count: 25,
         pending_count: 0,
       },
-    })
+    }))
 
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })
+    await waitFor(() => expect(getMyBets).toHaveBeenCalledWith(expect.objectContaining({ lottery_code: 'dlt', limit: 20, offset: 0 })))
     expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
     expect(screen.queryByText('第 2026012 期')).not.toBeInTheDocument()
     expect(screen.getByText('共25条')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '2' }))
+    await waitFor(() => expect(getMyBets).toHaveBeenCalledWith(expect.objectContaining({ lottery_code: 'dlt', limit: 20, offset: 20 })))
     expect(await screen.findByText('第 2026012 期')).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText('每页条数'), '10')
+    await waitFor(() => expect(getMyBets).toHaveBeenCalledWith(expect.objectContaining({ lottery_code: 'dlt', limit: 10, offset: 20 })))
     expect(await screen.findByText('第 2026012 期')).toBeInTheDocument()
     expect(screen.queryByText('第 2026022 期')).not.toBeInTheDocument()
+  })
+
+  it('sends my-bets filters with the paginated request', async () => {
+    renderPanel()
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.type(screen.getByLabelText('筛选期号'), '2603')
+    await userEvent.selectOptions(screen.getByLabelText('玩法'), 'dlt_dantuo')
+    await userEvent.selectOptions(screen.getByLabelText('状态'), 'settled')
+    await userEvent.selectOptions(screen.getByLabelText('来源'), 'ocr')
+    await userEvent.type(screen.getByLabelText('筛选开始日期'), '2026-04-01')
+    await userEvent.type(screen.getByLabelText('筛选结束日期'), '2026-04-30')
+
+    await waitFor(() =>
+      expect(getMyBets).toHaveBeenLastCalledWith({
+        lottery_code: 'dlt',
+        limit: 20,
+        offset: 0,
+        period_query: '2603',
+        play_type_filter: 'dlt_dantuo',
+        settlement_status_filter: 'settled',
+        source_type_filter: 'ocr',
+        date_start: '2026-04-01',
+        date_end: '2026-04-30',
+      }),
+    )
   })
 
   it('opens the detail modal from the card detail action', async () => {

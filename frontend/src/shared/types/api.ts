@@ -411,6 +411,18 @@ export type MyBetRecordUpdatePayload = MyBetRecordPayload & {
   record_id: number
 }
 
+export type MyBetRecordListPayload = {
+  lottery_code?: LotteryCode
+  limit?: number
+  offset?: number
+  period_query?: string
+  play_type_filter?: string
+  settlement_status_filter?: 'all' | 'pending' | 'settled'
+  source_type_filter?: 'all' | 'manual' | 'ocr'
+  date_start?: string
+  date_end?: string
+}
+
 export type MyBetLinePayload = {
   play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
   front_numbers?: string[]

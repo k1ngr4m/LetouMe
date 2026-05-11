@@ -25,6 +25,7 @@ import type {
   ExpertPublicListResponse,
   LoginPayload,
   MyBetRecordCreateResponse,
+  MyBetRecordListPayload,
   MyBetOCRDraftResponse,
   MyBetOCRImageUploadResponse,
   MyBetRecordListResponse,
@@ -433,10 +434,11 @@ export const apiClient = {
       body: JSON.stringify({ lottery_code: lotteryCode }),
     })
   },
-  getMyBets(lotteryCode: LotteryCode = 'dlt') {
+  getMyBets(payload: LotteryCode | MyBetRecordListPayload = 'dlt') {
+    const body = typeof payload === 'string' ? { lottery_code: payload } : payload
     return requestJson<MyBetRecordListResponse>('/api/my-bets/list', {
       method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode }),
+      body: JSON.stringify(body || {}),
     })
   },
   getMessages(payload?: {

@@ -57,13 +57,48 @@ class MyBetService:
         self.lottery_repository = lottery_repository or LotteryRepository()
         self.ticket_ocr_service = ticket_ocr_service or TicketOCRService()
 
-    def list_records(self, user_id: int, lottery_code: str = "dlt") -> dict[str, Any]:
+    def list_records(
+        self,
+        user_id: int,
+        lottery_code: str = "dlt",
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        period_query: str | None = None,
+        play_type_filter: str | None = None,
+        settlement_status_filter: str = "all",
+        source_type_filter: str = "all",
+        date_start: str | None = None,
+        date_end: str | None = None,
+    ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
-        raw_records = self.repository.list_records(user_id, lottery_code=normalized_code)
+        filters = {
+            "period_query": str(period_query or "").strip(),
+            "play_type_filter": str(play_type_filter or "").strip().lower(),
+            "settlement_status_filter": str(settlement_status_filter or "all").strip().lower(),
+            "source_type_filter": str(source_type_filter or "all").strip().lower(),
+            "date_start": date_start,
+            "date_end": date_end,
+        }
+        raw_records = self.repository.list_records(
+            user_id,
+            lottery_code=normalized_code,
+            limit=limit,
+            offset=offset,
+            filters=filters,
+        )
+        raw_summary_records = self.repository.list_records(
+            user_id,
+            lottery_code=normalized_code,
+            limit=None,
+            offset=0,
+            filters=filters,
+        )
         serialized_records = [self._serialize_record(item) for item in raw_records]
+        serialized_summary_records = [self._serialize_record(item) for item in raw_summary_records]
         target_periods = [
             str(item.get("target_period") or "")
-            for item in serialized_records
+            for item in serialized_summary_records
             if str(item.get("target_period") or "").strip()
         ]
         draw_cache = self.lottery_repository.list_draws_by_periods(target_periods, lottery_code=normalized_code)
@@ -84,18 +119,30 @@ class MyBetService:
             }
             for item in serialized_records
         ]
-        total_amount = sum(int(item.get("amount") or 0) for item in records)
-        total_discount_amount = sum(int(item.get("discount_amount") or 0) for item in records)
-        total_net_amount = sum(int(item.get("net_amount") or 0) for item in records)
+        summary_records = [
+            {
+                **item,
+                **self._calculate_settlement(
+                    item,
+                    lottery_code=normalized_code,
+                    draw_cache=draw_cache,
+                    previous_jackpot_cache=previous_jackpot_cache,
+                ),
+            }
+            for item in serialized_summary_records
+        ]
+        total_amount = sum(int(item.get("amount") or 0) for item in summary_records)
+        total_discount_amount = sum(int(item.get("discount_amount") or 0) for item in summary_records)
+        total_net_amount = sum(int(item.get("net_amount") or 0) for item in summary_records)
         summary = {
-            "total_count": len(records),
+            "total_count": len(summary_records),
             "total_amount": total_amount,
             "total_discount_amount": total_discount_amount,
             "total_net_amount": total_net_amount,
-            "total_prize_amount": sum(int(item.get("prize_amount") or 0) for item in records),
-            "total_net_profit": sum(int(item.get("net_profit") or 0) for item in records),
-            "settled_count": sum(1 for item in records if item.get("settlement_status") == "settled"),
-            "pending_count": sum(1 for item in records if item.get("settlement_status") == "pending"),
+            "total_prize_amount": sum(int(item.get("prize_amount") or 0) for item in summary_records),
+            "total_net_profit": sum(int(item.get("net_profit") or 0) for item in summary_records),
+            "settled_count": sum(1 for item in summary_records if item.get("settlement_status") == "settled"),
+            "pending_count": sum(1 for item in summary_records if item.get("settlement_status") == "pending"),
         }
         return {"records": records, "summary": summary}
 
