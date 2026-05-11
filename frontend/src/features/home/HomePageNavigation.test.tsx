@@ -26,11 +26,20 @@ import {
   renderPage,
 } from './HomePage.testUtils'
 
-describe('HomePage smoke', () => {
-  it('renders the prediction summary on the default dashboard tab', () => {
+describe('HomePage navigation', () => {
+  it('updates url when switching dashboard tabs', async () => {
     renderPage()
-    const summary = screen.getByLabelText('当前预测摘要')
-    expect(within(summary).getByText('目标期号')).toBeInTheDocument()
-    expect(within(summary).getByText('开奖状态')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/history')
+  })
+
+  it('navigates to rules page from tab strip', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '规则' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/dashboard/rules')
   })
 })

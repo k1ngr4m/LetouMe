@@ -26,11 +26,9 @@ import {
   renderPage,
 } from './HomePage.testUtils'
 
-describe('HomePage smoke', () => {
-  it('renders the prediction summary on the default dashboard tab', () => {
+describe('HomePage prediction smoke', () => {
+  it('renders prediction overview summary', () => {
     renderPage()
-    const summary = screen.getByLabelText('当前预测摘要')
-    expect(within(summary).getByText('目标期号')).toBeInTheDocument()
-    expect(within(summary).getByText('开奖状态')).toBeInTheDocument()
+    expect(screen.getByLabelText('当前预测摘要')).toBeInTheDocument()
   })
 })

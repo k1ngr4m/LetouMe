@@ -153,6 +153,7 @@ describe('MyBetsPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: '列表视图' }))
     const table = document.querySelector('.my-bets-table') as HTMLElement
     expect(table).not.toBeNull()
+    expect(within(table).queryByText('来源/状态')).not.toBeInTheDocument()
     expect(within(table).getByText('注数/倍数')).toBeInTheDocument()
     expect(within(table).getByText('1 注 / 2 倍')).toBeInTheDocument()
     expect(within(table).getByText('九等奖 · 中 1 注')).toBeInTheDocument()
