@@ -137,6 +137,86 @@ class MyBetServiceTests(unittest.TestCase):
         self.assertEqual(result["winning_bet_count"], 5)
         self.assertEqual(result["prize_amount"], 180)
 
+    def test_dlt_promotion_uses_whole_ticket_amount_threshold(self) -> None:
+        draw = {
+            "period": "26050",
+            "red_balls": ["01", "02", "03", "04", "05"],
+            "blue_balls": ["01", "02"],
+            "previous_jackpot_pool": 799_999_999,
+            "prize_breakdown": [],
+        }
+        line = {
+            "play_type": "dlt",
+            "front_numbers": ["01", "02", "03", "06", "07"],
+            "back_numbers": ["01", "02"],
+            "multiplier": 1,
+            "is_append": False,
+        }
+
+        ineligible = self.service._calculate_dlt_line_settlement(line, draw, promotion_ticket_amount=16)
+        eligible = self.service._calculate_dlt_line_settlement(line, draw, promotion_ticket_amount=18)
+
+        self.assertEqual(ineligible["prize_level"], "五等奖")
+        self.assertEqual(ineligible["prize_amount"], 150)
+        self.assertEqual(eligible["prize_amount"], 225)
+
+    def test_dlt_promotion_keeps_half_yuan_amounts(self) -> None:
+        result = self.service._calculate_dlt_line_settlement(
+            {
+                "play_type": "dlt",
+                "front_numbers": ["01", "02", "03", "06", "07"],
+                "back_numbers": ["01", "08"],
+                "multiplier": 1,
+                "is_append": False,
+            },
+            {
+                "period": "26050",
+                "red_balls": ["01", "02", "03", "04", "05"],
+                "blue_balls": ["01", "02"],
+                "previous_jackpot_pool": 799_999_999,
+                "prize_breakdown": [],
+            },
+            promotion_ticket_amount=18,
+        )
+
+        self.assertEqual(result["prize_level"], "六等奖")
+        self.assertEqual(result["prize_amount"], 22.5)
+
+    def test_dlt_record_settlement_uses_ticket_amount_before_discount_for_promotion(self) -> None:
+        result = self.service._calculate_settlement(
+            {
+                "target_period": "26050",
+                "amount": 18,
+                "discount_amount": 4,
+                "net_amount": 14,
+                "lines": [
+                    {
+                        "play_type": "dlt",
+                        "front_numbers": ["01", "02", "03", "06", "07"],
+                        "back_numbers": ["01", "02"],
+                        "multiplier": 1,
+                        "is_append": False,
+                    }
+                ],
+            },
+            lottery_code="dlt",
+            draw_cache={
+                "26050": {
+                    "period": "26050",
+                    "date": "2026-05-09",
+                    "red_balls": ["01", "02", "03", "04", "05"],
+                    "blue_balls": ["01", "02"],
+                    "prize_breakdown": [],
+                }
+            },
+            previous_jackpot_cache={"26050": 799_999_999},
+        )
+
+        self.assertEqual(result["settlement_status"], "settled")
+        self.assertEqual(result["prize_level"], "五等奖")
+        self.assertEqual(result["prize_amount"], 225)
+        self.assertEqual(result["net_profit"], 211)
+
     def test_build_qxc_line_payload_calculates_compound_bet_count(self) -> None:
         payload = self.service._build_qxc_line_payload(
             {

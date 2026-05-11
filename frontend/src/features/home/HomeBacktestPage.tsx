@@ -37,7 +37,8 @@ const PLAY_TYPE_OPTIONS: Record<LotteryCode, Array<{ value: PredictionPlayType; 
 }
 
 function formatCurrency(value?: number | null) {
-  return `¥${Math.round(Number(value || 0)).toLocaleString('zh-CN')}`
+  const numeric = Number(value || 0)
+  return `¥${numeric.toLocaleString('zh-CN', { maximumFractionDigits: Number.isInteger(numeric) ? 0 : 1 })}`
 }
 
 function formatPercent(value?: number | null) {

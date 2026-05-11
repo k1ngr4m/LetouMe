@@ -389,7 +389,8 @@ function resolveHistoryModelModeKey(model: {
 }
 
 function formatCurrency(value: number | undefined) {
-  return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
+  const numeric = Number(value || 0)
+  return `${numeric.toLocaleString('zh-CN', { maximumFractionDigits: Number.isInteger(numeric) ? 0 : 1 })} 元`
 }
 
 function formatPercent(value: number | undefined) {

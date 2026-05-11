@@ -11,6 +11,7 @@ from typing import Any
 from backend.app.cache import runtime_cache
 from backend.app.dlt_rules import (
     DLT_OLD_FIXED_PRIZE_RULES,
+    apply_dlt_promotion_to_prize_amount,
     dlt_prize_level_order,
     resolve_dlt_fallback_prize_amount,
     resolve_dlt_prize_level,
@@ -313,7 +314,7 @@ class PredictionService:
                     "period_summary": {
                         "total_bet_count": sum(int(model.get("bet_count") or 0) for model in models),
                         "total_cost_amount": sum(int(model.get("cost_amount") or 0) for model in models),
-                        "total_prize_amount": sum(int(model.get("prize_amount") or 0) for model in models),
+                        "total_prize_amount": self._normalize_money_amount(sum(float(model.get("prize_amount") or 0) for model in models)),
                     },
                 }
         if payload:
@@ -1257,7 +1258,7 @@ class PredictionService:
     def _build_backtest_overview(self, records: list[dict[str, Any]], model_rankings: list[dict[str, Any]]) -> dict[str, Any]:
         total_bet_count = sum(int(model.get("bet_count") or 0) for record in records for model in record.get("models", []))
         total_cost_amount = sum(int(model.get("cost_amount") or 0) for record in records for model in record.get("models", []))
-        total_prize_amount = sum(int(model.get("prize_amount") or 0) for record in records for model in record.get("models", []))
+        total_prize_amount = sum(float(model.get("prize_amount") or 0) for record in records for model in record.get("models", []))
         winning_period_count = sum(
             1
             for record in records
@@ -1293,7 +1294,7 @@ class PredictionService:
         rankings = []
         for stat in self._build_model_stats(records, score_profiles):
             cost_amount = int(stat.get("cost_amount") or 0)
-            prize_amount = int(stat.get("prize_amount") or 0)
+            prize_amount = float(stat.get("prize_amount") or 0)
             score_profile = stat.get("score_profile") or self._empty_score_profile()
             rankings.append(
                 {
@@ -1310,7 +1311,7 @@ class PredictionService:
         rankings.sort(
             key=lambda item: (
                 int(item.get("overall_score") or 0),
-                int(item.get("net_profit") or 0),
+                float(item.get("net_profit") or 0),
                 float(item.get("win_rate_by_period") or 0),
                 str(item.get("model_name") or ""),
             ),
@@ -1337,8 +1338,8 @@ class PredictionService:
                         "bet_count": int(model.get("bet_count") or 0),
                         "winning_bet_count": int(model.get("winning_bet_count") or 0),
                         "cost_amount": int(model.get("cost_amount") or 0),
-                        "prize_amount": int(model.get("prize_amount") or 0),
-                        "net_profit": int(model.get("prize_amount") or 0) - int(model.get("cost_amount") or 0),
+                        "prize_amount": self._normalize_money_amount(float(model.get("prize_amount") or 0)),
+                        "net_profit": self._normalize_money_amount(float(model.get("prize_amount") or 0) - int(model.get("cost_amount") or 0)),
                         "hit_period_win": bool(model.get("hit_period_win")),
                     }
                     for model in record.get("models", [])
@@ -1412,7 +1413,7 @@ class PredictionService:
         merged_stats.sort(
             key=lambda item: (
                 int(item.get("score_profile", {}).get("overall_score", 0)),
-                int(item.get("prize_amount") or 0),
+                float(item.get("prize_amount") or 0),
                 float(item.get("win_rate_by_period") or 0),
                 str(item.get("model_name") or item.get("model_id") or ""),
             ),
@@ -1510,6 +1511,7 @@ class PredictionService:
                     group_winning_bet_count, group_prize_amount, _ = self._resolve_dlt_multi_bet_prize_totals(
                         hit_result=hit_result,
                         actual_result=actual_result,
+                        ticket_amount=group_cost,
                     )
                     winning_bet_count += group_winning_bet_count
                     prize_amount += group_prize_amount
@@ -1521,7 +1523,11 @@ class PredictionService:
                         winning_bet_count += group_winning_bet_count
                         prize_amount += int(prize_info["amount"] or 0) * group_winning_bet_count
                 else:
-                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    prize_info = self.resolve_prize_amount(
+                        actual_result,
+                        prize_level,
+                        ticket_amount=group_cost if lottery_code == "dlt" else 0,
+                    )
                     if prize_info["amount"] > 0:
                         winning_bet_count += 1
                         prize_amount += prize_info["amount"]
@@ -1561,7 +1567,8 @@ class PredictionService:
         *,
         hit_result: dict[str, Any],
         actual_result: dict[str, Any],
-    ) -> tuple[int, int, str]:
+        ticket_amount: int | float = 0,
+    ) -> tuple[int, int | float, str]:
         breakdown = hit_result.get("prize_breakdown") if isinstance(hit_result.get("prize_breakdown"), list) else []
         winning_bet_count = 0
         prize_amount = 0
@@ -1571,13 +1578,13 @@ class PredictionService:
             count = int((item or {}).get("count") or 0)
             if not level or count <= 0:
                 continue
-            prize_info = self.resolve_prize_amount(actual_result, level)
+            prize_info = self.resolve_prize_amount(actual_result, level, ticket_amount=ticket_amount)
             winning_bet_count += count
-            prize_amount += int(prize_info["amount"] or 0) * count
+            prize_amount += float(prize_info["amount"] or 0) * count
             used_fallback = used_fallback or prize_info.get("source") == "fallback"
         if prize_amount <= 0:
             return winning_bet_count, prize_amount, "none"
-        return winning_bet_count, prize_amount, "fallback" if used_fallback else "official"
+        return winning_bet_count, self._normalize_money_amount(prize_amount), "fallback" if used_fallback else "official"
 
     def _annotate_history_record(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         if not payload:
@@ -1622,6 +1629,7 @@ class PredictionService:
                     group_winning_bet_count, group_prize_amount, prize_source = self._resolve_dlt_multi_bet_prize_totals(
                         hit_result=hit_result,
                         actual_result=actual_result,
+                        ticket_amount=group_cost,
                     )
                     prize_level = str(hit_result.get("best_prize_level") or prize_level or "") or None
                 elif lottery_code == "qxc":
@@ -1631,9 +1639,13 @@ class PredictionService:
                     group_prize_amount = int(prize_info["amount"] or 0) * group_winning_bet_count if group_winning_bet_count > 0 else 0
                     prize_source = prize_info["source"] if group_winning_bet_count <= 0 or group_prize_amount > 0 else "missing"
                 else:
-                    prize_info = self.resolve_prize_amount(actual_result, prize_level)
+                    prize_info = self.resolve_prize_amount(
+                        actual_result,
+                        prize_level,
+                        ticket_amount=group_cost if lottery_code == "dlt" else 0,
+                    )
                     group_winning_bet_count = 1 if prize_info["amount"] > 0 else 0
-                    group_prize_amount = int(prize_info["amount"] or 0)
+                    group_prize_amount = self._normalize_money_amount(float(prize_info["amount"] or 0))
                     prize_source = prize_info["source"]
                 predictions.append(
                     {
@@ -1700,7 +1712,7 @@ class PredictionService:
                     "bet_count": int(model.get("bet_count") or len(model.get("predictions", []))),
                     "cost_amount": int(model.get("cost_amount") or 0),
                     "winning_bet_count": int(model.get("winning_bet_count") or 0),
-                    "prize_amount": int(model.get("prize_amount") or 0),
+                    "prize_amount": self._normalize_money_amount(float(model.get("prize_amount") or 0)),
                     "hit_period_win": bool(model.get("hit_period_win")),
                     "win_rate_by_period": float(model.get("win_rate_by_period") or 0),
                     "win_rate_by_bet": float(model.get("win_rate_by_bet") or 0),
@@ -1794,7 +1806,7 @@ class PredictionService:
                 entry["bet_count"] += int(model.get("bet_count") or 0)
                 entry["winning_bet_count"] += int(model.get("winning_bet_count") or 0)
                 entry["cost_amount"] += int(model.get("cost_amount") or 0)
-                entry["prize_amount"] += int(model.get("prize_amount") or 0)
+                entry["prize_amount"] += float(model.get("prize_amount") or 0)
 
         result = []
         for entry in stats.values():
@@ -1894,7 +1906,7 @@ class PredictionService:
 
     def _build_record_performance(self, record: dict[str, Any], model: dict[str, Any]) -> dict[str, Any]:
         cost_amount = int(model.get("cost_amount") or 0)
-        prize_amount = int(model.get("prize_amount") or 0)
+        prize_amount = float(model.get("prize_amount") or 0)
         net_profit = prize_amount - cost_amount
         bet_count = int(model.get("bet_count") or 0)
         winning_bet_count = int(model.get("winning_bet_count") or 0)
@@ -1920,7 +1932,7 @@ class PredictionService:
         periods = len(records)
         bets = sum(int(item.get("bet_count") or 0) for item in records)
         total_cost = sum(int(item.get("cost_amount") or 0) for item in records)
-        total_prize = sum(int(item.get("prize_amount") or 0) for item in records)
+        total_prize = sum(float(item.get("prize_amount") or 0) for item in records)
         total_net = total_prize - total_cost
         period_hit_rate = sum(float(item.get("hit_rate_by_period") or 0) for item in records) / periods
         bet_hit_rate = (
@@ -1931,9 +1943,9 @@ class PredictionService:
         period_rois = [float(item.get("roi") or 0) for item in records]
         avg_period_roi = sum(period_rois) / periods
         period_roi_std = pstdev(period_rois) if len(period_rois) > 1 else 0
-        losing_period_ratio = sum(1 for item in records if int(item.get("net_profit") or 0) < 0) / periods
-        best_period = max(records, key=lambda item: (int(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
-        worst_period = min(records, key=lambda item: (int(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
+        losing_period_ratio = sum(1 for item in records if float(item.get("net_profit") or 0) < 0) / periods
+        best_period = max(records, key=lambda item: (float(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
+        worst_period = min(records, key=lambda item: (float(item.get("net_profit") or 0), int(item.get("best_hit_count") or 0)))
 
         profit_score = self._bounded_center_score(roi * 0.65 + avg_period_roi * 0.35, scale=1.5)
         hit_score = self._clamp_score((period_hit_rate * 0.55 + bet_hit_rate * 0.25 + avg_best_hit_rate * 0.20) * 100)
@@ -1995,8 +2007,8 @@ class PredictionService:
             "bet_count": int(record.get("bet_count") or 0),
             "winning_bet_count": int(record.get("winning_bet_count") or 0),
             "cost_amount": int(record.get("cost_amount") or 0),
-            "prize_amount": int(record.get("prize_amount") or 0),
-            "net_profit": int(record.get("net_profit") or 0),
+            "prize_amount": PredictionService._normalize_money_amount(float(record.get("prize_amount") or 0)),
+            "net_profit": PredictionService._normalize_money_amount(float(record.get("net_profit") or 0)),
             "roi": round(float(record.get("roi") or 0), 4),
             "best_hit_count": int(record.get("best_hit_count") or 0),
         }
@@ -2204,7 +2216,13 @@ class PredictionService:
         blue_hit_count = int(hit_result.get("blue_hit_count") or 0)
         return resolve_dlt_prize_level(red_hit_count, blue_hit_count, (actual_result or {}).get("period"))
 
-    def resolve_prize_amount(self, actual_result: dict[str, Any], prize_level: str | None) -> dict[str, Any]:
+    def resolve_prize_amount(
+        self,
+        actual_result: dict[str, Any],
+        prize_level: str | None,
+        *,
+        ticket_amount: int | float = 0,
+    ) -> dict[str, Any]:
         if not prize_level:
             return {"amount": 0, "source": "none"}
         lottery_code = normalize_lottery_code(actual_result.get("lottery_code") or "dlt")
@@ -2214,6 +2232,13 @@ class PredictionService:
             if prize.get("prize_level") == prize_level and prize.get("prize_type") == "basic":
                 amount = int(prize.get("prize_amount") or 0)
                 if amount > 0:
+                    if lottery_code == "dlt":
+                        amount = apply_dlt_promotion_to_prize_amount(
+                            prize_level,
+                            actual_result.get("period"),
+                            amount,
+                            ticket_amount,
+                        )
                     return {"amount": amount, "source": "official"}
         if lottery_code == "pl3" and prize_level in self.PL3_FIXED_PRIZE_RULES:
             return {"amount": self.PL3_FIXED_PRIZE_RULES[prize_level], "source": "fallback"}
@@ -2234,8 +2259,19 @@ class PredictionService:
                 previous_jackpot_pool,
             )
             if amount > 0:
+                amount = apply_dlt_promotion_to_prize_amount(
+                    prize_level,
+                    actual_result.get("period"),
+                    amount,
+                    ticket_amount,
+                )
                 return {"amount": amount, "source": "fallback"}
         return {"amount": 0, "source": "missing"}
+
+    @staticmethod
+    def _normalize_money_amount(value: int | float) -> int | float:
+        numeric = float(value or 0)
+        return int(numeric) if numeric.is_integer() else numeric
 
     @staticmethod
     def _normalize_qxc_position_selections(value: Any) -> list[list[str]]:

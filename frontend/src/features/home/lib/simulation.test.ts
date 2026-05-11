@@ -86,6 +86,54 @@ describe('simulation helpers', () => {
     expect(newRule[0].topPrizeLevel).toBe('六等奖')
   })
 
+  it('adds dlt promotion prize money only for eligible activity-period tickets', () => {
+    const selection = makeDltSelection(['01', '02', '03', '31', '32'], ['01', '03', '04', '05', '06', '07', '08', '09', '10'])
+    expect(calculateAmount(selection)).toBe(72)
+
+    const eligible = buildSimulationMatches(
+      selection,
+      [{
+        period: '26050',
+        date: '2026-05-09',
+        red_balls: ['01', '02', '03', '04', '05'],
+        blue_balls: ['01', '02'],
+        previous_jackpot_pool: 799_999_999,
+      }],
+      30,
+    )
+    const afterActivity = buildSimulationMatches(
+      selection,
+      [{
+        period: '26065',
+        date: '2026-06-13',
+        red_balls: ['01', '02', '03', '04', '05'],
+        blue_balls: ['01', '02'],
+        previous_jackpot_pool: 799_999_999,
+      }],
+      30,
+    )
+
+    expect(eligible[0].prizes).toEqual([{ level: '六等奖', count: 8 }, { level: '七等奖', count: 28 }])
+    expect(eligible[0].prizeAmount).toBe(460)
+    expect(afterActivity[0].prizeAmount).toBe(260)
+  })
+
+  it('marks dlt promotion-era fallback prize as not ready without previous jackpot data', () => {
+    const matches = buildSimulationMatches(
+      makeDltSelection(['01', '02', '03', '31', '32'], ['01', '03', '04', '05', '06', '07', '08', '09', '10']),
+      [{
+        period: '26050',
+        date: '2026-05-09',
+        red_balls: ['01', '02', '03', '04', '05'],
+        blue_balls: ['01', '02'],
+      }],
+      30,
+    )
+
+    expect(matches[0].prizeAmount).toBe(0)
+    expect(matches[0].prizeAmountReady).toBe(false)
+  })
+
   it('calculates pl3 direct and group bet count', () => {
     expect(
       calculateBetCount({

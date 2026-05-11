@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from backend.app.dlt_rules import (
     DLT_OLD_FIXED_PRIZE_RULES,
+    apply_dlt_promotion_to_prize_amount,
     dlt_prize_level_order,
     is_dlt_new_rule_period,
     resolve_dlt_fallback_prize_amount,
@@ -666,6 +667,7 @@ class MyBetService:
         total_prize_amount = 0
         total_winning_bets = 0
         best_level: str | None = None
+        dlt_promotion_ticket_amount = int(record.get("amount") or 0) if lottery_code == "dlt" else 0
         level_order = (
             dlt_prize_level_order(draw.get("period"))
             if lottery_code == "dlt"
@@ -675,8 +677,13 @@ class MyBetService:
         lines_with_hits: list[dict[str, Any]] = []
 
         for line in record.get("lines", []):
-            line_result = self._calculate_line_settlement(line=line, draw=draw, lottery_code=lottery_code)
-            total_prize_amount += int(line_result.get("prize_amount") or 0)
+            line_result = self._calculate_line_settlement(
+                line=line,
+                draw=draw,
+                lottery_code=lottery_code,
+                dlt_promotion_ticket_amount=dlt_promotion_ticket_amount,
+            )
+            total_prize_amount += float(line_result.get("prize_amount") or 0)
             total_winning_bets += int(line_result.get("winning_bet_count") or 0)
             lines_with_hits.append(
                 {
@@ -700,23 +707,36 @@ class MyBetService:
             "settlement_status": "settled",
             "winning_bet_count": total_winning_bets,
             "prize_level": best_level,
-            "prize_amount": total_prize_amount,
-            "net_profit": total_prize_amount - int(record.get("net_amount") or 0),
+            "prize_amount": self._normalize_money_amount(total_prize_amount),
+            "net_profit": self._normalize_money_amount(total_prize_amount - int(record.get("net_amount") or 0)),
             "settled_at": now_ts(),
             "actual_result": self._serialize_actual_result(draw, lottery_code=lottery_code, target_period=target_period),
             "lines": lines_with_hits,
         }
 
-    def _calculate_line_settlement(self, *, line: dict[str, Any], draw: dict[str, Any], lottery_code: str) -> dict[str, Any]:
+    def _calculate_line_settlement(
+        self,
+        *,
+        line: dict[str, Any],
+        draw: dict[str, Any],
+        lottery_code: str,
+        dlt_promotion_ticket_amount: int | float = 0,
+    ) -> dict[str, Any]:
         if lottery_code == "dlt":
-            return self._calculate_dlt_line_settlement(line, draw)
+            return self._calculate_dlt_line_settlement(line, draw, promotion_ticket_amount=dlt_promotion_ticket_amount)
         if lottery_code == "pl3":
             return self._calculate_pl3_line_settlement(line, draw)
         if lottery_code == "pl5":
             return self._calculate_pl5_line_settlement(line, draw)
         return self._calculate_qxc_line_settlement(line, draw)
 
-    def _calculate_dlt_line_settlement(self, line: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
+    def _calculate_dlt_line_settlement(
+        self,
+        line: dict[str, Any],
+        draw: dict[str, Any],
+        *,
+        promotion_ticket_amount: int | float = 0,
+    ) -> dict[str, Any]:
         play_type = str(line.get("play_type") or "dlt").strip().lower() or "dlt"
         if play_type == "dlt_dantuo":
             hit_result = PredictionService._calculate_dlt_dantuo_hit_result(
@@ -742,7 +762,12 @@ class MyBetService:
                 winning_count = int(breakdown.get(level) or 0)
                 if winning_count <= 0:
                     continue
-                basic_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="basic")
+                basic_amount = self._resolve_dlt_prize_amount(
+                    draw,
+                    level,
+                    prize_type="basic",
+                    promotion_ticket_amount=promotion_ticket_amount,
+                )
                 additional_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="additional") if is_append else 0
                 per_bet_amount = basic_amount + additional_amount
                 total_prize += winning_count * per_bet_amount * int(line.get("multiplier") or 1)
@@ -787,7 +812,12 @@ class MyBetService:
             winning_count = breakdown.get(level, 0)
             if winning_count <= 0:
                 continue
-            basic_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="basic")
+            basic_amount = self._resolve_dlt_prize_amount(
+                draw,
+                level,
+                prize_type="basic",
+                promotion_ticket_amount=promotion_ticket_amount,
+            )
             additional_amount = self._resolve_dlt_prize_amount(draw, level, prize_type="additional") if is_append else 0
             per_bet_amount = basic_amount + additional_amount
             total_prize += winning_count * per_bet_amount * int(line.get("multiplier") or 1)
@@ -1024,19 +1054,32 @@ class MyBetService:
             result[level] = result.get(level, 0) + int(count)
         return result
 
-    def _resolve_dlt_prize_amount(self, draw: dict[str, Any], level: str, *, prize_type: str) -> int:
+    def _resolve_dlt_prize_amount(
+        self,
+        draw: dict[str, Any],
+        level: str,
+        *,
+        prize_type: str,
+        promotion_ticket_amount: int | float = 0,
+    ) -> int | float:
         for prize in draw.get("prize_breakdown", []) or []:
             if str(prize.get("prize_level") or "") == level and str(prize.get("prize_type") or "basic") == prize_type:
                 amount = int(prize.get("prize_amount") or 0)
                 if amount > 0:
-                    return amount
+                    return apply_dlt_promotion_to_prize_amount(level, draw.get("period"), amount, promotion_ticket_amount) if prize_type == "basic" else amount
         if prize_type == "basic":
-            return resolve_dlt_fallback_prize_amount(
+            amount = resolve_dlt_fallback_prize_amount(
                 level,
                 draw.get("period"),
                 int(draw.get("previous_jackpot_pool") or 0),
             )
+            return apply_dlt_promotion_to_prize_amount(level, draw.get("period"), amount, promotion_ticket_amount)
         return 0
+
+    @staticmethod
+    def _normalize_money_amount(value: int | float) -> int | float:
+        numeric = float(value or 0)
+        return int(numeric) if numeric.is_integer() else numeric
 
     @staticmethod
     def _serialize_record(record: dict[str, Any]) -> dict[str, Any]:

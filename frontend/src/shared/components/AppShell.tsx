@@ -430,22 +430,11 @@ export function AppShell({ children }: PropsWithChildren) {
               </div>
               <div className="crm-chart-nav" aria-label="图表目录">
                 {CHART_CENTER_GROUPS.filter(hasChartSubItems).map((group) => (
-                  <div
-                    key={group.id}
-                    className={clsx(
-                      'crm-chart-nav__group',
-                      (
-                        group.id === 'number-analysis'
-                          ? ['#number-base', '#number-distribution', '#number-pattern']
-                          : ['#backtest-base', '#backtest-revenue', '#backtest-stability']
-                      ).includes(location.hash) && 'is-active',
-                    )}
-                  >
+                  <div key={group.id} className="crm-chart-nav__group">
                     <div
                       className={clsx(
                         'crm-nav-item',
                         'crm-nav-item--with-toggle',
-                        'crm-chart-nav__group-head',
                         'crm-chart-nav__item',
                         (
                           group.id === 'number-analysis'
@@ -456,7 +445,7 @@ export function AppShell({ children }: PropsWithChildren) {
                       title={group.title}
                     >
                       <button className="crm-nav-item__main" type="button" onClick={() => openChartDirectoryItem(group.items[0].id)}>
-                        <span className="crm-chart-nav__group-mark" aria-hidden="true" />
+                        {group.id === 'number-analysis' ? <BarChart3 size={16} aria-hidden="true" /> : <History size={16} aria-hidden="true" />}
                         <span>{group.title}</span>
                       </button>
                       <button
@@ -497,7 +486,7 @@ export function AppShell({ children }: PropsWithChildren) {
                         <button
                           key={item.id}
                           type="button"
-                          className={clsx('crm-nav-submenu__item', 'crm-chart-nav__subitem', location.hash === `#${item.id}` && 'is-active')}
+                          className={clsx('crm-nav-submenu__item', location.hash === `#${item.id}` && 'is-active')}
                           title={item.label}
                           aria-current={location.hash === `#${item.id}` ? 'page' : undefined}
                           onClick={() => openChartDirectoryItem(item.id)}

@@ -304,8 +304,8 @@ class MyBetRecordResponse(BaseModel):
     settlement_status: str = "pending"
     winning_bet_count: int = 0
     prize_level: str | None = None
-    prize_amount: int = 0
-    net_profit: int = 0
+    prize_amount: int | float = 0
+    net_profit: int | float = 0
     settled_at: int | None = None
     source_type: str = "manual"
     ticket_image_url: str = ""
@@ -324,8 +324,8 @@ class MyBetSummaryResponse(BaseModel):
     total_amount: int = 0
     total_discount_amount: int = 0
     total_net_amount: int = 0
-    total_prize_amount: int = 0
-    total_net_profit: int = 0
+    total_prize_amount: int | float = 0
+    total_net_profit: int | float = 0
     settled_count: int = 0
     pending_count: int = 0
 

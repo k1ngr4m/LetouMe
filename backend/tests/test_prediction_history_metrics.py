@@ -470,6 +470,36 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         runtime_cache.clear()
         self.service = PredictionService(prediction_repository=_FakePredictionRepository())
 
+    def test_dlt_prediction_prize_amount_uses_promotion_cost_threshold(self) -> None:
+        service = PredictionService()
+        actual_result = {
+            "lottery_code": "dlt",
+            "period": "26050",
+            "previous_jackpot_pool": 799_999_999,
+            "prize_breakdown": [],
+        }
+
+        self.assertEqual(service.resolve_prize_amount(actual_result, "五等奖", ticket_amount=16), {"amount": 150, "source": "fallback"})
+        self.assertEqual(service.resolve_prize_amount(actual_result, "五等奖", ticket_amount=18), {"amount": 225, "source": "fallback"})
+        self.assertEqual(service.resolve_prize_amount(actual_result, "六等奖", ticket_amount=18), {"amount": 22.5, "source": "fallback"})
+
+    def test_dlt_multi_bet_prediction_prize_totals_include_promotion(self) -> None:
+        service = PredictionService()
+        winning_bets, prize_amount, prize_source = service._resolve_dlt_multi_bet_prize_totals(
+            hit_result={"prize_breakdown": [{"prize_level": "六等奖", "count": 2}]},
+            actual_result={
+                "lottery_code": "dlt",
+                "period": "26050",
+                "previous_jackpot_pool": 799_999_999,
+                "prize_breakdown": [],
+            },
+            ticket_amount=18,
+        )
+
+        self.assertEqual(winning_bets, 2)
+        self.assertEqual(prize_amount, 45)
+        self.assertEqual(prize_source, "fallback")
+
     def test_history_list_payload_contains_cost_prize_and_win_rates(self) -> None:
         payload = self.service.get_history_list_payload(limit=20, offset=0)
 

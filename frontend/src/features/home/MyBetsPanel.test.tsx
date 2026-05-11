@@ -145,12 +145,11 @@ describe('MyBetsPanel', () => {
     }
   })
 
-  it('switches to table view and opens the detail modal from a row', async () => {
+  it('defaults to table view and opens the detail modal from a row', async () => {
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })
     expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '列表视图' }))
     const table = document.querySelector('.my-bets-table') as HTMLElement
     expect(table).not.toBeNull()
     expect(within(table).queryByText('来源/状态')).not.toBeInTheDocument()
@@ -173,7 +172,6 @@ describe('MyBetsPanel', () => {
     await screen.findByRole('heading', { name: '我的投注' })
     await screen.findByText('第 2026032 期')
 
-    await userEvent.click(screen.getByRole('button', { name: '列表视图' }))
     await userEvent.click(screen.getByRole('button', { name: '删除：第 2026032 期' }))
 
     await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
@@ -219,6 +217,7 @@ describe('MyBetsPanel', () => {
   it('opens the detail modal from the card detail action', async () => {
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
     await userEvent.click(await screen.findByRole('button', { name: '查看详情' }))
 
     const dialog = await screen.findByRole('dialog', { name: /第 2026032 期/ })

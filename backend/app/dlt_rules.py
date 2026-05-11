@@ -5,9 +5,13 @@ from typing import Final
 
 DLT_RULE_SWITCH_PERIOD: Final[int] = 26014
 DLT_NEW_RULE_JACKPOT_THRESHOLD: Final[int] = 800_000_000
+DLT_PROMOTION_START_PERIOD: Final[int] = 26050
+DLT_PROMOTION_END_PERIOD: Final[int] = 26064
+DLT_PROMOTION_TICKET_AMOUNT_THRESHOLD: Final[int] = 18
 
 DLT_OLD_PRIZE_LEVEL_ORDER: Final[list[str]] = ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖", "七等奖", "八等奖", "九等奖"]
 DLT_NEW_PRIZE_LEVEL_ORDER: Final[list[str]] = ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖", "七等奖"]
+DLT_PROMOTION_PRIZE_LEVELS: Final[set[str]] = {"三等奖", "四等奖", "五等奖", "六等奖", "七等奖"}
 
 DLT_OLD_FIXED_PRIZE_RULES: Final[dict[str, int]] = {
     "三等奖": 10000,
@@ -50,6 +54,15 @@ def normalize_dlt_period_value(period: str | int | None) -> int:
 
 def is_dlt_new_rule_period(period: str | int | None) -> bool:
     return normalize_dlt_period_value(period) >= DLT_RULE_SWITCH_PERIOD
+
+
+def is_dlt_promotion_period(period: str | int | None) -> bool:
+    value = normalize_dlt_period_value(period)
+    return DLT_PROMOTION_START_PERIOD <= value <= DLT_PROMOTION_END_PERIOD
+
+
+def is_dlt_promotion_eligible(period: str | int | None, ticket_amount: int | float | None) -> bool:
+    return is_dlt_promotion_period(period) and float(ticket_amount or 0) >= DLT_PROMOTION_TICKET_AMOUNT_THRESHOLD
 
 
 def dlt_prize_level_order(period: str | int | None) -> list[str]:
@@ -106,3 +119,36 @@ def resolve_dlt_fallback_prize_amount(prize_level: str, period: str | int | None
         tier_rules = DLT_NEW_FIXED_PRIZE_RULES_HIGH if pool >= DLT_NEW_RULE_JACKPOT_THRESHOLD else DLT_NEW_FIXED_PRIZE_RULES_LOW
         return int(tier_rules.get(prize_level) or 0)
     return int(DLT_OLD_FIXED_PRIZE_RULES.get(prize_level) or 0)
+
+
+def _normalize_dlt_money_amount(value: float) -> int | float:
+    return int(value) if value.is_integer() else value
+
+
+def resolve_dlt_promotion_bonus_amount(prize_level: str, period: str | int | None, basic_amount: int | float, ticket_amount: int | float | None) -> int | float:
+    if prize_level not in DLT_PROMOTION_PRIZE_LEVELS or not is_dlt_promotion_eligible(period, ticket_amount):
+        return 0
+    amount = float(basic_amount or 0)
+    if amount <= 0:
+        return 0
+    if prize_level == "七等奖":
+        return _normalize_dlt_money_amount(amount)
+    return _normalize_dlt_money_amount(amount * 0.5)
+
+
+def apply_dlt_promotion_to_prize_amount(prize_level: str, period: str | int | None, basic_amount: int | float, ticket_amount: int | float | None) -> int | float:
+    amount = float(basic_amount or 0)
+    if amount <= 0:
+        return 0
+    bonus = float(resolve_dlt_promotion_bonus_amount(prize_level, period, amount, ticket_amount))
+    return _normalize_dlt_money_amount(amount + bonus)
+
+
+def resolve_dlt_fallback_prize_amount_with_promotion(
+    prize_level: str,
+    period: str | int | None,
+    previous_jackpot_pool: int | None,
+    ticket_amount: int | float | None,
+) -> int | float:
+    basic_amount = resolve_dlt_fallback_prize_amount(prize_level, period, previous_jackpot_pool)
+    return apply_dlt_promotion_to_prize_amount(prize_level, period, basic_amount, ticket_amount)

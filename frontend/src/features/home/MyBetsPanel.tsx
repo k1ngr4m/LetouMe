@@ -138,7 +138,8 @@ function buildPl3GroupSumBetCounts() {
 const PL3_GROUP_SUM_BET_COUNTS = buildPl3GroupSumBetCounts()
 
 function formatCurrency(value: number | undefined) {
-  return `${Math.round(value || 0).toLocaleString('zh-CN')} 元`
+  const numeric = Number(value || 0)
+  return `${numeric.toLocaleString('zh-CN', { maximumFractionDigits: Number.isInteger(numeric) ? 0 : 1 })} 元`
 }
 
 function normalizeDigitsInput(value: string) {
@@ -855,7 +856,7 @@ export function MyBetsPanel({
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
-  const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>('card')
+  const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>('table')
   const [recordsPage, setRecordsPage] = useState(1)
   const [recordsPageSize, setRecordsPageSize] = useState<(typeof MY_BETS_PAGE_SIZE_OPTIONS)[number]>(20)
   const [recordsPageInput, setRecordsPageInput] = useState('1')

@@ -1,4 +1,4 @@
-import type { LotteryCode, LotteryDraw, PrizeBreakdownItem, SimulationTicketRecord } from '../../../shared/types/api'
+import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
 export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
@@ -116,6 +116,34 @@ function buildPl3GroupSumBetCounts() {
 }
 
 const PL3_GROUP_SUM_BET_COUNTS = buildPl3GroupSumBetCounts()
+const DLT_NEW_RULE_JACKPOT_THRESHOLD = 800_000_000
+const DLT_PROMOTION_START_PERIOD = 26050
+const DLT_PROMOTION_END_PERIOD = 26064
+const DLT_PROMOTION_TICKET_AMOUNT_THRESHOLD = 18
+const DLT_PROMOTION_LEVELS = new Set<PrizeLevel>(['三等奖', '四等奖', '五等奖', '六等奖', '七等奖'])
+const DLT_OLD_FIXED_PRIZE_RULES: Partial<Record<PrizeLevel, number>> = {
+  三等奖: 10000,
+  四等奖: 3000,
+  五等奖: 300,
+  六等奖: 200,
+  七等奖: 100,
+  八等奖: 15,
+  九等奖: 5,
+}
+const DLT_NEW_FIXED_PRIZE_RULES_LOW: Partial<Record<PrizeLevel, number>> = {
+  三等奖: 5000,
+  四等奖: 300,
+  五等奖: 150,
+  六等奖: 15,
+  七等奖: 5,
+}
+const DLT_NEW_FIXED_PRIZE_RULES_HIGH: Partial<Record<PrizeLevel, number>> = {
+  三等奖: 6666,
+  四等奖: 380,
+  五等奖: 200,
+  六等奖: 18,
+  七等奖: 7,
+}
 
 export const pl3SumOptions = Array.from({ length: 28 }, (_, index) => padBall(index))
 
@@ -468,7 +496,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
       const winningPrizes = dltPrizeLevelOrder(draw.period)
         .filter((level) => (prizeMap.get(level) || 0) > 0)
         .map((level) => ({ level, count: prizeMap.get(level) || 0 }))
-      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown, selection.lotteryCode)
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw, selection.lotteryCode, costAmount)
       const prizeAmountReady = isPrizeBreakdownReady(draw, winningPrizes, selection.lotteryCode)
       return {
         period: draw.period,
@@ -503,7 +531,7 @@ function buildDltMatches(selection: SimulationSelection, draws: LotteryDraw[], l
         draw.period,
       )
       const winningPrizes = prizes.filter((item) => item.count > 0)
-      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown, selection.lotteryCode)
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw, selection.lotteryCode, costAmount)
       const prizeAmountReady = isPrizeBreakdownReady(draw, winningPrizes, selection.lotteryCode)
       return {
         period: draw.period,
@@ -552,7 +580,7 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
         : selection.lotteryCode === 'qxc'
           ? calculateQxcPrizeBreakdown(selection, actualDigits)
         : calculatePl3PrizeBreakdown(selection, actualDigits)
-      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw.prize_breakdown, selection.lotteryCode)
+      const prizeSettlement = resolveMatchPrizeAmount(winningPrizes, draw, selection.lotteryCode, costAmount)
       const prizeAmountReady = isPrizeBreakdownReady(draw, winningPrizes, selection.lotteryCode)
 
       return {
@@ -581,14 +609,15 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
 
 function resolveMatchPrizeAmount(
   prizes: SimulationMatchPrize[],
-  prizeBreakdown: PrizeBreakdownItem[] | undefined,
+  draw: LotteryDraw,
   lotteryCode?: LotteryCode,
+  ticketAmount = 0,
 ) {
   if (!prizes.length) {
     return { amount: 0, isReady: true }
   }
   const basicAmountMap = new Map<string, number>()
-  for (const item of prizeBreakdown || []) {
+  for (const item of draw.prize_breakdown || []) {
     if (String(item.prize_type || 'basic') !== 'basic') continue
     const level = String(item.prize_level || '').trim()
     if (!level) continue
@@ -596,12 +625,24 @@ function resolveMatchPrizeAmount(
   }
   let amount = 0
   for (const prize of prizes) {
+    let prizeAmount = basicAmountMap.has(prize.level)
+      ? Number(basicAmountMap.get(prize.level) || 0)
+      : 0
     if (!basicAmountMap.has(prize.level)) {
-      return { amount: 0, isReady: false }
+      if (lotteryCode !== 'dlt') {
+        return { amount: 0, isReady: false }
+      }
+      const fallback = resolveDltFallbackPrizeAmount(prize.level, draw)
+      if (fallback === null) {
+        return { amount: 0, isReady: false }
+      }
+      prizeAmount = fallback
     }
-    const prizeAmount = Number(basicAmountMap.get(prize.level) || 0)
     if (lotteryCode === 'qxc' && (prize.level === '一等奖' || prize.level === '二等奖') && prizeAmount <= 0) {
       return { amount: 0, isReady: false }
+    }
+    if (lotteryCode === 'dlt') {
+      prizeAmount = applyDltPromotionToPrizeAmount(prize.level, draw.period, prizeAmount, ticketAmount)
     }
     amount += Number(prize.count || 0) * prizeAmount
   }
@@ -616,7 +657,7 @@ function isPrizeBreakdownReady(draw: LotteryDraw, prizes: SimulationMatchPrize[]
   if (draw.prize_breakdown_ready === false && (lotteryCode !== 'qxc' || requiresFloatingPrizeData)) {
     return false
   }
-  return resolveMatchPrizeAmount(prizes, draw.prize_breakdown, lotteryCode).isReady
+  return resolveMatchPrizeAmount(prizes, draw, lotteryCode).isReady
 }
 
 function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHitCount: number, blueHitCount: number, period: string) {
@@ -669,10 +710,41 @@ function calculateDltPrizeBreakdown(frontCount: number, backCount: number, redHi
 }
 
 function isDltNewRulePeriod(period: string): boolean {
+  return normalizeDltPeriodValue(period) >= 26014
+}
+
+function normalizeDltPeriodValue(period: string): number {
   const digits = (period || '').replace(/\D/g, '')
-  if (!digits) return false
-  const normalized = Number((digits.length >= 5 ? digits.slice(-5) : digits) || '0')
-  return normalized >= 26014
+  if (!digits) return 0
+  return Number((digits.length >= 5 ? digits.slice(-5) : digits) || '0')
+}
+
+function isDltPromotionEligible(period: string, ticketAmount: number) {
+  const normalized = normalizeDltPeriodValue(period)
+  return normalized >= DLT_PROMOTION_START_PERIOD && normalized <= DLT_PROMOTION_END_PERIOD && ticketAmount >= DLT_PROMOTION_TICKET_AMOUNT_THRESHOLD
+}
+
+function applyDltPromotionToPrizeAmount(level: PrizeLevel, period: string, basicAmount: number, ticketAmount: number) {
+  if (!DLT_PROMOTION_LEVELS.has(level) || !isDltPromotionEligible(period, ticketAmount) || basicAmount <= 0) {
+    return basicAmount
+  }
+  if (level === '七等奖') {
+    return basicAmount * 2
+  }
+  return basicAmount * 1.5
+}
+
+function resolveDltFallbackPrizeAmount(level: PrizeLevel, draw: LotteryDraw) {
+  if (!isDltNewRulePeriod(draw.period)) {
+    return DLT_OLD_FIXED_PRIZE_RULES[level] ?? null
+  }
+  if (draw.previous_jackpot_pool === undefined || draw.previous_jackpot_pool === null) {
+    return null
+  }
+  const rules = Number(draw.previous_jackpot_pool || 0) >= DLT_NEW_RULE_JACKPOT_THRESHOLD
+    ? DLT_NEW_FIXED_PRIZE_RULES_HIGH
+    : DLT_NEW_FIXED_PRIZE_RULES_LOW
+  return rules[level] ?? null
 }
 
 function dltPrizeLevelOrder(period: string): PrizeLevel[] {

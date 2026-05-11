@@ -11,8 +11,8 @@ class ScoreSnapshot(BaseModel):
     bet_count: int = 0
     winning_bet_count: int = 0
     cost_amount: int = 0
-    prize_amount: int = 0
-    net_profit: int = 0
+    prize_amount: int | float = 0
+    net_profit: int | float = 0
     roi: float = 0
     best_hit_count: int = 0
 
@@ -31,8 +31,8 @@ class ScoreWindowProfile(BaseModel):
     hit_rate_by_period: float = 0
     hit_rate_by_bet: float = 0
     cost_amount: int = 0
-    prize_amount: int = 0
-    net_profit: int = 0
+    prize_amount: int | float = 0
+    net_profit: int | float = 0
     roi: float = 0
     avg_period_roi: float = 0
     best_period: ScoreSnapshot = Field(default_factory=ScoreSnapshot)
@@ -65,7 +65,7 @@ class PredictionHistorySummaryModel(BaseModel):
     bet_count: int = 0
     cost_amount: int = 0
     winning_bet_count: int = 0
-    prize_amount: int = 0
+    prize_amount: int | float = 0
     hit_period_win: bool = False
     win_rate_by_period: float | None = None
     win_rate_by_bet: float | None = None
@@ -75,7 +75,7 @@ class PredictionHistorySummaryModel(BaseModel):
 class PredictionHistoryPeriodSummary(BaseModel):
     total_bet_count: int = 0
     total_cost_amount: int = 0
-    total_prize_amount: int = 0
+    total_prize_amount: int | float = 0
 
 
 class PredictionHistoryModelStat(BaseModel):
@@ -86,7 +86,7 @@ class PredictionHistoryModelStat(BaseModel):
     bet_count: int = 0
     winning_bet_count: int = 0
     cost_amount: int = 0
-    prize_amount: int = 0
+    prize_amount: int | float = 0
     win_rate_by_period: float = 0
     win_rate_by_bet: float = 0
     score_profile: ScoreProfile = Field(default_factory=ScoreProfile)
