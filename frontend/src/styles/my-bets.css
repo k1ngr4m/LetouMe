@@ -1247,17 +1247,23 @@
   }
 
   .my-bets-pagination {
-    justify-content: center;
-    gap: 0.58rem;
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.42rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .my-bets-pagination__pages {
-    order: 3;
-    width: 100%;
-    justify-content: center;
+    order: initial;
+    width: auto;
+    justify-content: flex-start;
   }
 
   .my-bets-pagination__jump {
-    order: 4;
+    order: initial;
   }
 }
