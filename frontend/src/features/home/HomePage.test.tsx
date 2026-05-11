@@ -3519,6 +3519,101 @@ describe('HomePage dashboard sidebar', () => {
     expect(screen.getAllByRole('button', { name: '展开详情' })).toHaveLength(2)
   })
 
+  it('switches my-bets to table view and opens detail modal from a row', async () => {
+    getMyBets.mockResolvedValueOnce({
+      records: [
+        {
+          id: 1,
+          lottery_code: 'dlt',
+          target_period: '2026032',
+          play_type: 'dlt',
+          front_numbers: ['01', '02', '03', '04', '05'],
+          back_numbers: ['06', '07'],
+          lines: [
+            {
+              line_no: 1,
+              play_type: 'dlt',
+              front_numbers: ['01', '02', '03', '04', '05'],
+              back_numbers: ['06', '07'],
+              multiplier: 2,
+              is_append: false,
+              bet_count: 1,
+              amount: 4,
+            },
+          ],
+          amount: 4,
+          discount_amount: 1,
+          net_amount: 3,
+          prize_amount: 10,
+          net_profit: 7,
+          winning_bet_count: 1,
+          prize_level: '九等奖',
+          settlement_status: 'settled',
+          source_type: 'manual',
+          actual_result: {
+            period: '2026032',
+            date: '2026-03-18',
+            red_balls: ['01', '02', '03', '08', '09'],
+            blue_balls: ['06', '12'],
+          },
+          created_at: '2026-03-18T00:00:00Z',
+          updated_at: '2026-03-18T00:00:00Z',
+        },
+      ],
+      summary: {
+        total_count: 1,
+        total_amount: 4,
+        total_discount_amount: 1,
+        total_net_amount: 3,
+        total_prize_amount: 10,
+        total_net_profit: 7,
+        settled_count: 1,
+        pending_count: 0,
+      },
+    })
+
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '列表视图' }))
+    const table = document.querySelector('.my-bets-table') as HTMLElement
+    expect(table).not.toBeNull()
+    expect(within(table).getByText('注数/倍数')).toBeInTheDocument()
+    expect(within(table).getByText('1 注 / 2 倍')).toBeInTheDocument()
+    expect(within(table).getByText('九等奖 · 中 1 注')).toBeInTheDocument()
+
+    await userEvent.click(within(table).getByText('九等奖 · 中 1 注'))
+    const dialog = await screen.findByRole('dialog', { name: /第 2026032 期/ })
+    expect(within(dialog).getByText('开奖号码')).toBeInTheDocument()
+    expect(within(dialog).getByText('子注单 #1 · 大乐透')).toBeInTheDocument()
+    expect(within(dialog).getByText('总奖金')).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('keeps table row actions from opening my-bets detail modal', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await screen.findByText('第 2026032 期')
+
+    await userEvent.click(screen.getByRole('button', { name: '列表视图' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除：第 2026032 期' }))
+
+    await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('opens my-bets detail modal from the card body', async () => {
+    renderPage('/dashboard/my-bets')
+    await screen.findByRole('heading', { name: '我的投注' })
+    await userEvent.click(await screen.findByRole('button', { name: '查看详情' }))
+
+    const dialog = await screen.findByRole('dialog', { name: /第 2026032 期/ })
+    expect(within(dialog).getByText('子注单明细')).toBeInTheDocument()
+  })
+
   it('supports dlt dantuo create on my-bets tab', async () => {
     renderPage('/dashboard/my-bets')
     await screen.findByRole('heading', { name: '我的投注' })

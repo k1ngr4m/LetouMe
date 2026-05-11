@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, ChevronDown, ChevronUp, ChevronsUpDown, Coins, Gift, ImageIcon, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronUp, ChevronsUpDown, Coins, Eye, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
 import { StatusCard } from '../../shared/components/StatusCard'
@@ -57,6 +57,7 @@ type BetFormState = {
 }
 
 type MyBetsViewMode = 'list' | 'form'
+type MyBetsDisplayMode = 'card' | 'table'
 
 type LineQuote = {
   betCount: number
@@ -573,6 +574,18 @@ function formatPlayType(playType: string) {
   return '大乐透'
 }
 
+function formatRecordWinSummary(record: MyBetRecord) {
+  return record.prize_level ? `${record.prize_level} · 中 ${record.winning_bet_count} 注` : '未中奖'
+}
+
+function formatRecordLineSummary(record: MyBetRecord) {
+  const lines = record.lines || []
+  const betCount = lines.reduce((sum, line) => sum + Number(line.bet_count || 0), 0) || record.bet_count || 0
+  const multipliers = [...new Set(lines.map((line) => line.multiplier).filter(Boolean))].sort((left, right) => left - right)
+  const multiplierText = multipliers.length === 1 ? `${multipliers[0]} 倍` : multipliers.length > 1 ? `${multipliers.join('/')} 倍` : `${record.multiplier || 1} 倍`
+  return `${betCount} 注 / ${multiplierText}`
+}
+
 function resolveQxcDigitColor(index: number, total: number): 'qxc-front' | 'qxc-back' {
   return index === total - 1 ? 'qxc-back' : 'qxc-front'
 }
@@ -827,7 +840,9 @@ export function MyBetsPanel({
   const queryClient = useQueryClient()
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
+  const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>('card')
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
+  const [selectedDetailRecord, setSelectedDetailRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [messageTone, setMessageTone] = useState<'success' | 'error'>('success')
   const [expandedRecordMap, setExpandedRecordMap] = useState<Record<number, boolean>>({})
@@ -990,6 +1005,17 @@ export function MyBetsPanel({
     [summary],
   )
   const shouldWarnUnsaved = isFormDirty && !saveMutation.isPending && !ocrMutation.isPending
+
+  useEffect(() => {
+    if (!selectedDetailRecord) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedDetailRecord(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedDetailRecord])
 
   useEffect(() => {
     onDirtyStateChange?.(shouldWarnUnsaved)
@@ -1161,13 +1187,39 @@ export function MyBetsPanel({
     setExpandedRecordMap(next)
   }
 
+  function openRecordDetail(record: MyBetRecord) {
+    setSelectedDetailRecord(record)
+  }
+
   return (
     <div className="page-section my-bets-page">
       <StatusCard
         title="我的投注"
         actions={
           <div className="toolbar-inline my-bets-page__toolbar">
-            {viewMode === 'list' && hasRecords ? (
+            {viewMode === 'list' ? (
+              <div className="my-bets-view-toggle" aria-label="投注展示视图">
+                <button
+                  className={clsx('icon-button my-bets-page__toolbar-button', displayMode === 'card' && 'is-active')}
+                  type="button"
+                  onClick={() => setDisplayMode('card')}
+                  aria-label="卡片视图"
+                  title="卡片视图"
+                >
+                  <LayoutGrid size={16} aria-hidden="true" />
+                </button>
+                <button
+                  className={clsx('icon-button my-bets-page__toolbar-button', displayMode === 'table' && 'is-active')}
+                  type="button"
+                  onClick={() => setDisplayMode('table')}
+                  aria-label="列表视图"
+                  title="列表视图"
+                >
+                  <List size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+            {viewMode === 'list' && displayMode === 'card' && hasRecords ? (
               <button
                 className={clsx('icon-button my-bets-page__toolbar-button', allRecordsExpanded && 'is-active')}
                 type="button"
@@ -1230,6 +1282,80 @@ export function MyBetsPanel({
               <div className="state-shell">正在加载投注记录...</div>
             ) : betsQuery.error instanceof Error ? (
               <div className="state-shell state-shell--error">读取失败：{betsQuery.error.message}</div>
+            ) : records.length && displayMode === 'table' ? (
+              <div className="table-shell my-bets-table-shell">
+                <table className="history-table my-bets-table">
+                  <thead>
+                    <tr>
+                      <th>期号</th>
+                      <th>玩法</th>
+                      <th>来源/状态</th>
+                      <th>投注时间</th>
+                      <th>注数/倍数</th>
+                      <th>总投入</th>
+                      <th>优惠</th>
+                      <th>净投入</th>
+                      <th>奖金</th>
+                      <th>盈亏</th>
+                      <th>中奖结果</th>
+                      <th className="my-bets-table__col--actions">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map((record) => (
+                      <tr
+                        key={record.id}
+                        className={clsx('my-bets-table__row', highlightedRecordId === record.id && 'is-focus-highlight')}
+                        ref={(node) => {
+                          recordRefMap.current[record.id] = node
+                        }}
+                        onClick={() => openRecordDetail(record)}
+                      >
+                        <td>
+                          <button
+                            className="my-bets-table__record-link"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openRecordDetail(record)
+                            }}
+                          >
+                            第 {record.target_period} 期
+                          </button>
+                        </td>
+                        <td>{formatPlayType(record.play_type)}</td>
+                        <td>
+                          <div className="my-bets-table__status-stack">
+                            {record.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : <span className="my-bets-status">手动</span>}
+                            {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
+                          </div>
+                        </td>
+                        <td>{formatDateTimeLocal(record.ticket_purchased_at || record.created_at)}</td>
+                        <td>{formatRecordLineSummary(record)}</td>
+                        <td>{formatCurrency(record.amount)}</td>
+                        <td>{formatCurrency(record.discount_amount || 0)}</td>
+                        <td>{formatCurrency(record.net_amount || Math.max(0, record.amount - (record.discount_amount || 0)))}</td>
+                        <td>{formatCurrency(record.prize_amount)}</td>
+                        <td className={clsx(record.net_profit >= 0 ? 'is-profit' : 'is-loss')}>{formatCurrency(record.net_profit)}</td>
+                        <td>{formatRecordWinSummary(record)}</td>
+                        <td className="my-bets-table__col--actions" onClick={(event) => event.stopPropagation()}>
+                          <div className="my-bets-table__actions">
+                            <button className="icon-button" type="button" onClick={() => openRecordDetail(record)} aria-label={`查看详情：第 ${record.target_period} 期`} title="查看详情">
+                              <Eye size={15} aria-hidden="true" />
+                            </button>
+                            <button className="icon-button" type="button" onClick={() => openEditForm(record)} aria-label={`编辑：第 ${record.target_period} 期`} title="编辑">
+                              <PencilLine size={15} aria-hidden="true" />
+                            </button>
+                            <button className="icon-button" type="button" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)} aria-label={`删除：第 ${record.target_period} 期`} title="删除">
+                              <Trash2 size={15} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : records.length ? (
               <div className="my-bets-list">
                 {records.map((record, index) => {
@@ -1245,6 +1371,7 @@ export function MyBetsPanel({
                     initial={animationsEnabled ? { opacity: 0, y: cardEnterY } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: animationsEnabled ? 0.22 * motionScale : 0, delay: animationsEnabled ? Math.min(index * 0.025, 0.22) : 0 }}
+                    onClick={() => openRecordDetail(record)}
                   >
                 <div className="my-bets-card__header">
                   <div>
@@ -1265,7 +1392,11 @@ export function MyBetsPanel({
                       </div>
                     ) : null}
                   </div>
-                  <div className="my-bets-card__actions">
+                  <div className="my-bets-card__actions" onClick={(event) => event.stopPropagation()}>
+                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => openRecordDetail(record)}>
+                      <Eye size={14} aria-hidden="true" />
+                      查看详情
+                    </button>
                     <button className="ghost-button ghost-button--compact" type="button" onClick={() => toggleRecordExpanded(record.id)}>
                       {isExpanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
                       {isExpanded ? '收起详情' : '展开详情'}
@@ -1310,7 +1441,7 @@ export function MyBetsPanel({
                   <span>{record.prize_level ? `${record.prize_level} · 中 ${record.winning_bet_count} 注` : '未中奖'}</span>
                 </div>
                 {record.ticket_image_url ? (
-                  <a className="my-bets-card__meta my-bets-card__meta--with-icon" href={record.ticket_image_url} target="_blank" rel="noreferrer">
+                  <a className="my-bets-card__meta my-bets-card__meta--with-icon" href={record.ticket_image_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
                     <ImageIcon size={14} aria-hidden="true" />
                     查看票据图片
                   </a>
@@ -1884,6 +2015,109 @@ export function MyBetsPanel({
             </form>
           </div>
         </section>
+      ) : null}
+
+      {selectedDetailRecord ? (
+        <div className="modal-shell" role="presentation" onClick={() => setSelectedDetailRecord(null)}>
+          <div className="modal-card my-bets-modal-card my-bets-detail-modal" role="dialog" aria-modal="true" aria-labelledby="my-bets-detail-title" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-card__header my-bets-detail-modal__header">
+              <div>
+                <p className="modal-card__eyebrow">My Bets Detail</p>
+                <h2 id="my-bets-detail-title">{`第 ${selectedDetailRecord.target_period} 期 · ${formatPlayType(selectedDetailRecord.play_type)}`}</h2>
+                <p className="modal-card__subtitle">{`投注时间 ${formatDateTimeLocal(selectedDetailRecord.ticket_purchased_at || selectedDetailRecord.created_at)}`}</p>
+              </div>
+              <button className="ghost-button ghost-button--compact" type="button" onClick={() => setSelectedDetailRecord(null)}>
+                关闭
+              </button>
+            </div>
+
+            <div className="my-bets-detail-modal__body">
+              <section className="my-bets-detail-modal__section">
+                <div className="my-bets-detail-modal__status-row">
+                  {selectedDetailRecord.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : <span className="my-bets-status">手动录入</span>}
+                  {selectedDetailRecord.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
+                  <span className={clsx('my-bets-detail-modal__profit', selectedDetailRecord.net_profit >= 0 ? 'is-profit' : 'is-loss')}>
+                    {`盈亏 ${formatCurrency(selectedDetailRecord.net_profit)}`}
+                  </span>
+                </div>
+                <div className="my-bets-detail-modal__draw">
+                  <span>开奖号码</span>
+                  {renderActualResult(selectedDetailRecord, lotteryCode)}
+                </div>
+              </section>
+
+              <section className="my-bets-detail-modal__metrics" aria-label="投注金额汇总">
+                <article>
+                  <span>注数/倍数</span>
+                  <strong>{formatRecordLineSummary(selectedDetailRecord)}</strong>
+                </article>
+                <article>
+                  <span>总投入</span>
+                  <strong>{formatCurrency(selectedDetailRecord.amount)}</strong>
+                </article>
+                <article>
+                  <span>优惠</span>
+                  <strong>{formatCurrency(selectedDetailRecord.discount_amount || 0)}</strong>
+                </article>
+                <article>
+                  <span>净投入</span>
+                  <strong>{formatCurrency(selectedDetailRecord.net_amount || Math.max(0, selectedDetailRecord.amount - (selectedDetailRecord.discount_amount || 0)))}</strong>
+                </article>
+                <article>
+                  <span>总奖金</span>
+                  <strong>{formatCurrency(selectedDetailRecord.prize_amount)}</strong>
+                </article>
+                <article>
+                  <span>中奖结果</span>
+                  <strong>{formatRecordWinSummary(selectedDetailRecord)}</strong>
+                </article>
+              </section>
+
+              <section className="my-bets-detail-modal__section">
+                <div className="my-bets-detail-modal__section-title">
+                  <strong>子注单明细</strong>
+                  <span>{`${selectedDetailRecord.lines?.length || 0} 条`}</span>
+                </div>
+                {(selectedDetailRecord.lines || []).length ? (
+                  <div className="my-bets-card__line-list">
+                    {(selectedDetailRecord.lines || []).map((line) => (
+                      <div key={`${selectedDetailRecord.id}-detail-line-${line.line_no}`} className="my-bets-line-card">
+                        <span className="my-bets-line-card__label">{`子注单 #${line.line_no} · ${formatPlayType(line.play_type)}`}</span>
+                        {renderLineNumbers(selectedDetailRecord.id, line, lotteryCode, Boolean(selectedDetailRecord.actual_result))}
+                        <span className="my-bets-card__meta">{`${line.bet_count} 注 × ${line.multiplier} 倍${line.is_append ? '（追加）' : ''} · ${formatCurrency(line.amount)}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="state-shell">暂无子注单明细。</div>
+                )}
+              </section>
+
+              <section className="my-bets-detail-modal__section my-bets-detail-modal__timeline">
+                <div>
+                  <span>创建时间</span>
+                  <strong>{formatDateTimeLocal(selectedDetailRecord.created_at)}</strong>
+                </div>
+                <div>
+                  <span>更新时间</span>
+                  <strong>{formatDateTimeLocal(selectedDetailRecord.updated_at)}</strong>
+                </div>
+                {selectedDetailRecord.settled_at ? (
+                  <div>
+                    <span>结算时间</span>
+                    <strong>{formatDateTimeLocal(selectedDetailRecord.settled_at)}</strong>
+                  </div>
+                ) : null}
+                {selectedDetailRecord.ticket_image_url ? (
+                  <a className="ghost-button ghost-button--compact" href={selectedDetailRecord.ticket_image_url} target="_blank" rel="noreferrer">
+                    <ImageIcon size={14} aria-hidden="true" />
+                    查看票据图片
+                  </a>
+                ) : null}
+              </section>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )
