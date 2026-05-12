@@ -135,6 +135,7 @@
 .page-stack {
   display: grid;
   gap: 1.25rem;
+  align-content: start;
 }
 
 .page-stack > *:nth-child(2) {
@@ -1943,4 +1944,3 @@
 .rules-page__prize-grid span {
   color: var(--text-secondary);
 }
-
