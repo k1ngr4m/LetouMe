@@ -16,6 +16,7 @@ from backend.app.auth import (
     require_model_management_permission,
     require_role_management_permission,
     require_schedule_management_permission,
+    require_super_admin,
     require_user_management_permission,
     set_session_cookie,
 )

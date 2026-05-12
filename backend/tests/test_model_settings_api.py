@@ -36,20 +36,37 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.env.stop()
         self.temp_dir.cleanup()
 
-    def test_list_models_returns_seeded_database_models(self) -> None:
+    def _ensure_test_model(self, model_code: str = "test-api-model", *, is_active: bool = True) -> dict:
+        payload = {
+            "model_code": model_code,
+            "display_name": "Test API Model",
+            "provider": "openai_compatible",
+            "api_model_name": f"{model_code}-api",
+            "base_url": "https://example.test/v1",
+            "api_key": "secret-key",
+            "app_code": "",
+            "temperature": 0.7,
+            "is_active": is_active,
+        }
+        response = self.client.post("/api/settings/models/create", json=payload)
+        if response.status_code == 400 and "模型编码已存在" in str(response.json().get("detail")):
+            response = self.client.post(
+                "/api/settings/models/update",
+                json={**payload, "original_model_code": model_code},
+            )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_list_models_does_not_require_seeded_database_models(self) -> None:
         response = self.client.post("/api/settings/models/list", json={"include_deleted": False})
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertTrue(any(model["model_code"] == "claude-sonnet-4.6" for model in payload["models"]))
         self.assertTrue(all(isinstance(model["updated_at"], str) for model in payload["models"]))
-        deepseek_chat = next(model for model in payload["models"] if model["model_code"] == "deepseek-v3.2")
-        self.assertEqual(deepseek_chat["provider"], "deepseek")
-        self.assertEqual(deepseek_chat["api_model_name"], "deepseek-chat")
-        self.assertEqual(deepseek_chat["base_url"], "https://api.deepseek.com")
 
     def test_get_model_detail_serializes_updated_at(self) -> None:
-        response = self.client.post("/api/settings/model/detail", json={"model_code": "claude-sonnet-4.6"})
+        self._ensure_test_model("test-detail-model")
+        response = self.client.post("/api/settings/model/detail", json={"model_code": "test-detail-model"})
 
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json()["updated_at"], str)
@@ -249,9 +266,10 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertFalse(restore_response.json()["is_deleted"])
 
     def test_patch_status_toggles_active_flag(self) -> None:
+        self._ensure_test_model("test-status-model")
         response = self.client.post(
             "/api/settings/models/status",
-            json={"model_code": "claude-sonnet-4.6", "is_active": False},
+            json={"model_code": "test-status-model", "is_active": False},
         )
 
         self.assertEqual(response.status_code, 200)

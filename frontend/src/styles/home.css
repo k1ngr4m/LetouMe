@@ -3483,8 +3483,14 @@
 }
 
 .prediction-summary-stack.is-empty {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 5rem;
+  overflow: hidden;
   padding: 0.5rem;
-  align-items: stretch;
+  align-items: start;
+  align-content: start;
+  grid-auto-rows: 3.7rem;
 }
 
 .hero-metric-card {
@@ -3505,6 +3511,7 @@
 
 .prediction-summary-stack.is-empty .hero-metric-card,
 .hero-metric-card.is-empty {
+  height: auto;
   min-height: 3.6rem;
   justify-content: center;
   gap: 0.42rem;
