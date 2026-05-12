@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useLocation, useNavigate } from 'react-router-dom'
-import Cropper, { type Area } from 'react-easy-crop'
 import { apiClient } from '../../shared/api/client'
 import { StatusCard } from '../../shared/components/StatusCard'
 import { UserAvatar } from '../../shared/components/UserAvatar'
@@ -632,67 +631,6 @@ function formatBeijingDateKey(value?: number | null) {
   return formatter.format(new Date(value * 1000))
 }
 
-const PROFILE_AVATAR_MAX_SIZE_BYTES = 4 * 1024 * 1024 + 512 * 1024
-const PROFILE_AVATAR_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png'])
-const PROFILE_AVATAR_ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png']
-
-function getProfileAvatarValidationError(file: File) {
-  if (file.size > PROFILE_AVATAR_MAX_SIZE_BYTES) {
-    return '头像图片大小不能超过 4.5MB'
-  }
-  const normalizedName = file.name.toLowerCase()
-  const hasValidExtension = PROFILE_AVATAR_ALLOWED_EXTENSIONS.some((extension) => normalizedName.endsWith(extension))
-  const normalizedType = (file.type || '').toLowerCase()
-  if (!hasValidExtension || (normalizedType && !PROFILE_AVATAR_ALLOWED_TYPES.has(normalizedType))) {
-    return '头像仅支持 JPG、PNG 格式'
-  }
-  return null
-}
-
-async function createCroppedAvatarFile(source: File, pixelCrop: Area) {
-  const imageUrl = URL.createObjectURL(source)
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('头像图片解析失败'))
-    img.src = imageUrl
-  }).finally(() => URL.revokeObjectURL(imageUrl))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(pixelCrop.width))
-  canvas.height = Math.max(1, Math.round(pixelCrop.height))
-  const context = canvas.getContext('2d')
-  if (!context) {
-    throw new Error('头像裁剪失败，请稍后重试')
-  }
-  context.drawImage(
-    image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  )
-  const outputType = source.type === 'image/png' ? 'image/png' : 'image/jpeg'
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (value) => {
-        if (!value) {
-          reject(new Error('头像裁剪失败，请稍后重试'))
-          return
-        }
-        resolve(value)
-      },
-      outputType,
-      outputType === 'image/jpeg' ? 0.92 : undefined,
-    )
-  })
-  const extension = outputType === 'image/png' ? 'png' : 'jpg'
-  return new File([blob], `avatar-${Date.now()}.${extension}`, { type: outputType })
-}
 
 const SCHEDULE_COLUMN_MIN_WIDTHS: Record<ScheduleColumnKey, number> = {
   name: 220,
@@ -1205,13 +1143,6 @@ export function SettingsPage() {
   const [roleForm, setRoleForm] = useState<RolePayload>(EMPTY_ROLE_FORM)
   const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null)
   const [scheduleActionMenu, setScheduleActionMenu] = useState<string | null>(null)
-  const [avatarCropModalOpen, setAvatarCropModalOpen] = useState(false)
-  const [profileAvatarSourceFile, setProfileAvatarSourceFile] = useState<File | null>(null)
-  const [profileAvatarSourceUrl, setProfileAvatarSourceUrl] = useState('')
-  const [profileAvatarCrop, setProfileAvatarCrop] = useState({ x: 0, y: 0 })
-  const [profileAvatarZoom, setProfileAvatarZoom] = useState(1)
-  const [profileAvatarCroppedAreaPixels, setProfileAvatarCroppedAreaPixels] = useState<Area | null>(null)
-  const profileAvatarInputRef = useRef<HTMLInputElement | null>(null)
 
   const canManageModels = hasPermission('model_management')
   const canManageSchedules = hasPermission('schedule_management')
@@ -1327,15 +1258,6 @@ export function SettingsPage() {
     window.addEventListener('click', closeMenu)
     return () => window.removeEventListener('click', closeMenu)
   }, [providerSourceMenuOpen])
-
-  useEffect(
-    () => () => {
-      if (profileAvatarSourceUrl) {
-        URL.revokeObjectURL(profileAvatarSourceUrl)
-      }
-    },
-    [profileAvatarSourceUrl],
-  )
 
   useEffect(() => {
     setMaintenanceLogOffset(0)
@@ -1791,20 +1713,6 @@ export function SettingsPage() {
       setMessageType('error')
     },
   })
-  const profileAvatarMutation = useMutation({
-    mutationFn: (file: File) => apiClient.uploadProfileAvatar(file),
-    onSuccess: (response) => {
-      queryClient.setQueryData(['auth', 'me'], response.user)
-      setMessage('头像已更新。')
-      setMessageType('success')
-      closeProfileAvatarCropModal()
-    },
-    onError: (error) => {
-      setMessage(error instanceof Error ? error.message : '头像上传失败')
-      setMessageType('error')
-    },
-  })
-
   const passwordMutation = useMutation({
     mutationFn: () => apiClient.changePassword({ current_password: passwordForm.current_password, new_password: passwordForm.new_password }),
     onSuccess: async () => {
@@ -2948,62 +2856,6 @@ export function SettingsPage() {
     profileMutation.mutate()
   }
 
-  function openProfileAvatarFilePicker() {
-    profileAvatarInputRef.current?.click()
-  }
-
-  function closeProfileAvatarCropModal() {
-    if (profileAvatarSourceUrl) {
-      URL.revokeObjectURL(profileAvatarSourceUrl)
-    }
-    setAvatarCropModalOpen(false)
-    setProfileAvatarSourceFile(null)
-    setProfileAvatarSourceUrl('')
-    setProfileAvatarCrop({ x: 0, y: 0 })
-    setProfileAvatarZoom(1)
-    setProfileAvatarCroppedAreaPixels(null)
-  }
-
-  function onProfileAvatarCropComplete(_: Area, croppedAreaPixels: Area) {
-    setProfileAvatarCroppedAreaPixels(croppedAreaPixels)
-  }
-
-  function handleProfileAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    const validationError = getProfileAvatarValidationError(file)
-    if (validationError) {
-      setMessage(validationError)
-      setMessageType('error')
-      return
-    }
-    if (profileAvatarSourceUrl) {
-      URL.revokeObjectURL(profileAvatarSourceUrl)
-    }
-    setProfileAvatarSourceFile(file)
-    setProfileAvatarSourceUrl(URL.createObjectURL(file))
-    setProfileAvatarCrop({ x: 0, y: 0 })
-    setProfileAvatarZoom(1)
-    setProfileAvatarCroppedAreaPixels(null)
-    setAvatarCropModalOpen(true)
-  }
-
-  async function submitProfileAvatarCrop() {
-    if (!profileAvatarSourceFile || !profileAvatarCroppedAreaPixels) {
-      setMessage('请先裁剪头像后再上传')
-      setMessageType('error')
-      return
-    }
-    try {
-      const croppedFile = await createCroppedAvatarFile(profileAvatarSourceFile, profileAvatarCroppedAreaPixels)
-      profileAvatarMutation.mutate(croppedFile)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '头像裁剪失败')
-      setMessageType('error')
-    }
-  }
-
   return (
     <div className="page-stack">
       <datalist id="lottery-fetch-limit-presets">
@@ -3032,21 +2884,11 @@ export function SettingsPage() {
                   <div className="settings-split-row settings-split-row--avatar">
                     <div className="settings-split-row__main">
                       <h3>头像</h3>
-                      <p>支持 JPG、PNG 格式，最大 4.5MB</p>
+                      <p>头像上传功能已下线，保留历史头像展示。</p>
                     </div>
                     <div className="settings-split-row__extra">
                       <UserAvatar avatarUrl={user?.avatar_url} displayName={user?.nickname || user?.username || 'U'} className="settings-avatar-fallback" />
                     </div>
-                    <button type="button" className="ghost-button settings-split-row__action" onClick={openProfileAvatarFilePicker} disabled={profileAvatarMutation.isPending}>
-                      更换
-                    </button>
-                    <input
-                      ref={profileAvatarInputRef}
-                      type="file"
-                      className="settings-avatar-file-input"
-                      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                      onChange={handleProfileAvatarFileChange}
-                    />
                   </div>
 
                   <div
@@ -4694,59 +4536,6 @@ export function SettingsPage() {
           onRemove={removeCustomHeaderDraft}
           onSave={saveCustomHeaders}
         />
-      ) : null}
-
-      {avatarCropModalOpen ? (
-        <div className="modal-shell" role="presentation" onClick={() => !profileAvatarMutation.isPending && closeProfileAvatarCropModal()}>
-          <div className="modal-card modal-card--form settings-avatar-crop-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-card__header">
-              <div>
-                <p className="modal-card__eyebrow">头像裁剪</p>
-                <h3>调整头像显示区域</h3>
-              </div>
-              <button className="ghost-button" type="button" onClick={closeProfileAvatarCropModal} disabled={profileAvatarMutation.isPending}>关闭</button>
-            </div>
-            <div className="settings-avatar-crop-modal__body">
-              <div className="settings-avatar-crop-modal__canvas">
-                {profileAvatarSourceUrl ? (
-                  <Cropper
-                    image={profileAvatarSourceUrl}
-                    crop={profileAvatarCrop}
-                    zoom={profileAvatarZoom}
-                    aspect={1}
-                    cropShape="round"
-                    showGrid={false}
-                    onCropChange={setProfileAvatarCrop}
-                    onZoomChange={setProfileAvatarZoom}
-                    onCropComplete={onProfileAvatarCropComplete}
-                  />
-                ) : null}
-              </div>
-              <label className="field settings-avatar-crop-modal__zoom">
-                <span>缩放</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={3}
-                  step={0.05}
-                  value={profileAvatarZoom}
-                  onChange={(event) => setProfileAvatarZoom(Number(event.target.value))}
-                />
-              </label>
-            </div>
-            <div className="form-actions settings-avatar-crop-modal__actions">
-              <button className="ghost-button" type="button" onClick={closeProfileAvatarCropModal} disabled={profileAvatarMutation.isPending}>取消</button>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={() => void submitProfileAvatarCrop()}
-                disabled={profileAvatarMutation.isPending || !profileAvatarCroppedAreaPixels}
-              >
-                {profileAvatarMutation.isPending ? '上传中...' : '确认上传'}
-              </button>
-            </div>
-          </div>
-        </div>
       ) : null}
 
       {providerModalOpen ? (

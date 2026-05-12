@@ -599,11 +599,6 @@ export type MyBetOCRDraftResponse = {
   warnings: string[]
 }
 
-export type MyBetOCRImageUploadResponse = {
-  lottery_code: LotteryCode
-  ticket_image_url: string
-}
-
 export type MessageStatusFilter = 'all' | 'unread' | 'read'
 export type MessageResultFilter = 'all' | 'won' | 'lost'
 export type MessageDateFilter = {

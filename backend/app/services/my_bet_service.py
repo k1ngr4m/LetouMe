@@ -265,10 +265,6 @@ class MyBetService:
             "warnings": warnings,
         }
 
-    def upload_ticket_image(self, *, lottery_code: str, image_bytes: bytes, filename: str) -> dict[str, Any]:
-        normalized_code = normalize_lottery_code(lottery_code)
-        return self.ticket_ocr_service.upload_image(lottery_code=normalized_code, image_bytes=image_bytes, filename=filename)
-
     def _build_payload(self, payload: dict[str, Any], *, lottery_code: str) -> dict[str, Any]:
         target_period = str(payload.get("target_period") or "").strip()
         if not target_period:

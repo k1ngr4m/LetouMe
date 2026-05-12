@@ -7,7 +7,6 @@ import {
   getMyBets,
   recognizeMyBetByImage,
   updateMyBet,
-  uploadMyBetOCRImage,
   renderPage,
 } from './HomePage.testUtils'
 
@@ -78,7 +77,6 @@ describe('HomePage my-bets dashboard', () => {
         }),
       ),
     )
-    expect(uploadMyBetOCRImage).not.toHaveBeenCalled()
   })
 
   it('keeps my-bets details collapsed by default and supports expand controls', async () => {

@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import base64
-import json
 import re
 from datetime import datetime
 from math import comb
-from time import perf_counter
 from typing import Any
-from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import requests
@@ -60,128 +57,9 @@ class TicketOCRService:
             "warnings": warnings,
         }
 
-    def upload_image(self, *, lottery_code: str, image_bytes: bytes, filename: str) -> dict[str, Any]:
-        normalized_code = normalize_lottery_code(lottery_code)
-        self._validate_imgloc_settings()
-        image_url = self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code=normalized_code)
-        return {"lottery_code": normalized_code, "ticket_image_url": image_url}
-
-    def upload_profile_avatar(self, *, image_bytes: bytes, filename: str) -> str:
-        self._validate_imgloc_settings()
-        return self._upload_to_imgloc(image_bytes=image_bytes, filename=filename, lottery_code="profile")
-
     def _validate_baidu_settings(self) -> None:
         if not self.settings.baidu_ocr_api_key or not self.settings.baidu_ocr_secret_key:
             raise ValueError("未配置百度 OCR 密钥")
-
-    def _validate_imgloc_settings(self) -> None:
-        if not self.settings.imgloc_api_key:
-            raise ValueError("未配置 imgloc 图床密钥")
-
-    def _upload_to_imgloc(self, *, image_bytes: bytes, filename: str, lottery_code: str) -> str:
-        started_at = perf_counter()
-        resolved_filename = filename or "ticket.jpg"
-        self.logger.info(
-            "Uploading ticket image to imgloc",
-            extra={
-                "context": {
-                    "lottery_code": lottery_code,
-                    "filename": resolved_filename,
-                    "image_size_bytes": len(image_bytes),
-                    "imgloc_api_url": self.settings.imgloc_api_url,
-                }
-            },
-        )
-        files = {
-            "source": (resolved_filename, image_bytes),
-        }
-        data = {
-            "key": self.settings.imgloc_api_key,
-            "format": "json",
-        }
-        try:
-            response = requests.post(self.settings.imgloc_api_url, data=data, files=files, timeout=30)
-        except requests.RequestException as exc:
-            self.logger.error(
-                "Imgloc upload request failed",
-                extra={
-                    "context": {
-                        "lottery_code": lottery_code,
-                        "error_type": exc.__class__.__name__,
-                        "error_message": str(exc),
-                    }
-                },
-            )
-            raise ValueError("上传图床失败（网络请求异常）") from exc
-        if response.status_code >= 400:
-            response_text = self._truncate_text(response.text)
-            payload: dict[str, Any] | None = None
-            if response.content and callable(getattr(response, "json", None)):
-                try:
-                    parsed_payload = response.json()
-                    if isinstance(parsed_payload, dict):
-                        payload = parsed_payload
-                except ValueError:
-                    payload = None
-            self.logger.error(
-                "Imgloc upload returned non-success status",
-                extra={
-                    "context": {
-                        "lottery_code": lottery_code,
-                        "status_code": response.status_code,
-                        "content_type": response.headers.get("content-type", ""),
-                        "response_preview": response_text,
-                    }
-                },
-            )
-            if self._is_imgloc_content_blocked(
-                status_code=response.status_code,
-                payload=payload,
-                response_text=response_text,
-            ):
-                raise ValueError("图片被图床风控拦截，请更换清晰票面；可先保存投注不上传图片")
-            raise ValueError(f"上传图床失败（HTTP {response.status_code}）")
-        try:
-            payload = response.json() if response.content else {}
-        except ValueError as exc:
-            response_text = self._truncate_text(response.text)
-            self.logger.error(
-                "Imgloc upload response is not valid JSON",
-                extra={
-                    "context": {
-                        "lottery_code": lottery_code,
-                        "status_code": response.status_code,
-                        "response_preview": response_text,
-                    }
-                },
-            )
-            raise ValueError("上传图床失败（响应解析失败）") from exc
-        image_url = self._extract_imgloc_url(payload)
-        if not image_url:
-            payload_keys = ",".join(sorted(str(key) for key in payload.keys())) if isinstance(payload, dict) else ""
-            self.logger.error(
-                "Imgloc upload response missing image URL",
-                extra={
-                    "context": {
-                        "lottery_code": lottery_code,
-                        "status_code": response.status_code,
-                        "payload_keys": payload_keys,
-                    }
-                },
-            )
-            raise ValueError("上传图床失败（未返回图片URL）")
-        duration_ms = round((perf_counter() - started_at) * 1000, 2)
-        self.logger.info(
-            "Imgloc upload succeeded",
-            extra={
-                "context": {
-                    "lottery_code": lottery_code,
-                    "duration_ms": duration_ms,
-                    "image_url_host": urlparse(image_url).netloc,
-                }
-            },
-        )
-        return image_url
 
     @staticmethod
     def _truncate_text(value: Any, *, limit: int = 300) -> str:
@@ -189,50 +67,6 @@ class TicketOCRService:
         if len(text) <= limit:
             return text
         return f"{text[:limit]}..."
-
-    @staticmethod
-    def _extract_imgloc_url(payload: dict[str, Any]) -> str:
-        if not isinstance(payload, dict):
-            return ""
-        for key in ("url", "image_url", "display_url"):
-            value = payload.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        image_value = payload.get("image")
-        if isinstance(image_value, str) and image_value.strip():
-            return image_value.strip()
-        if isinstance(image_value, dict):
-            for key in ("url", "image_url", "display_url"):
-                value = image_value.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-        data = payload.get("data")
-        if isinstance(data, dict):
-            for key in ("url", "image_url", "display_url"):
-                value = data.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-            image = data.get("image")
-            if isinstance(image, dict):
-                value = image.get("url")
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-        return ""
-
-    @staticmethod
-    def _is_imgloc_content_blocked(*, status_code: int, payload: dict[str, Any] | None, response_text: str) -> bool:
-        if status_code not in {400, 403}:
-            return False
-        text_candidates = [str(response_text or "").lower()]
-        if isinstance(payload, dict):
-            text_candidates.append(json.dumps(payload, ensure_ascii=False).lower())
-            error = payload.get("error")
-            if isinstance(error, dict):
-                error_code = str(error.get("code") or "").strip()
-                error_message = str(error.get("message") or "").lower()
-                if error_code == "403" and ("inappropriate" in error_message or "suspected" in error_message):
-                    return True
-        return any("suspected inappropriate content" in candidate for candidate in text_candidates)
 
     def _recognize_text_by_baidu(self, *, image_bytes: bytes) -> str:
         access_token = self._get_baidu_access_token()

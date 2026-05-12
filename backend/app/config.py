@@ -42,8 +42,6 @@ class Settings:
     baidu_ocr_secret_key: str = ""
     baidu_ocr_token_url: str = "https://aip.baidubce.com/oauth/2.0/token"
     baidu_ocr_url: str = "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic"
-    imgloc_api_key: str = ""
-    imgloc_api_url: str = "https://imgloc.com/api/1/upload"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -136,8 +134,6 @@ def load_settings() -> Settings:
         baidu_ocr_secret_key=os.getenv("BAIDU_OCR_SECRET_KEY", ""),
         baidu_ocr_token_url=os.getenv("BAIDU_OCR_TOKEN_URL", "https://aip.baidubce.com/oauth/2.0/token"),
         baidu_ocr_url=os.getenv("BAIDU_OCR_URL", "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic"),
-        imgloc_api_key=os.getenv("IMGLOC_API_KEY", ""),
-        imgloc_api_url=os.getenv("IMGLOC_API_URL", "https://imgloc.com/api/1/upload"),
         smtp_host=os.getenv("SMTP_HOST", ""),
         smtp_port=smtp_port,
         smtp_user=os.getenv("SMTP_USER", ""),

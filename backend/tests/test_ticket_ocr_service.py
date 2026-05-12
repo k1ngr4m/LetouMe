@@ -4,8 +4,6 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import requests
-
 from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.ticket_ocr_service import TicketOCRService
 
@@ -18,17 +16,8 @@ class TicketOCRServiceTests(unittest.TestCase):
                 baidu_ocr_secret_key="demo",
                 baidu_ocr_token_url="https://example.com/token",
                 baidu_ocr_url="https://example.com/ocr",
-                imgloc_api_key="demo",
-                imgloc_api_url="https://example.com/upload",
             )
         )
-
-    def test_extract_imgloc_url_supports_common_shapes(self) -> None:
-        self.assertEqual(self.service._extract_imgloc_url({"url": "https://img/a.jpg"}), "https://img/a.jpg")
-        self.assertEqual(self.service._extract_imgloc_url({"data": {"display_url": "https://img/b.jpg"}}), "https://img/b.jpg")
-        self.assertEqual(self.service._extract_imgloc_url({"data": {"image": {"url": "https://img/c.jpg"}}}), "https://img/c.jpg")
-        self.assertEqual(self.service._extract_imgloc_url({"image": {"url": "https://img/d.jpg"}}), "https://img/d.jpg")
-        self.assertEqual(self.service._extract_imgloc_url({"image": "https://img/e.jpg"}), "https://img/e.jpg")
 
     def test_parse_pl3_lines_extracts_direct_and_group(self) -> None:
         lines = self.service._parse_pl3_lines(
@@ -509,79 +498,12 @@ class TicketOCRServiceTests(unittest.TestCase):
                 baidu_ocr_secret_key="demo",
                 baidu_ocr_token_url="https://example.com/token",
                 baidu_ocr_url="https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic",
-                imgloc_api_key="demo",
-                imgloc_api_url="https://example.com/upload",
             )
         )
         self.assertEqual(
             standard_service._resolve_baidu_ocr_url(),
             TicketOCRService.BAIDU_HIGH_ACCURACY_OCR_URL,
         )
-
-    @patch("backend.app.services.ticket_ocr_service.requests.post")
-    def test_upload_to_imgloc_returns_http_status_detail(self, mocked_post) -> None:
-        mocked_post.return_value = SimpleNamespace(
-            status_code=400,
-            text='{"error":"bad request"}',
-            headers={"content-type": "application/json"},
-            content=b'{"error":"bad request"}',
-        )
-        with self.assertRaises(ValueError) as context:
-            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="pl3")
-        self.assertIn("HTTP 400", str(context.exception))
-
-    @patch("backend.app.services.ticket_ocr_service.requests.post")
-    def test_upload_to_imgloc_returns_content_blocked_detail(self, mocked_post) -> None:
-        mocked_post.return_value = SimpleNamespace(
-            status_code=400,
-            text='{"status_code":400,"error":{"message":"Suspected inappropriate content","code":403},"status_txt":"Bad Request"}',
-            headers={"content-type": "application/json; charset=UTF-8"},
-            content=b'{"status_code":400,"error":{"message":"Suspected inappropriate content","code":403},"status_txt":"Bad Request"}',
-            json=lambda: {
-                "status_code": 400,
-                "error": {"message": "Suspected inappropriate content", "code": 403},
-                "status_txt": "Bad Request",
-            },
-        )
-        with self.assertRaises(ValueError) as context:
-            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="dlt")
-        self.assertEqual(str(context.exception), "图片被图床风控拦截，请更换清晰票面；可先保存投注不上传图片")
-
-    @patch("backend.app.services.ticket_ocr_service.requests.post")
-    def test_upload_to_imgloc_returns_parse_failure_detail(self, mocked_post) -> None:
-        mocked_post.return_value = SimpleNamespace(
-            status_code=200,
-            text="not-json",
-            headers={"content-type": "text/plain"},
-            content=b"not-json",
-            json=lambda: (_ for _ in ()).throw(ValueError("invalid json")),
-        )
-        with self.assertRaises(ValueError) as context:
-            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="dlt")
-        self.assertEqual(str(context.exception), "上传图床失败（响应解析失败）")
-
-    @patch("backend.app.services.ticket_ocr_service.requests.post")
-    def test_upload_to_imgloc_returns_missing_url_detail(self, mocked_post) -> None:
-        mocked_post.return_value = SimpleNamespace(
-            status_code=200,
-            text='{"ok":true}',
-            headers={"content-type": "application/json"},
-            content=b'{"ok":true}',
-            json=lambda: {"ok": True},
-        )
-        with self.assertRaises(ValueError) as context:
-            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="dlt")
-        self.assertEqual(str(context.exception), "上传图床失败（未返回图片URL）")
-        _, kwargs = mocked_post.call_args
-        self.assertIn("files", kwargs)
-        self.assertIn("source", kwargs["files"])
-
-    @patch("backend.app.services.ticket_ocr_service.requests.post")
-    def test_upload_to_imgloc_returns_network_error_detail(self, mocked_post) -> None:
-        mocked_post.side_effect = requests.RequestException("timeout")
-        with self.assertRaises(ValueError) as context:
-            self.service._upload_to_imgloc(image_bytes=b"demo", filename="demo.jpg", lottery_code="dlt")
-        self.assertEqual(str(context.exception), "上传图床失败（网络请求异常）")
 
 
 class MyBetMultiLinePayloadTests(unittest.TestCase):

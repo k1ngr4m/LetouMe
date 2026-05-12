@@ -356,11 +356,6 @@ class MyBetOCRDraftResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class MyBetOCRImageUploadResponse(BaseModel):
-    lottery_code: str = "dlt"
-    ticket_image_url: str
-
-
 class SiteMessageResponse(BaseModel):
     id: int
     lottery_code: str = "dlt"

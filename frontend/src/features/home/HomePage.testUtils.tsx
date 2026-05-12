@@ -23,7 +23,6 @@ const hoistedMocks = vi.hoisted(() => ({
   simulatePl3SumHistoryMislabel: { current: false },
   simulateJackpotPoolData: { current: false },
   updateMyBet: vi.fn(),
-  uploadMyBetOCRImage: vi.fn(),
   simulateHistoryFilterLoading: { current: false },
   homeDataArgsCapture: {
     current: null as null | {
@@ -56,7 +55,6 @@ export const {
   simulatePl3SumHistoryMislabel,
   simulateJackpotPoolData,
   updateMyBet,
-  uploadMyBetOCRImage,
   simulateHistoryFilterLoading,
   homeDataArgsCapture,
   toPng,
@@ -151,7 +149,6 @@ vi.mock('../../shared/api/client', () => ({
     quoteSimulationTicket,
     recognizeMyBetByImage,
     updateMyBet,
-    uploadMyBetOCRImage,
   },
 }))
 
@@ -1142,8 +1139,6 @@ beforeEach(() => {
     ],
     warnings: [],
   })
-  uploadMyBetOCRImage.mockReset()
-  uploadMyBetOCRImage.mockResolvedValue({ lottery_code: 'dlt', ticket_image_url: 'https://img.test/ticket.jpg' })
   createSimulationTicket.mockReset()
   createSimulationTicket.mockResolvedValue({
     ticket: {
@@ -1261,4 +1256,3 @@ beforeEach(() => {
     return { lottery_code: 'dlt', play_type: 'dlt', bet_count: betCount, amount: betCount * 2 }
   })
 })
-

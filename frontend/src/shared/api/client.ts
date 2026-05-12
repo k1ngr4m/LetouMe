@@ -27,7 +27,6 @@ import type {
   MyBetRecordCreateResponse,
   MyBetRecordListPayload,
   MyBetOCRDraftResponse,
-  MyBetOCRImageUploadResponse,
   MyBetRecordListResponse,
   MyBetRecordPayload,
   MyBetRecordUpdatePayload,
@@ -308,11 +307,6 @@ export const apiClient = {
       body: JSON.stringify(payload),
     })
   },
-  uploadProfileAvatar(image: File) {
-    const formData = new FormData()
-    formData.set('image', image)
-    return requestFormData<CurrentUserResponse>('/api/settings/profile/avatar/upload', formData)
-  },
   changePassword(payload: PasswordChangePayload) {
     return requestJson<CurrentUserResponse>('/api/settings/profile/password', {
       method: 'POST',
@@ -544,21 +538,6 @@ export const apiClient = {
       formData.set('lottery_code', lotteryCode)
       formData.set('image', optimized.file)
       return requestFormData<MyBetOCRDraftResponse>('/api/my-bets/ocr/recognize', formData)
-    })
-  },
-  uploadMyBetOCRImage(lotteryCode: LotteryCode, image: File) {
-    return optimizeTicketImageForUpload(image).then((optimized) => {
-      if (optimized.compressed) {
-        appLogger.info('Ticket image optimized before upload', {
-          lottery_code: lotteryCode,
-          original_size_bytes: optimized.originalSize,
-          optimized_size_bytes: optimized.outputSize,
-        })
-      }
-      const formData = new FormData()
-      formData.set('lottery_code', lotteryCode)
-      formData.set('image', optimized.file)
-      return requestFormData<MyBetOCRImageUploadResponse>('/api/my-bets/ocr/upload-image', formData)
     })
   },
   createSimulationTicket(payload: SimulationTicketPayload) {
