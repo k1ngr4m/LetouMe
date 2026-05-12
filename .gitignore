@@ -55,3 +55,5 @@ Thumbs.db
 /.agents/
 /skills-lock.json
 /.mindfs/sessions/
+/.mindfs/
+/deploy/
