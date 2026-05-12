@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from backend.app.db.connection import ensure_schema
+from backend.app.db.connection import ensure_schema, get_connection
 from backend.app.main import app
 
 
@@ -71,20 +71,25 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json()["updated_at"], str)
 
-    def test_list_providers_includes_deepseek_and_lmstudio(self) -> None:
+    def test_list_providers_does_not_restore_deepseek_or_aihubmix_defaults(self) -> None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE model_provider
+                    SET is_deleted = 1
+                    WHERE provider_code IN (?, ?)
+                    """,
+                    ("deepseek", "aihubmix"),
+                )
+
         response = self.client.post("/api/settings/providers/list", json={})
 
         self.assertEqual(response.status_code, 200)
         providers = response.json()["providers"]
-        self.assertTrue(any(provider["code"] == "deepseek" and provider["name"] == "DeepSeek" for provider in providers))
-        self.assertTrue(
-            any(
-                provider["code"] == "aihubmix"
-                and provider["name"] == "AIHubMix"
-                and provider["base_url"] == "https://aihubmix.com/v1"
-                for provider in providers
-            )
-        )
+        provider_codes = {provider["code"] for provider in providers}
+        self.assertNotIn("deepseek", provider_codes)
+        self.assertNotIn("aihubmix", provider_codes)
         self.assertTrue(any(provider["code"] == "lmstudio" and provider["name"] == "LM Studio" for provider in providers))
 
     def test_discover_provider_models_endpoint_returns_result(self) -> None:

@@ -1,6 +1,6 @@
 .dashboard-layout {
   display: grid;
-  grid-template-columns: 144px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }

@@ -21,32 +21,6 @@ PROVIDER_LABELS = {
 PROVIDER_CODE_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 
 PRESET_PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
-    "deepseek": {
-        "provider_name": "DeepSeek",
-        "website_url": "https://platform.deepseek.com",
-        "api_format": "openai_compatible",
-        "base_url": DEEPSEEK_BASE_URL,
-        "remark": "",
-        "is_system_preset": True,
-        "model_configs": [
-            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash"},
-            {"model_id": "deepseek-v4-pro", "display_name": "DeepSeek V4 Pro"},
-            {"model_id": "deepseek-chat", "display_name": "DeepSeek Chat (legacy alias)"},
-            {"model_id": "deepseek-reasoner", "display_name": "DeepSeek Reasoner (legacy alias)"},
-        ],
-    },
-    "aihubmix": {
-        "provider_name": "AIHubMix",
-        "website_url": "https://aihubmix.com",
-        "api_format": "openai_compatible",
-        "base_url": "https://aihubmix.com/v1",
-        "remark": "",
-        "is_system_preset": True,
-        "model_configs": [
-            {"model_id": "gpt-5", "display_name": "GPT-5"},
-            {"model_id": "gpt-5-mini", "display_name": "GPT-5 Mini"},
-        ],
-    },
     "lmstudio": {
         "provider_name": "LM Studio",
         "website_url": "https://lmstudio.ai",
@@ -292,37 +266,66 @@ class ModelRepository:
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 self._ensure_preset_providers(cursor)
-                cursor.execute("SELECT 1 FROM model_provider WHERE provider_code = ?", (normalized["code"],))
-                if cursor.fetchone():
+                cursor.execute("SELECT id, is_deleted FROM model_provider WHERE provider_code = ?", (normalized["code"],))
+                existing_row = cursor.fetchone()
+                if existing_row and not bool(existing_row.get("is_deleted")):
                     raise ValueError(f"供应商标识已存在: {normalized['code']}")
-                cursor.execute(
-                    """
-                    INSERT INTO model_provider (
-                        provider_code,
-                        provider_name,
-                        api_format,
-                        remark,
-                        website_url,
-                        api_key,
-                        base_url,
-                        is_system_preset,
-                        is_deleted
+                if existing_row:
+                    provider_id = int(existing_row["id"])
+                    cursor.execute(
+                        """
+                        UPDATE model_provider
+                        SET provider_name = ?,
+                            api_format = ?,
+                            remark = ?,
+                            website_url = ?,
+                            api_key = ?,
+                            base_url = ?,
+                            is_system_preset = ?,
+                            is_deleted = 0,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (
+                            normalized["name"],
+                            normalized["api_format"],
+                            normalized["remark"],
+                            normalized["website_url"],
+                            normalized["api_key"],
+                            normalized["base_url"],
+                            1 if normalized["is_system_preset"] else 0,
+                            provider_id,
+                        ),
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-                    """,
-                    (
-                        normalized["code"],
-                        normalized["name"],
-                        normalized["api_format"],
-                        normalized["remark"],
-                        normalized["website_url"],
-                        normalized["api_key"],
-                        normalized["base_url"],
-                        1 if normalized["is_system_preset"] else 0,
-                    ),
-                )
-                cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (normalized["code"],))
-                provider_id = int(cursor.fetchone()["id"])
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO model_provider (
+                            provider_code,
+                            provider_name,
+                            api_format,
+                            remark,
+                            website_url,
+                            api_key,
+                            base_url,
+                            is_system_preset,
+                            is_deleted
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                        """,
+                        (
+                            normalized["code"],
+                            normalized["name"],
+                            normalized["api_format"],
+                            normalized["remark"],
+                            normalized["website_url"],
+                            normalized["api_key"],
+                            normalized["base_url"],
+                            1 if normalized["is_system_preset"] else 0,
+                        ),
+                    )
+                    cursor.execute("SELECT id FROM model_provider WHERE provider_code = ?", (normalized["code"],))
+                    provider_id = int(cursor.fetchone()["id"])
                 self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
                 self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
         invalidate_model_registry_cache()

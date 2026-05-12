@@ -40,7 +40,6 @@ const SETTINGS_PATHS = {
   maintenance: '/settings/maintenance',
   schedules: '/settings/schedules',
   users: '/settings/users',
-  roles: '/settings/roles',
 }
 const LOTTERY_OPTIONS: Array<{ code: LotteryCode; label: string }> = [
   { code: 'dlt', label: '大乐透' },
@@ -127,7 +126,6 @@ export function AppShell({ children }: PropsWithChildren) {
   const canManageModels = hasPermission('model_management')
   const canManageSchedules = hasPermission('schedule_management')
   const canManageUsers = hasPermission('user_management')
-  const canManageRoles = hasPermission('role_management')
   const isSettingsRoute = location.pathname.startsWith('/settings')
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
   const isChartCenterRoute = location.pathname === HOME_TAB_PATHS.charts
@@ -630,12 +628,6 @@ export function AppShell({ children }: PropsWithChildren) {
                 <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.users} onClick={onSettingsNavigate} title="用户管理">
                   <UsersRound size={16} aria-hidden="true" />
                   <span>用户管理</span>
-                </NavLink>
-              ) : null}
-              {canManageRoles ? (
-                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={SETTINGS_PATHS.roles} onClick={onSettingsNavigate} title="角色权限">
-                  <UserCog size={16} aria-hidden="true" />
-                  <span>角色权限</span>
                 </NavLink>
               ) : null}
             </>

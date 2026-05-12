@@ -1224,9 +1224,8 @@ export function SettingsPage() {
     if (isSuperAdmin) tabs.push({ id: 'maintenance', label: '数据维护' })
     if (canManageSchedules) tabs.push({ id: 'schedules', label: '定时任务' })
     if (canManageUsers) tabs.push({ id: 'users', label: '用户管理' })
-    if (canManageRoles) tabs.push({ id: 'roles', label: '角色管理' })
     return tabs
-  }, [canManageModels, canManageRoles, canManageSchedules, canManageUsers, isSuperAdmin])
+  }, [canManageModels, canManageSchedules, canManageUsers, isSuperAdmin])
 
   const displayEmail = useMemo(() => {
     const candidate = [user?.email, user?.username].find((item) => typeof item === 'string' && item.includes('@'))
@@ -3198,7 +3197,6 @@ export function SettingsPage() {
                     }) : (
                       <div className="provider-source-empty">
                         <strong>暂无提供商源</strong>
-                        <span>点击新增，从 DeepSeek、AIHubMix 或 XiaoMi Token Plan 模板创建。</span>
                       </div>
                     )}
                   </div>

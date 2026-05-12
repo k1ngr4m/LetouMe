@@ -29,10 +29,10 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
 
         bootstrap_default_models.assert_not_called()
 
-    def test_bootstrap_default_models_does_not_insert_ai_models(self) -> None:
+    def test_bootstrap_default_models_does_not_insert_models_or_deepseek_provider(self) -> None:
         connection = MagicMock()
         cursor = MagicMock()
-        cursor.fetchone.side_effect = [{"id": index + 1} for index in range(32)]
+        cursor.fetchone.side_effect = [{"id": index + 1} for index in range(5)] + [None]
         connection.cursor.return_value.__enter__.return_value = cursor
         connection.__enter__.return_value = connection
 
@@ -47,7 +47,8 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
 
         executed_sql = "\n".join(str(call.args[0]) for call in cursor.execute.call_args_list)
         self.assertIn("INSERT INTO model_provider", executed_sql)
-        self.assertIn("provider_model_config", executed_sql)
+        self.assertNotIn('"deepseek"', executed_sql)
+        self.assertNotIn("provider_model_config", executed_sql)
         self.assertNotIn("INSERT INTO ai_model (", executed_sql)
         self.assertNotIn("INSERT INTO ai_model_tag", executed_sql)
         self.assertNotIn("INSERT INTO ai_model_lottery", executed_sql)

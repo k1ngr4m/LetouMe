@@ -20,7 +20,6 @@ SUPPORTED_PROVIDERS = (
     "openai",
     "anthropic",
     "gemini",
-    "deepseek",
     "lmstudio",
     "openai_compatible",
 )
@@ -154,7 +153,14 @@ def bootstrap_default_models() -> None:
                     )
                     provider_ids[provider_code] = int(cursor.fetchone()["id"])
 
-                _migrate_deepseek_models(cursor, provider_ids)
+                cursor.execute(
+                    "SELECT id FROM model_provider WHERE provider_code = ? AND is_deleted = 0",
+                    ("deepseek",),
+                )
+                deepseek_row = cursor.fetchone()
+                if deepseek_row:
+                    provider_ids["deepseek"] = int(deepseek_row["id"])
+                    _migrate_deepseek_models(cursor, provider_ids)
 
         _bootstrap_ready = True
         _bootstrap_signature = signature

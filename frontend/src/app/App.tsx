@@ -13,7 +13,6 @@ const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
 const SCHEDULE_MANAGEMENT_PERMISSION = 'schedule_management'
 const USER_MANAGEMENT_PERMISSION = 'user_management'
-const ROLE_MANAGEMENT_PERMISSION = 'role_management'
 
 const LandingPage = lazy(() => import('../features/landing/LandingPage').then((module) => ({ default: module.LandingPage })))
 const LoginPage = lazy(() => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage })))
@@ -200,13 +199,7 @@ export function App() {
             />
             <Route
               path="/settings/roles"
-              element={
-                <ProtectedRoute requiredPermission={ROLE_MANAGEMENT_PERMISSION}>
-                  <AppShell>
-                    <SettingsPage />
-                  </AppShell>
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/settings/profile" replace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
