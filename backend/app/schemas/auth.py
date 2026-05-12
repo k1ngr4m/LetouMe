@@ -29,13 +29,6 @@ class ForgotPasswordResetPayload(BaseModel):
     new_password: str
 
 
-class OAuthStartResponse(BaseModel):
-    provider: str
-    enabled: bool
-    auth_url: str | None = None
-    message: str | None = None
-
-
 class AuthUserResponse(BaseModel):
     id: int
     username: str

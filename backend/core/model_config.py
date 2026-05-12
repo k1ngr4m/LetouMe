@@ -488,7 +488,9 @@ def load_model_registry(_config_path: str | None = None, *, use_cache: bool = Tr
                     am.display_name,
                     mp.provider_code,
                     mp.api_format,
+                    mp.is_deleted AS provider_is_deleted,
                     pmc.provider_id,
+                    pmc.is_deleted AS provider_model_is_deleted,
                     mp.base_url AS provider_base_url,
                     mp.api_key AS provider_api_key,
                     am.api_model_name,
@@ -534,7 +536,7 @@ def load_model_registry(_config_path: str | None = None, *, use_cache: bool = Tr
             temperature=row.get("temperature"),
             lottery_codes=lotteries_by_code.get(model_code, ["dlt"]),
             is_active=bool(row.get("is_active")),
-            is_deleted=bool(row.get("is_deleted")),
+            is_deleted=bool(row.get("is_deleted")) or bool(row.get("provider_is_deleted")) or bool(row.get("provider_model_is_deleted")),
             extra=_merge_model_extra_options(
                 extra_options_by_provider_id.get(int(row["provider_id"]), {}) if row.get("provider_id") is not None else {},
                 _parse_extra_options(row.get("extra_options_json")),

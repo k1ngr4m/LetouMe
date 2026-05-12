@@ -32,7 +32,6 @@ import type {
   MyBetRecordPayload,
   MyBetRecordUpdatePayload,
   MyBetRecordUpdateResponse,
-  OAuthStartResponse,
   RegisterSendCodePayload,
   LotteryHistoryResponse,
   LotteryFetchTask,
@@ -289,11 +288,6 @@ export const apiClient = {
     return requestJson<SuccessResponse>('/api/auth/forgot-password/reset', {
       method: 'POST',
       body: JSON.stringify(payload),
-    })
-  },
-  getOAuthStart(provider: 'google' | 'github') {
-    return requestJson<OAuthStartResponse>(`/api/auth/oauth/${provider}/start`, {
-      method: 'GET',
     })
   },
   logout() {

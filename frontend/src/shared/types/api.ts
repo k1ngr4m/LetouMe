@@ -1387,13 +1387,6 @@ export type ForgotPasswordResetPayload = {
   new_password: string
 }
 
-export type OAuthStartResponse = {
-  provider: string
-  enabled: boolean
-  auth_url?: string | null
-  message?: string | null
-}
-
 export type AdminUserCreatePayload = {
   username: string
   email?: string

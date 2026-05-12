@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/AuthProvider'
-import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import './auth-redesign.css'
 
@@ -39,7 +38,6 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,22 +50,6 @@ export function LoginPage() {
       setError(requestError instanceof Error ? requestError.message : '登录失败')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  async function handleOAuth(provider: 'google' | 'github') {
-    try {
-      setOauthLoading(provider)
-      setError(null)
-      const response = await apiClient.getOAuthStart(provider)
-      if (!response.enabled || !response.auth_url) {
-        throw new Error(response.message || '第三方登录暂未开通')
-      }
-      window.location.href = response.auth_url
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : '暂时无法使用第三方登录')
-    } finally {
-      setOauthLoading(null)
     }
   }
 
@@ -116,22 +98,10 @@ export function LoginPage() {
               {isSubmitting ? '登录中...' : '登录'}
             </button>
           </form>
-          <button className="authx-secondary" type="button" onClick={() => setError('魔法链接功能即将上线')}>
-            使用魔法链接登录
-          </button>
           <p className="authx-switch">
             还没有账号？
             <Link to="/register">立即注册</Link>
           </p>
-          <div className="authx-divider">或者使用</div>
-          <div className="authx-social">
-            <button type="button" onClick={() => void handleOAuth('google')} disabled={oauthLoading !== null}>
-              <span aria-hidden="true">G</span> Google
-            </button>
-            <button type="button" onClick={() => void handleOAuth('github')} disabled={oauthLoading !== null}>
-              <span aria-hidden="true">⌘</span> GitHub
-            </button>
-          </div>
         </section>
       </div>
     </div>

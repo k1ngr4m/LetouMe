@@ -45,7 +45,6 @@ export function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [countdown, setCountdown] = useState(0)
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
   const canSendCode = useMemo(() => countdown <= 0 && email.trim().length > 0 && !isSendingCode, [countdown, email, isSendingCode])
 
   async function handleSendCode() {
@@ -93,22 +92,6 @@ export function RegisterPage() {
       setError(requestError instanceof Error ? requestError.message : '注册失败')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  async function handleOAuth(provider: 'google' | 'github') {
-    try {
-      setOauthLoading(provider)
-      setError(null)
-      const response = await apiClient.getOAuthStart(provider)
-      if (!response.enabled || !response.auth_url) {
-        throw new Error(response.message || '第三方登录暂未开通')
-      }
-      window.location.href = response.auth_url
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : '暂时无法使用第三方登录')
-    } finally {
-      setOauthLoading(null)
     }
   }
 
@@ -188,15 +171,6 @@ export function RegisterPage() {
               {isSubmitting ? '注册中...' : '注册'}
             </button>
           </form>
-          <div className="authx-divider">或者使用</div>
-          <div className="authx-social">
-            <button type="button" onClick={() => void handleOAuth('google')} disabled={oauthLoading !== null}>
-              <span aria-hidden="true">G</span> Google
-            </button>
-            <button type="button" onClick={() => void handleOAuth('github')} disabled={oauthLoading !== null}>
-              <span aria-hidden="true">⌘</span> GitHub
-            </button>
-          </div>
           <p className="authx-switch">
             已有账户？
             <Link to="/login">立即登录</Link>
