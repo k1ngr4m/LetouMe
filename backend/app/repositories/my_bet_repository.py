@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 from backend.app.db.connection import get_connection
 from backend.app.db.lottery_tables import use_lottery_table_scope
 from backend.app.number_codec import EMPTY_NUMBER_FIELDS, build_number_rows, with_number_fields, merge_number_rows
 from backend.app.lotteries import storage_issue_no
-from backend.app.time_utils import beijing_date_end_ts, beijing_date_start_ts, ensure_timestamp, format_beijing_datetime, now_ts
+from backend.app.time_utils import BEIJING_TIMEZONE, beijing_date_end_ts, beijing_date_start_ts, ensure_timestamp, format_beijing_datetime, now_ts
+
+
+def _add_months(value: datetime, delta: int) -> datetime:
+    month_index = value.month - 1 + delta
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    month_lengths = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    return value.replace(year=year, month=month, day=min(value.day, month_lengths[month - 1]))
 
 
 class MyBetRepository:
@@ -102,6 +111,158 @@ class MyBetRepository:
         normalized_value = start_value if normalized_operator in {"gt", "gte"} else end_value
         where_clauses.append(f"{column_sql} {comparator} ?")
         params.append(normalized_value)
+
+    @staticmethod
+    def _resolve_dynamic_date_range(dynamic_key: Any, *, start_value: Any = None, end_value: Any = None) -> tuple[str, str] | None:
+        normalized_key = str(dynamic_key or "").strip().lower()
+        today = datetime.fromtimestamp(now_ts(), BEIJING_TIMEZONE).date()
+
+        def date_text(value: datetime | Any) -> str:
+            if isinstance(value, datetime):
+                return value.strftime("%Y-%m-%d")
+            return str(value)
+
+        def resolve_custom(value: Any) -> datetime | None:
+            parts = str(value or "").strip().lower().split(":")
+            if len(parts) != 3:
+                return None
+            direction, amount_text, unit = parts
+            try:
+                amount = int(amount_text)
+            except ValueError:
+                return None
+            base = datetime.combine(today, datetime.min.time())
+            sign = -1 if direction == "past" else 1 if direction == "future" else 0
+            if unit == "week":
+                return base + timedelta(days=sign * amount * 7)
+            if unit == "month":
+                return _add_months(base, sign * amount)
+            return base + timedelta(days=sign * amount)
+
+        if normalized_key == "today":
+            return date_text(datetime.combine(today, datetime.min.time())), date_text(datetime.combine(today, datetime.min.time()))
+        if normalized_key == "yesterday":
+            day = today - timedelta(days=1)
+            return date_text(datetime.combine(day, datetime.min.time())), date_text(datetime.combine(day, datetime.min.time()))
+        if normalized_key == "tomorrow":
+            day = today + timedelta(days=1)
+            return date_text(datetime.combine(day, datetime.min.time())), date_text(datetime.combine(day, datetime.min.time()))
+
+        week_start = today - timedelta(days=today.weekday())
+        month_start = today.replace(day=1)
+        quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        quarter_start = today.replace(month=quarter_start_month, day=1)
+        half_start_month = 1 if today.month <= 6 else 7
+        half_start = today.replace(month=half_start_month, day=1)
+        year_start = today.replace(month=1, day=1)
+
+        if normalized_key == "this_week":
+            return date_text(datetime.combine(week_start, datetime.min.time())), date_text(datetime.combine(week_start + timedelta(days=6), datetime.min.time()))
+        if normalized_key == "last_week":
+            start = week_start - timedelta(days=7)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(start + timedelta(days=6), datetime.min.time()))
+        if normalized_key == "next_week":
+            start = week_start + timedelta(days=7)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(start + timedelta(days=6), datetime.min.time()))
+        if normalized_key == "this_month":
+            end = _add_months(datetime.combine(month_start, datetime.min.time()), 1).date() - timedelta(days=1)
+            return date_text(datetime.combine(month_start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "last_month":
+            start = _add_months(datetime.combine(month_start, datetime.min.time()), -1).date()
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(month_start - timedelta(days=1), datetime.min.time()))
+        if normalized_key == "next_month":
+            start = _add_months(datetime.combine(month_start, datetime.min.time()), 1).date()
+            end = _add_months(datetime.combine(month_start, datetime.min.time()), 2).date() - timedelta(days=1)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "this_quarter":
+            end = _add_months(datetime.combine(quarter_start, datetime.min.time()), 3).date() - timedelta(days=1)
+            return date_text(datetime.combine(quarter_start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "last_quarter":
+            start = _add_months(datetime.combine(quarter_start, datetime.min.time()), -3).date()
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(quarter_start - timedelta(days=1), datetime.min.time()))
+        if normalized_key == "next_quarter":
+            start = _add_months(datetime.combine(quarter_start, datetime.min.time()), 3).date()
+            end = _add_months(datetime.combine(quarter_start, datetime.min.time()), 6).date() - timedelta(days=1)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "first_half":
+            start = today.replace(month=1, day=1)
+            end = today.replace(month=6, day=30)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "second_half":
+            start = today.replace(month=7, day=1)
+            end = today.replace(month=12, day=31)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "this_year":
+            end = today.replace(month=12, day=31)
+            return date_text(datetime.combine(year_start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "last_year":
+            start = today.replace(year=today.year - 1, month=1, day=1)
+            end = today.replace(year=today.year - 1, month=12, day=31)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "next_year":
+            start = today.replace(year=today.year + 1, month=1, day=1)
+            end = today.replace(year=today.year + 1, month=12, day=31)
+            return date_text(datetime.combine(start, datetime.min.time())), date_text(datetime.combine(end, datetime.min.time()))
+        if normalized_key == "custom":
+            start = resolve_custom(start_value)
+            end = resolve_custom(end_value)
+            if start and end:
+                first, second = (start, end) if start <= end else (end, start)
+                return date_text(first), date_text(second)
+        return None
+
+    @staticmethod
+    def _append_date_range_filter(
+        where_clauses: list[str],
+        params: list[Any],
+        *,
+        column_sql: str,
+        start_value: Any,
+        end_value: Any,
+        cursor: Any,
+    ) -> None:
+        if not str(start_value or "").strip() or not str(end_value or "").strip():
+            return
+        record_storage_mode = MyBetRepository._resolve_record_time_storage_mode(cursor)
+        meta_storage_mode = MyBetRepository._resolve_meta_time_storage_mode(cursor)
+        normalized_start = MyBetRepository._normalize_filter_time_value(
+            beijing_date_start_ts(start_value),
+            record_storage_mode=record_storage_mode,
+            meta_storage_mode=meta_storage_mode,
+        )
+        normalized_end = MyBetRepository._normalize_filter_time_value(
+            beijing_date_end_ts(end_value),
+            record_storage_mode=record_storage_mode,
+            meta_storage_mode=meta_storage_mode,
+        )
+        where_clauses.append(f"({column_sql} >= ? AND {column_sql} <= ?)")
+        params.extend([normalized_start, normalized_end])
+
+    @staticmethod
+    def _append_date_field_filter(
+        where_clauses: list[str],
+        params: list[Any],
+        *,
+        column_sql: str,
+        value: Any,
+        start_value: Any,
+        end_value: Any,
+        operator: str,
+        dynamic_key: Any,
+        dynamic_start: Any,
+        dynamic_end: Any,
+        cursor: Any,
+    ) -> None:
+        normalized_operator = str(operator or "eq").strip().lower()
+        if normalized_operator == "range":
+            MyBetRepository._append_date_range_filter(where_clauses, params, column_sql=column_sql, start_value=start_value, end_value=end_value, cursor=cursor)
+            return
+        if normalized_operator == "dynamic":
+            dynamic_range = MyBetRepository._resolve_dynamic_date_range(dynamic_key, start_value=dynamic_start, end_value=dynamic_end)
+            if dynamic_range:
+                MyBetRepository._append_date_range_filter(where_clauses, params, column_sql=column_sql, start_value=dynamic_range[0], end_value=dynamic_range[1], cursor=cursor)
+            return
+        MyBetRepository._append_date_filter(where_clauses, params, column_sql=column_sql, value=value, operator=normalized_operator, cursor=cursor)
 
     def list_records(
         self,
@@ -230,11 +391,39 @@ class MyBetRepository:
             operator=str(normalized_filters.get("date_end_operator") or "lte"),
             cursor=cursor,
         )
+        MyBetRepository._append_date_field_filter(
+            where_clauses,
+            params,
+            column_sql="COALESCE(meta.ticket_purchased_at, record.created_at)",
+            value=normalized_filters.get("ticket_time_value"),
+            start_value=normalized_filters.get("ticket_time_start"),
+            end_value=normalized_filters.get("ticket_time_end"),
+            operator=str(normalized_filters.get("ticket_time_operator") or "eq"),
+            dynamic_key=normalized_filters.get("ticket_time_dynamic"),
+            dynamic_start=normalized_filters.get("ticket_time_dynamic_start"),
+            dynamic_end=normalized_filters.get("ticket_time_dynamic_end"),
+            cursor=cursor,
+        )
+        MyBetRepository._append_date_field_filter(
+            where_clauses,
+            params,
+            column_sql="record.created_at",
+            value=normalized_filters.get("created_time_value"),
+            start_value=normalized_filters.get("created_time_start"),
+            end_value=normalized_filters.get("created_time_end"),
+            operator=str(normalized_filters.get("created_time_operator") or "eq"),
+            dynamic_key=normalized_filters.get("created_time_dynamic"),
+            dynamic_start=normalized_filters.get("created_time_dynamic_start"),
+            dynamic_end=normalized_filters.get("created_time_dynamic_end"),
+            cursor=cursor,
+        )
 
         return " AND ".join(where_clauses), params
 
     @staticmethod
     def _normalize_filter_time_value(value: Any, *, record_storage_mode: str, meta_storage_mode: str) -> int | str:
+        if value is None:
+            return ""
         if record_storage_mode == "epoch" and meta_storage_mode == "epoch":
             return int(value)
         return format_beijing_datetime(value, with_seconds=True) or int(value)

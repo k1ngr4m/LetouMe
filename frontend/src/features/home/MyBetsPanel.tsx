@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Coins, Eye, FilterX, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { Calendar, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Clock3, Coins, Eye, FilterX, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
@@ -75,7 +75,25 @@ type MyBetsTextOperator = MyBetTextFilterOperator
 type MyBetsEnumOperator = MyBetEnumFilterOperator
 type MyBetsDateOperator = MyBetDateFilterOperator
 
-type MyBetsFilterFieldKey = 'period' | 'play_type' | 'settlement_status' | 'date_start' | 'date_end'
+type MyBetsFilterFieldKey = 'period' | 'play_type' | 'settlement_status' | 'ticket_time' | 'created_time'
+type MyBetsDateFilterKey = 'ticket_time' | 'created_time'
+type MyBetsDynamicDateValue = 'today' | 'yesterday' | 'tomorrow' | 'this_week' | 'last_week' | 'next_week' | 'this_month' | 'last_month' | 'next_month' | 'this_quarter' | 'last_quarter' | 'next_quarter' | 'first_half' | 'second_half' | 'this_year' | 'last_year' | 'next_year' | 'custom'
+
+type MyBetsDateFilterState = {
+  operator: MyBetsDateOperator
+  value: string
+  rangeStart: string
+  rangeEnd: string
+  dynamicValue: MyBetsDynamicDateValue
+  dynamicStart: string
+  dynamicEnd: string
+}
+
+type MyBetsDynamicCustomParts = {
+  direction: 'current' | 'past' | 'future'
+  amount: string
+  unit: 'day' | 'week' | 'month'
+}
 
 const MY_BETS_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 200] as const
 const MY_BETS_COMPACT_VIEWPORT_WIDTH = 760
@@ -83,8 +101,8 @@ const DEFAULT_MY_BETS_FILTER_OPERATORS = {
   period: 'contains' as MyBetsTextOperator,
   playType: 'eq' as MyBetsEnumOperator,
   settlementStatus: 'eq' as MyBetsEnumOperator,
-  dateStart: 'gte' as MyBetsDateOperator,
-  dateEnd: 'lte' as MyBetsDateOperator,
+  ticketTime: 'eq' as MyBetsDateOperator,
+  createdTime: 'eq' as MyBetsDateOperator,
 }
 const TEXT_FILTER_OPERATORS: Array<{ value: MyBetTextFilterOperator; label: string; symbol: string }> = [
   { value: 'contains', label: '包含', symbol: '∋' },
@@ -102,13 +120,50 @@ const ENUM_FILTER_OPERATORS: Array<{ value: MyBetEnumFilterOperator; label: stri
 const DATE_FILTER_OPERATORS: Array<{ value: MyBetDateFilterOperator; label: string; symbol: string }> = [
   { value: 'eq', label: '等于', symbol: '=' },
   { value: 'ne', label: '不等于', symbol: '!=' },
-  { value: 'gt', label: '晚于', symbol: '>' },
-  { value: 'gte', label: '晚于或等于', symbol: '>=' },
-  { value: 'lt', label: '早于', symbol: '<' },
-  { value: 'lte', label: '早于或等于', symbol: '<=' },
+  { value: 'gt', label: '大于', symbol: '>' },
+  { value: 'gte', label: '大于等于', symbol: '>=' },
+  { value: 'lt', label: '小于', symbol: '<' },
+  { value: 'lte', label: '小于等于', symbol: '<=' },
   { value: 'empty', label: '为空', symbol: '∅' },
   { value: 'not_empty', label: '不为空', symbol: '≠∅' },
+  { value: 'range', label: '选择范围', symbol: '~' },
+  { value: 'dynamic', label: '动态值', symbol: '◷' },
 ]
+
+const DYNAMIC_DATE_OPTIONS: Array<{ value: MyBetsDynamicDateValue; label: string }> = [
+  { value: 'today', label: '今日' },
+  { value: 'yesterday', label: '昨日' },
+  { value: 'tomorrow', label: '明天' },
+  { value: 'this_week', label: '本周' },
+  { value: 'last_week', label: '上周' },
+  { value: 'next_week', label: '下周' },
+  { value: 'this_month', label: '本月' },
+  { value: 'last_month', label: '上月' },
+  { value: 'next_month', label: '下月' },
+  { value: 'this_quarter', label: '本季度' },
+  { value: 'last_quarter', label: '上季度' },
+  { value: 'next_quarter', label: '下季度' },
+  { value: 'first_half', label: '上半年' },
+  { value: 'second_half', label: '下半年' },
+  { value: 'this_year', label: '今年' },
+  { value: 'last_year', label: '去年' },
+  { value: 'next_year', label: '明年' },
+  { value: 'custom', label: '自定义' },
+]
+
+const DEFAULT_DYNAMIC_DATE_VALUE: MyBetsDynamicDateValue = 'today'
+
+function createDefaultDateFilterState(operator: MyBetsDateOperator): MyBetsDateFilterState {
+  return {
+    operator,
+    value: '',
+    rangeStart: '',
+    rangeEnd: '',
+    dynamicValue: DEFAULT_DYNAMIC_DATE_VALUE,
+    dynamicStart: '',
+    dynamicEnd: '',
+  }
+}
 
 type LineQuote = {
   betCount: number
@@ -179,8 +234,347 @@ function MyBetsFilterOperatorMenu<T extends string>({
   )
 }
 
+type MyBetsCalendarPanelProps = {
+  mode: 'single' | 'range'
+  value?: string
+  rangeStart?: string
+  rangeEnd?: string
+  onSelectDate?: (value: string) => void
+  onSelectRange?: (start: string, end: string) => void
+}
+
+function MyBetsCalendarPanel({
+  mode,
+  value = '',
+  rangeStart = '',
+  rangeEnd = '',
+  onSelectDate,
+  onSelectRange,
+}: MyBetsCalendarPanelProps) {
+  const initialDate = parseDateKey(rangeStart || value) || new Date()
+  const [visibleMonth, setVisibleMonth] = useState(() => ({ year: initialDate.getFullYear(), month: initialDate.getMonth() + 1 }))
+  const leftCells = buildCalendarCells(visibleMonth.year, visibleMonth.month)
+  const rightMonth = shiftMonth(visibleMonth, 1)
+  const rightCells = buildCalendarCells(rightMonth.year, rightMonth.month)
+  const selectedKey = value
+
+  const renderMonth = (monthInfo: { year: number; month: number }, cells: ReturnType<typeof buildCalendarCells>) => (
+    <div className="my-bets-date-calendar__month">
+      <div className="my-bets-date-calendar__title">{`${monthInfo.year} 年 ${monthInfo.month} 月`}</div>
+      <div className="my-bets-date-calendar__weekdays" aria-hidden="true">
+        {['日', '一', '二', '三', '四', '五', '六'].map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+      <div className="my-bets-date-calendar__grid">
+        {cells.map((cell) => {
+          const isSelected = mode === 'single' ? selectedKey === cell.dateKey : cell.dateKey === rangeStart || cell.dateKey === rangeEnd
+          const isInRange = mode === 'range' && isDateKeyBetween(cell.dateKey, rangeStart, rangeEnd)
+          return (
+            <button
+              key={cell.dateKey}
+              type="button"
+              className={clsx(
+                'my-bets-date-calendar__day',
+                !cell.inCurrentMonth && 'is-outside',
+                cell.isToday && 'is-today',
+                isSelected && 'is-selected',
+                isInRange && 'is-in-range',
+              )}
+              onClick={() => {
+                if (mode === 'single') {
+                  onSelectDate?.(cell.dateKey)
+                  return
+                }
+                if (!rangeStart || (rangeStart && rangeEnd)) {
+                  onSelectRange?.(cell.dateKey, '')
+                  return
+                }
+                if (cell.dateKey < rangeStart) {
+                  onSelectRange?.(cell.dateKey, rangeStart)
+                  return
+                }
+                onSelectRange?.(rangeStart, cell.dateKey)
+              }}
+              aria-label={cell.dateKey}
+            >
+              {cell.day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className={clsx('my-bets-date-calendar', mode === 'range' && 'my-bets-date-calendar--range')}>
+      <div className="my-bets-date-calendar__nav">
+        <button type="button" onClick={() => setVisibleMonth((current) => shiftMonth(current, -12))} aria-label="上一年">
+          <ChevronLeft size={14} aria-hidden="true" />
+          <ChevronLeft size={14} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))} aria-label="上一月">
+          <ChevronLeft size={16} aria-hidden="true" />
+        </button>
+        <span />
+        <button type="button" onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))} aria-label="下一月">
+          <ChevronRight size={16} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => setVisibleMonth((current) => shiftMonth(current, 12))} aria-label="下一年">
+          <ChevronRight size={14} aria-hidden="true" />
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="my-bets-date-calendar__months">
+        {renderMonth(visibleMonth, leftCells)}
+        {mode === 'range' ? renderMonth(rightMonth, rightCells) : null}
+      </div>
+    </div>
+  )
+}
+
+type MyBetsDateFilterControlProps = {
+  label: string
+  fieldKey: MyBetsDateFilterKey
+  state: MyBetsDateFilterState
+  isOperatorOpen: boolean
+  isValueOpen: boolean
+  onToggleOperator: (fieldKey: MyBetsDateFilterKey) => void
+  onCloseOperator: () => void
+  onToggleValue: (fieldKey: MyBetsDateFilterKey) => void
+  onChange: (next: MyBetsDateFilterState) => void
+}
+
+function MyBetsDateFilterControl({
+  label,
+  fieldKey,
+  state,
+  isOperatorOpen,
+  isValueOpen,
+  onToggleOperator,
+  onCloseOperator,
+  onToggleValue,
+  onChange,
+}: MyBetsDateFilterControlProps) {
+  const displayValue = getDateFilterDisplayValue(state)
+  const showValueButton = !isEmptyOperator(state.operator)
+  const isCalendarMode = state.operator === 'range' || (!isEmptyOperator(state.operator) && state.operator !== 'dynamic')
+  const customStart = parseDynamicCustomValue(state.dynamicStart || 'current:1:day')
+  const customEnd = parseDynamicCustomValue(state.dynamicEnd || 'current:1:day')
+  const updateCustomPart = (target: 'start' | 'end', partial: Partial<MyBetsDynamicCustomParts>) => {
+    const current = target === 'start' ? customStart : customEnd
+    const nextValue = formatDynamicCustomValue({ ...current, ...partial })
+    onChange(target === 'start' ? { ...state, dynamicStart: nextValue } : { ...state, dynamicEnd: nextValue })
+  }
+
+  return (
+    <label className="my-bets-filter-field my-bets-date-filter-field">
+      <span>{label}</span>
+      <div className="my-bets-date-filter">
+        <MyBetsFilterOperatorMenu
+          fieldLabel={label}
+          fieldKey={fieldKey}
+          operator={state.operator}
+          options={DATE_FILTER_OPERATORS}
+          isOpen={isOperatorOpen}
+          onToggleOpen={(key) => onToggleOperator(key as MyBetsDateFilterKey)}
+          onClose={onCloseOperator}
+          onChange={(operator) =>
+            onChange({
+              ...state,
+              operator,
+            })
+          }
+        />
+        {showValueButton ? (
+          <button
+            type="button"
+            className={clsx('my-bets-date-filter__value', isValueOpen && 'is-active')}
+            onClick={() => onToggleValue(fieldKey)}
+            aria-label={`${label}筛选值`}
+          >
+            {state.operator === 'dynamic' ? <Clock3 size={15} aria-hidden="true" /> : <Calendar size={15} aria-hidden="true" />}
+            <span>{displayValue || (state.operator === 'range' ? '选择范围' : state.operator === 'dynamic' ? '请选择' : '选择日期')}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+        ) : null}
+        {isValueOpen && showValueButton ? (
+          <div className={clsx('my-bets-date-popover', state.operator === 'range' && 'my-bets-date-popover--range', state.operator === 'dynamic' && 'my-bets-date-popover--dynamic')}>
+            {isCalendarMode ? (
+              <MyBetsCalendarPanel
+                mode={state.operator === 'range' ? 'range' : 'single'}
+                value={state.value}
+                rangeStart={state.rangeStart}
+                rangeEnd={state.rangeEnd}
+                onSelectDate={(value) => onChange({ ...state, value })}
+                onSelectRange={(rangeStart, rangeEnd) => onChange({ ...state, rangeStart, rangeEnd })}
+              />
+            ) : (
+              <div className="my-bets-date-dynamic">
+                <div className="my-bets-date-dynamic__options" role="menu" aria-label={`${label}动态值`}>
+                  {DYNAMIC_DATE_OPTIONS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      className={clsx('my-bets-date-dynamic__item', state.dynamicValue === item.value && 'is-active')}
+                      onClick={() => onChange({ ...state, dynamicValue: item.value })}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                {state.dynamicValue === 'custom' ? (
+                  <div className="my-bets-date-dynamic__custom">
+                    <span>自定义</span>
+                    <div className="my-bets-date-dynamic__custom-inputs">
+                      <label>
+                        <span>开始</span>
+                        <select value={customStart.direction} onChange={(event) => updateCustomPart('start', { direction: event.target.value as MyBetsDynamicCustomParts['direction'] })}>
+                          <option value="current">当前</option>
+                          <option value="past">过去</option>
+                          <option value="future">未来</option>
+                        </select>
+                        <input type="number" min="0" value={customStart.amount} onChange={(event) => updateCustomPart('start', { amount: event.target.value.replace(/[^\d]/g, '') })} />
+                        <select value={customStart.unit} onChange={(event) => updateCustomPart('start', { unit: event.target.value as MyBetsDynamicCustomParts['unit'] })}>
+                          <option value="day">天</option>
+                          <option value="week">周</option>
+                          <option value="month">月</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>结束</span>
+                        <select value={customEnd.direction} onChange={(event) => updateCustomPart('end', { direction: event.target.value as MyBetsDynamicCustomParts['direction'] })}>
+                          <option value="current">当前</option>
+                          <option value="past">过去</option>
+                          <option value="future">未来</option>
+                        </select>
+                        <input type="number" min="0" value={customEnd.amount} onChange={(event) => updateCustomPart('end', { amount: event.target.value.replace(/[^\d]/g, '') })} />
+                        <select value={customEnd.unit} onChange={(event) => updateCustomPart('end', { unit: event.target.value as MyBetsDynamicCustomParts['unit'] })}>
+                          <option value="day">天</option>
+                          <option value="week">周</option>
+                          <option value="month">月</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </label>
+  )
+}
+
 function isEmptyOperator(operator: string) {
   return operator === 'empty' || operator === 'not_empty'
+}
+
+function parseDateKey(value: string) {
+  const [year, month, day] = value.split('-').map((part) => Number(part))
+  if (!year || !month || !day) return null
+  const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function shiftMonth(month: { year: number; month: number }, delta: number) {
+  const date = new Date(month.year, month.month - 1 + delta, 1)
+  return { year: date.getFullYear(), month: date.getMonth() + 1 }
+}
+
+function buildCalendarCells(year: number, month: number) {
+  const first = new Date(year, month - 1, 1)
+  const start = new Date(year, month - 1, 1 - first.getDay())
+  const todayKey = formatDateKey(new Date())
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    return {
+      date,
+      dateKey: formatDateKey(date),
+      day: date.getDate(),
+      inCurrentMonth: date.getMonth() === month - 1,
+      isToday: formatDateKey(date) === todayKey,
+    }
+  })
+}
+
+function isDateKeyBetween(dateKey: string, startKey: string, endKey: string) {
+  if (!startKey || !endKey) return false
+  const min = startKey <= endKey ? startKey : endKey
+  const max = startKey <= endKey ? endKey : startKey
+  return dateKey >= min && dateKey <= max
+}
+
+function getDateFilterDisplayValue(state: MyBetsDateFilterState) {
+  if (isEmptyOperator(state.operator)) return ''
+  if (state.operator === 'range') {
+    if (state.rangeStart && state.rangeEnd) return `${state.rangeStart} 至 ${state.rangeEnd}`
+    if (state.rangeStart) return `${state.rangeStart} 至`
+    if (state.rangeEnd) return `至 ${state.rangeEnd}`
+    return ''
+  }
+  if (state.operator === 'dynamic') {
+    const option = DYNAMIC_DATE_OPTIONS.find((item) => item.value === state.dynamicValue)
+    if (state.dynamicValue === 'custom' && state.dynamicStart && state.dynamicEnd) {
+      return `${getDynamicCustomLabel(state.dynamicStart)} ~ ${getDynamicCustomLabel(state.dynamicEnd)}`
+    }
+    return option?.label || ''
+  }
+  return state.value
+}
+
+function hasActiveDateFilter(state: MyBetsDateFilterState, defaultOperator: MyBetsDateOperator) {
+  if (state.operator !== defaultOperator) return true
+  return Boolean(state.value || state.rangeStart || state.rangeEnd || state.dynamicStart || state.dynamicEnd || state.dynamicValue !== DEFAULT_DYNAMIC_DATE_VALUE)
+}
+
+function toDateFilterPayload(state: MyBetsDateFilterState) {
+  if (state.operator === 'range') {
+    return {
+      operator: state.operator,
+      start: state.rangeStart || undefined,
+      end: state.rangeEnd || undefined,
+    }
+  }
+  if (state.operator === 'dynamic') {
+    return {
+      operator: state.operator,
+      dynamic: state.dynamicValue,
+      dynamicStart: state.dynamicValue === 'custom' ? state.dynamicStart || undefined : undefined,
+      dynamicEnd: state.dynamicValue === 'custom' ? state.dynamicEnd || undefined : undefined,
+    }
+  }
+  return {
+    operator: state.operator,
+    value: !isEmptyOperator(state.operator) ? state.value || undefined : undefined,
+  }
+}
+
+function parseDynamicCustomValue(value: string): MyBetsDynamicCustomParts {
+  const [direction, amount, unit] = value.split(':')
+  return {
+    direction: direction === 'past' || direction === 'future' ? direction : 'current',
+    amount: amount && /^\d+$/.test(amount) ? amount : '1',
+    unit: unit === 'week' || unit === 'month' ? unit : 'day',
+  }
+}
+
+function formatDynamicCustomValue(parts: MyBetsDynamicCustomParts) {
+  return `${parts.direction}:${parts.amount || '0'}:${parts.unit}`
+}
+
+function getDynamicCustomLabel(value: string) {
+  const parts = parseDynamicCustomValue(value)
+  const directionLabel = parts.direction === 'past' ? '过去' : parts.direction === 'future' ? '未来' : '当前'
+  const unitLabel = parts.unit === 'week' ? '周' : parts.unit === 'month' ? '月' : '天'
+  return `${directionLabel}${parts.amount}${unitLabel}`
 }
 
 function getInitialMyBetsDisplayMode(): MyBetsDisplayMode {
@@ -1004,11 +1398,10 @@ export function MyBetsPanel({
   const [playTypeFilterOperator, setPlayTypeFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
   const [settlementStatusFilter, setSettlementStatusFilter] = useState<MyBetsSettlementFilter>('all')
   const [settlementStatusFilterOperator, setSettlementStatusFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
-  const [dateStartFilter, setDateStartFilter] = useState('')
-  const [dateStartFilterOperator, setDateStartFilterOperator] = useState<MyBetsDateOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart)
-  const [dateEndFilter, setDateEndFilter] = useState('')
-  const [dateEndFilterOperator, setDateEndFilterOperator] = useState<MyBetsDateOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd)
+  const [ticketTimeFilter, setTicketTimeFilter] = useState<MyBetsDateFilterState>(() => createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime))
+  const [createdTimeFilter, setCreatedTimeFilter] = useState<MyBetsDateFilterState>(() => createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime))
   const [activeFilterOperatorMenu, setActiveFilterOperatorMenu] = useState<MyBetsFilterFieldKey | null>(null)
+  const [activeDateFilterPopover, setActiveDateFilterPopover] = useState<MyBetsDateFilterKey | null>(null)
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [selectedDetailRecord, setSelectedDetailRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -1041,6 +1434,8 @@ export function MyBetsPanel({
   const normalizedPeriodQuery = periodQuery.trim()
   const normalizedPlayTypeFilter = playTypeFilter === 'all' ? '' : playTypeFilter
   const normalizedSettlementStatusFilter = settlementStatusFilter === 'all' ? '' : settlementStatusFilter
+  const ticketTimePayload = useMemo(() => toDateFilterPayload(ticketTimeFilter), [ticketTimeFilter])
+  const createdTimePayload = useMemo(() => toDateFilterPayload(createdTimeFilter), [createdTimeFilter])
   const hasActiveFilters = Boolean(
     normalizedPeriodQuery ||
       periodQueryOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.period ||
@@ -1048,10 +1443,8 @@ export function MyBetsPanel({
       playTypeFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.playType ||
       normalizedSettlementStatusFilter ||
       settlementStatusFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus ||
-      dateStartFilter ||
-      dateStartFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart ||
-      dateEndFilter ||
-      dateEndFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd,
+      hasActiveDateFilter(ticketTimeFilter, DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime) ||
+      hasActiveDateFilter(createdTimeFilter, DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime),
   )
   const recordsOffset = (recordsPage - 1) * recordsPageSize
   const betsQuery = useQuery({
@@ -1066,10 +1459,8 @@ export function MyBetsPanel({
       playTypeFilterOperator,
       settlementStatusFilter,
       settlementStatusFilterOperator,
-      dateStartFilter,
-      dateStartFilterOperator,
-      dateEndFilter,
-      dateEndFilterOperator,
+      ticketTimePayload,
+      createdTimePayload,
     ],
     queryFn: async () =>
       apiClient.getMyBets({
@@ -1082,10 +1473,20 @@ export function MyBetsPanel({
         play_type_filter_operator: playTypeFilterOperator,
         settlement_status_filter: normalizedSettlementStatusFilter || undefined,
         settlement_status_filter_operator: settlementStatusFilterOperator,
-        date_start: dateStartFilter || undefined,
-        date_start_operator: dateStartFilterOperator,
-        date_end: dateEndFilter || undefined,
-        date_end_operator: dateEndFilterOperator,
+        ticket_time_value: ticketTimePayload.value,
+        ticket_time_start: ticketTimePayload.start,
+        ticket_time_end: ticketTimePayload.end,
+        ticket_time_operator: ticketTimePayload.operator,
+        ticket_time_dynamic: ticketTimePayload.dynamic,
+        ticket_time_dynamic_start: ticketTimePayload.dynamicStart,
+        ticket_time_dynamic_end: ticketTimePayload.dynamicEnd,
+        created_time_value: createdTimePayload.value,
+        created_time_start: createdTimePayload.start,
+        created_time_end: createdTimePayload.end,
+        created_time_operator: createdTimePayload.operator,
+        created_time_dynamic: createdTimePayload.dynamic,
+        created_time_dynamic_start: createdTimePayload.dynamicStart,
+        created_time_dynamic_end: createdTimePayload.dynamicEnd,
       }),
   })
 
@@ -1258,6 +1659,27 @@ export function MyBetsPanel({
   }, [activeFilterOperatorMenu])
 
   useEffect(() => {
+    if (!activeDateFilterPopover) return
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('.my-bets-date-filter')) return
+      setActiveDateFilterPopover(null)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveDateFilterPopover(null)
+      }
+    }
+    window.addEventListener('click', handleDocumentClick)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('click', handleDocumentClick)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [activeDateFilterPopover])
+
+  useEffect(() => {
     if (!betsQuery.data) return
     setRecordsPage((currentPage) => Math.min(currentPage, totalRecordPages))
   }, [betsQuery.data, totalRecordPages])
@@ -1271,10 +1693,8 @@ export function MyBetsPanel({
     playTypeFilterOperator,
     normalizedSettlementStatusFilter,
     settlementStatusFilterOperator,
-    dateStartFilter,
-    dateStartFilterOperator,
-    dateEndFilter,
-    dateEndFilterOperator,
+    ticketTimePayload,
+    createdTimePayload,
   ])
 
   useEffect(() => {
@@ -1490,11 +1910,10 @@ export function MyBetsPanel({
     setPlayTypeFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
     setSettlementStatusFilter('all')
     setSettlementStatusFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
-    setDateStartFilter('')
-    setDateStartFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart)
-    setDateEndFilter('')
-    setDateEndFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd)
+    setTicketTimeFilter(createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime))
+    setCreatedTimeFilter(createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime))
     setActiveFilterOperatorMenu(null)
+    setActiveDateFilterPopover(null)
     setRecordsPage(1)
   }
 
@@ -1675,52 +2094,40 @@ export function MyBetsPanel({
                   ) : null}
                 </div>
               </label>
-              <label className="my-bets-filter-field">
-                <span>开始日期</span>
-                <div className="my-bets-filter-field__controls">
-                  <MyBetsFilterOperatorMenu
-                    fieldLabel="开始日期"
-                    fieldKey="date_start"
-                    operator={dateStartFilterOperator}
-                    options={DATE_FILTER_OPERATORS}
-                    isOpen={activeFilterOperatorMenu === 'date_start'}
-                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
-                    onClose={() => setActiveFilterOperatorMenu(null)}
-                    onChange={setDateStartFilterOperator}
-                  />
-                  {!isEmptyOperator(dateStartFilterOperator) ? (
-                    <input
-                      type="date"
-                      value={dateStartFilter}
-                      onChange={(event) => setDateStartFilter(event.target.value)}
-                      aria-label="筛选开始日期"
-                    />
-                  ) : null}
-                </div>
-              </label>
-              <label className="my-bets-filter-field">
-                <span>结束日期</span>
-                <div className="my-bets-filter-field__controls">
-                  <MyBetsFilterOperatorMenu
-                    fieldLabel="结束日期"
-                    fieldKey="date_end"
-                    operator={dateEndFilterOperator}
-                    options={DATE_FILTER_OPERATORS}
-                    isOpen={activeFilterOperatorMenu === 'date_end'}
-                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
-                    onClose={() => setActiveFilterOperatorMenu(null)}
-                    onChange={setDateEndFilterOperator}
-                  />
-                  {!isEmptyOperator(dateEndFilterOperator) ? (
-                    <input
-                      type="date"
-                      value={dateEndFilter}
-                      onChange={(event) => setDateEndFilter(event.target.value)}
-                      aria-label="筛选结束日期"
-                    />
-                  ) : null}
-                </div>
-              </label>
+              <MyBetsDateFilterControl
+                label="投注时间"
+                fieldKey="ticket_time"
+                state={ticketTimeFilter}
+                isOperatorOpen={activeFilterOperatorMenu === 'ticket_time'}
+                isValueOpen={activeDateFilterPopover === 'ticket_time'}
+                onToggleOperator={(fieldKey) => {
+                  setActiveDateFilterPopover(null)
+                  setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))
+                }}
+                onCloseOperator={() => setActiveFilterOperatorMenu(null)}
+                onToggleValue={(fieldKey) => {
+                  setActiveFilterOperatorMenu(null)
+                  setActiveDateFilterPopover((current) => (current === fieldKey ? null : fieldKey))
+                }}
+                onChange={setTicketTimeFilter}
+              />
+              <MyBetsDateFilterControl
+                label="创建时间"
+                fieldKey="created_time"
+                state={createdTimeFilter}
+                isOperatorOpen={activeFilterOperatorMenu === 'created_time'}
+                isValueOpen={activeDateFilterPopover === 'created_time'}
+                onToggleOperator={(fieldKey) => {
+                  setActiveDateFilterPopover(null)
+                  setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))
+                }}
+                onCloseOperator={() => setActiveFilterOperatorMenu(null)}
+                onToggleValue={(fieldKey) => {
+                  setActiveFilterOperatorMenu(null)
+                  setActiveDateFilterPopover((current) => (current === fieldKey ? null : fieldKey))
+                }}
+                onChange={setCreatedTimeFilter}
+              />
               <button
                 className="ghost-button ghost-button--compact my-bets-filter-clear"
                 type="button"

@@ -278,9 +278,23 @@ class MyBetRecordListPayload(BaseModel):
     settlement_status_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
     source_type_filter: Literal["all", "manual", "ocr"] = "all"
     date_start: str | None = None
-    date_start_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty"] = "gte"
+    date_start_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty", "range", "dynamic"] = "gte"
     date_end: str | None = None
-    date_end_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty"] = "lte"
+    date_end_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty", "range", "dynamic"] = "lte"
+    ticket_time_value: str | None = None
+    ticket_time_start: str | None = None
+    ticket_time_end: str | None = None
+    ticket_time_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty", "range", "dynamic"] = "eq"
+    ticket_time_dynamic: str | None = None
+    ticket_time_dynamic_start: str | None = None
+    ticket_time_dynamic_end: str | None = None
+    created_time_value: str | None = None
+    created_time_start: str | None = None
+    created_time_end: str | None = None
+    created_time_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty", "range", "dynamic"] = "eq"
+    created_time_dynamic: str | None = None
+    created_time_dynamic_start: str | None = None
+    created_time_dynamic_end: str | None = None
 
 
 class MyBetLinePayload(BaseModel):

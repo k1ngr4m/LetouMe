@@ -1026,6 +1026,7 @@ a {
 }
 
 :root[data-theme='light'] .my-bets-filter-operator-button,
+:root[data-theme='light'] .my-bets-date-filter__value,
 :root[data-theme='light'] .my-bets-filter-field input,
 :root[data-theme='light'] .my-bets-filter-field select {
   border-color: rgba(132, 153, 184, 0.26);
@@ -1035,6 +1036,8 @@ a {
 }
 
 :root[data-theme='light'] .my-bets-filter-operator-button:hover,
+:root[data-theme='light'] .my-bets-date-filter__value:hover,
+:root[data-theme='light'] .my-bets-date-filter__value.is-active,
 :root[data-theme='light'] .my-bets-filter-field input:hover,
 :root[data-theme='light'] .my-bets-filter-field select:hover {
   border-color: rgba(232, 139, 66, 0.42);
@@ -1060,6 +1063,39 @@ a {
   box-shadow:
     0 18px 38px rgba(88, 110, 145, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+:root[data-theme='light'] .my-bets-date-popover {
+  border-color: rgba(132, 153, 184, 0.24);
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow:
+    0 22px 46px rgba(88, 110, 145, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+:root[data-theme='light'] .my-bets-date-popover::before {
+  border-color: rgba(132, 153, 184, 0.24);
+}
+
+:root[data-theme='light'] .my-bets-date-calendar__nav button:hover,
+:root[data-theme='light'] .my-bets-date-calendar__day:hover,
+:root[data-theme='light'] .my-bets-date-dynamic__item:hover,
+:root[data-theme='light'] .my-bets-date-dynamic__item.is-active {
+  background: rgba(242, 246, 252, 0.96);
+}
+
+:root[data-theme='light'] .my-bets-date-calendar__month + .my-bets-date-calendar__month,
+:root[data-theme='light'] .my-bets-date-calendar__weekdays,
+:root[data-theme='light'] .my-bets-date-dynamic__custom {
+  border-color: rgba(132, 153, 184, 0.18);
+}
+
+:root[data-theme='light'] .my-bets-date-calendar__day.is-in-range {
+  background: rgba(214, 225, 243, 0.72);
+}
+
+:root[data-theme='light'] .my-bets-date-calendar__day.is-outside {
+  color: rgba(117, 134, 163, 0.48);
 }
 
 :root[data-theme='light'] .my-bets-filter-operator-menu__item {

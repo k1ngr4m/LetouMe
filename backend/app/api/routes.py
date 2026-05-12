@@ -567,6 +567,20 @@ def list_my_bets(payload: MyBetRecordListPayload, current_user: dict = Depends(r
         date_start_operator=payload.date_start_operator,
         date_end=payload.date_end,
         date_end_operator=payload.date_end_operator,
+        ticket_time_value=payload.ticket_time_value,
+        ticket_time_start=payload.ticket_time_start,
+        ticket_time_end=payload.ticket_time_end,
+        ticket_time_operator=payload.ticket_time_operator,
+        ticket_time_dynamic=payload.ticket_time_dynamic,
+        ticket_time_dynamic_start=payload.ticket_time_dynamic_start,
+        ticket_time_dynamic_end=payload.ticket_time_dynamic_end,
+        created_time_value=payload.created_time_value,
+        created_time_start=payload.created_time_start,
+        created_time_end=payload.created_time_end,
+        created_time_operator=payload.created_time_operator,
+        created_time_dynamic=payload.created_time_dynamic,
+        created_time_dynamic_start=payload.created_time_dynamic_start,
+        created_time_dynamic_end=payload.created_time_dynamic_end,
     )
 
 

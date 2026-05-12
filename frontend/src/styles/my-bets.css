@@ -207,7 +207,7 @@
 
 .my-bets-filter-panel {
   display: grid;
-  grid-template-columns: minmax(9rem, 1.1fr) minmax(8rem, 1fr) minmax(8rem, 0.9fr) minmax(8rem, 0.9fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
+  grid-template-columns: minmax(9rem, 0.95fr) minmax(8rem, 0.86fr) minmax(8rem, 0.82fr) minmax(14rem, 1.16fr) minmax(14rem, 1.16fr) auto;
   gap: 0.5rem;
   align-items: end;
   padding: 0.56rem;
@@ -325,6 +325,255 @@
   width: 1.3rem;
   color: #f9d79b;
   flex: 0 0 auto;
+}
+
+.my-bets-date-filter-field {
+  position: relative;
+}
+
+.my-bets-date-filter {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+}
+
+.my-bets-date-filter .my-bets-filter-operator-button {
+  border-radius: 0.62rem 0 0 0.62rem;
+}
+
+.my-bets-date-filter__value {
+  height: 2.22rem;
+  min-width: 0;
+  padding: 0 0.64rem;
+  border: 1px solid rgba(139, 164, 202, 0.2);
+  border-left: 0;
+  border-radius: 0 0.62rem 0.62rem 0;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  font-weight: 780;
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.my-bets-date-filter__value span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-bets-date-filter__value svg:last-child {
+  margin-left: auto;
+  opacity: 0.74;
+}
+
+.my-bets-date-filter__value:hover,
+.my-bets-date-filter__value.is-active {
+  border-color: rgba(255, 169, 77, 0.48);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.my-bets-date-popover {
+  position: absolute;
+  top: calc(100% + 0.48rem);
+  left: 0;
+  z-index: 18;
+  min-width: min(23rem, calc(100vw - 2rem));
+  border: 1px solid rgba(139, 164, 202, 0.2);
+  border-radius: 0.95rem;
+  background: rgba(10, 16, 27, 0.98);
+  box-shadow: 0 24px 54px rgba(2, 7, 15, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.my-bets-date-popover::before {
+  content: '';
+  position: absolute;
+  top: -0.45rem;
+  left: 4.6rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-left: 1px solid rgba(139, 164, 202, 0.2);
+  border-top: 1px solid rgba(139, 164, 202, 0.2);
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.my-bets-date-popover--range {
+  min-width: min(44rem, calc(100vw - 2rem));
+}
+
+.my-bets-date-calendar {
+  position: relative;
+  padding: 1rem;
+}
+
+.my-bets-date-calendar__nav {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.7rem;
+}
+
+.my-bets-date-calendar__nav button {
+  height: 1.9rem;
+  min-width: 1.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.my-bets-date-calendar__nav button:hover {
+  color: #f1b24c;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.my-bets-date-calendar__months {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.my-bets-date-calendar--range .my-bets-date-calendar__months {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.my-bets-date-calendar__month + .my-bets-date-calendar__month {
+  border-left: 1px solid rgba(139, 164, 202, 0.14);
+  padding-left: 1rem;
+}
+
+.my-bets-date-calendar__title {
+  margin-bottom: 0.7rem;
+  text-align: center;
+  color: var(--text-1);
+  font-size: 1.1rem;
+  font-weight: 850;
+}
+
+.my-bets-date-calendar__weekdays,
+.my-bets-date-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+
+.my-bets-date-calendar__weekdays {
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.38rem;
+  border-bottom: 1px solid rgba(139, 164, 202, 0.14);
+  color: var(--text-2);
+  font-weight: 780;
+  text-align: center;
+}
+
+.my-bets-date-calendar__day {
+  height: 2.15rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 740;
+  cursor: pointer;
+}
+
+.my-bets-date-calendar__day:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.my-bets-date-calendar__day.is-outside {
+  color: color-mix(in srgb, var(--text-2) 55%, transparent);
+}
+
+.my-bets-date-calendar__day.is-today {
+  color: #ffb05e;
+}
+
+.my-bets-date-calendar__day.is-in-range {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.my-bets-date-calendar__day.is-selected {
+  color: #fff;
+  background: linear-gradient(135deg, #ee7a3f, #f4ae46);
+  box-shadow: 0 8px 18px rgba(238, 122, 63, 0.22);
+}
+
+.my-bets-date-dynamic {
+  position: relative;
+  min-width: 18rem;
+  max-width: min(26rem, calc(100vw - 2rem));
+}
+
+.my-bets-date-dynamic__options {
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.42rem;
+}
+
+.my-bets-date-dynamic__item {
+  width: 100%;
+  min-height: 2.45rem;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 0.58rem;
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 780;
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-bets-date-dynamic__item:hover,
+.my-bets-date-dynamic__item.is-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.my-bets-date-dynamic__custom {
+  display: grid;
+  gap: 0.62rem;
+  padding: 0.78rem;
+  border-top: 1px solid rgba(139, 164, 202, 0.14);
+}
+
+.my-bets-date-dynamic__custom > span {
+  color: var(--text-2);
+  font-weight: 800;
+}
+
+.my-bets-date-dynamic__custom-inputs {
+  display: grid;
+  gap: 0.56rem;
+}
+
+.my-bets-date-dynamic__custom-inputs label {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(4.2rem, 1fr) minmax(3.2rem, 0.7fr) minmax(3.8rem, 0.8fr);
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
+.my-bets-date-dynamic__custom-inputs input,
+.my-bets-date-dynamic__custom-inputs select {
+  height: 2rem;
+  border-radius: 0.54rem;
 }
 
 .my-bets-filter-field input,

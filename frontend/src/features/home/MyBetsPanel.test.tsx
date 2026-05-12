@@ -252,14 +252,21 @@ describe('MyBetsPanel', () => {
     expect(screen.getByRole('button', { name: '期号条件符：包含' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '玩法条件符：等于' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '状态条件符：等于' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '投注时间条件符：等于' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '创建时间条件符：等于' })).toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText('筛选期号'), '2603')
     await userEvent.click(screen.getByRole('button', { name: '期号条件符：包含' }))
     await userEvent.click(screen.getByRole('menuitemradio', { name: '等于' }))
     await userEvent.selectOptions(screen.getByLabelText('筛选玩法'), 'dlt_dantuo')
     await userEvent.selectOptions(screen.getByLabelText('筛选状态'), 'settled')
-    await userEvent.type(screen.getByLabelText('筛选开始日期'), '2026-04-01')
-    await userEvent.type(screen.getByLabelText('筛选结束日期'), '2026-04-30')
+    await userEvent.click(screen.getByRole('button', { name: '投注时间筛选值' }))
+    await userEvent.click(screen.getByRole('button', { name: '2026-05-01' }))
+    await userEvent.click(screen.getByRole('button', { name: '创建时间条件符：等于' }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: '选择范围' }))
+    await userEvent.click(screen.getByRole('button', { name: '创建时间筛选值' }))
+    await userEvent.click(screen.getByRole('button', { name: '2026-05-01' }))
+    await userEvent.click(screen.getByRole('button', { name: '2026-05-30' }))
 
     await waitFor(() =>
       expect(getMyBets).toHaveBeenLastCalledWith({
@@ -272,10 +279,20 @@ describe('MyBetsPanel', () => {
         play_type_filter_operator: 'eq',
         settlement_status_filter: 'settled',
         settlement_status_filter_operator: 'eq',
-        date_start: '2026-04-01',
-        date_start_operator: 'gte',
-        date_end: '2026-04-30',
-        date_end_operator: 'lte',
+        ticket_time_value: '2026-05-01',
+        ticket_time_start: undefined,
+        ticket_time_end: undefined,
+        ticket_time_operator: 'eq',
+        ticket_time_dynamic: undefined,
+        ticket_time_dynamic_start: undefined,
+        ticket_time_dynamic_end: undefined,
+        created_time_value: undefined,
+        created_time_start: '2026-05-01',
+        created_time_end: '2026-05-30',
+        created_time_operator: 'range',
+        created_time_dynamic: undefined,
+        created_time_dynamic_start: undefined,
+        created_time_dynamic_end: undefined,
       }),
     )
   })

@@ -632,6 +632,14 @@ class MyBetServiceTests(unittest.TestCase):
             source_type_filter="ocr",
             date_start="2026-04-01",
             date_end="2026-04-30",
+            ticket_time_value="2026-05-01",
+            ticket_time_operator="eq",
+            created_time_start="2026-05-01",
+            created_time_end="2026-05-31",
+            created_time_operator="range",
+            created_time_dynamic="custom",
+            created_time_dynamic_start="past:7:day",
+            created_time_dynamic_end="current:0:day",
         )
 
         expected_filters = {
@@ -646,6 +654,20 @@ class MyBetServiceTests(unittest.TestCase):
             "date_start_operator": "gte",
             "date_end": "2026-04-30",
             "date_end_operator": "lte",
+            "ticket_time_value": "2026-05-01",
+            "ticket_time_start": None,
+            "ticket_time_end": None,
+            "ticket_time_operator": "eq",
+            "ticket_time_dynamic": "",
+            "ticket_time_dynamic_start": None,
+            "ticket_time_dynamic_end": None,
+            "created_time_value": None,
+            "created_time_start": "2026-05-01",
+            "created_time_end": "2026-05-31",
+            "created_time_operator": "range",
+            "created_time_dynamic": "custom",
+            "created_time_dynamic_start": "past:7:day",
+            "created_time_dynamic_end": "current:0:day",
         }
         self.assertEqual(repository.calls[0]["filters"], expected_filters)
         self.assertEqual(repository.calls[1]["filters"], expected_filters)

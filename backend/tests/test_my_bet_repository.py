@@ -382,6 +382,9 @@ class MyBetRepositoryTests(unittest.TestCase):
                     "source_type_filter": "ocr",
                     "date_start": "2026-04-01",
                     "date_end": "2026-04-30",
+                    "created_time_start": "2026-05-01",
+                    "created_time_end": "2026-05-31",
+                    "created_time_operator": "range",
                 },
             )
 
@@ -392,7 +395,23 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertIn("EXISTS (SELECT 1 FROM draw_issue", list_sql)
         self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?", list_sql)
         self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?", list_sql)
-        self.assertEqual(list_params, (7, "%2603%", "dlt_dantuo", "ocr", "2026-04-01 00:00:00", "2026-04-30 23:59:59", 20, 0))
+        self.assertIn("record.created_at >= ?", list_sql)
+        self.assertIn("record.created_at <= ?", list_sql)
+        self.assertEqual(
+            list_params,
+            (
+                7,
+                "%2603%",
+                "dlt_dantuo",
+                "ocr",
+                "2026-04-01 00:00:00",
+                "2026-04-30 23:59:59",
+                "2026-05-01 00:00:00",
+                "2026-05-31 23:59:59",
+                20,
+                0,
+            ),
+        )
 
     def test_list_records_supports_date_equality_and_empty_filters(self) -> None:
         repository = MyBetRepository()
@@ -439,6 +458,48 @@ class MyBetRepositoryTests(unittest.TestCase):
                 "2026-04-01 23:59:59",
                 "2026-04-30 00:00:00",
                 "2026-04-30 23:59:59",
+                20,
+                0,
+            ),
+        )
+
+    def test_list_records_supports_dynamic_date_filters(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.now_ts", return_value=1778515200),
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._list_lines_map", return_value={}),
+        ):
+            repository.list_records(
+                7,
+                lottery_code="dlt",
+                limit=20,
+                offset=0,
+                filters={
+                    "ticket_time_operator": "dynamic",
+                    "ticket_time_dynamic": "this_month",
+                    "created_time_operator": "dynamic",
+                    "created_time_dynamic": "custom",
+                    "created_time_dynamic_start": "past:7:day",
+                    "created_time_dynamic_end": "current:0:day",
+                },
+            )
+
+        list_sql, list_params = next((item for item in cursor.executed if "FROM my_bet_record AS record" in item[0]), ("", None))
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?", list_sql)
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?", list_sql)
+        self.assertIn("record.created_at >= ?", list_sql)
+        self.assertIn("record.created_at <= ?", list_sql)
+        self.assertEqual(
+            list_params,
+            (
+                7,
+                "2026-05-01 00:00:00",
+                "2026-05-31 23:59:59",
+                "2026-05-05 00:00:00",
+                "2026-05-12 23:59:59",
                 20,
                 0,
             ),

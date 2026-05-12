@@ -2,7 +2,7 @@ export type LotteryCode = 'dlt' | 'pl3' | 'pl5' | 'qxc'
 
 export type MyBetTextFilterOperator = 'eq' | 'ne' | 'contains' | 'empty' | 'not_empty'
 export type MyBetEnumFilterOperator = 'eq' | 'ne' | 'empty' | 'not_empty'
-export type MyBetDateFilterOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'empty' | 'not_empty'
+export type MyBetDateFilterOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'empty' | 'not_empty' | 'range' | 'dynamic'
 
 export type LotteryDraw = {
   lottery_code?: LotteryCode
@@ -430,6 +430,20 @@ export type MyBetRecordListPayload = {
   date_start_operator?: MyBetDateFilterOperator
   date_end?: string
   date_end_operator?: MyBetDateFilterOperator
+  ticket_time_value?: string
+  ticket_time_start?: string
+  ticket_time_end?: string
+  ticket_time_operator?: MyBetDateFilterOperator
+  ticket_time_dynamic?: string
+  ticket_time_dynamic_start?: string
+  ticket_time_dynamic_end?: string
+  created_time_value?: string
+  created_time_start?: string
+  created_time_end?: string
+  created_time_operator?: MyBetDateFilterOperator
+  created_time_dynamic?: string
+  created_time_dynamic_start?: string
+  created_time_dynamic_end?: string
 }
 
 export type MyBetLinePayload = {
