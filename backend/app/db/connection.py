@@ -139,7 +139,6 @@ class MySQLCursorAdapter:
     def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None) -> int:
         routed_query = rewrite_lottery_tables(
             query,
-            split_enabled=self._settings.lottery_split_tables_enabled,
         )
         normalized_query = routed_query.replace("?", "%s")
         started_at = perf_counter()
@@ -151,7 +150,6 @@ class MySQLCursorAdapter:
     def executemany(self, query: str, params: list[tuple[Any, ...]]) -> int:
         routed_query = rewrite_lottery_tables(
             query,
-            split_enabled=self._settings.lottery_split_tables_enabled,
         )
         normalized_query = routed_query.replace("?", "%s")
         started_at = perf_counter()
@@ -337,9 +335,9 @@ def ensure_schema() -> None:
             return
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                schema_statements = get_schema_statements(split_enabled=settings.lottery_split_tables_enabled)
-                schema_migrations = get_schema_migrations(split_enabled=settings.lottery_split_tables_enabled)
-                schema_index_migrations = get_schema_index_migrations(split_enabled=settings.lottery_split_tables_enabled)
+                schema_statements = get_schema_statements()
+                schema_migrations = get_schema_migrations()
+                schema_index_migrations = get_schema_index_migrations()
 
                 for statement in schema_statements:
                     cursor.execute(statement)

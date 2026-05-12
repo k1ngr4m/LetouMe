@@ -1270,9 +1270,7 @@ def _extract_table_name(statement: str) -> str | None:
     return str(match.group(1)) if match else None
 
 
-def get_schema_statements(*, split_enabled: bool) -> list[str]:
-    if not split_enabled:
-        return list(SCHEMA_STATEMENTS)
+def get_schema_statements() -> list[str]:
     return [
         statement
         for statement in SCHEMA_STATEMENTS
@@ -1280,9 +1278,7 @@ def get_schema_statements(*, split_enabled: bool) -> list[str]:
     ]
 
 
-def get_schema_migrations(*, split_enabled: bool) -> dict[str, dict[str, str]]:
-    if not split_enabled:
-        return SCHEMA_MIGRATIONS
+def get_schema_migrations() -> dict[str, dict[str, str]]:
     return {
         table_name: migrations
         for table_name, migrations in SCHEMA_MIGRATIONS.items()
@@ -1290,9 +1286,7 @@ def get_schema_migrations(*, split_enabled: bool) -> dict[str, dict[str, str]]:
     }
 
 
-def get_schema_index_migrations(*, split_enabled: bool) -> dict[str, dict[str, dict[str, str]]]:
-    if not split_enabled:
-        return SCHEMA_INDEX_MIGRATIONS
+def get_schema_index_migrations() -> dict[str, dict[str, dict[str, str]]]:
     return {
         table_name: migrations
         for table_name, migrations in SCHEMA_INDEX_MIGRATIONS.items()

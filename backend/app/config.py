@@ -37,7 +37,6 @@ class Settings:
     auth_bootstrap_admin_username: str = "admin"
     auth_bootstrap_admin_password: str = "admin123456"
     mysql_pool_size: int = 6
-    lottery_split_tables_enabled: bool = True
     baidu_ocr_api_key: str = ""
     baidu_ocr_secret_key: str = ""
     baidu_ocr_token_url: str = "https://aip.baidubce.com/oauth/2.0/token"
@@ -129,7 +128,6 @@ def load_settings() -> Settings:
         auth_bootstrap_admin_username=os.getenv("AUTH_BOOTSTRAP_ADMIN_USERNAME", "admin"),
         auth_bootstrap_admin_password=os.getenv("AUTH_BOOTSTRAP_ADMIN_PASSWORD", "admin123456"),
         mysql_pool_size=int(os.getenv("MYSQL_POOL_SIZE", "6")),
-        lottery_split_tables_enabled=os.getenv("LOTTERY_SPLIT_TABLES_ENABLED", "true").lower() in {"1", "true", "yes", "on"},
         baidu_ocr_api_key=os.getenv("BAIDU_OCR_API_KEY", ""),
         baidu_ocr_secret_key=os.getenv("BAIDU_OCR_SECRET_KEY", ""),
         baidu_ocr_token_url=os.getenv("BAIDU_OCR_TOKEN_URL", "https://aip.baidubce.com/oauth/2.0/token"),

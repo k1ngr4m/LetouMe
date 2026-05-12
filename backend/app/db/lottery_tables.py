@@ -55,9 +55,7 @@ def use_lottery_table_scope(lottery_code: str | None) -> Iterator[None]:
         _lottery_scope.reset(token)
 
 
-def rewrite_lottery_tables(query: str, *, split_enabled: bool, lottery_code: str | None = None) -> str:
-    if not split_enabled:
-        return query
+def rewrite_lottery_tables(query: str, *, lottery_code: str | None = None) -> str:
     scoped_code = normalize_lottery_code(lottery_code) if lottery_code else get_lottery_table_scope()
     if not scoped_code:
         return query
