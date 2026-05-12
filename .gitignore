@@ -57,3 +57,4 @@ Thumbs.db
 /.mindfs/sessions/
 /.mindfs/
 /deploy/
+/backend/scripts/
