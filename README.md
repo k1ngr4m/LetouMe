@@ -8,6 +8,8 @@
 
 LetouMe is an AI-powered lottery analytics platform for China lottery games, combining draw history, model predictions, expert strategies, backtesting, and bet tracking in one web app.
 
+> **Disclaimer**: The AI prediction data shown on this website is for reference and research purposes only and does not constitute lottery purchase advice. Lottery results are random, and no prediction can guarantee a win. Please purchase responsibly and within your means.
+
 ## Key Features
 
 - **Multi-lottery data views**: Explore historical draws and trend data for Super Lotto, Pick 3, Pick 5, Seven Star Lottery, and more.
