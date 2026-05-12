@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   Gauge,
   History,
+  Info,
   LogOut,
   Menu,
   Settings2,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '../theme/ThemeProvider'
-import { SiteDisclaimer } from './SiteDisclaimer'
+import { DISCLAIMER_TEXT } from './SiteDisclaimer'
 import { UserAvatar } from './UserAvatar'
 import { AssistantDrawer } from './AssistantDrawer'
 import { HOME_EXPERT_PREDICTION_PATH, HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
@@ -710,7 +711,18 @@ export function AppShell({ children }: PropsWithChildren) {
             </button>
             <div>
               <p className="crm-topbar__eyebrow">{pageSubtitle}</p>
-              <h2 className="crm-topbar__title">{pageTitle}</h2>
+              <div className="crm-topbar__title-row">
+                <h2 className="crm-topbar__title">{pageTitle}</h2>
+                <span className="crm-topbar__disclaimer-entry">
+                  <button className="crm-topbar__disclaimer-btn" type="button" aria-label="温馨提示" aria-describedby="crm-topbar-disclaimer">
+                    <Info size={15} aria-hidden="true" />
+                  </button>
+                  <span className="crm-topbar__disclaimer-tooltip" id="crm-topbar-disclaimer" role="tooltip">
+                    <span className="crm-topbar__disclaimer-badge">温馨提示</span>
+                    <span>{DISCLAIMER_TEXT}</span>
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
           <div className="crm-topbar__workspace-actions">
@@ -800,7 +812,6 @@ export function AppShell({ children }: PropsWithChildren) {
         </header>
 
         <main className={clsx('app-main crm-main', isMyBetsRoute && 'crm-main--my-bets')}>
-          <SiteDisclaimer compact />
           {children}
         </main>
       </div>

@@ -276,6 +276,8 @@ class MyBetRecordListPayload(BaseModel):
     play_type_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
     settlement_status_filter: Literal["all", "pending", "settled"] = "all"
     settlement_status_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
+    win_result_filter: Literal["all", "winning", "not_winning"] = "all"
+    win_result_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
     source_type_filter: Literal["all", "manual", "ocr"] = "all"
     date_start: str | None = None
     date_start_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty", "range", "dynamic"] = "gte"

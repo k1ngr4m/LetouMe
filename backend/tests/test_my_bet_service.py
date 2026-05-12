@@ -649,6 +649,8 @@ class MyBetServiceTests(unittest.TestCase):
             "play_type_filter_operator": "eq",
             "settlement_status_filter": "settled",
             "settlement_status_filter_operator": "eq",
+            "win_result_filter": "all",
+            "win_result_filter_operator": "eq",
             "source_type_filter": "ocr",
             "date_start": "2026-04-01",
             "date_start_operator": "gte",
@@ -671,6 +673,67 @@ class MyBetServiceTests(unittest.TestCase):
         }
         self.assertEqual(repository.calls[0]["filters"], expected_filters)
         self.assertEqual(repository.calls[1]["filters"], expected_filters)
+
+    def test_list_records_filters_win_result_after_settlement(self) -> None:
+        def make_record(record_id: int, period: str) -> dict:
+            return {
+                "id": record_id,
+                "lottery_code": "dlt",
+                "target_period": period,
+                "play_type": "dlt",
+                "multiplier": 1,
+                "is_append": 0,
+                "bet_count": 1,
+                "amount": 2,
+                "discount_amount": 0,
+                "net_amount": 2,
+                "source_type": "manual",
+                "created_at": "2026-03-31T00:00:00Z",
+                "updated_at": "2026-03-31T00:00:00Z",
+                "ticket_purchased_at": None,
+                "lines": [
+                    {
+                        "line_no": 1,
+                        "play_type": "dlt",
+                        "front_numbers": "01,02,03,04,05",
+                        "back_numbers": "01,02",
+                        "multiplier": 1,
+                        "is_append": 0,
+                        "bet_count": 1,
+                        "amount": 2,
+                    }
+                ],
+            }
+
+        class FakeRepository:
+            def __init__(self) -> None:
+                self.records = [make_record(1, "26031"), make_record(2, "26032")]
+                self.calls: list[dict] = []
+
+            def list_records(self, user_id: int, lottery_code: str = "dlt", *, limit: int | None = 20, offset: int = 0, filters=None):
+                self.calls.append({"limit": limit, "offset": offset, "filters": filters})
+                if limit is None:
+                    return self.records
+                return self.records[offset : offset + limit]
+
+        class FakeLotteryRepository:
+            def list_draws_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {
+                    "26031": {"period": "26031", "red_balls": ["01", "02", "03", "04", "05"], "blue_balls": ["01", "02"], "prizes": []},
+                    "26032": {"period": "26032", "red_balls": ["06", "07", "08", "09", "10"], "blue_balls": ["03", "04"], "prizes": []},
+                }
+
+            def list_previous_jackpot_pool_by_periods(self, periods: list[str], lottery_code: str = "dlt"):
+                return {}
+
+        repository = FakeRepository()
+        service = MyBetService(repository=repository, lottery_repository=FakeLotteryRepository())
+
+        result = service.list_records(1, lottery_code="dlt", limit=20, offset=0, win_result_filter="winning")
+
+        self.assertEqual([item["id"] for item in result["records"]], [1])
+        self.assertEqual(result["summary"]["total_count"], 1)
+        self.assertEqual(repository.calls[0]["limit"], None)
 
 
 if __name__ == "__main__":

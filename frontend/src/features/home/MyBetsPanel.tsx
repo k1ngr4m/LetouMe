@@ -71,11 +71,12 @@ type BetFormState = {
 type MyBetsViewMode = 'list' | 'form'
 type MyBetsDisplayMode = 'card' | 'table'
 type MyBetsSettlementFilter = 'all' | 'pending' | 'settled'
+type MyBetsWinResultFilter = 'all' | 'winning' | 'not_winning'
 type MyBetsTextOperator = MyBetTextFilterOperator
 type MyBetsEnumOperator = MyBetEnumFilterOperator
 type MyBetsDateOperator = MyBetDateFilterOperator
 
-type MyBetsFilterFieldKey = 'period' | 'play_type' | 'settlement_status' | 'ticket_time' | 'created_time'
+type MyBetsFilterFieldKey = 'period' | 'play_type' | 'settlement_status' | 'win_result' | 'ticket_time' | 'created_time'
 type MyBetsDateFilterKey = 'ticket_time' | 'created_time'
 type MyBetsDynamicDateValue = 'today' | 'yesterday' | 'tomorrow' | 'this_week' | 'last_week' | 'next_week' | 'this_month' | 'last_month' | 'next_month' | 'this_quarter' | 'last_quarter' | 'next_quarter' | 'first_half' | 'second_half' | 'this_year' | 'last_year' | 'next_year' | 'custom'
 
@@ -101,6 +102,7 @@ const DEFAULT_MY_BETS_FILTER_OPERATORS = {
   period: 'contains' as MyBetsTextOperator,
   playType: 'eq' as MyBetsEnumOperator,
   settlementStatus: 'eq' as MyBetsEnumOperator,
+  winResult: 'eq' as MyBetsEnumOperator,
   ticketTime: 'eq' as MyBetsDateOperator,
   createdTime: 'eq' as MyBetsDateOperator,
 }
@@ -606,6 +608,11 @@ const myBetsSettlementFilterOptions: Array<{ value: MyBetsSettlementFilter; labe
   { value: 'all', label: '全部状态' },
   { value: 'pending', label: '待开奖' },
   { value: 'settled', label: '已结算' },
+]
+const myBetsWinResultFilterOptions: Array<{ value: MyBetsWinResultFilter; label: string }> = [
+  { value: 'all', label: '全部结果' },
+  { value: 'winning', label: '中奖' },
+  { value: 'not_winning', label: '未中奖' },
 ]
 const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
 const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
@@ -1398,6 +1405,8 @@ export function MyBetsPanel({
   const [playTypeFilterOperator, setPlayTypeFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
   const [settlementStatusFilter, setSettlementStatusFilter] = useState<MyBetsSettlementFilter>('all')
   const [settlementStatusFilterOperator, setSettlementStatusFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
+  const [winResultFilter, setWinResultFilter] = useState<MyBetsWinResultFilter>('all')
+  const [winResultFilterOperator, setWinResultFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.winResult)
   const [ticketTimeFilter, setTicketTimeFilter] = useState<MyBetsDateFilterState>(() => createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime))
   const [createdTimeFilter, setCreatedTimeFilter] = useState<MyBetsDateFilterState>(() => createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime))
   const [activeFilterOperatorMenu, setActiveFilterOperatorMenu] = useState<MyBetsFilterFieldKey | null>(null)
@@ -1434,6 +1443,7 @@ export function MyBetsPanel({
   const normalizedPeriodQuery = periodQuery.trim()
   const normalizedPlayTypeFilter = playTypeFilter === 'all' ? '' : playTypeFilter
   const normalizedSettlementStatusFilter = settlementStatusFilter === 'all' ? '' : settlementStatusFilter
+  const normalizedWinResultFilter = winResultFilter === 'all' ? '' : winResultFilter
   const ticketTimePayload = useMemo(() => toDateFilterPayload(ticketTimeFilter), [ticketTimeFilter])
   const createdTimePayload = useMemo(() => toDateFilterPayload(createdTimeFilter), [createdTimeFilter])
   const hasActiveFilters = Boolean(
@@ -1443,6 +1453,8 @@ export function MyBetsPanel({
       playTypeFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.playType ||
       normalizedSettlementStatusFilter ||
       settlementStatusFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus ||
+      normalizedWinResultFilter ||
+      winResultFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.winResult ||
       hasActiveDateFilter(ticketTimeFilter, DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime) ||
       hasActiveDateFilter(createdTimeFilter, DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime),
   )
@@ -1459,6 +1471,8 @@ export function MyBetsPanel({
       playTypeFilterOperator,
       settlementStatusFilter,
       settlementStatusFilterOperator,
+      winResultFilter,
+      winResultFilterOperator,
       ticketTimePayload,
       createdTimePayload,
     ],
@@ -1473,6 +1487,8 @@ export function MyBetsPanel({
         play_type_filter_operator: playTypeFilterOperator,
         settlement_status_filter: normalizedSettlementStatusFilter || undefined,
         settlement_status_filter_operator: settlementStatusFilterOperator,
+        win_result_filter: normalizedWinResultFilter || undefined,
+        win_result_filter_operator: winResultFilterOperator,
         ticket_time_value: ticketTimePayload.value,
         ticket_time_start: ticketTimePayload.start,
         ticket_time_end: ticketTimePayload.end,
@@ -1693,6 +1709,8 @@ export function MyBetsPanel({
     playTypeFilterOperator,
     normalizedSettlementStatusFilter,
     settlementStatusFilterOperator,
+    normalizedWinResultFilter,
+    winResultFilterOperator,
     ticketTimePayload,
     createdTimePayload,
   ])
@@ -1910,6 +1928,8 @@ export function MyBetsPanel({
     setPlayTypeFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
     setSettlementStatusFilter('all')
     setSettlementStatusFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
+    setWinResultFilter('all')
+    setWinResultFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.winResult)
     setTicketTimeFilter(createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.ticketTime))
     setCreatedTimeFilter(createDefaultDateFilterState(DEFAULT_MY_BETS_FILTER_OPERATORS.createdTime))
     setActiveFilterOperatorMenu(null)
@@ -1919,11 +1939,11 @@ export function MyBetsPanel({
 
   return (
     <div className={clsx('page-section my-bets-page', viewMode === 'list' ? 'my-bets-page--list' : 'my-bets-page--form')}>
-      <StatusCard
-        title="我的投注"
-        actions={
-          <div className="toolbar-inline my-bets-page__toolbar">
-            {viewMode === 'list' ? (
+      {viewMode === 'list' ? (
+        <StatusCard
+          title="我的投注"
+          actions={
+            <div className="toolbar-inline my-bets-page__toolbar">
               <div className="my-bets-view-toggle" aria-label="投注展示视图">
                 <button
                   className={clsx('icon-button my-bets-page__toolbar-button', displayMode === 'card' && 'is-active')}
@@ -1944,8 +1964,6 @@ export function MyBetsPanel({
                   <List size={16} aria-hidden="true" />
                 </button>
               </div>
-            ) : null}
-            {viewMode === 'list' ? (
               <button
                 className={clsx('icon-button my-bets-page__toolbar-button', summaryCardsVisible && 'is-active')}
                 type="button"
@@ -1955,8 +1973,7 @@ export function MyBetsPanel({
               >
                 <Eye size={16} aria-hidden="true" />
               </button>
-            ) : null}
-            {viewMode === 'list' && displayMode === 'card' && hasRecords ? (
+              {displayMode === 'card' && hasRecords ? (
               <button
                 className={clsx('icon-button my-bets-page__toolbar-button', allRecordsExpanded && 'is-active')}
                 type="button"
@@ -1966,8 +1983,7 @@ export function MyBetsPanel({
               >
                 <ChevronsUpDown size={16} aria-hidden="true" />
               </button>
-            ) : null}
-            {viewMode === 'list' ? (
+              ) : null}
               <button
                 className="icon-button my-bets-page__toolbar-button my-bets-page__toolbar-button--primary"
                 type="button"
@@ -1977,19 +1993,9 @@ export function MyBetsPanel({
               >
                 <Plus size={16} aria-hidden="true" />
               </button>
-            ) : (
-              <button
-                className="ghost-button ghost-button--compact my-bets-page__toolbar-back"
-                type="button"
-                onClick={backToListView}
-              >
-                返回列表
-              </button>
-            )}
-          </div>
-        }
-      >
-        {viewMode === 'list' ? (
+            </div>
+          }
+        >
           <div className="my-bets-list-view-shell">
             {summaryCardsVisible ? (
               <div className="my-bets-summary-grid">
@@ -2086,6 +2092,34 @@ export function MyBetsPanel({
                       aria-label="筛选状态"
                     >
                       {myBetsSettlementFilterOptions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+              </label>
+              <label className="my-bets-filter-field">
+                <span>中奖结果</span>
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="中奖结果"
+                    fieldKey="win_result"
+                    operator={winResultFilterOperator}
+                    options={ENUM_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'win_result'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setWinResultFilterOperator}
+                  />
+                  {!isEmptyOperator(winResultFilterOperator) ? (
+                    <select
+                      value={winResultFilter}
+                      onChange={(event) => setWinResultFilter(event.target.value as MyBetsWinResultFilter)}
+                      aria-label="筛选中奖结果"
+                    >
+                      {myBetsWinResultFilterOptions.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
@@ -2371,10 +2405,8 @@ export function MyBetsPanel({
               </div>
             ) : null}
           </div>
-        ) : (
-          null
-        )}
-      </StatusCard>
+        </StatusCard>
+      ) : null}
 
       {viewMode === 'form' ? (
         <section className="my-bets-form-view" data-testid="my-bets-form-view">

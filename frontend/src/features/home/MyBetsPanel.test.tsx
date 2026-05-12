@@ -252,6 +252,7 @@ describe('MyBetsPanel', () => {
     expect(screen.getByRole('button', { name: '期号条件符：包含' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '玩法条件符：等于' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '状态条件符：等于' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '中奖结果条件符：等于' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '投注时间条件符：等于' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '创建时间条件符：等于' })).toBeInTheDocument()
 
@@ -260,6 +261,7 @@ describe('MyBetsPanel', () => {
     await userEvent.click(screen.getByRole('menuitemradio', { name: '等于' }))
     await userEvent.selectOptions(screen.getByLabelText('筛选玩法'), 'dlt_dantuo')
     await userEvent.selectOptions(screen.getByLabelText('筛选状态'), 'settled')
+    await userEvent.selectOptions(screen.getByLabelText('筛选中奖结果'), 'winning')
     await userEvent.click(screen.getByRole('button', { name: '投注时间筛选值' }))
     await userEvent.click(screen.getByRole('button', { name: '2026-05-01' }))
     await userEvent.click(screen.getByRole('button', { name: '创建时间条件符：等于' }))
@@ -279,6 +281,8 @@ describe('MyBetsPanel', () => {
         play_type_filter_operator: 'eq',
         settlement_status_filter: 'settled',
         settlement_status_filter_operator: 'eq',
+        win_result_filter: 'winning',
+        win_result_filter_operator: 'eq',
         ticket_time_value: '2026-05-01',
         ticket_time_start: undefined,
         ticket_time_end: undefined,

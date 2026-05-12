@@ -842,11 +842,108 @@
   display: none;
 }
 
+.crm-topbar__title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  position: relative;
+}
+
 .crm-topbar__title {
   margin: 0.04rem 0 0;
   font-size: 1.08rem;
   font-weight: 600;
   color: var(--text-1);
+}
+
+.crm-topbar__disclaimer-entry {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.crm-topbar__disclaimer-btn {
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid rgba(244, 173, 78, 0.42);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #f4bc7e;
+  background: color-mix(in srgb, var(--crm-topbar-bg) 82%, #f4ad4e 18%);
+  cursor: help;
+  transition:
+    background-color 140ms var(--motion-ease-standard),
+    border-color 140ms var(--motion-ease-standard),
+    color 140ms var(--motion-ease-standard),
+    transform 140ms var(--motion-ease-standard);
+}
+
+.crm-topbar__disclaimer-btn:hover,
+.crm-topbar__disclaimer-btn:focus-visible {
+  color: #fff4df;
+  border-color: rgba(244, 188, 126, 0.72);
+  background: color-mix(in srgb, var(--crm-topbar-bg) 58%, #f27f36 42%);
+  transform: translateY(-1px);
+}
+
+.crm-topbar__disclaimer-tooltip {
+  position: absolute;
+  top: calc(100% + 0.64rem);
+  left: 0;
+  width: max-content;
+  max-width: min(32rem, calc(100vw - 2rem));
+  padding: 0.68rem 0.78rem;
+  border: 1px solid rgba(244, 173, 78, 0.26);
+  border-radius: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.66rem;
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--crm-topbar-bg) 86%, #1b1712 14%);
+  box-shadow: 0 14px 34px rgba(8, 12, 18, 0.34);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0, -4px, 0);
+  transition:
+    opacity 140ms var(--motion-ease-standard),
+    transform 140ms var(--motion-ease-standard);
+  z-index: 65;
+}
+
+.crm-topbar__disclaimer-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -0.34rem;
+  left: 0.62rem;
+  width: 0.68rem;
+  height: 0.68rem;
+  border-left: 1px solid rgba(244, 173, 78, 0.26);
+  border-top: 1px solid rgba(244, 173, 78, 0.26);
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.crm-topbar__disclaimer-badge {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.56rem;
+  border-radius: 999px;
+  color: #ffd39b;
+  background: rgba(244, 173, 78, 0.18);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.crm-topbar__disclaimer-entry:hover .crm-topbar__disclaimer-tooltip,
+.crm-topbar__disclaimer-entry:focus-within .crm-topbar__disclaimer-tooltip {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 .crm-topbar__actions {
@@ -1032,19 +1129,23 @@
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.9rem;
+  grid-template-rows: minmax(0, 1fr);
   padding-bottom: 0.9rem;
-}
-
-.crm-main--my-bets .site-disclaimer--compact {
-  flex: 0 0 auto;
-  min-height: 48px;
-  height: 48px;
 }
 
 .crm-main--my-bets > .my-bets-page {
   min-height: 0;
+}
+
+@media (min-width: 861px) {
+  .crm-main--my-bets:has(.my-bets-page--form) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .crm-main--my-bets:has(.my-bets-page--form) > .my-bets-page {
+    min-height: auto;
+  }
 }
 
 .crm-main .page-section,

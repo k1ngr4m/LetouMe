@@ -70,6 +70,8 @@ class MyBetService:
         play_type_filter_operator: str = "eq",
         settlement_status_filter: str = "all",
         settlement_status_filter_operator: str = "eq",
+        win_result_filter: str = "all",
+        win_result_filter_operator: str = "eq",
         source_type_filter: str = "all",
         date_start: str | None = None,
         date_start_operator: str = "gte",
@@ -98,6 +100,8 @@ class MyBetService:
             "play_type_filter_operator": str(play_type_filter_operator or "eq").strip().lower(),
             "settlement_status_filter": str(settlement_status_filter or "all").strip().lower(),
             "settlement_status_filter_operator": str(settlement_status_filter_operator or "eq").strip().lower(),
+            "win_result_filter": str(win_result_filter or "all").strip().lower(),
+            "win_result_filter_operator": str(win_result_filter_operator or "eq").strip().lower(),
             "source_type_filter": str(source_type_filter or "all").strip().lower(),
             "date_start": date_start,
             "date_start_operator": str(date_start_operator or "gte").strip().lower(),
@@ -118,13 +122,16 @@ class MyBetService:
             "created_time_dynamic_start": created_time_dynamic_start,
             "created_time_dynamic_end": created_time_dynamic_end,
         }
-        raw_records = self.repository.list_records(
-            user_id,
-            lottery_code=normalized_code,
-            limit=limit,
-            offset=offset,
-            filters=filters,
-        )
+        requires_settlement_filter = self._has_active_win_result_filter(filters)
+        raw_records: list[dict[str, Any]] = []
+        if not requires_settlement_filter:
+            raw_records = self.repository.list_records(
+                user_id,
+                lottery_code=normalized_code,
+                limit=limit,
+                offset=offset,
+                filters=filters,
+            )
         raw_summary_records = self.repository.list_records(
             user_id,
             lottery_code=normalized_code,
@@ -145,18 +152,6 @@ class MyBetService:
             if normalized_code == "dlt"
             else {}
         )
-        records = [
-            {
-                **item,
-                **self._calculate_settlement(
-                    item,
-                    lottery_code=normalized_code,
-                    draw_cache=draw_cache,
-                    previous_jackpot_cache=previous_jackpot_cache,
-                ),
-            }
-            for item in serialized_records
-        ]
         summary_records = [
             {
                 **item,
@@ -169,6 +164,22 @@ class MyBetService:
             }
             for item in serialized_summary_records
         ]
+        summary_records = self._apply_win_result_filter(summary_records, filters)
+        if requires_settlement_filter:
+            records = summary_records[offset : offset + limit] if limit is not None else summary_records
+        else:
+            records = [
+                {
+                    **item,
+                    **self._calculate_settlement(
+                        item,
+                        lottery_code=normalized_code,
+                        draw_cache=draw_cache,
+                        previous_jackpot_cache=previous_jackpot_cache,
+                    ),
+                }
+                for item in serialized_records
+            ]
         total_amount = sum(int(item.get("amount") or 0) for item in summary_records)
         total_discount_amount = sum(int(item.get("discount_amount") or 0) for item in summary_records)
         total_net_amount = sum(int(item.get("net_amount") or 0) for item in summary_records)
@@ -183,6 +194,31 @@ class MyBetService:
             "pending_count": sum(1 for item in summary_records if item.get("settlement_status") == "pending"),
         }
         return {"records": records, "summary": summary}
+
+    @staticmethod
+    def _has_active_win_result_filter(filters: dict[str, Any]) -> bool:
+        operator = str(filters.get("win_result_filter_operator") or "eq").strip().lower()
+        value = str(filters.get("win_result_filter") or "all").strip().lower()
+        return operator in {"empty", "not_empty"} or value in {"winning", "not_winning"}
+
+    @staticmethod
+    def _apply_win_result_filter(records: list[dict[str, Any]], filters: dict[str, Any]) -> list[dict[str, Any]]:
+        operator = str(filters.get("win_result_filter_operator") or "eq").strip().lower()
+        value = str(filters.get("win_result_filter") or "all").strip().lower()
+        if operator == "empty":
+            return [item for item in records if item.get("settlement_status") != "settled"]
+        if operator == "not_empty":
+            return [item for item in records if item.get("settlement_status") == "settled"]
+        if value not in {"winning", "not_winning"}:
+            return records
+
+        def is_winning(item: dict[str, Any]) -> bool:
+            return item.get("settlement_status") == "settled" and (int(item.get("winning_bet_count") or 0) > 0 or int(item.get("prize_amount") or 0) > 0 or bool(item.get("prize_level")))
+
+        expected = value == "winning"
+        if operator == "ne":
+            expected = not expected
+        return [item for item in records if is_winning(item) == expected]
 
     def create_record(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(payload.get("lottery_code"))

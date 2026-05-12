@@ -425,6 +425,8 @@ export type MyBetRecordListPayload = {
   play_type_filter_operator?: MyBetEnumFilterOperator
   settlement_status_filter?: 'all' | 'pending' | 'settled'
   settlement_status_filter_operator?: MyBetEnumFilterOperator
+  win_result_filter?: 'all' | 'winning' | 'not_winning'
+  win_result_filter_operator?: MyBetEnumFilterOperator
   source_type_filter?: 'all' | 'manual' | 'ocr'
   date_start?: string
   date_start_operator?: MyBetDateFilterOperator

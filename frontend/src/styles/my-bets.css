@@ -207,7 +207,7 @@
 
 .my-bets-filter-panel {
   display: grid;
-  grid-template-columns: minmax(9rem, 0.95fr) minmax(8rem, 0.86fr) minmax(8rem, 0.82fr) minmax(14rem, 1.16fr) minmax(14rem, 1.16fr) auto;
+  grid-template-columns: minmax(9rem, 0.9fr) minmax(8rem, 0.78fr) minmax(8rem, 0.74fr) minmax(8.5rem, 0.82fr) minmax(14rem, 1.1fr) minmax(14rem, 1.1fr) auto;
   gap: 0.5rem;
   align-items: end;
   padding: 0.56rem;
