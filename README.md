@@ -17,11 +17,7 @@ LetouMe is an AI-powered lottery analytics platform for China lottery games, com
 - **Ticket OCR**: Recognize ticket images with Baidu OCR and turn them into structured personal bet records.
 - **Admin-ready architecture**: Built with FastAPI, React/Vite, MySQL, RBAC permissions, and a settings console.
 
-## Demo / Visuals
-
-> Add your product screenshot or GIF here.
-
-![LetouMe Demo](docs/demo.gif)
+![LetouMe Demo](demo.png)
 
 ## Quick Start
 
@@ -54,32 +50,6 @@ npm run dev
 The web app will be available at:
 
 - Frontend: `http://localhost:5173`
-
-### 3. Basic Usage
-
-Check the API service:
-
-```bash
-curl http://localhost:8000/
-```
-
-Request lottery history:
-
-```bash
-curl -X POST http://localhost:8000/api/lottery/history \
-  -H "Content-Type: application/json" \
-  -d '{"lottery_code":"dlt","page":1,"page_size":20}'
-```
-
-Request current predictions:
-
-```bash
-curl -X POST http://localhost:8000/api/predictions/current \
-  -H "Content-Type: application/json" \
-  -d '{"lottery_code":"dlt"}'
-```
-
-> API request fields may vary by feature. Use `http://localhost:8000/docs` to inspect the latest schemas.
 
 ## Configuration
 
