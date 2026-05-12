@@ -40,7 +40,7 @@ class LotteryFetchTaskServiceTests(unittest.TestCase):
             "error_message": None,
         }
 
-        service._handle_task_update(state, trigger_type="manual")
+        service._handle_task_update(state, schedule_task_code=None, trigger_type="manual")
 
         log_repository.update_by_task_id.assert_called_once()
 
@@ -60,7 +60,7 @@ class LotteryFetchTaskServiceTests(unittest.TestCase):
             "error_message": None,
         }
 
-        service._handle_task_update(state, trigger_type="manual")
+        service._handle_task_update(state, schedule_task_code=None, trigger_type="manual")
 
         self.assertEqual(log_repository.update_by_task_id.call_count, 2)
         log_repository.create_log.assert_called_once()

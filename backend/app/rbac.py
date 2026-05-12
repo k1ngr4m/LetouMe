@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import Any
 from threading import Lock
 
-from backend.app.db.connection import ensure_schema, get_connection
+from backend.app.db.connection import ensure_schema, get_connection, get_database_signature
 
 BASIC_PROFILE_PERMISSION = "basic_profile"
 MODEL_MANAGEMENT_PERMISSION = "model_management"
-EXPERT_MANAGEMENT_PERMISSION = "expert_management"
 USER_MANAGEMENT_PERMISSION = "user_management"
 ROLE_MANAGEMENT_PERMISSION = "role_management"
 SCHEDULE_MANAGEMENT_PERMISSION = "schedule_management"
@@ -23,10 +22,6 @@ DEFAULT_PERMISSIONS = {
     MODEL_MANAGEMENT_PERMISSION: {
         "name": "模型管理",
         "description": "允许查看、创建、编辑、启停和删除模型配置，以及查看 Provider 列表。",
-    },
-    EXPERT_MANAGEMENT_PERMISSION: {
-        "name": "专家管理",
-        "description": "允许查看、创建、编辑、启停和删除专家配置，并手动触发专家预测生成任务。",
     },
     USER_MANAGEMENT_PERMISSION: {
         "name": "用户管理",
@@ -55,17 +50,21 @@ DEFAULT_ROLES = {
     },
 }
 _rbac_ready = False
+_rbac_signature: tuple[Any, ...] | None = None
 _rbac_lock = Lock()
 
 
 def ensure_rbac_setup() -> None:
-    global _rbac_ready
-    if _rbac_ready:
+    global _rbac_ready, _rbac_signature
+    signature = get_database_signature()
+    if _rbac_ready and _rbac_signature == signature:
         return
     ensure_schema()
     with _rbac_lock:
-        if _rbac_ready:
+        if _rbac_ready and _rbac_signature == signature:
             return
+        if _rbac_signature != signature:
+            _rbac_ready = False
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 for permission_code, meta in DEFAULT_PERMISSIONS.items():
@@ -111,6 +110,7 @@ def ensure_rbac_setup() -> None:
                 _sync_role_permissions(cursor, role_ids, permission_ids)
                 _migrate_legacy_user_roles(cursor)
         _rbac_ready = True
+        _rbac_signature = signature
 
 
 def _load_permission_ids(cursor) -> dict[str, int]:

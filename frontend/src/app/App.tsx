@@ -7,12 +7,10 @@ import { MotionProvider } from '../shared/theme/MotionProvider'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { LotterySelectionProvider } from '../shared/lottery/LotterySelectionProvider'
 import { ToastProvider } from '../shared/feedback/ToastProvider'
-import { HOME_EXPERT_PREDICTION_PATH, HOME_RULES_PATH, HOME_SMART_PREDICTION_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
-import { SHOW_EXPERT_MANAGEMENT, SHOW_EXPERT_PREDICTION, SHOW_SMART_PREDICTION } from '../shared/config/featureFlags'
+import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
-const EXPERT_MANAGEMENT_PERMISSION = 'expert_management'
 const SCHEDULE_MANAGEMENT_PERMISSION = 'schedule_management'
 const USER_MANAGEMENT_PERMISSION = 'user_management'
 const ROLE_MANAGEMENT_PERMISSION = 'role_management'
@@ -26,16 +24,9 @@ const HomeModelDetailPage = lazy(() =>
   import('../features/home/HomeModelDetailPage').then((module) => ({ default: module.HomeModelDetailPage })),
 )
 const HomeRulesPage = lazy(() => import('../features/home/HomeRulesPage').then((module) => ({ default: module.HomeRulesPage })))
-const HomeSmartPredictionPage = lazy(() =>
-  import('../features/home/HomeSmartPredictionPage').then((module) => ({ default: module.HomeSmartPredictionPage })),
-)
-const HomeExpertPredictionPage = lazy(() =>
-  import('../features/home/HomeExpertPredictionPage').then((module) => ({ default: module.HomeExpertPredictionPage })),
-)
 const HomeBacktestPage = lazy(() => import('../features/home/HomeBacktestPage').then((module) => ({ default: module.HomeBacktestPage })))
 const MessageCenterPage = lazy(() => import('../features/messages/MessageCenterPage').then((module) => ({ default: module.MessageCenterPage })))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
-const ExpertsSettingsPage = lazy(() => import('../features/settings/ExpertsSettingsPage').then((module) => ({ default: module.ExpertsSettingsPage })))
 
 function RouteLoadingFallback() {
   return <div style={{ padding: '24px', textAlign: 'center' }}>加载中...</div>
@@ -137,34 +128,6 @@ export function App() {
               }
             />
             <Route
-              path={HOME_SMART_PREDICTION_PATH}
-              element={
-                SHOW_SMART_PREDICTION ? (
-                  <ProtectedRoute>
-                    <AppShell>
-                      <HomeSmartPredictionPage />
-                    </AppShell>
-                  </ProtectedRoute>
-                ) : (
-                  <Navigate to={HOME_TAB_PATHS.prediction} replace />
-                )
-              }
-            />
-            <Route
-              path={HOME_EXPERT_PREDICTION_PATH}
-              element={
-                SHOW_EXPERT_PREDICTION ? (
-                  <ProtectedRoute>
-                    <AppShell>
-                      <HomeExpertPredictionPage />
-                    </AppShell>
-                  </ProtectedRoute>
-                ) : (
-                  <Navigate to={HOME_TAB_PATHS.prediction} replace />
-                )
-              }
-            />
-            <Route
               path={MESSAGE_CENTER_PATH}
               element={
                 <ProtectedRoute>
@@ -203,20 +166,6 @@ export function App() {
                     <SettingsPage />
                   </AppShell>
                 </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings/experts"
-              element={
-                SHOW_EXPERT_MANAGEMENT ? (
-                  <ProtectedRoute requiredPermission={EXPERT_MANAGEMENT_PERMISSION}>
-                    <AppShell>
-                      <ExpertsSettingsPage />
-                    </AppShell>
-                  </ProtectedRoute>
-                ) : (
-                  <Navigate to="/settings/profile" replace />
-                )
               }
             />
             <Route

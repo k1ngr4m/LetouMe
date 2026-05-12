@@ -17,12 +17,6 @@ import type {
   ForgotPasswordResetPayload,
   ForgotPasswordSendCodePayload,
   GenerateSettingsModelPredictionsPayload,
-  ExpertCurrentDetail,
-  ExpertHistoryDetail,
-  ExpertHistoryListResponse,
-  ExpertPredictionTask,
-  ExpertPredictionRunStartPayload,
-  ExpertPublicListResponse,
   LoginPayload,
   MyBetRecordCreateResponse,
   MyBetRecordListPayload,
@@ -59,9 +53,6 @@ import type {
   SettingsModelListResponse,
   SettingsModelPayload,
   SettingsProvider,
-  SettingsExpert,
-  SettingsExpertListResponse,
-  SettingsExpertPayload,
   SettingsProviderModelDiscoveryPayload,
   SettingsProviderModelDiscoveryResponse,
   SettingsProviderListResponse,
@@ -72,9 +63,6 @@ import type {
   SimulationTicketPayload,
   SiteMessageListResponse,
   SiteMessageUnreadCountResponse,
-  SmartPredictionRun,
-  SmartPredictionRunListResponse,
-  SmartPredictionRunStartPayload,
   SuccessResponse,
   UserListResponse,
   RegisterPayload,
@@ -356,66 +344,6 @@ export const apiClient = {
       body: JSON.stringify(payload || {}),
     })
   },
-  getExpertsList(lotteryCode: LotteryCode = 'dlt') {
-    return requestJson<ExpertPublicListResponse>('/api/experts/list', {
-      method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode }),
-    })
-  },
-  getExpertCurrentDetail(expertCode: string, lotteryCode: LotteryCode = 'dlt') {
-    return requestJson<ExpertCurrentDetail>('/api/experts/current/detail', {
-      method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode, expert_code: expertCode }),
-    })
-  },
-  getExpertHistoryList(payload?: { lottery_code?: LotteryCode; expert_code?: string; period_query?: string; limit?: number; offset?: number }) {
-    return requestJson<ExpertHistoryListResponse>('/api/experts/history/list', {
-      method: 'POST',
-      body: JSON.stringify(payload || {}),
-    })
-  },
-  getExpertHistoryDetail(targetPeriod: string, expertCode: string, lotteryCode: LotteryCode = 'dlt') {
-    return requestJson<ExpertHistoryDetail>('/api/experts/history/detail', {
-      method: 'POST',
-      body: JSON.stringify({ lottery_code: lotteryCode, target_period: targetPeriod, expert_code: expertCode }),
-    })
-  },
-  startSmartPredictionRun(payload: SmartPredictionRunStartPayload) {
-    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/start', {
-      method: 'POST',
-      body: JSON.stringify({ lottery_code: payload.lottery_code || 'dlt', ...payload }),
-    })
-  },
-  getSmartPredictionRunDetail(runId: string) {
-    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/detail', {
-      method: 'POST',
-      body: JSON.stringify({ run_id: runId }),
-    })
-  },
-  cancelSmartPredictionRun(runId: string) {
-    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/cancel', {
-      method: 'POST',
-      body: JSON.stringify({ run_id: runId }),
-    })
-  },
-  startSmartPredictionStage2(runId: string, stage2ModelCode?: string, forceRerun = true) {
-    return requestJson<SmartPredictionRun>('/api/predictions/smart/run/stage2/start', {
-      method: 'POST',
-      body: JSON.stringify({ run_id: runId, stage2_model_code: stage2ModelCode, force_rerun: forceRerun }),
-    })
-  },
-  listSmartPredictionRuns(payload?: { limit?: number; offset?: number }) {
-    return requestJson<SmartPredictionRunListResponse>('/api/predictions/smart/history/list', {
-      method: 'POST',
-      body: JSON.stringify(payload || {}),
-    })
-  },
-  getSmartPredictionHistoryDetail(runId: string) {
-    return requestJson<SmartPredictionRun>('/api/predictions/smart/history/detail', {
-      method: 'POST',
-      body: JSON.stringify({ run_id: runId }),
-    })
-  },
   getSimulationTickets(lotteryCode: LotteryCode = 'dlt') {
     return requestJson<SimulationTicketListResponse>('/api/simulation/tickets/list', {
       method: 'POST',
@@ -562,61 +490,6 @@ export const apiClient = {
     return requestJson<SettingsModelListResponse>('/api/settings/models/list', {
       method: 'POST',
       body: JSON.stringify({ include_deleted: includeDeleted, lottery_code: lotteryCode }),
-    })
-  },
-  getSettingsExperts(includeDeleted = false, lotteryCode?: LotteryCode) {
-    return requestJson<SettingsExpertListResponse>('/api/settings/experts/list', {
-      method: 'POST',
-      body: JSON.stringify({ include_deleted: includeDeleted, lottery_code: lotteryCode }),
-    })
-  },
-  getSettingsExpert(expertCode: string) {
-    return requestJson<SettingsExpert>('/api/settings/experts/detail', {
-      method: 'POST',
-      body: JSON.stringify({ expert_code: expertCode }),
-    })
-  },
-  createSettingsExpert(payload: SettingsExpertPayload) {
-    return requestJson<SettingsExpert>('/api/settings/experts/create', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  },
-  updateSettingsExpert(expertCode: string, payload: SettingsExpertPayload) {
-    return requestJson<SettingsExpert>('/api/settings/experts/update', {
-      method: 'POST',
-      body: JSON.stringify({ original_expert_code: expertCode, ...payload }),
-    })
-  },
-  toggleSettingsExpert(expertCode: string, isActive: boolean) {
-    return requestJson<SettingsExpert>('/api/settings/experts/status', {
-      method: 'POST',
-      body: JSON.stringify({ expert_code: expertCode, is_active: isActive }),
-    })
-  },
-  deleteSettingsExpert(expertCode: string) {
-    return requestJson<SettingsExpert>('/api/settings/experts/delete', {
-      method: 'POST',
-      body: JSON.stringify({ expert_code: expertCode }),
-    })
-  },
-  restoreSettingsExpert(expertCode: string) {
-    return requestJson<SettingsExpert>('/api/settings/experts/restore', {
-      method: 'POST',
-      body: JSON.stringify({ expert_code: expertCode }),
-    })
-  },
-  startSettingsExpertPredictionRun(payload: LotteryCode | ExpertPredictionRunStartPayload = 'dlt') {
-    const body = typeof payload === 'string' ? { lottery_code: payload } : payload
-    return requestJson<ExpertPredictionTask>('/api/settings/experts/predictions/run/start', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-  },
-  getSettingsExpertPredictionTask(taskId: string) {
-    return requestJson<ExpertPredictionTask>('/api/settings/experts/predictions/task-detail', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: taskId }),
     })
   },
   getSettingsModel(modelCode: string) {

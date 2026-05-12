@@ -1,13 +1,3 @@
-@media (max-width: 860px) {
-  .expert-weight-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .expert-weight-card__controls {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion]) {
     --motion-fast: 1ms;
@@ -1920,35 +1910,7 @@
   }
 }
 
-@media (max-width: 1080px) {
-  .smart-prediction-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .smart-prediction-flow {
-    position: static;
-  }
-
-  .expert-tier-card__content {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .expert-history-toolbar,
-  .expert-history-record__header,
-  .expert-history-tier-grid,
-  .expert-history-detail-trace-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .expert-history-record__draw {
-    justify-content: flex-start;
-  }
-
-  .expert-history-detail-modal__draw {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
+@media (max-width: 1080px) {}
 
 @media (max-width: 980px) {
   .hero-panel--command .hero-panel__grid {

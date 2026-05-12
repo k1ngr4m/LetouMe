@@ -24,6 +24,7 @@ class Settings:
     mysql_password: str
     mysql_database: str
     sqlite_path: Path
+    db_driver: str = "sqlite"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     frontend_origin: str = "http://localhost:5173"
@@ -56,7 +57,7 @@ class Settings:
     def sqlite_source_path(self) -> Path:
         if self.sqlite_path.is_absolute():
             return self.sqlite_path
-        return PROJECT_ROOT / self.sqlite_path
+        return REPO_ROOT / self.sqlite_path
 
 
 def _build_database_url(
@@ -80,20 +81,33 @@ def _split_mysql_config(database_url: str) -> tuple[str, int, str, str, str]:
     )
 
 
+def _normalize_db_driver(value: str | None) -> str:
+    driver = str(value or "sqlite").strip().lower()
+    if driver not in {"sqlite", "mysql"}:
+        return "sqlite"
+    return driver
+
+
 def load_settings() -> Settings:
+    db_driver = _normalize_db_driver(os.getenv("DB_DRIVER"))
     mysql_host = os.getenv("MYSQL_HOST", "127.0.0.1")
     mysql_port = int(os.getenv("MYSQL_PORT", "3306"))
     mysql_user = os.getenv("MYSQL_USER", "root")
     mysql_password = os.getenv("MYSQL_PASSWORD", "")
     mysql_database = os.getenv("MYSQL_DATABASE", "letoume")
-    database_url = os.getenv("DATABASE_URL") or _build_database_url(
-        mysql_host,
-        mysql_port,
-        mysql_user,
-        mysql_password,
-        mysql_database,
-    )
-    mysql_host, mysql_port, mysql_user, mysql_password, mysql_database = _split_mysql_config(database_url)
+    sqlite_path = Path(os.getenv("SQLITE_PATH", os.getenv("DB_PATH", "data/letoume.sqlite3")))
+    if db_driver == "mysql":
+        database_url = os.getenv("DATABASE_URL") or _build_database_url(
+            mysql_host,
+            mysql_port,
+            mysql_user,
+            mysql_password,
+            mysql_database,
+        )
+        mysql_host, mysql_port, mysql_user, mysql_password, mysql_database = _split_mysql_config(database_url)
+    else:
+        sqlite_source_path = sqlite_path if sqlite_path.is_absolute() else REPO_ROOT / sqlite_path
+        database_url = f"sqlite:///{sqlite_source_path}"
 
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
@@ -114,7 +128,8 @@ def load_settings() -> Settings:
         mysql_user=mysql_user,
         mysql_password=mysql_password,
         mysql_database=mysql_database,
-        sqlite_path=Path(os.getenv("SQLITE_PATH", os.getenv("DB_PATH", "letoume.db"))),
+        sqlite_path=sqlite_path,
+        db_driver=db_driver,
         api_host=os.getenv("API_HOST", "0.0.0.0"),
         api_port=int(os.getenv("API_PORT", "8000")),
         frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"),

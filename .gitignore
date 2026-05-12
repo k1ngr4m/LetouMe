@@ -10,6 +10,10 @@ pids
 *.pid
 *.seed
 *.pid.lock
+data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Dependency directories
 node_modules/

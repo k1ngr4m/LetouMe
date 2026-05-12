@@ -79,68 +79,6 @@ class ModelStatusUpdatePayload(BaseModel):
     is_active: bool
 
 
-class ExpertListPayload(BaseModel):
-    include_deleted: bool = False
-    lottery_code: str | None = None
-
-
-class ExpertCodePayload(BaseModel):
-    expert_code: str
-
-
-class ExpertSettingsPayload(BaseModel):
-    display_name: str
-    bio: str | None = ""
-    model_code: str
-    lottery_code: str = "dlt"
-    is_active: bool = True
-    config: dict[str, Any] = Field(default_factory=dict)
-
-
-class ExpertUpdatePayload(ExpertSettingsPayload):
-    original_expert_code: str
-
-
-class ExpertStatusUpdatePayload(BaseModel):
-    expert_code: str
-    is_active: bool
-
-
-class ExpertCurrentDetailPayload(BaseModel):
-    lottery_code: str = "dlt"
-    expert_code: str
-
-
-class ExpertHistoryListPayload(BaseModel):
-    lottery_code: str = "dlt"
-    expert_code: str | None = None
-    period_query: str | None = None
-    limit: int | None = Field(default=20, ge=1, le=100)
-    offset: int = Field(default=0, ge=0)
-
-
-class ExpertHistoryDetailPayload(BaseModel):
-    lottery_code: str = "dlt"
-    target_period: str
-    expert_code: str
-
-
-class ExpertPredictionRunStartPayload(BaseModel):
-    lottery_code: str = "dlt"
-    expert_code: str | None = None
-    mode: str = "current"
-    overwrite: bool = False
-    parallelism: int | None = Field(default=None, ge=1, le=8)
-    start_period: str | None = None
-    end_period: str | None = None
-    recent_period_count: Literal[1, 5, 10, 20] | None = None
-    prompt_history_period_count: Literal[30, 50, 100] | None = None
-
-
-class ExpertPredictionTaskPayload(BaseModel):
-    task_id: str
-
-
 class GenerateModelPredictionsPayload(BaseModel):
     lottery_code: str = "dlt"
     model_code: str
@@ -197,35 +135,6 @@ class SettingsPredictionRecordDetailPayload(BaseModel):
 class PredictionHistoryDetailPayload(BaseModel):
     lottery_code: str = "dlt"
     target_period: str
-
-
-class SmartPredictionRunStartPayload(BaseModel):
-    lottery_code: str = "dlt"
-    data_model_codes: list[str] = Field(default_factory=list)
-    stage1_model_code: str
-    stage2_model_code: str
-    history_period_count: Literal[30, 50, 100] = 50
-    strategy_codes: list[Literal["hot", "cold", "balanced", "cycle", "composite"]] = Field(default_factory=list)
-    include_trend: bool = True
-    include_scores: bool = True
-    auto_stage2: bool = True
-    retry_once: bool = True
-    strict_validation: bool = True
-
-
-class SmartPredictionRunIdPayload(BaseModel):
-    run_id: str
-
-
-class SmartPredictionRunListPayload(BaseModel):
-    limit: int = Field(default=20, ge=1, le=100)
-    offset: int = Field(default=0, ge=0)
-
-
-class SmartPredictionStage2StartPayload(BaseModel):
-    run_id: str
-    stage2_model_code: str | None = None
-    force_rerun: bool = True
 
 
 class SimulationTicketPayload(BaseModel):

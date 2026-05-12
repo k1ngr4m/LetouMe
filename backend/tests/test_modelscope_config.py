@@ -68,7 +68,10 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
         definition = registry.get("phase5-model")
         self.assertEqual(definition.provider, "openai_compatible")
         self.assertEqual(definition.api_model, "phase5-api-model")
-        self.assertEqual(definition.extra, {"timeout": 30, "headers": {"x-app": "demo"}})
+        self.assertEqual(
+            definition.extra,
+            {"timeout": 30, "headers": {"x-app": "demo"}, "custom_body_params": {"temperature": 0.6}},
+        )
 
         executed_sql = "\n".join(str(call.args[0]) for call in cursor.execute.call_args_list)
         self.assertIn("FROM model_provider_option", executed_sql)

@@ -8,24 +8,38 @@ from backend.app.config import load_settings
 
 
 class DatabaseConfigTests(unittest.TestCase):
-    def test_defaults_to_local_mysql_database(self) -> None:
+    def test_defaults_to_sqlite_database(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             settings = load_settings()
 
-        self.assertEqual(settings.mysql_host, "127.0.0.1")
-        self.assertEqual(settings.mysql_port, 3306)
-        self.assertEqual(settings.mysql_user, "root")
-        self.assertEqual(settings.mysql_database, "letoume")
-        self.assertIn("mysql+pymysql://root:@127.0.0.1:3306/letoume", settings.database_url)
+        self.assertEqual(settings.db_driver, "sqlite")
+        self.assertEqual(settings.sqlite_path.as_posix(), "data/letoume.sqlite3")
+        self.assertTrue(settings.database_url.startswith("sqlite:///"))
 
-    def test_database_url_overrides_split_mysql_fields(self) -> None:
+    def test_sqlite_driver_ignores_mysql_environment(self) -> None:
         with patch.dict(
             os.environ,
-            {"DATABASE_URL": "mysql+pymysql://demo:secret@db.example.com:3307/sample?charset=utf8mb4"},
+            {
+                "DB_DRIVER": "sqlite",
+                "DATABASE_URL": "mysql+pymysql://demo:secret@db.example.com:3307/sample?charset=utf8mb4",
+                "MYSQL_HOST": "db.example.com",
+            },
             clear=True,
         ):
             settings = load_settings()
 
+        self.assertEqual(settings.db_driver, "sqlite")
+        self.assertTrue(settings.database_url.startswith("sqlite:///"))
+
+    def test_database_url_overrides_split_mysql_fields(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"DB_DRIVER": "mysql", "DATABASE_URL": "mysql+pymysql://demo:secret@db.example.com:3307/sample?charset=utf8mb4"},
+            clear=True,
+        ):
+            settings = load_settings()
+
+        self.assertEqual(settings.db_driver, "mysql")
         self.assertEqual(settings.mysql_host, "db.example.com")
         self.assertEqual(settings.mysql_port, 3307)
         self.assertEqual(settings.mysql_user, "demo")

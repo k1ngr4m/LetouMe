@@ -13,6 +13,7 @@ from backend.app.db.connection import ensure_schema, get_request_metrics, reset_
 from backend.app.logging_utils import configure_logging, get_logger
 from backend.app.rbac import ensure_rbac_setup
 from backend.app.services.schedule_service import schedule_service
+from backend.core.model_config import bootstrap_default_models
 
 
 def create_app() -> FastAPI:
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup() -> None:
         ensure_schema()
+        bootstrap_default_models()
         ensure_rbac_setup()
         AuthService(settings=settings).ensure_bootstrap_admin()
         schedule_service.start()

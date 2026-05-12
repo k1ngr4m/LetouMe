@@ -403,12 +403,15 @@ class ModelRepository:
                 model_codes = [str(model_row["model_code"]) for model_row in cursor.fetchall() if model_row.get("model_code")]
                 cursor.execute(
                     """
-                    UPDATE ai_model am
-                    INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
-                    SET am.is_deleted = 1,
-                        am.is_active = 0,
-                        am.updated_at = ?
-                    WHERE pmc.provider_id = ?
+                    UPDATE ai_model
+                    SET is_deleted = 1,
+                        is_active = 0,
+                        updated_at = ?
+                    WHERE provider_model_id IN (
+                        SELECT id
+                        FROM provider_model_config
+                        WHERE provider_id = ?
+                    )
                     """,
                     (now_ts(), provider_id),
                 )

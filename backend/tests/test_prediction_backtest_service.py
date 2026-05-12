@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import Mock
 
 from backend.app.services.prediction_service import PredictionService
 
@@ -108,8 +109,13 @@ def _build_records() -> list[dict]:
 
 
 class PredictionBacktestServiceTests(unittest.TestCase):
+    def _service(self, records: list[dict] | None = None) -> PredictionService:
+        lottery_service = Mock()
+        lottery_service.get_previous_draw_by_period.return_value = None
+        return PredictionService(prediction_repository=_BacktestRepository(records=records), lottery_service=lottery_service)
+
     def test_recent_period_count_limits_records(self) -> None:
-        service = PredictionService(prediction_repository=_BacktestRepository())
+        service = self._service()
 
         payload = service.get_backtest_summary_payload(recent_period_count=1, include_inactive_models=True)
 
@@ -117,7 +123,7 @@ class PredictionBacktestServiceTests(unittest.TestCase):
         self.assertEqual(payload["periods"][0]["target_period"], "26002")
 
     def test_model_rankings_keep_play_modes_separated(self) -> None:
-        service = PredictionService(prediction_repository=_BacktestRepository())
+        service = self._service()
 
         payload = service.get_backtest_summary_payload(recent_period_count=None, include_inactive_models=True)
         ranking_keys = {(item["model_id"], item["prediction_play_mode"]) for item in payload["model_rankings"]}
@@ -126,7 +132,7 @@ class PredictionBacktestServiceTests(unittest.TestCase):
         self.assertIn(("model-a", "compound"), ranking_keys)
 
     def test_model_filter_and_strategy_breakdown(self) -> None:
-        service = PredictionService(prediction_repository=_BacktestRepository())
+        service = self._service()
 
         payload = service.get_backtest_summary_payload(
             recent_period_count=None,
@@ -140,7 +146,7 @@ class PredictionBacktestServiceTests(unittest.TestCase):
         self.assertGreaterEqual(payload["strategy_breakdown"][0]["period_count"], 1)
 
     def test_empty_history_returns_empty_payload(self) -> None:
-        service = PredictionService(prediction_repository=_BacktestRepository(records=[]))
+        service = self._service(records=[])
 
         payload = service.get_backtest_summary_payload(include_inactive_models=True)
 

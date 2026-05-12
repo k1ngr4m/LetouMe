@@ -15,6 +15,7 @@ class AppStartupTests(unittest.TestCase):
             patch("backend.app.main.ensure_rbac_setup") as ensure_rbac_setup_mock,
             patch("backend.app.main.bootstrap_default_models") as bootstrap_mock,
             patch("backend.app.main.AuthService") as auth_service_mock,
+            patch("backend.app.main.schedule_service.start") as schedule_start_mock,
         ):
             auth_service_mock.return_value.ensure_bootstrap_admin.return_value = None
             with TestClient(create_app()):
@@ -24,6 +25,7 @@ class AppStartupTests(unittest.TestCase):
         ensure_rbac_setup_mock.assert_called_once()
         bootstrap_mock.assert_called_once()
         auth_service_mock.return_value.ensure_bootstrap_admin.assert_called_once()
+        schedule_start_mock.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -13,15 +13,13 @@ from backend.app.main import create_app
 
 class SimulationTicketApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        database_url = os.getenv("MYSQL_TEST_DATABASE_URL")
-        if not database_url:
-            self.skipTest("MYSQL_TEST_DATABASE_URL is required for MySQL integration tests")
         self.temp_dir = tempfile.TemporaryDirectory()
+        sqlite_path = os.path.join(self.temp_dir.name, "simulation-ticket-test.sqlite3")
         self.env = patch.dict(
             os.environ,
             {
-                "DATABASE_URL": database_url,
-                "MYSQL_DATABASE": os.getenv("MYSQL_TEST_DATABASE", "letoume_test"),
+                "DB_DRIVER": "sqlite",
+                "SQLITE_PATH": sqlite_path,
                 "AUTH_BOOTSTRAP_ADMIN_USERNAME": "admin",
                 "AUTH_BOOTSTRAP_ADMIN_PASSWORD": "admin123456",
             },
@@ -31,10 +29,10 @@ class SimulationTicketApiTests(unittest.TestCase):
         ensure_schema()
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("DELETE FROM simulation_ticket")
                 cursor.execute("DELETE FROM user_session")
                 cursor.execute("DELETE FROM app_user WHERE username != ?", ("admin",))
         self.client = TestClient(create_app())
+        self.client.__enter__()
         register_code = self._issue_register_code("player-a@example.com")
         self.client.post(
             "/api/auth/register",
@@ -42,6 +40,7 @@ class SimulationTicketApiTests(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
+        self.client.__exit__(None, None, None)
         self.env.stop()
         self.temp_dir.cleanup()
 

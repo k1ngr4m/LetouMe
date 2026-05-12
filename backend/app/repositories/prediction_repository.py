@@ -648,7 +648,19 @@ class PredictionRepository:
                     None,
                 ),
             )
-            batch_id = int(cursor.lastrowid)
+            if getattr(connection, "driver", "mysql") == "sqlite":
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM prediction_batch
+                    WHERE target_issue_id = ? AND status = ?
+                    LIMIT 1
+                    """,
+                    (target_issue_id, status),
+                )
+                batch_id = int((cursor.fetchone() or {}).get("id") or cursor.lastrowid)
+            else:
+                batch_id = int(cursor.lastrowid)
             if archive_metadata:
                 cursor.execute(
                     """

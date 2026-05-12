@@ -13,15 +13,13 @@ from backend.app.main import create_app
 
 class AuthApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        database_url = os.getenv("MYSQL_TEST_DATABASE_URL")
-        if not database_url:
-            self.skipTest("MYSQL_TEST_DATABASE_URL is required for MySQL integration tests")
         self.temp_dir = tempfile.TemporaryDirectory()
+        sqlite_path = os.path.join(self.temp_dir.name, "auth-test.sqlite3")
         self.env = patch.dict(
             os.environ,
             {
-                "DATABASE_URL": database_url,
-                "MYSQL_DATABASE": os.getenv("MYSQL_TEST_DATABASE", "letoume_test"),
+                "DB_DRIVER": "sqlite",
+                "SQLITE_PATH": sqlite_path,
                 "AUTH_BOOTSTRAP_ADMIN_USERNAME": "admin",
                 "AUTH_BOOTSTRAP_ADMIN_PASSWORD": "admin123456",
             },
@@ -34,8 +32,10 @@ class AuthApiTests(unittest.TestCase):
                 cursor.execute("DELETE FROM user_session")
                 cursor.execute("DELETE FROM app_user")
         self.client = TestClient(create_app())
+        self.client.__enter__()
 
     def tearDown(self) -> None:
+        self.client.__exit__(None, None, None)
         self.env.stop()
         self.temp_dir.cleanup()
 
@@ -94,8 +94,8 @@ class AuthApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()["users"]
-        self.assertTrue(all(user["created_at"] is None or isinstance(user["created_at"], str) for user in payload))
-        self.assertTrue(all(user["last_login_at"] is None or isinstance(user["last_login_at"], str) for user in payload))
+        self.assertTrue(all(user["created_at"] is None or isinstance(user["created_at"], (int, str)) for user in payload))
+        self.assertTrue(all(user["last_login_at"] is None or isinstance(user["last_login_at"], (int, str)) for user in payload))
 
     def test_register_creates_normal_user_and_logs_in(self) -> None:
         register_code = self._issue_register_code("signup-user@example.com")

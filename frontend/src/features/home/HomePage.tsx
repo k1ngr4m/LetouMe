@@ -809,6 +809,12 @@ export function HomePage() {
     }
     return formatJackpotInYiYuan(latestDrawWithJackpot.jackpot_pool_balance)
   }, [chartDraws])
+  const hasPredictionSummaryData = Boolean(
+    currentPredictions.data?.target_period ||
+      currentPredictions.data?.prediction_date ||
+      lotteryCharts.data?.next_draw?.next_date_display ||
+      currentJackpotDisplay !== '—',
+  )
 
   useEffect(() => {
     savePinnedModels(validPinnedModelIds, selectedLottery)
@@ -1540,16 +1546,16 @@ export function HomePage() {
               ))}
             </div>
           ) : null}
-          <section className="prediction-summary-stack hero-metrics" aria-label="当前预测摘要">
-            <article className="hero-metric-card hero-metric-card--primary">
+          <section className={clsx('prediction-summary-stack hero-metrics', !hasPredictionSummaryData && 'is-empty')} aria-label="当前预测摘要">
+            <article className={clsx('hero-metric-card hero-metric-card--primary', !currentPredictions.data?.target_period && 'is-empty')}>
               <span>目标期号</span>
               <strong>{currentPredictions.data?.target_period || '-'}</strong>
             </article>
-            <article className="hero-metric-card hero-metric-card--primary">
+            <article className={clsx('hero-metric-card hero-metric-card--primary', !lotteryCharts.data?.next_draw?.next_date_display && 'is-empty')}>
               <span>下期开奖日</span>
               <strong>{lotteryCharts.data?.next_draw?.next_date_display || '-'}</strong>
             </article>
-            <article className="hero-metric-card">
+            <article className={clsx('hero-metric-card', !currentPredictions.data?.prediction_date && 'is-empty')}>
               <span>预测日期</span>
               <em>{currentPredictions.data?.prediction_date || '-'}</em>
             </article>
@@ -1557,7 +1563,7 @@ export function HomePage() {
               <span>开奖状态</span>
               <em>{actualResult ? '已开奖' : '待开奖'}</em>
             </article>
-            <article className="hero-metric-card">
+            <article className={clsx('hero-metric-card', currentJackpotDisplay === '—' && 'is-empty')}>
               <span>本期奖池</span>
               <strong>{currentJackpotDisplay}</strong>
             </article>
@@ -1567,7 +1573,6 @@ export function HomePage() {
             <section ref={modelSectionRef} data-section="models" className="prediction-overview-section prediction-overview-section--models">
               <StatusCard
                 title="模型列表"
-                // subtitle="列表页和卡片视图先看号码，评分视图更直观比较各模型评分，详情再看完整能力画像。"
                 actions={
                   <button
                     className={clsx('icon-button prediction-overview-toolbar__filter', isModelFilterOpen && 'is-active')}
@@ -1695,7 +1700,6 @@ export function HomePage() {
             <section ref={weightsSectionRef} data-section="weights" className="prediction-overview-section prediction-overview-section--summary">
               <StatusCard
                 title="预测统计"
-                // subtitle="展示各个模型中每个号码出现的次数、命中模型数和命中占比。"
                 actions={
                   <div className={clsx('toolbar-inline prediction-summary-toolbar', mobileExportDisabled && 'is-mobile-compact')}>
                     {!mobileExportDisabled ? (

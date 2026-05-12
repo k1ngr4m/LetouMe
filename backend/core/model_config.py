@@ -8,7 +8,7 @@ from time import monotonic
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from backend.app.db.connection import ensure_schema, get_connection
+from backend.app.db.connection import ensure_schema, get_connection, get_database_signature
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.time_utils import now_ts
 
@@ -32,143 +32,11 @@ SUPPORTED_API_FORMATS = (
     "google_gemini",
 )
 _bootstrap_ready = False
+_bootstrap_signature: tuple[Any, ...] | None = None
 _bootstrap_lock = Lock()
 _registry_cache_lock = Lock()
-_registry_cache_entry: tuple[float, "ModelRegistry"] | None = None
+_registry_cache_entry: tuple[float, tuple[Any, ...], "ModelRegistry"] | None = None
 MODEL_REGISTRY_CACHE_TTL_SECONDS = 60
-
-DEFAULT_MODEL_CATALOG: list[dict[str, Any]] = [
-    {
-        "model_code": "gpt-4o",
-        "display_name": "GPT-4o",
-        "provider": "openai",
-        "api_model_name": "gpt-4o",
-        "version": "1",
-        "tags": ["reasoning", "fast"],
-        "is_active": False,
-        "base_url": DEFAULT_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "claude-sonnet-4.6",
-        "display_name": "Claude-4.6",
-        "provider": "anthropic",
-        "api_model_name": "claude-sonnet-4-6",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": True,
-        "base_url": DEFAULT_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "gemini-3-flash-preview",
-        "display_name": "Gemini-3",
-        "provider": "gemini",
-        "api_model_name": "gemini-3-flash-preview",
-        "version": "1",
-        "tags": ["fast"],
-        "is_active": False,
-        "base_url": DEFAULT_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "deepseek-v3.2",
-        "display_name": "DeepSeek-v3.2",
-        "provider": "deepseek",
-        "api_model_name": "deepseek-chat",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": DEEPSEEK_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "deepseek-v4-flash",
-        "display_name": "DeepSeek-V4-Flash",
-        "provider": "deepseek",
-        "api_model_name": "deepseek-v4-flash",
-        "version": "1",
-        "tags": ["reasoning", "fast"],
-        "is_active": False,
-        "base_url": DEEPSEEK_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "deepseek-v4-pro",
-        "display_name": "DeepSeek-V4-Pro",
-        "provider": "deepseek",
-        "api_model_name": "deepseek-v4-pro",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": DEEPSEEK_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "deepseek-reasoner",
-        "display_name": "DeepSeek-V3.2-Reasoner",
-        "provider": "deepseek",
-        "api_model_name": "deepseek-reasoner",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": DEEPSEEK_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "gemini-3.1-pro-preview",
-        "display_name": "Gemini-3.1",
-        "provider": "gemini",
-        "api_model_name": "gemini-3.1-pro-preview",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": DEFAULT_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "doubao-seed-2-0-pro",
-        "display_name": "Doubao-Seed-2.0-Pro",
-        "provider": "openai_compatible",
-        "api_model_name": "doubao-seed-2-0-pro",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": DEFAULT_BASE_URL,
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-    {
-        "model_code": "zhipuai-glm-5",
-        "display_name": "ZhipuAI/GLM-5",
-        "provider": "openai_compatible",
-        "api_model_name": "ZhipuAI/GLM-5",
-        "version": "1",
-        "tags": ["reasoning"],
-        "is_active": False,
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "api_key": "",
-        "app_code": "",
-        "lottery_codes": ["dlt"],
-    },
-]
 
 
 @dataclass(frozen=True)
@@ -254,13 +122,16 @@ class ModelRegistry:
 
 
 def bootstrap_default_models() -> None:
-    global _bootstrap_ready
-    if _bootstrap_ready:
+    global _bootstrap_ready, _bootstrap_signature
+    signature = get_database_signature()
+    if _bootstrap_ready and _bootstrap_signature == signature:
         return
     ensure_schema()
     with _bootstrap_lock:
-        if _bootstrap_ready:
+        if _bootstrap_ready and _bootstrap_signature == signature:
             return
+        if _bootstrap_signature != signature:
+            _bootstrap_ready = False
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 provider_ids: dict[str, int] = {}
@@ -285,85 +156,8 @@ def bootstrap_default_models() -> None:
 
                 _migrate_deepseek_models(cursor, provider_ids)
 
-                for item in DEFAULT_MODEL_CATALOG:
-                    cursor.execute("SELECT id FROM ai_model WHERE model_code = ?", (item["model_code"],))
-                    existing_row = cursor.fetchone()
-                    if existing_row:
-                        continue
-                    provider_model_id = _ensure_provider_model_config(
-                        cursor,
-                        provider_ids[item["provider"]],
-                        item["api_model_name"],
-                        item["display_name"],
-                    )
-                    cursor.execute(
-                        """
-                        INSERT INTO ai_model (
-                            model_code,
-                            display_name,
-                            provider_model_id,
-                            api_model_name,
-                            version,
-                            is_active,
-                            base_url,
-                            api_key,
-                        app_code,
-                        temperature,
-                        extra_options_json,
-                        is_deleted,
-                        updated_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-                        """,
-                        (
-                            item["model_code"],
-                            item["display_name"],
-                            provider_model_id,
-                            item["api_model_name"],
-                            item.get("version"),
-                            1 if item.get("is_active") else 0,
-                            item.get("base_url") or DEFAULT_BASE_URL,
-                            item.get("api_key") or "",
-                            item.get("app_code") or "",
-                            item.get("temperature"),
-                            json.dumps(item.get("extra_options") or {}, ensure_ascii=False) if item.get("extra_options") else None,
-                            now_ts(),
-                        ),
-                    )
-                    cursor.execute(
-                        "SELECT id FROM ai_model WHERE model_code = ?",
-                        (item["model_code"],),
-                    )
-                    model_db_id = int(cursor.fetchone()["id"])
-                    for tag in item.get("tags", []):
-                        cursor.execute(
-                            """
-                            INSERT INTO model_tag (tag_code, tag_name)
-                            VALUES (?, ?)
-                            ON DUPLICATE KEY UPDATE tag_name = VALUES(tag_name)
-                            """,
-                            (tag, tag),
-                        )
-                        cursor.execute("SELECT id FROM model_tag WHERE tag_code = ?", (tag,))
-                        tag_id = int(cursor.fetchone()["id"])
-                        cursor.execute(
-                            """
-                            INSERT INTO ai_model_tag (model_id, tag_id)
-                            VALUES (?, ?)
-                            ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)
-                            """,
-                            (model_db_id, tag_id),
-                        )
-                    for lottery_code in item.get("lottery_codes", ["dlt"]):
-                        cursor.execute(
-                            """
-                            INSERT INTO ai_model_lottery (model_id, lottery_code)
-                            VALUES (?, ?)
-                            ON DUPLICATE KEY UPDATE lottery_code = VALUES(lottery_code)
-                            """,
-                            (model_db_id, normalize_lottery_code(lottery_code)),
-                        )
         _bootstrap_ready = True
+        _bootstrap_signature = signature
         invalidate_model_registry_cache()
 
 
@@ -472,12 +266,13 @@ def invalidate_model_registry_cache() -> None:
 
 def load_model_registry(_config_path: str | None = None, *, use_cache: bool = True) -> ModelRegistry:
     global _registry_cache_entry
+    signature = get_database_signature()
     if use_cache:
         now = monotonic()
         with _registry_cache_lock:
             cached = _registry_cache_entry
-            if cached and cached[0] > now:
-                return cached[1]
+            if cached and cached[0] > now and cached[1] == signature:
+                return cached[2]
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -546,7 +341,7 @@ def load_model_registry(_config_path: str | None = None, *, use_cache: bool = Tr
     registry = ModelRegistry(definitions=definitions)
     if use_cache:
         with _registry_cache_lock:
-            _registry_cache_entry = (monotonic() + MODEL_REGISTRY_CACHE_TTL_SECONDS, registry)
+            _registry_cache_entry = (monotonic() + MODEL_REGISTRY_CACHE_TTL_SECONDS, signature, registry)
     return registry
 
 

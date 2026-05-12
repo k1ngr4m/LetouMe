@@ -138,6 +138,7 @@ class PredictionRepositoryLoggingTests(unittest.TestCase):
             summary="upsert prediction_batch(current) target_period=2025002",
             payload={
                 "target_period": "2025002",
+                "lottery_code": "dlt",
                 "prediction_date": "2025-01-02",
                 "batch_id": unittest.mock.ANY,
             },

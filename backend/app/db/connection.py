@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import sqlite3
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
@@ -8,7 +10,8 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from backend.app.config import Settings, load_settings
 from backend.app.db.lottery_tables import rewrite_lottery_tables
-from backend.app.db.schema import get_schema_index_migrations, get_schema_migrations, get_schema_statements
+from backend.app.db.schema import get_schema_statements
+from backend.app.db.sqlite_schema import get_sqlite_schema_statements
 from backend.app.logging_utils import get_logger
 
 if TYPE_CHECKING:
@@ -21,9 +24,10 @@ _schema_ready = False
 _ready_lock = Lock()
 _pool_lock = Lock()
 _connection_pool: list[Any] = []
-_pool_signature: tuple[str, int, str, str] | None = None
-_ready_signature: tuple[str, int, str, str] | None = None
+_pool_signature: tuple[Any, ...] | None = None
+_ready_signature: tuple[Any, ...] | None = None
 _request_metrics: ContextVar[dict[str, float | int]] = ContextVar("db_request_metrics", default={"query_count": 0, "db_time_ms": 0.0})
+_SHOW_COLUMNS_PATTERN = re.compile(r"SHOW\s+COLUMNS\s+FROM\s+([a-zA-Z0-9_]+)\s+LIKE\s+'([^']+)'", re.IGNORECASE)
 
 
 def reset_request_metrics() -> None:
@@ -47,8 +51,14 @@ def _track_query(duration_ms: float, query: str) -> None:
         logger.warning("Slow SQL detected", extra={"context": {"duration_ms": round(duration_ms, 2), "query": " ".join(query.split())[:240]}})
 
 
-def _settings_signature(settings: Settings) -> tuple[str, int, str, str]:
-    return (settings.mysql_host, settings.mysql_port, settings.mysql_user, settings.mysql_database)
+def _settings_signature(settings: Settings) -> tuple[Any, ...]:
+    if settings.db_driver == "mysql":
+        return ("mysql", settings.mysql_host, settings.mysql_port, settings.mysql_user, settings.mysql_database)
+    return ("sqlite", str(settings.sqlite_source_path.resolve()))
+
+
+def get_database_signature() -> tuple[Any, ...]:
+    return _settings_signature(load_settings())
 
 
 def _close_pool_locked() -> None:
@@ -108,7 +118,7 @@ def _format_mysql_operational_error(settings: Settings, exc: Exception) -> str:
     return f"MySQL connection failed ({code}): {exc}\nConnection details: {details}\n"
 
 
-class CursorContext:
+class MySQLCursorContext:
     def __init__(self, connection, settings: Settings) -> None:
         self._connection = connection
         self._settings = settings
@@ -166,12 +176,14 @@ class MySQLCursorAdapter:
 
 
 class MySQLConnectionAdapter:
+    driver = "mysql"
+
     def __init__(self, connection, settings: Settings) -> None:
         self._connection = connection
         self._settings = settings
 
-    def cursor(self) -> CursorContext:
-        return CursorContext(self._connection, self._settings)
+    def cursor(self) -> MySQLCursorContext:
+        return MySQLCursorContext(self._connection, self._settings)
 
     def commit(self) -> None:
         self._connection.commit()
@@ -181,6 +193,129 @@ class MySQLConnectionAdapter:
 
     def close(self) -> None:
         _release_raw_mysql_connection(self._settings, self._connection)
+
+
+class SQLiteCursorContext:
+    def __init__(self, connection: sqlite3.Connection, settings: Settings) -> None:
+        self._connection = connection
+        self._settings = settings
+        self._cursor: sqlite3.Cursor | None = None
+
+    def __enter__(self):
+        self._cursor = self._connection.cursor()
+        return SQLiteCursorAdapter(self._cursor, settings=self._settings)
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._cursor is not None:
+            self._cursor.close()
+
+
+class SQLiteCursorAdapter:
+    def __init__(self, cursor: sqlite3.Cursor, *, settings: Settings) -> None:
+        self._cursor = cursor
+        self._settings = settings
+        self._override_rows: list[dict[str, Any]] | None = None
+
+    @property
+    def lastrowid(self) -> int:
+        return int(self._cursor.lastrowid or 0)
+
+    @property
+    def rowcount(self) -> int:
+        return int(self._cursor.rowcount or 0)
+
+    def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None) -> int:
+        routed_query = rewrite_lottery_tables(query)
+        normalized_query = _normalize_sqlite_query(routed_query)
+        started_at = perf_counter()
+        self._override_rows = None
+        try:
+            show_columns_match = _SHOW_COLUMNS_PATTERN.fullmatch(" ".join(normalized_query.split()))
+            if show_columns_match:
+                self._override_rows = _sqlite_show_columns(self._cursor, show_columns_match.group(1), show_columns_match.group(2))
+                return len(self._override_rows)
+            return self._cursor.execute(normalized_query, params or ()).rowcount
+        finally:
+            _track_query((perf_counter() - started_at) * 1000, routed_query)
+
+    def executemany(self, query: str, params: list[tuple[Any, ...]]) -> int:
+        routed_query = rewrite_lottery_tables(query)
+        normalized_query = _normalize_sqlite_query(routed_query)
+        started_at = perf_counter()
+        try:
+            return self._cursor.executemany(normalized_query, params).rowcount
+        finally:
+            _track_query((perf_counter() - started_at) * 1000, routed_query)
+
+    def fetchone(self) -> dict[str, Any] | None:
+        if self._override_rows is not None:
+            return self._override_rows.pop(0) if self._override_rows else None
+        row = self._cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def fetchall(self) -> list[dict[str, Any]]:
+        if self._override_rows is not None:
+            rows = self._override_rows
+            self._override_rows = []
+            return rows
+        return [dict(row) for row in self._cursor.fetchall()]
+
+
+class SQLiteConnectionAdapter:
+    driver = "sqlite"
+
+    def __init__(self, connection: sqlite3.Connection, settings: Settings) -> None:
+        self._connection = connection
+        self._settings = settings
+
+    def cursor(self) -> SQLiteCursorContext:
+        return SQLiteCursorContext(self._connection, self._settings)
+
+    def commit(self) -> None:
+        self._connection.commit()
+
+    def rollback(self) -> None:
+        self._connection.rollback()
+
+    def close(self) -> None:
+        self._connection.close()
+
+
+def _normalize_sqlite_query(query: str) -> str:
+    normalized = query
+    normalized = re.sub(r"\bINSERT\s+IGNORE\s+INTO\b", "INSERT OR IGNORE INTO", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bON\s+DUPLICATE\s+KEY\s+UPDATE\b", "ON CONFLICT DO UPDATE SET", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bVALUES\((`?[a-zA-Z0-9_]+`?)\)", r"excluded.\1", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bLAST_INSERT_ID\(([^)]+)\)", r"\1", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(
+        r"JSON_UNQUOTE\(\s*JSON_EXTRACT\(([^,]+),\s*'([^']+)'\)\s*\)",
+        r"json_extract(\1, '\2')",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(r"\bJSON_EXTRACT\(([^,]+),\s*'([^']+)'\)", r"json_extract(\1, '\2')", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bSIGNED\b", "INTEGER", normalized, flags=re.IGNORECASE)
+    return normalized
+
+
+def _sqlite_show_columns(cursor: sqlite3.Cursor, table_name: str, column_name: str) -> list[dict[str, Any]]:
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    rows = cursor.fetchall()
+    result = []
+    for row in rows:
+        row_dict = dict(row)
+        if str(row_dict.get("name")) == column_name:
+            result.append({"Field": row_dict.get("name"), "Type": row_dict.get("type")})
+    return result
+
+
+def _open_sqlite_connection(settings: Settings) -> sqlite3.Connection:
+    sqlite_path = settings.sqlite_source_path
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(sqlite_path)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
 
 
 def _open_mysql_connection(settings: Settings, *, with_database: bool):
@@ -214,6 +349,10 @@ def _ensure_database_exists(settings: Settings) -> None:
             _schema_ready = False
             _ready_signature = signature
         if _db_ready:
+            return
+        if settings.db_driver == "sqlite":
+            settings.sqlite_source_path.parent.mkdir(parents=True, exist_ok=True)
+            _db_ready = True
             return
         connection = _open_mysql_connection(settings, with_database=False)
         try:
@@ -261,57 +400,14 @@ def _release_raw_mysql_connection(settings: Settings, connection) -> None:
         _connection_pool.append(connection)
 
 
-def _run_data_migrations(cursor) -> None:
-    cursor.execute(
-        """
-        SELECT id
-        FROM model_provider
-        WHERE provider_code = ?
-        LIMIT 1
-        """,
-        ("aimixhub",),
-    )
-    legacy_provider = cursor.fetchone()
-    if not legacy_provider:
-        return
-    cursor.execute(
-        """
-        SELECT id
-        FROM model_provider
-        WHERE provider_code = ?
-        LIMIT 1
-        """,
-        ("aihubmix",),
-    )
-    target_provider = cursor.fetchone()
-    if target_provider:
-        cursor.execute(
-            """
-            UPDATE model_provider
-            SET is_deleted = 1,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE provider_code = ?
-            """,
-            ("aimixhub",),
-        )
-        return
-    cursor.execute(
-        """
-        UPDATE model_provider
-        SET provider_code = ?,
-            provider_name = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE provider_code = ?
-        """,
-        ("aihubmix", "AIHubMix", "aimixhub"),
-    )
-
-
 @contextmanager
-def get_connection() -> Iterator[MySQLConnectionAdapter]:
+def get_connection() -> Iterator[MySQLConnectionAdapter | SQLiteConnectionAdapter]:
     settings = load_settings()
     _ensure_database_exists(settings)
-    connection = MySQLConnectionAdapter(_acquire_raw_mysql_connection(settings), settings)
+    if settings.db_driver == "mysql":
+        connection: MySQLConnectionAdapter | SQLiteConnectionAdapter = MySQLConnectionAdapter(_acquire_raw_mysql_connection(settings), settings)
+    else:
+        connection = SQLiteConnectionAdapter(_open_sqlite_connection(settings), settings)
     try:
         yield connection
         connection.commit()
@@ -324,55 +420,19 @@ def get_connection() -> Iterator[MySQLConnectionAdapter]:
 
 def ensure_schema() -> None:
     global _schema_ready, _ready_signature
-    if _schema_ready:
-        return
     settings = load_settings()
+    signature = _settings_signature(settings)
+    if _schema_ready and _ready_signature == signature:
+        return
     _ensure_database_exists(settings)
     with _ready_lock:
-        if _ready_signature != _settings_signature(settings):
+        if _ready_signature != signature:
             _schema_ready = False
         if _schema_ready:
             return
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                schema_statements = get_schema_statements()
-                schema_migrations = get_schema_migrations()
-                schema_index_migrations = get_schema_index_migrations()
-
+                schema_statements = get_schema_statements() if settings.db_driver == "mysql" else get_sqlite_schema_statements()
                 for statement in schema_statements:
                     cursor.execute(statement)
-
-                for table_name, migrations in schema_migrations.items():
-                    cursor.execute(
-                        """
-                        SELECT COLUMN_NAME
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                        """,
-                        (settings.mysql_database, table_name),
-                    )
-                    existing_columns = {str(row["COLUMN_NAME"]) for row in cursor.fetchall()}
-                    for column_name, statement in migrations.items():
-                        if column_name not in existing_columns:
-                            cursor.execute(statement)
-
-                for table_name, index_migrations in schema_index_migrations.items():
-                    cursor.execute(
-                        """
-                        SELECT INDEX_NAME
-                        FROM INFORMATION_SCHEMA.STATISTICS
-                        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                        """,
-                        (settings.mysql_database, table_name),
-                    )
-                    existing_indexes = {str(row["INDEX_NAME"]) for row in cursor.fetchall()}
-                    for index_name, statement in index_migrations.get("add", {}).items():
-                        if index_name not in existing_indexes:
-                            cursor.execute(statement)
-                            existing_indexes.add(index_name)
-                    for index_name, statement in index_migrations.get("drop", {}).items():
-                        if index_name in existing_indexes:
-                            cursor.execute(statement)
-                            existing_indexes.discard(index_name)
-                _run_data_migrations(cursor)
         _schema_ready = True
