@@ -149,6 +149,7 @@ describe('MyBetsPanel', () => {
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })
     expect(await screen.findByText('第 2026032 期')).toBeInTheDocument()
+    expect(document.querySelector('.my-bets-summary-grid')).not.toBeInTheDocument()
 
     const table = document.querySelector('.my-bets-table') as HTMLElement
     expect(table).not.toBeNull()
@@ -157,7 +158,7 @@ describe('MyBetsPanel', () => {
     const pagination = document.querySelector('.my-bets-pagination') as HTMLElement
     expect(pagination).not.toBeNull()
     expect(recordScroll.contains(pagination)).toBe(false)
-    expect(within(table).queryByText('来源/状态')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('来源')).not.toBeInTheDocument()
     expect(within(table).getByText('注数/倍数')).toBeInTheDocument()
     expect(within(table).getByText('1 注 / 2 倍')).toBeInTheDocument()
     expect(within(table).getByText('九等奖 · 中 1 注')).toBeInTheDocument()
@@ -167,11 +168,31 @@ describe('MyBetsPanel', () => {
     expect(within(dialog).getByText('开奖号码')).toBeInTheDocument()
     expect(within(dialog).getByText('创建时间')).toBeInTheDocument()
     expect(within(dialog).getByText('更新时间')).toBeInTheDocument()
+    expect(within(dialog).queryByText('结算时间')).not.toBeInTheDocument()
     expect(within(dialog).getByText('子注单 #1 · 大乐透')).toBeInTheDocument()
     expect(within(dialog).getByText('总奖金')).toBeInTheDocument()
 
     await userEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('toggles summary cards from the toolbar', async () => {
+    renderPanel()
+    await screen.findByRole('heading', { name: '我的投注' })
+    await screen.findByText('第 2026032 期')
+
+    expect(document.querySelector('.my-bets-summary-grid')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '显示汇总' }))
+    await screen.findByText('投注笔数')
+    const summaryGrid = document.querySelector('.my-bets-summary-grid')
+    expect(summaryGrid).toBeInTheDocument()
+    expect(within(summaryGrid as HTMLElement).getByText('投注笔数')).toBeInTheDocument()
+    expect(within(summaryGrid as HTMLElement).getByText('总投入')).toBeInTheDocument()
+    expect(within(summaryGrid as HTMLElement).getByText('累计盈亏')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '隐藏汇总' }))
+    expect(document.querySelector('.my-bets-summary-grid')).not.toBeInTheDocument()
   })
 
   it('keeps table row actions from opening the detail modal', async () => {
@@ -228,10 +249,15 @@ describe('MyBetsPanel', () => {
     renderPanel()
     await screen.findByRole('heading', { name: '我的投注' })
 
+    expect(screen.getByRole('button', { name: '期号条件符：包含' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '玩法条件符：等于' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '状态条件符：等于' })).toBeInTheDocument()
+
     await userEvent.type(screen.getByLabelText('筛选期号'), '2603')
-    await userEvent.selectOptions(screen.getByLabelText('玩法'), 'dlt_dantuo')
-    await userEvent.selectOptions(screen.getByLabelText('状态'), 'settled')
-    await userEvent.selectOptions(screen.getByLabelText('来源'), 'ocr')
+    await userEvent.click(screen.getByRole('button', { name: '期号条件符：包含' }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: '等于' }))
+    await userEvent.selectOptions(screen.getByLabelText('筛选玩法'), 'dlt_dantuo')
+    await userEvent.selectOptions(screen.getByLabelText('筛选状态'), 'settled')
     await userEvent.type(screen.getByLabelText('筛选开始日期'), '2026-04-01')
     await userEvent.type(screen.getByLabelText('筛选结束日期'), '2026-04-30')
 
@@ -241,13 +267,27 @@ describe('MyBetsPanel', () => {
         limit: 20,
         offset: 0,
         period_query: '2603',
+        period_query_operator: 'eq',
         play_type_filter: 'dlt_dantuo',
+        play_type_filter_operator: 'eq',
         settlement_status_filter: 'settled',
-        source_type_filter: 'ocr',
+        settlement_status_filter_operator: 'eq',
         date_start: '2026-04-01',
+        date_start_operator: 'gte',
         date_end: '2026-04-30',
+        date_end_operator: 'lte',
       }),
     )
+  })
+
+  it('hides the field input when the operator is empty', async () => {
+    renderPanel()
+    await screen.findByRole('heading', { name: '我的投注' })
+
+    await userEvent.click(screen.getByRole('button', { name: '期号条件符：包含' }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: '为空' }))
+
+    expect(screen.queryByLabelText('筛选期号')).not.toBeInTheDocument()
   })
 
   it('opens the detail modal from the card detail action', async () => {

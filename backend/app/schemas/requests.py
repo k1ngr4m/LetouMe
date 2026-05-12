@@ -271,11 +271,16 @@ class MyBetRecordListPayload(BaseModel):
     limit: int = Field(default=20, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
     period_query: str | None = None
+    period_query_operator: Literal["eq", "ne", "contains", "empty", "not_empty"] = "contains"
     play_type_filter: str | None = None
+    play_type_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
     settlement_status_filter: Literal["all", "pending", "settled"] = "all"
+    settlement_status_filter_operator: Literal["eq", "ne", "empty", "not_empty"] = "eq"
     source_type_filter: Literal["all", "manual", "ocr"] = "all"
     date_start: str | None = None
+    date_start_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty"] = "gte"
     date_end: str | None = None
+    date_end_operator: Literal["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty"] = "lte"
 
 
 class MyBetLinePayload(BaseModel):

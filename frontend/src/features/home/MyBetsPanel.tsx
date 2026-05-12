@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Coins, Eye, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Coins, Eye, FilterX, Gift, ImageIcon, LayoutGrid, List, PencilLine, Plus, ReceiptText, ScanLine, Sparkles, Ticket, Trash2, Trophy, Wallet } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { apiClient } from '../../shared/api/client'
 import { NumberBall } from '../../shared/components/NumberBall'
@@ -10,7 +10,18 @@ import { StatusCard } from '../../shared/components/StatusCard'
 import { useToast } from '../../shared/feedback/ToastProvider'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import { useMotion } from '../../shared/theme/MotionProvider'
-import type { LotteryCode, MyBetLine, MyBetLinePayload, MyBetOCRDraftResponse, MyBetRecord, MyBetRecordPayload, MyBetRecordUpdatePayload } from '../../shared/types/api'
+import type {
+  LotteryCode,
+  MyBetDateFilterOperator,
+  MyBetEnumFilterOperator,
+  MyBetLine,
+  MyBetLinePayload,
+  MyBetOCRDraftResponse,
+  MyBetRecord,
+  MyBetRecordPayload,
+  MyBetRecordUpdatePayload,
+  MyBetTextFilterOperator,
+} from '../../shared/types/api'
 
 type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo'
 type DltPlayType = 'dlt' | 'dlt_dantuo'
@@ -60,16 +71,116 @@ type BetFormState = {
 type MyBetsViewMode = 'list' | 'form'
 type MyBetsDisplayMode = 'card' | 'table'
 type MyBetsSettlementFilter = 'all' | 'pending' | 'settled'
-type MyBetsSourceFilter = 'all' | 'manual' | 'ocr'
+type MyBetsTextOperator = MyBetTextFilterOperator
+type MyBetsEnumOperator = MyBetEnumFilterOperator
+type MyBetsDateOperator = MyBetDateFilterOperator
+
+type MyBetsFilterFieldKey = 'period' | 'play_type' | 'settlement_status' | 'date_start' | 'date_end'
 
 const MY_BETS_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 200] as const
 const MY_BETS_COMPACT_VIEWPORT_WIDTH = 760
+const DEFAULT_MY_BETS_FILTER_OPERATORS = {
+  period: 'contains' as MyBetsTextOperator,
+  playType: 'eq' as MyBetsEnumOperator,
+  settlementStatus: 'eq' as MyBetsEnumOperator,
+  dateStart: 'gte' as MyBetsDateOperator,
+  dateEnd: 'lte' as MyBetsDateOperator,
+}
+const TEXT_FILTER_OPERATORS: Array<{ value: MyBetTextFilterOperator; label: string; symbol: string }> = [
+  { value: 'contains', label: '包含', symbol: '∋' },
+  { value: 'eq', label: '等于', symbol: '=' },
+  { value: 'ne', label: '不等于', symbol: '!=' },
+  { value: 'empty', label: '为空', symbol: '∅' },
+  { value: 'not_empty', label: '不为空', symbol: '≠∅' },
+]
+const ENUM_FILTER_OPERATORS: Array<{ value: MyBetEnumFilterOperator; label: string; symbol: string }> = [
+  { value: 'eq', label: '等于', symbol: '=' },
+  { value: 'ne', label: '不等于', symbol: '!=' },
+  { value: 'empty', label: '为空', symbol: '∅' },
+  { value: 'not_empty', label: '不为空', symbol: '≠∅' },
+]
+const DATE_FILTER_OPERATORS: Array<{ value: MyBetDateFilterOperator; label: string; symbol: string }> = [
+  { value: 'eq', label: '等于', symbol: '=' },
+  { value: 'ne', label: '不等于', symbol: '!=' },
+  { value: 'gt', label: '晚于', symbol: '>' },
+  { value: 'gte', label: '晚于或等于', symbol: '>=' },
+  { value: 'lt', label: '早于', symbol: '<' },
+  { value: 'lte', label: '早于或等于', symbol: '<=' },
+  { value: 'empty', label: '为空', symbol: '∅' },
+  { value: 'not_empty', label: '不为空', symbol: '≠∅' },
+]
 
 type LineQuote = {
   betCount: number
   amount: number
   valid: boolean
   reason?: string
+}
+
+type MyBetsFilterOperatorMenuProps<T extends string> = {
+  fieldLabel: string
+  fieldKey: MyBetsFilterFieldKey
+  operator: T
+  options: Array<{ value: T; label: string; symbol: string }>
+  isOpen: boolean
+  onToggleOpen: (fieldKey: MyBetsFilterFieldKey) => void
+  onClose: () => void
+  onChange: (value: T) => void
+}
+
+function MyBetsFilterOperatorMenu<T extends string>({
+  fieldLabel,
+  fieldKey,
+  operator,
+  options,
+  isOpen,
+  onToggleOpen,
+  onClose,
+  onChange,
+}: MyBetsFilterOperatorMenuProps<T>) {
+  const current = options.find((item) => item.value === operator) || options[0]
+  return (
+    <div className="my-bets-filter-operator-wrap">
+      <button
+        type="button"
+        className={clsx('my-bets-filter-operator-button', isOpen && 'is-active')}
+        onClick={() => onToggleOpen(fieldKey)}
+        aria-label={`${fieldLabel}条件符：${current.label}`}
+        title={`${fieldLabel}条件符：${current.label}`}
+      >
+        <span className="my-bets-filter-operator-button__symbol" aria-hidden="true">
+          {current.symbol}
+        </span>
+        <ChevronDown className="my-bets-filter-operator-button__chevron" size={12} aria-hidden="true" />
+      </button>
+      {isOpen ? (
+        <div className="my-bets-filter-operator-menu" role="menu" aria-label={`${fieldLabel}条件符选项`}>
+          {options.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={clsx('my-bets-filter-operator-menu__item', operator === item.value && 'is-active')}
+              onClick={() => {
+                onChange(item.value)
+                onClose()
+              }}
+              role="menuitemradio"
+              aria-checked={operator === item.value}
+            >
+              <span className="my-bets-filter-operator-menu__symbol" aria-hidden="true">
+                {item.symbol}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function isEmptyOperator(operator: string) {
+  return operator === 'empty' || operator === 'not_empty'
 }
 
 function getInitialMyBetsDisplayMode(): MyBetsDisplayMode {
@@ -101,11 +212,6 @@ const myBetsSettlementFilterOptions: Array<{ value: MyBetsSettlementFilter; labe
   { value: 'all', label: '全部状态' },
   { value: 'pending', label: '待开奖' },
   { value: 'settled', label: '已结算' },
-]
-const myBetsSourceFilterOptions: Array<{ value: MyBetsSourceFilter; label: string }> = [
-  { value: 'all', label: '全部来源' },
-  { value: 'manual', label: '手动录入' },
-  { value: 'ocr', label: 'OCR识别' },
 ]
 const dltFrontPool = Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(2, '0'))
 const dltBackPool = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
@@ -888,15 +994,21 @@ export function MyBetsPanel({
   const editImageInputRef = useRef<HTMLInputElement | null>(null)
   const [viewMode, setViewMode] = useState<MyBetsViewMode>('list')
   const [displayMode, setDisplayMode] = useState<MyBetsDisplayMode>(getInitialMyBetsDisplayMode)
+  const [summaryCardsVisible, setSummaryCardsVisible] = useState(false)
   const [recordsPage, setRecordsPage] = useState(1)
   const [recordsPageSize, setRecordsPageSize] = useState<(typeof MY_BETS_PAGE_SIZE_OPTIONS)[number]>(20)
   const [recordsPageInput, setRecordsPageInput] = useState('1')
   const [periodQuery, setPeriodQuery] = useState('')
+  const [periodQueryOperator, setPeriodQueryOperator] = useState<MyBetsTextOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.period)
   const [playTypeFilter, setPlayTypeFilter] = useState('all')
+  const [playTypeFilterOperator, setPlayTypeFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
   const [settlementStatusFilter, setSettlementStatusFilter] = useState<MyBetsSettlementFilter>('all')
-  const [sourceTypeFilter, setSourceTypeFilter] = useState<MyBetsSourceFilter>('all')
+  const [settlementStatusFilterOperator, setSettlementStatusFilterOperator] = useState<MyBetsEnumOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
   const [dateStartFilter, setDateStartFilter] = useState('')
+  const [dateStartFilterOperator, setDateStartFilterOperator] = useState<MyBetsDateOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart)
   const [dateEndFilter, setDateEndFilter] = useState('')
+  const [dateEndFilterOperator, setDateEndFilterOperator] = useState<MyBetsDateOperator>(DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd)
+  const [activeFilterOperatorMenu, setActiveFilterOperatorMenu] = useState<MyBetsFilterFieldKey | null>(null)
   const [editingRecord, setEditingRecord] = useState<MyBetRecord | null>(null)
   const [selectedDetailRecord, setSelectedDetailRecord] = useState<MyBetRecord | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -928,13 +1040,18 @@ export function MyBetsPanel({
 
   const normalizedPeriodQuery = periodQuery.trim()
   const normalizedPlayTypeFilter = playTypeFilter === 'all' ? '' : playTypeFilter
+  const normalizedSettlementStatusFilter = settlementStatusFilter === 'all' ? '' : settlementStatusFilter
   const hasActiveFilters = Boolean(
     normalizedPeriodQuery ||
+      periodQueryOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.period ||
       normalizedPlayTypeFilter ||
-      settlementStatusFilter !== 'all' ||
-      sourceTypeFilter !== 'all' ||
+      playTypeFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.playType ||
+      normalizedSettlementStatusFilter ||
+      settlementStatusFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus ||
       dateStartFilter ||
-      dateEndFilter,
+      dateStartFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart ||
+      dateEndFilter ||
+      dateEndFilterOperator !== DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd,
   )
   const recordsOffset = (recordsPage - 1) * recordsPageSize
   const betsQuery = useQuery({
@@ -944,11 +1061,15 @@ export function MyBetsPanel({
       recordsPage,
       recordsPageSize,
       normalizedPeriodQuery,
+      periodQueryOperator,
       normalizedPlayTypeFilter,
+      playTypeFilterOperator,
       settlementStatusFilter,
-      sourceTypeFilter,
+      settlementStatusFilterOperator,
       dateStartFilter,
+      dateStartFilterOperator,
       dateEndFilter,
+      dateEndFilterOperator,
     ],
     queryFn: async () =>
       apiClient.getMyBets({
@@ -956,11 +1077,15 @@ export function MyBetsPanel({
         limit: recordsPageSize,
         offset: recordsOffset,
         period_query: normalizedPeriodQuery || undefined,
+        period_query_operator: periodQueryOperator,
         play_type_filter: normalizedPlayTypeFilter || undefined,
-        settlement_status_filter: settlementStatusFilter,
-        source_type_filter: sourceTypeFilter,
+        play_type_filter_operator: playTypeFilterOperator,
+        settlement_status_filter: normalizedSettlementStatusFilter || undefined,
+        settlement_status_filter_operator: settlementStatusFilterOperator,
         date_start: dateStartFilter || undefined,
+        date_start_operator: dateStartFilterOperator,
         date_end: dateEndFilter || undefined,
+        date_end_operator: dateEndFilterOperator,
       }),
   })
 
@@ -1112,13 +1237,45 @@ export function MyBetsPanel({
   }, [selectedDetailRecord])
 
   useEffect(() => {
+    if (!activeFilterOperatorMenu) return
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('.my-bets-filter-operator-wrap')) return
+      setActiveFilterOperatorMenu(null)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveFilterOperatorMenu(null)
+      }
+    }
+    window.addEventListener('click', handleDocumentClick)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('click', handleDocumentClick)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [activeFilterOperatorMenu])
+
+  useEffect(() => {
     if (!betsQuery.data) return
     setRecordsPage((currentPage) => Math.min(currentPage, totalRecordPages))
   }, [betsQuery.data, totalRecordPages])
 
   useEffect(() => {
     setRecordsPage(1)
-  }, [normalizedPeriodQuery, normalizedPlayTypeFilter, settlementStatusFilter, sourceTypeFilter, dateStartFilter, dateEndFilter])
+  }, [
+    normalizedPeriodQuery,
+    periodQueryOperator,
+    normalizedPlayTypeFilter,
+    playTypeFilterOperator,
+    normalizedSettlementStatusFilter,
+    settlementStatusFilterOperator,
+    dateStartFilter,
+    dateStartFilterOperator,
+    dateEndFilter,
+    dateEndFilterOperator,
+  ])
 
   useEffect(() => {
     setRecordsPageInput(String(normalizedRecordsPage))
@@ -1328,11 +1485,16 @@ export function MyBetsPanel({
 
   function clearMyBetsFilters() {
     setPeriodQuery('')
+    setPeriodQueryOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.period)
     setPlayTypeFilter('all')
+    setPlayTypeFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.playType)
     setSettlementStatusFilter('all')
-    setSourceTypeFilter('all')
+    setSettlementStatusFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.settlementStatus)
     setDateStartFilter('')
+    setDateStartFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.dateStart)
     setDateEndFilter('')
+    setDateEndFilterOperator(DEFAULT_MY_BETS_FILTER_OPERATORS.dateEnd)
+    setActiveFilterOperatorMenu(null)
     setRecordsPage(1)
   }
 
@@ -1363,6 +1525,17 @@ export function MyBetsPanel({
                   <List size={16} aria-hidden="true" />
                 </button>
               </div>
+            ) : null}
+            {viewMode === 'list' ? (
+              <button
+                className={clsx('icon-button my-bets-page__toolbar-button', summaryCardsVisible && 'is-active')}
+                type="button"
+                onClick={() => setSummaryCardsVisible((current) => !current)}
+                aria-label={summaryCardsVisible ? '隐藏汇总' : '显示汇总'}
+                title={summaryCardsVisible ? '隐藏汇总' : '显示汇总'}
+              >
+                <Eye size={16} aria-hidden="true" />
+              </button>
             ) : null}
             {viewMode === 'list' && displayMode === 'card' && hasRecords ? (
               <button
@@ -1399,81 +1572,164 @@ export function MyBetsPanel({
       >
         {viewMode === 'list' ? (
           <div className="my-bets-list-view-shell">
-            <div className="my-bets-summary-grid">
-              {summaryCards.map((item, index) => {
-                const Icon = item.icon
-                return (
-                  <motion.article
-                    key={item.key}
-                    className={clsx('my-bets-summary-card', item.cardClassName)}
-                    initial={animationsEnabled ? { opacity: 0, y: summaryEnterY } : false}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: animationsEnabled ? 0.2 * motionScale : 0, delay: animationsEnabled ? index * 0.03 : 0 }}
-                  >
-                    <span className="my-bets-summary-card__label">{item.label}</span>
-                    <span className="my-bets-summary-card__icon" aria-hidden="true">
-                      <Icon size={16} />
-                    </span>
-                    <strong className={item.valueClassName}>{item.value}</strong>
-                    {item.meta ? <small>{item.meta}</small> : null}
-                  </motion.article>
-                )
-              })}
-            </div>
+            {summaryCardsVisible ? (
+              <div className="my-bets-summary-grid">
+                {summaryCards.map((item, index) => {
+                  const Icon = item.icon
+                  return (
+                    <motion.article
+                      key={item.key}
+                      className={clsx('my-bets-summary-card', item.cardClassName)}
+                      initial={animationsEnabled ? { opacity: 0, y: summaryEnterY } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: animationsEnabled ? 0.2 * motionScale : 0, delay: animationsEnabled ? index * 0.03 : 0 }}
+                    >
+                      <span className="my-bets-summary-card__label">{item.label}</span>
+                      <span className="my-bets-summary-card__icon" aria-hidden="true">
+                        <Icon size={16} />
+                      </span>
+                      <strong className={item.valueClassName}>{item.value}</strong>
+                      {item.meta ? <small>{item.meta}</small> : null}
+                    </motion.article>
+                  )
+                })}
+              </div>
+            ) : null}
 
             {message ? <div className="simulation-inline-message">{message}</div> : null}
 
             <div className="my-bets-filter-panel" aria-label="我的投注筛选">
-              <label className="my-bets-filter-field my-bets-filter-field--search">
+              <div className="my-bets-filter-field my-bets-filter-field--search">
                 <span>期号</span>
-                <input
-                  value={periodQuery}
-                  onChange={(event) => setPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
-                  inputMode="numeric"
-                  placeholder="输入期号"
-                  aria-label="筛选期号"
-                />
-              </label>
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="期号"
+                    fieldKey="period"
+                    operator={periodQueryOperator}
+                    options={TEXT_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'period'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setPeriodQueryOperator}
+                  />
+                  {!isEmptyOperator(periodQueryOperator) ? (
+                    <input
+                      value={periodQuery}
+                      onChange={(event) => setPeriodQuery(event.target.value.replace(/[^\d]/g, ''))}
+                      inputMode="numeric"
+                      placeholder="输入期号"
+                      aria-label="筛选期号"
+                    />
+                  ) : null}
+                </div>
+              </div>
               <label className="my-bets-filter-field">
                 <span>玩法</span>
-                <select value={playTypeFilter} onChange={(event) => setPlayTypeFilter(event.target.value)}>
-                  {myBetsPlayTypeOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="玩法"
+                    fieldKey="play_type"
+                    operator={playTypeFilterOperator}
+                    options={ENUM_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'play_type'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setPlayTypeFilterOperator}
+                  />
+                  {!isEmptyOperator(playTypeFilterOperator) ? (
+                    <select value={playTypeFilter} onChange={(event) => setPlayTypeFilter(event.target.value)} aria-label="筛选玩法">
+                      {myBetsPlayTypeOptions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
               </label>
               <label className="my-bets-filter-field">
                 <span>状态</span>
-                <select value={settlementStatusFilter} onChange={(event) => setSettlementStatusFilter(event.target.value as MyBetsSettlementFilter)}>
-                  {myBetsSettlementFilterOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="my-bets-filter-field">
-                <span>来源</span>
-                <select value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value as MyBetsSourceFilter)}>
-                  {myBetsSourceFilterOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="状态"
+                    fieldKey="settlement_status"
+                    operator={settlementStatusFilterOperator}
+                    options={ENUM_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'settlement_status'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setSettlementStatusFilterOperator}
+                  />
+                  {!isEmptyOperator(settlementStatusFilterOperator) ? (
+                    <select
+                      value={settlementStatusFilter}
+                      onChange={(event) => setSettlementStatusFilter(event.target.value as MyBetsSettlementFilter)}
+                      aria-label="筛选状态"
+                    >
+                      {myBetsSettlementFilterOptions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
               </label>
               <label className="my-bets-filter-field">
                 <span>开始日期</span>
-                <input type="date" value={dateStartFilter} onChange={(event) => setDateStartFilter(event.target.value)} aria-label="筛选开始日期" />
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="开始日期"
+                    fieldKey="date_start"
+                    operator={dateStartFilterOperator}
+                    options={DATE_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'date_start'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setDateStartFilterOperator}
+                  />
+                  {!isEmptyOperator(dateStartFilterOperator) ? (
+                    <input
+                      type="date"
+                      value={dateStartFilter}
+                      onChange={(event) => setDateStartFilter(event.target.value)}
+                      aria-label="筛选开始日期"
+                    />
+                  ) : null}
+                </div>
               </label>
               <label className="my-bets-filter-field">
                 <span>结束日期</span>
-                <input type="date" value={dateEndFilter} onChange={(event) => setDateEndFilter(event.target.value)} aria-label="筛选结束日期" />
+                <div className="my-bets-filter-field__controls">
+                  <MyBetsFilterOperatorMenu
+                    fieldLabel="结束日期"
+                    fieldKey="date_end"
+                    operator={dateEndFilterOperator}
+                    options={DATE_FILTER_OPERATORS}
+                    isOpen={activeFilterOperatorMenu === 'date_end'}
+                    onToggleOpen={(fieldKey) => setActiveFilterOperatorMenu((current) => (current === fieldKey ? null : fieldKey))}
+                    onClose={() => setActiveFilterOperatorMenu(null)}
+                    onChange={setDateEndFilterOperator}
+                  />
+                  {!isEmptyOperator(dateEndFilterOperator) ? (
+                    <input
+                      type="date"
+                      value={dateEndFilter}
+                      onChange={(event) => setDateEndFilter(event.target.value)}
+                      aria-label="筛选结束日期"
+                    />
+                  ) : null}
+                </div>
               </label>
-              <button className="ghost-button ghost-button--compact my-bets-filter-clear" type="button" disabled={!hasActiveFilters} onClick={clearMyBetsFilters}>
-                清空
+              <button
+                className="ghost-button ghost-button--compact my-bets-filter-clear"
+                type="button"
+                disabled={!hasActiveFilters}
+                onClick={clearMyBetsFilters}
+                aria-label="重置所有筛选内容"
+                title="重置所有筛选内容"
+              >
+                <FilterX size={16} aria-hidden="true" />
               </button>
             </div>
 
@@ -1571,7 +1827,6 @@ export function MyBetsPanel({
                     <p className="hero-panel__eyebrow">{`第 ${record.target_period} 期`}</p>
                     <div className="my-bets-card__title-row">
                       <strong>{formatPlayType(record.play_type)}</strong>
-                      {record.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : null}
                       {record.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                     </div>
                     <span className="my-bets-card__meta my-bets-card__meta--with-icon">
@@ -2286,7 +2541,6 @@ export function MyBetsPanel({
             <div className="my-bets-detail-modal__body">
               <section className="my-bets-detail-modal__section">
                 <div className="my-bets-detail-modal__status-row">
-                  {selectedDetailRecord.source_type === 'ocr' ? <span className="my-bets-status">OCR</span> : <span className="my-bets-status">手动录入</span>}
                   {selectedDetailRecord.settlement_status === 'pending' ? <span className="my-bets-status is-pending">待开奖</span> : <span className="my-bets-status is-settled">已结算</span>}
                   <span className={clsx('my-bets-detail-modal__profit', selectedDetailRecord.net_profit >= 0 ? 'is-profit' : 'is-loss')}>
                     {`盈亏 ${formatCurrency(selectedDetailRecord.net_profit)}`}
@@ -2354,12 +2608,6 @@ export function MyBetsPanel({
                   <span>更新时间</span>
                   <strong>{formatDateTimeLocal(selectedDetailRecord.updated_at)}</strong>
                 </div>
-                {selectedDetailRecord.settled_at ? (
-                  <div>
-                    <span>结算时间</span>
-                    <strong>{formatDateTimeLocal(selectedDetailRecord.settled_at)}</strong>
-                  </div>
-                ) : null}
                 {selectedDetailRecord.ticket_image_url ? (
                   <a className="ghost-button ghost-button--compact" href={selectedDetailRecord.ticket_image_url} target="_blank" rel="noreferrer">
                     <ImageIcon size={14} aria-hidden="true" />

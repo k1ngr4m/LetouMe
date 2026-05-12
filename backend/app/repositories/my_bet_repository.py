@@ -13,6 +13,96 @@ class MyBetRepository:
     _record_time_storage_mode: str | None = None
     _meta_time_storage_mode: str | None = None
 
+    @staticmethod
+    def _append_text_filter(where_clauses: list[str], params: list[Any], column_sql: str, value: str, operator: str) -> None:
+        normalized_value = str(value or "").strip()
+        normalized_operator = str(operator or "contains").strip().lower()
+        if normalized_operator == "empty":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} = '')")
+            return
+        if normalized_operator == "not_empty":
+            where_clauses.append(f"({column_sql} IS NOT NULL AND {column_sql} <> '')")
+            return
+        if not normalized_value:
+            return
+        if normalized_operator == "eq":
+            where_clauses.append(f"{column_sql} = ?")
+            params.append(normalized_value)
+        elif normalized_operator == "ne":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} <> ?)")
+            params.append(normalized_value)
+        else:
+            where_clauses.append(f"{column_sql} LIKE ?")
+            params.append(f"%{normalized_value}%")
+
+    @staticmethod
+    def _append_enum_filter(where_clauses: list[str], params: list[Any], column_sql: str, value: str, operator: str, *, default_value: str | None = None) -> None:
+        normalized_value = str(value or "").strip().lower() or (default_value or "")
+        normalized_operator = str(operator or "eq").strip().lower()
+        if normalized_operator == "empty":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} = '')")
+            return
+        if normalized_operator == "not_empty":
+            where_clauses.append(f"({column_sql} IS NOT NULL AND {column_sql} <> '')")
+            return
+        if not normalized_value:
+            return
+        if normalized_operator == "ne":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} <> ?)")
+            params.append(normalized_value)
+        else:
+            where_clauses.append(f"{column_sql} = ?")
+            params.append(normalized_value)
+
+    @staticmethod
+    def _append_date_filter(
+        where_clauses: list[str],
+        params: list[Any],
+        *,
+        column_sql: str,
+        value: Any,
+        operator: str,
+        cursor: Any,
+    ) -> None:
+        normalized_operator = str(operator or "gte").strip().lower()
+        if normalized_operator == "empty":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} = '')")
+            return
+        if normalized_operator == "not_empty":
+            where_clauses.append(f"({column_sql} IS NOT NULL AND {column_sql} <> '')")
+            return
+        if value is None or str(value).strip() == "":
+            return
+        record_storage_mode = MyBetRepository._resolve_record_time_storage_mode(cursor)
+        meta_storage_mode = MyBetRepository._resolve_meta_time_storage_mode(cursor)
+        start_value = MyBetRepository._normalize_filter_time_value(
+            beijing_date_start_ts(value),
+            record_storage_mode=record_storage_mode,
+            meta_storage_mode=meta_storage_mode,
+        )
+        end_value = MyBetRepository._normalize_filter_time_value(
+            beijing_date_end_ts(value),
+            record_storage_mode=record_storage_mode,
+            meta_storage_mode=meta_storage_mode,
+        )
+        if normalized_operator == "eq":
+            where_clauses.append(f"({column_sql} >= ? AND {column_sql} <= ?)")
+            params.extend([start_value, end_value])
+            return
+        if normalized_operator == "ne":
+            where_clauses.append(f"({column_sql} IS NULL OR {column_sql} < ? OR {column_sql} > ?)")
+            params.extend([start_value, end_value])
+            return
+        comparator = {
+            "gt": ">",
+            "gte": ">=",
+            "lt": "<",
+            "lte": "<=",
+        }.get(normalized_operator, ">=")
+        normalized_value = start_value if normalized_operator in {"gt", "gte"} else end_value
+        where_clauses.append(f"{column_sql} {comparator} ?")
+        params.append(normalized_value)
+
     def list_records(
         self,
         user_id: int,
@@ -77,14 +167,30 @@ class MyBetRepository:
         params: list[Any] = [int(user_id)]
 
         period_query = str(normalized_filters.get("period_query") or "").strip()
-        if period_query:
-            where_clauses.append("record.target_period LIKE ?")
-            params.append(f"%{storage_issue_no(lottery_code, period_query)}%")
+        period_query_operator = str(normalized_filters.get("period_query_operator") or "contains").strip().lower()
+        if period_query_operator in {"empty", "not_empty"}:
+            MyBetRepository._append_text_filter(where_clauses, params, "record.target_period", "", period_query_operator)
+        elif period_query:
+            if period_query_operator == "eq":
+                where_clauses.append("record.target_period = ?")
+                params.append(storage_issue_no(lottery_code, period_query))
+            elif period_query_operator == "ne":
+                where_clauses.append("(record.target_period IS NULL OR record.target_period <> ?)")
+                params.append(storage_issue_no(lottery_code, period_query))
+            else:
+                where_clauses.append("record.target_period LIKE ?")
+                params.append(f"%{storage_issue_no(lottery_code, period_query)}%")
 
         play_type_filter = str(normalized_filters.get("play_type_filter") or "").strip().lower()
-        if play_type_filter and play_type_filter != "all":
-            where_clauses.append("record.play_type = ?")
-            params.append(play_type_filter)
+        play_type_filter_operator = str(normalized_filters.get("play_type_filter_operator") or "eq").strip().lower()
+        if (play_type_filter and play_type_filter != "all") or play_type_filter_operator in {"empty", "not_empty"}:
+            MyBetRepository._append_enum_filter(
+                where_clauses,
+                params,
+                "record.play_type",
+                play_type_filter,
+                play_type_filter_operator,
+            )
 
         source_type_filter = str(normalized_filters.get("source_type_filter") or "all").strip().lower()
         if source_type_filter in {"manual", "ocr"}:
@@ -92,37 +198,38 @@ class MyBetRepository:
             params.append(source_type_filter)
 
         settlement_status_filter = str(normalized_filters.get("settlement_status_filter") or "all").strip().lower()
-        if settlement_status_filter == "settled":
-            where_clauses.append(
+        settlement_status_filter_operator = str(normalized_filters.get("settlement_status_filter_operator") or "eq").strip().lower()
+        if settlement_status_filter_operator == "empty":
+            where_clauses.append("1 = 0")
+        elif settlement_status_filter_operator == "not_empty":
+            where_clauses.append("1 = 1")
+        elif settlement_status_filter in {"settled", "pending"}:
+            settlement_clause = (
                 "EXISTS (SELECT 1 FROM draw_issue di INNER JOIN draw_result dr ON dr.issue_id = di.id WHERE di.issue_no = record.target_period)"
+                if settlement_status_filter == "settled"
+                else "NOT EXISTS (SELECT 1 FROM draw_issue di INNER JOIN draw_result dr ON dr.issue_id = di.id WHERE di.issue_no = record.target_period)"
             )
-        elif settlement_status_filter == "pending":
-            where_clauses.append(
-                "NOT EXISTS (SELECT 1 FROM draw_issue di INNER JOIN draw_result dr ON dr.issue_id = di.id WHERE di.issue_no = record.target_period)"
-            )
+            if settlement_status_filter_operator == "ne":
+                where_clauses.append(f"NOT ({settlement_clause})")
+            else:
+                where_clauses.append(settlement_clause)
 
-        date_start = beijing_date_start_ts(normalized_filters.get("date_start"))
-        date_end = beijing_date_end_ts(normalized_filters.get("date_end"))
-        if date_start and date_end and date_start > date_end:
-            date_start, date_end = date_end, date_start
-        if date_start is not None:
-            where_clauses.append("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?")
-            params.append(
-                MyBetRepository._normalize_filter_time_value(
-                    date_start,
-                    record_storage_mode=MyBetRepository._resolve_record_time_storage_mode(cursor),
-                    meta_storage_mode=MyBetRepository._resolve_meta_time_storage_mode(cursor),
-                )
-            )
-        if date_end is not None:
-            where_clauses.append("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?")
-            params.append(
-                MyBetRepository._normalize_filter_time_value(
-                    date_end,
-                    record_storage_mode=MyBetRepository._resolve_record_time_storage_mode(cursor),
-                    meta_storage_mode=MyBetRepository._resolve_meta_time_storage_mode(cursor),
-                )
-            )
+        MyBetRepository._append_date_filter(
+            where_clauses,
+            params,
+            column_sql="COALESCE(meta.ticket_purchased_at, record.created_at)",
+            value=normalized_filters.get("date_start"),
+            operator=str(normalized_filters.get("date_start_operator") or "gte"),
+            cursor=cursor,
+        )
+        MyBetRepository._append_date_filter(
+            where_clauses,
+            params,
+            column_sql="COALESCE(meta.ticket_purchased_at, record.created_at)",
+            value=normalized_filters.get("date_end"),
+            operator=str(normalized_filters.get("date_end_operator") or "lte"),
+            cursor=cursor,
+        )
 
         return " AND ".join(where_clauses), params
 

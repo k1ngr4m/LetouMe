@@ -65,20 +65,30 @@ class MyBetService:
         limit: int = 20,
         offset: int = 0,
         period_query: str | None = None,
+        period_query_operator: str = "contains",
         play_type_filter: str | None = None,
+        play_type_filter_operator: str = "eq",
         settlement_status_filter: str = "all",
+        settlement_status_filter_operator: str = "eq",
         source_type_filter: str = "all",
         date_start: str | None = None,
+        date_start_operator: str = "gte",
         date_end: str | None = None,
+        date_end_operator: str = "lte",
     ) -> dict[str, Any]:
         normalized_code = normalize_lottery_code(lottery_code)
         filters = {
             "period_query": str(period_query or "").strip(),
+            "period_query_operator": str(period_query_operator or "contains").strip().lower(),
             "play_type_filter": str(play_type_filter or "").strip().lower(),
+            "play_type_filter_operator": str(play_type_filter_operator or "eq").strip().lower(),
             "settlement_status_filter": str(settlement_status_filter or "all").strip().lower(),
+            "settlement_status_filter_operator": str(settlement_status_filter_operator or "eq").strip().lower(),
             "source_type_filter": str(source_type_filter or "all").strip().lower(),
             "date_start": date_start,
+            "date_start_operator": str(date_start_operator or "gte").strip().lower(),
             "date_end": date_end,
+            "date_end_operator": str(date_end_operator or "lte").strip().lower(),
         }
         raw_records = self.repository.list_records(
             user_id,

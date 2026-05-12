@@ -557,11 +557,16 @@ def list_my_bets(payload: MyBetRecordListPayload, current_user: dict = Depends(r
         limit=payload.limit,
         offset=payload.offset,
         period_query=payload.period_query,
+        period_query_operator=payload.period_query_operator,
         play_type_filter=payload.play_type_filter,
+        play_type_filter_operator=payload.play_type_filter_operator,
         settlement_status_filter=payload.settlement_status_filter,
+        settlement_status_filter_operator=payload.settlement_status_filter_operator,
         source_type_filter=payload.source_type_filter,
         date_start=payload.date_start,
+        date_start_operator=payload.date_start_operator,
         date_end=payload.date_end,
+        date_end_operator=payload.date_end_operator,
     )
 
 

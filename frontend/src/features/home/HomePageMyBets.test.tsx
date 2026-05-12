@@ -24,7 +24,7 @@ describe('HomePage my-bets dashboard', () => {
     await screen.findByRole('heading', { name: '我的投注' })
     await waitFor(() => expect(screen.getByText('第 2026032 期')).toBeInTheDocument(), { timeout: 10000 })
 
-    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除：第 2026032 期' }))
     await waitFor(() => expect(deleteMyBet).toHaveBeenCalledWith(1, 'dlt'))
 
     await userEvent.click(screen.getByRole('button', { name: '添加投注' }))
@@ -152,6 +152,7 @@ describe('HomePage my-bets dashboard', () => {
     renderPage('/dashboard/my-bets')
     await screen.findByRole('heading', { name: '我的投注' })
     await screen.findByText('第 2026032 期')
+    await userEvent.click(screen.getByRole('button', { name: '卡片视图' }))
 
     expect(screen.queryByText('开奖号码：')).not.toBeInTheDocument()
     expect(screen.queryByText('子注单 #1 · 大乐透')).not.toBeInTheDocument()
@@ -343,7 +344,7 @@ describe('HomePage my-bets dashboard', () => {
     await screen.findByRole('heading', { name: '我的投注' })
     await screen.findByText('七星彩复式')
 
-    await userEvent.click(screen.getByRole('button', { name: '编辑' }))
+    await userEvent.click(screen.getByRole('button', { name: '编辑：第 2026032 期' }))
     const formView = await screen.findByTestId('my-bets-form-view')
 
     expect(within(formView).getByLabelText('第一位号码（逗号分隔）')).toHaveValue('00,01')

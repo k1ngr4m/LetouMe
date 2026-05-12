@@ -1,5 +1,9 @@
 export type LotteryCode = 'dlt' | 'pl3' | 'pl5' | 'qxc'
 
+export type MyBetTextFilterOperator = 'eq' | 'ne' | 'contains' | 'empty' | 'not_empty'
+export type MyBetEnumFilterOperator = 'eq' | 'ne' | 'empty' | 'not_empty'
+export type MyBetDateFilterOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'empty' | 'not_empty'
+
 export type LotteryDraw = {
   lottery_code?: LotteryCode
   period: string
@@ -416,11 +420,16 @@ export type MyBetRecordListPayload = {
   limit?: number
   offset?: number
   period_query?: string
+  period_query_operator?: MyBetTextFilterOperator
   play_type_filter?: string
+  play_type_filter_operator?: MyBetEnumFilterOperator
   settlement_status_filter?: 'all' | 'pending' | 'settled'
+  settlement_status_filter_operator?: MyBetEnumFilterOperator
   source_type_filter?: 'all' | 'manual' | 'ocr'
   date_start?: string
+  date_start_operator?: MyBetDateFilterOperator
   date_end?: string
+  date_end_operator?: MyBetDateFilterOperator
 }
 
 export type MyBetLinePayload = {

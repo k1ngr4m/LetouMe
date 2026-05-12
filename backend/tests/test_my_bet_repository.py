@@ -394,6 +394,56 @@ class MyBetRepositoryTests(unittest.TestCase):
         self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?", list_sql)
         self.assertEqual(list_params, (7, "%2603%", "dlt_dantuo", "ocr", "2026-04-01 00:00:00", "2026-04-30 23:59:59", 20, 0))
 
+    def test_list_records_supports_date_equality_and_empty_filters(self) -> None:
+        repository = MyBetRepository()
+        cursor = _FakeCursor()
+
+        with (
+            patch("backend.app.repositories.my_bet_repository.get_connection", return_value=_ConnectionContext(cursor)),
+            patch("backend.app.repositories.my_bet_repository.MyBetRepository._list_lines_map", return_value={}),
+        ):
+            repository.list_records(
+                7,
+                lottery_code="dlt",
+                limit=20,
+                offset=0,
+                filters={
+                    "period_query": "",
+                    "period_query_operator": "empty",
+                    "play_type_filter": "dlt",
+                    "play_type_filter_operator": "not_empty",
+                    "settlement_status_filter": "settled",
+                    "settlement_status_filter_operator": "ne",
+                    "date_start": "2026-04-01",
+                    "date_start_operator": "eq",
+                    "date_end": "2026-04-30",
+                    "date_end_operator": "ne",
+                },
+            )
+
+        list_sql, list_params = next((item for item in cursor.executed if "FROM my_bet_record AS record" in item[0]), ("", None))
+        self.assertIn("(record.target_period IS NULL OR record.target_period = '')", list_sql)
+        self.assertIn("(record.play_type IS NOT NULL AND record.play_type <> '')", list_sql)
+        self.assertIn("NOT (EXISTS (SELECT 1 FROM draw_issue", list_sql)
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) >= ?", list_sql)
+        self.assertIn("COALESCE(meta.ticket_purchased_at, record.created_at) <= ?", list_sql)
+        self.assertIn(
+            "(COALESCE(meta.ticket_purchased_at, record.created_at) IS NULL OR COALESCE(meta.ticket_purchased_at, record.created_at) < ? OR COALESCE(meta.ticket_purchased_at, record.created_at) > ?)",
+            list_sql,
+        )
+        self.assertEqual(
+            list_params,
+            (
+                7,
+                "2026-04-01 00:00:00",
+                "2026-04-01 23:59:59",
+                "2026-04-30 00:00:00",
+                "2026-04-30 23:59:59",
+                20,
+                0,
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

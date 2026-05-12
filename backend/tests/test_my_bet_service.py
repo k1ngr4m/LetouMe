@@ -636,11 +636,16 @@ class MyBetServiceTests(unittest.TestCase):
 
         expected_filters = {
             "period_query": "2603",
+            "period_query_operator": "contains",
             "play_type_filter": "dlt_dantuo",
+            "play_type_filter_operator": "eq",
             "settlement_status_filter": "settled",
+            "settlement_status_filter_operator": "eq",
             "source_type_filter": "ocr",
             "date_start": "2026-04-01",
+            "date_start_operator": "gte",
             "date_end": "2026-04-30",
+            "date_end_operator": "lte",
         }
         self.assertEqual(repository.calls[0]["filters"], expected_filters)
         self.assertEqual(repository.calls[1]["filters"], expected_filters)

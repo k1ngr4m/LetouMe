@@ -894,8 +894,7 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: auto;
   }
 
   .my-bets-table-shell {
@@ -904,8 +903,7 @@
     max-width: 100%;
     margin-right: 0;
     padding-bottom: 0.36rem;
-    overflow-x: auto;
-    overflow-y: visible;
+    overflow: visible;
     overscroll-behavior-x: contain;
   }
 
@@ -923,10 +921,6 @@
     line-height: 1.22;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .my-bets-table th {
-    position: static;
   }
 
   .my-bets-table th:nth-child(1),
