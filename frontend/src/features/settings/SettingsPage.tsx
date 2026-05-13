@@ -2993,29 +2993,29 @@ export function SettingsPage() {
             <div className="page-section">
               <StatusCard title="账户管理" subtitle="邮箱验证和账户操作。">
                 <div className="settings-split-page">
-                  <div className="settings-split-row">
-                    <div className="settings-split-row__icon-wrap">
-                      <AccountLinkIcon />
-                    </div>
-                    <div className="settings-split-row__main">
-                      <h3>绑定的登录方式</h3>
-                      <p>绑定多种登录方式后，可用任意方式登录同一账号</p>
-                      <div className="settings-linked-providers">
-                        <div className="settings-linked-providers__item">
-                          <span>邮箱密码</span>
-                          <span className="status-pill is-active">已绑定</span>
-                        </div>
-                        <div className="settings-linked-providers__item">
-                          <span>Google</span>
-                          <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>
-                        </div>
-                        <div className="settings-linked-providers__item">
-                          <span>GitHub</span>
-                          <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/*<div className="settings-split-row">*/}
+                  {/*  <div className="settings-split-row__icon-wrap">*/}
+                  {/*    <AccountLinkIcon />*/}
+                  {/*  </div>*/}
+                    {/*<div className="settings-split-row__main">*/}
+                    {/*  <h3>绑定的登录方式</h3>*/}
+                    {/*  <p>绑定多种登录方式后，可用任意方式登录同一账号</p>*/}
+                    {/*  <div className="settings-linked-providers">*/}
+                    {/*    <div className="settings-linked-providers__item">*/}
+                    {/*      <span>邮箱密码</span>*/}
+                    {/*      <span className="status-pill is-active">已绑定</span>*/}
+                    {/*    </div>*/}
+                    {/*    <div className="settings-linked-providers__item">*/}
+                    {/*      <span>Google</span>*/}
+                    {/*      <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>*/}
+                    {/*    </div>*/}
+                    {/*    <div className="settings-linked-providers__item">*/}
+                    {/*      <span>GitHub</span>*/}
+                    {/*      <button type="button" className="ghost-button" disabled title="即将开放">绑定</button>*/}
+                    {/*    </div>*/}
+                    {/*  </div>*/}
+                    {/*</div>*/}
+                  {/*</div>*/}
 
                   <div className="settings-split-row">
                     <div className="settings-split-row__icon-wrap">
