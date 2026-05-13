@@ -69,6 +69,7 @@ from backend.app.schemas.requests import (
     ProviderCreatePayload,
     ProviderModelDiscoveryPayload,
     ProviderUpdatePayload,
+    LotteryBootstrapPayload,
     LotteryFetchTaskPayload,
     MaintenanceRunLogListPayload,
     PasswordChangePayload,
@@ -123,6 +124,7 @@ from backend.app.schemas.responses import (
 from backend.app.lotteries import normalize_lottery_code
 from backend.app.rbac import MODEL_MANAGEMENT_PERMISSION, SCHEDULE_MANAGEMENT_PERMISSION
 from backend.app.services.lottery_service import LotteryService
+from backend.app.services.lottery_bootstrap_service import lottery_bootstrap_task_service
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.model_service import ModelService
 from backend.app.services.prediction_generation_service import PredictionGenerationService
@@ -687,12 +689,24 @@ def fetch_settings_lottery_history(payload: PaginationPayload, _: dict = Depends
     return lottery_fetch_task_service.create_task(payload.lottery_code, limit=payload.limit or 30)
 
 
+@router.post("/settings/lottery/bootstrap", response_model=LotteryFetchTaskResponse)
+def bootstrap_settings_lottery_history(payload: LotteryBootstrapPayload, _: dict = Depends(require_super_admin)) -> dict:
+    return lottery_bootstrap_task_service.create_task(
+        lottery_codes=payload.lottery_codes,
+        chunk_size=payload.chunk_size,
+        detail_mode=payload.detail_mode,
+        resume=payload.resume,
+    )
+
+
 @router.post("/settings/lottery/fetch/task-detail", response_model=LotteryFetchTaskResponse)
 def get_settings_lottery_fetch_task(
     payload: LotteryFetchTaskPayload,
     _: dict = Depends(require_super_admin),
 ) -> dict:
     task = lottery_fetch_task_service.get_task(payload.task_id)
+    if not task:
+        task = lottery_bootstrap_task_service.get_task(payload.task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task

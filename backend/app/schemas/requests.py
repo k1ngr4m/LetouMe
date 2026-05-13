@@ -120,6 +120,13 @@ class LotteryFetchTaskPayload(BaseModel):
     lottery_code: str = "dlt"
 
 
+class LotteryBootstrapPayload(BaseModel):
+    lottery_codes: list[str] = Field(default_factory=lambda: ["dlt", "pl3", "pl5", "qxc"])
+    chunk_size: int = Field(default=500, ge=1, le=5000)
+    detail_mode: Literal["all", "none"] = "all"
+    resume: bool = True
+
+
 class MaintenanceRunLogListPayload(BaseModel):
     lottery_code: str | None = None
     limit: int = Field(default=20, ge=1, le=200)

@@ -664,7 +664,8 @@ const MAINTENANCE_COLUMN_MIN_WIDTHS: Record<MaintenanceColumnKey, number> = {
   actions: 118,
 }
 
-function getLotteryLabel(lotteryCode: LotteryCode) {
+function getLotteryLabel(lotteryCode: LotteryCode | 'all') {
+  if (lotteryCode === 'all') return '全部彩种'
   return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : lotteryCode === 'pl5' ? '排列5' : '七星彩'
 }
 
@@ -969,7 +970,8 @@ function getScheduleRunTriggerLabel(triggerType: string | null | undefined) {
   return triggerType === 'schedule' ? '定时' : '手动'
 }
 
-function getMaintenanceTaskType(log: MaintenanceRunLog): 'lottery_fetch' | 'prediction_generate' {
+function getMaintenanceTaskType(log: MaintenanceRunLog): 'lottery_fetch' | 'prediction_generate' | 'lottery_bootstrap' {
+  if (log.task_type === 'lottery_bootstrap') return 'lottery_bootstrap'
   if (log.task_type === 'prediction_generate') return 'prediction_generate'
   if (log.task_type === 'lottery_fetch') return 'lottery_fetch'
   if (log.mode || log.model_code) return 'prediction_generate'
@@ -977,7 +979,8 @@ function getMaintenanceTaskType(log: MaintenanceRunLog): 'lottery_fetch' | 'pred
   return 'lottery_fetch'
 }
 
-function getMaintenanceTaskTypeLabel(taskType: 'lottery_fetch' | 'prediction_generate') {
+function getMaintenanceTaskTypeLabel(taskType: 'lottery_fetch' | 'prediction_generate' | 'lottery_bootstrap') {
+  if (taskType === 'lottery_bootstrap') return '全量初始化'
   return taskType === 'prediction_generate' ? '预测生成' : '开奖抓取'
 }
 
@@ -1106,6 +1109,7 @@ export function SettingsPage() {
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
   const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null, qxc: null })
+  const [lotteryBootstrapTask, setLotteryBootstrapTask] = useState<LotteryFetchTask | null>(null)
   const [lotteryFetchLimitInputs, setLotteryFetchLimitInputs] = useState<Record<LotteryCode, string>>(() => {
     const persisted = loadSettingsLotteryFetchLimits()
     return {
@@ -1446,6 +1450,36 @@ export function SettingsPage() {
     }, 1200)
     return () => window.clearTimeout(timer)
   }, [lotteryFetchTasks.qxc, queryClient])
+
+  useEffect(() => {
+    const task = lotteryBootstrapTask
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryBootstrapTask(nextTask)
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`全量初始化完成：基础写入 ${summary.base_saved ?? summary.saved_count} 条，详情处理 ${summary.detail_processed ?? 0} 期，失败 ${summary.detail_failed ?? 0} 期。`)
+          setMessageType('success')
+          ;(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).forEach((lotteryCode) => {
+            void queryClient.invalidateQueries({ queryKey: ['lottery-history', lotteryCode] })
+            void queryClient.invalidateQueries({ queryKey: ['current-predictions', lotteryCode] })
+            void queryClient.invalidateQueries({ queryKey: ['predictions-history', lotteryCode] })
+          })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '全量初始化失败')
+          setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取全量初始化任务状态失败')
+        setMessageType('error')
+      }
+    }, 1600)
+    return () => window.clearTimeout(timer)
+  }, [lotteryBootstrapTask, queryClient])
 
   const models = modelsQuery.data?.models ?? EMPTY_MODELS
   const providers = providersQuery.data?.providers ?? EMPTY_PROVIDERS
@@ -1949,6 +1983,25 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建七星彩数据更新任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const bootstrapLotteryMutation = useMutation({
+    mutationFn: () => apiClient.bootstrapSettingsLotteryHistory({
+      lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
+      chunk_size: 500,
+      detail_mode: 'all',
+      resume: true,
+    }),
+    onSuccess: (task) => {
+      setLotteryBootstrapTask(task)
+      setMessage('全彩种历史开奖记录初始化任务已创建，正在后台慢速补齐详情。')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建全量初始化任务失败')
       setMessageType('error')
     },
   })
@@ -3440,6 +3493,57 @@ export function SettingsPage() {
                   <div className="panel-card settings-schedule-list-card">
                     <div className="panel-card__header">
                       <div>
+                        <h2 className="panel-card__title">全量初始化</h2>
+                        <p className="panel-card__subtitle">首次部署时批量导入全部彩种历史开奖，并慢速补齐大乐透与七星彩奖金明细。</p>
+                      </div>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={bootstrapLotteryMutation.isPending || Boolean(lotteryBootstrapTask && ['queued', 'running'].includes(lotteryBootstrapTask.status))}
+                        onClick={() => bootstrapLotteryMutation.mutate()}
+                      >
+                        {bootstrapLotteryMutation.isPending || (lotteryBootstrapTask && ['queued', 'running'].includes(lotteryBootstrapTask.status)) ? '初始化中...' : '初始化全部历史'}
+                      </button>
+                    </div>
+                    {lotteryBootstrapTask ? (
+                      <div className="settings-schedule-list-summary settings-maintenance-bootstrap-summary">
+                        <span>
+                          状态：
+                          <strong>{getTaskStatusLabel(lotteryBootstrapTask.status)}</strong>
+                        </span>
+                        <span>
+                          当前彩种：
+                          <strong>{lotteryBootstrapTask.progress_summary.current_lottery ? getLotteryLabel(lotteryBootstrapTask.progress_summary.current_lottery) : '-'}</strong>
+                        </span>
+                        <span>
+                          当前期号：
+                          <strong>{lotteryBootstrapTask.progress_summary.current_period || lotteryBootstrapTask.progress_summary.latest_period || '-'}</strong>
+                        </span>
+                        <span>
+                          基础写入：
+                          <strong>{lotteryBootstrapTask.progress_summary.base_saved ?? lotteryBootstrapTask.progress_summary.saved_count}</strong>
+                        </span>
+                        <span>
+                          详情处理：
+                          <strong>{lotteryBootstrapTask.progress_summary.detail_processed ?? 0}</strong>
+                        </span>
+                        <span>
+                          详情失败：
+                          <strong>{lotteryBootstrapTask.progress_summary.detail_failed ?? 0}</strong>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="settings-schedule-list-summary settings-maintenance-bootstrap-summary">
+                        <span>默认处理 大乐透、排列3、排列5、七星彩</span>
+                        <span>断点续跑已开启</span>
+                        <span>详情请求间隔 1.5 秒</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="panel-card settings-schedule-list-card">
+                    <div className="panel-card__header">
+                      <div>
                         <h2 className="panel-card__title">维护列表</h2>
                         <p className="panel-card__subtitle">每行对应一个彩种，支持立即执行，执行中会自动刷新状态。</p>
                       </div>
@@ -3609,10 +3713,14 @@ export function SettingsPage() {
                             maintenanceLogs.map((item: MaintenanceRunLog) => (
                               (() => {
                                 const taskType = getMaintenanceTaskType(item)
-                                const summaryText = taskType === 'prediction_generate'
+                                const summaryText = taskType === 'lottery_bootstrap'
+                                  ? `${item.saved_count} / ${item.processed_count || 0} / ${item.failed_count || 0}`
+                                  : taskType === 'prediction_generate'
                                   ? `${item.processed_count || 0} / ${item.skipped_count || 0} / ${item.failed_count || 0}`
                                   : `${item.fetched_count} / ${item.saved_count}`
-                                const detailText = taskType === 'prediction_generate'
+                                const detailText = taskType === 'lottery_bootstrap'
+                                  ? item.latest_period ? `详情补齐至 ${item.latest_period}` : '全彩种'
+                                  : taskType === 'prediction_generate'
                                   ? `${getGenerationModeLabel(item.mode)} · ${item.model_code === '__bulk__' ? '批量模型' : item.model_code || '-'}`
                                   : item.latest_period || '-'
                                 return (

@@ -116,6 +116,9 @@ class AuthApiTests(unittest.TestCase):
         lottery_fetch_forbidden = self.client.post("/api/settings/lottery/fetch", json={})
         self.assertEqual(lottery_fetch_forbidden.status_code, 403)
 
+        lottery_bootstrap_forbidden = self.client.post("/api/settings/lottery/bootstrap", json={})
+        self.assertEqual(lottery_bootstrap_forbidden.status_code, 403)
+
     def test_register_rejects_duplicate_username(self) -> None:
         first_code = self._issue_register_code("dup-user@example.com")
         self.client.post("/api/auth/register", json={"username": "dup-user", "email": "dup-user@example.com", "password": "signup123", "code": first_code})

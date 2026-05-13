@@ -28,6 +28,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     bulkGenerateSettingsModelPredictions: vi.fn(),
     getPredictionGenerationTaskDetail: vi.fn(),
     fetchSettingsLotteryHistory: vi.fn(),
+    bootstrapSettingsLotteryHistory: vi.fn(),
     getLotteryFetchTaskDetail: vi.fn(),
     listMaintenanceRunLogs: vi.fn(),
     listScheduleRunLogs: vi.fn(),
@@ -1076,6 +1077,79 @@ describe('SettingsPage model management view switch', () => {
     expect(apiClientMock.fetchSettingsLotteryHistory).toHaveBeenCalledWith('dlt', 30)
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('lottery-task-1'), { timeout: 2500 })
     expect(await screen.findByText('2026033')).toBeInTheDocument()
+  })
+
+  it('starts full lottery bootstrap task from maintenance page', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({ models: [] })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.bootstrapSettingsLotteryHistory.mockResolvedValue({
+      task_id: 'bootstrap-task-1',
+      lottery_code: 'all',
+      status: 'queued',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
+        total_lotteries: 4,
+        current_lottery: null,
+        current_lottery_index: 0,
+        phase: 'queued',
+        base_fetched: 0,
+        base_saved: 0,
+        detail_processed: 0,
+        detail_failed: 0,
+        fetched_count: 0,
+        saved_count: 0,
+        latest_period: null,
+        current_period: null,
+        duration_ms: 0,
+      },
+      error_message: null,
+    })
+    apiClientMock.getLotteryFetchTaskDetail.mockResolvedValue({
+      task_id: 'bootstrap-task-1',
+      lottery_code: 'all',
+      status: 'succeeded',
+      created_at: '2026-03-16T12:00:00Z',
+      started_at: '2026-03-16T12:00:01Z',
+      finished_at: '2026-03-16T12:00:03Z',
+      progress_summary: {
+        lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
+        total_lotteries: 4,
+        current_lottery: null,
+        current_lottery_index: 4,
+        phase: 'done',
+        base_fetched: 400,
+        base_saved: 400,
+        detail_processed: 120,
+        detail_failed: 1,
+        fetched_count: 400,
+        saved_count: 400,
+        latest_period: '26001',
+        current_period: null,
+        duration_ms: 2034,
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '数据维护' }))
+    await userEvent.click(screen.getByRole('button', { name: '初始化全部历史' }))
+
+    expect(apiClientMock.bootstrapSettingsLotteryHistory).toHaveBeenCalledWith({
+      lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
+      chunk_size: 500,
+      detail_mode: 'all',
+      resume: true,
+    })
+    await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('bootstrap-task-1'), { timeout: 2500 })
+    expect(await screen.findByText('120')).toBeInTheDocument()
   })
 
   it('shows prediction generation logs in maintenance table', async () => {

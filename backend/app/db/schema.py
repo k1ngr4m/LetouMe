@@ -323,6 +323,17 @@ SCHEMA_STATEMENTS = [
         INDEX idx_maintenance_run_log_status_created (status, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS lottery_bootstrap_checkpoint (
+        lottery_code VARCHAR(16) NOT NULL PRIMARY KEY,
+        phase VARCHAR(32) NOT NULL DEFAULT 'base',
+        last_period VARCHAR(32) NULL,
+        base_done TINYINT(1) NOT NULL DEFAULT 0,
+        detail_done TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_lottery_bootstrap_checkpoint_phase (phase, updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]
 
 _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [

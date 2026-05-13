@@ -293,6 +293,19 @@ SQLITE_SCHEMA_STATEMENTS = [
         )
     """,
     """
+    CREATE TABLE IF NOT EXISTS lottery_bootstrap_checkpoint (
+            lottery_code TEXT NOT NULL PRIMARY KEY,
+            phase TEXT NOT NULL DEFAULT 'base',
+            last_period TEXT NULL,
+            base_done INTEGER NOT NULL DEFAULT 0,
+            detail_done INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_lottery_bootstrap_checkpoint_phase ON lottery_bootstrap_checkpoint (phase, updated_at)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS dlt_draw_issue (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             issue_no TEXT NOT NULL UNIQUE,

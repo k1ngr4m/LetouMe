@@ -520,6 +520,42 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "lottery-task-2")
         create_task.assert_called_once_with("qxc", limit=120)
 
+    def test_bootstrap_lottery_task_endpoint_returns_task_payload(self) -> None:
+        with patch("backend.app.api.routes.lottery_bootstrap_task_service.create_task") as create_task:
+            create_task.return_value = {
+                "lottery_code": "all",
+                "task_id": "bootstrap-task-1",
+                "status": "queued",
+                "created_at": 1,
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "fetched_count": 0,
+                    "saved_count": 0,
+                    "latest_period": None,
+                    "duration_ms": 0,
+                    "total_lotteries": 4,
+                    "current_lottery": None,
+                    "base_fetched": 0,
+                    "base_saved": 0,
+                    "detail_processed": 0,
+                    "detail_failed": 0,
+                    "current_period": None,
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post("/api/settings/lottery/bootstrap", json={})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["task_id"], "bootstrap-task-1")
+        create_task.assert_called_once_with(
+            lottery_codes=["dlt", "pl3", "pl5", "qxc"],
+            chunk_size=500,
+            detail_mode="all",
+            resume=True,
+        )
+
     def test_fetch_lottery_logs_endpoint_returns_list_payload(self) -> None:
         with patch("backend.app.api.routes.lottery_fetch_task_service.list_logs") as list_logs:
             list_logs.return_value = {

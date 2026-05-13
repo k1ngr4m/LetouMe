@@ -32,6 +32,16 @@ class SchemaSplitModeTests(unittest.TestCase):
             self.assertNotIn(removed_field, schema_sql)
             self.assertNotIn(removed_field, sqlite_schema_sql)
 
+    def test_schema_includes_lottery_bootstrap_checkpoint(self) -> None:
+        schema_sql = "\n".join(get_schema_statements())
+        sqlite_schema_sql = "\n".join(get_sqlite_schema_statements())
+
+        self.assertIn("CREATE TABLE IF NOT EXISTS lottery_bootstrap_checkpoint", schema_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS lottery_bootstrap_checkpoint", sqlite_schema_sql)
+        for field_name in ("lottery_code", "phase", "last_period", "base_done", "detail_done", "updated_at"):
+            self.assertIn(field_name, schema_sql)
+            self.assertIn(field_name, sqlite_schema_sql)
+
     def test_sqlite_ensure_schema_creates_database_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             sqlite_path = Path(temp_dir) / "letoume-test.sqlite3"

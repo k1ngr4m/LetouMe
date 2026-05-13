@@ -949,12 +949,27 @@ export type PredictionGenerationTask = {
 
 export type LotteryFetchTask = {
   task_id: string
-  lottery_code?: LotteryCode
+  lottery_code?: LotteryCode | 'all'
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   created_at: number
   started_at?: number | null
   finished_at?: number | null
   progress_summary: {
+    lottery_codes?: LotteryCode[]
+    total_lotteries?: number
+    current_lottery?: LotteryCode | null
+    current_lottery_index?: number
+    phase?: string
+    detail_mode?: 'all' | 'none' | string
+    chunk_size?: number
+    resume?: boolean
+    base_fetched?: number
+    base_saved?: number
+    detail_processed?: number
+    detail_failed?: number
+    processed_count?: number
+    failed_count?: number
+    current_period?: string | null
     fetched_count: number
     saved_count: number
     latest_period?: string | null
@@ -967,9 +982,9 @@ export type MaintenanceRunLog = {
   id: number
   task_id: string
   schedule_task_code?: string | null
-  lottery_code: LotteryCode
+  lottery_code: LotteryCode | 'all'
   trigger_type: 'manual' | 'schedule'
-  task_type?: 'lottery_fetch' | 'prediction_generate'
+  task_type?: 'lottery_fetch' | 'prediction_generate' | 'lottery_bootstrap'
   mode?: 'current' | 'history' | string | null
   model_code?: string | null
   status: 'queued' | 'running' | 'succeeded' | 'failed'
