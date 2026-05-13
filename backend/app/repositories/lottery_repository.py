@@ -61,7 +61,9 @@ class LotteryRepository:
                 di.draw_date,
                 di.updated_at,
                 dr.id AS draw_result_id,
-                dr.jackpot_pool_balance
+                dr.jackpot_pool_balance,
+                dr.sales_amount,
+                dr.prize_total_amount
             FROM draw_issue di
             LEFT JOIN draw_result dr ON dr.issue_id = di.id
             WHERE dr.id IS NOT NULL
@@ -122,7 +124,9 @@ class LotteryRepository:
                             di.draw_date,
                             di.updated_at,
                             dr.id AS draw_result_id,
-                            dr.jackpot_pool_balance
+                            dr.jackpot_pool_balance,
+                            dr.sales_amount,
+                            dr.prize_total_amount
                         FROM draw_issue di
                         LEFT JOIN draw_result dr ON dr.issue_id = di.id
                         WHERE di.issue_no = ?
@@ -166,7 +170,9 @@ class LotteryRepository:
                                 di.draw_date,
                                 di.updated_at,
                                 dr.id AS draw_result_id,
-                                dr.jackpot_pool_balance
+                                dr.jackpot_pool_balance,
+                                dr.sales_amount,
+                                dr.prize_total_amount
                             FROM draw_issue di
                             INNER JOIN draw_result dr ON dr.issue_id = di.id
                             WHERE di.issue_no IN ({placeholders})
@@ -207,7 +213,9 @@ class LotteryRepository:
                             di.draw_date,
                             di.updated_at,
                             dr.id AS draw_result_id,
-                            dr.jackpot_pool_balance
+                            dr.jackpot_pool_balance,
+                            dr.sales_amount,
+                            dr.prize_total_amount
                         FROM draw_issue di
                         LEFT JOIN draw_result dr ON dr.issue_id = di.id
                         WHERE di.issue_no < ? AND dr.id IS NOT NULL
@@ -297,13 +305,20 @@ class LotteryRepository:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO draw_result (issue_id, jackpot_pool_balance)
-                VALUES (?, ?)
+                INSERT INTO draw_result (issue_id, jackpot_pool_balance, sales_amount, prize_total_amount)
+                VALUES (?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     issue_id = VALUES(issue_id),
-                    jackpot_pool_balance = VALUES(jackpot_pool_balance)
+                    jackpot_pool_balance = VALUES(jackpot_pool_balance),
+                    sales_amount = VALUES(sales_amount),
+                    prize_total_amount = VALUES(prize_total_amount)
                 """,
-                (issue_id, int(draw.get("jackpot_pool_balance") or 0)),
+                (
+                    issue_id,
+                    int(draw.get("jackpot_pool_balance") or 0),
+                    int(draw.get("sales_amount") or 0),
+                    int(draw.get("prize_total_amount") or 0),
+                ),
             )
             cursor.execute("SELECT id FROM draw_result WHERE issue_id = ?", (issue_id,))
             draw_result_id = cursor.fetchone()["id"]
@@ -416,6 +431,8 @@ class LotteryRepository:
             "blue_balls": blue_balls,
             "digits": digits,
             "jackpot_pool_balance": int(row.get("jackpot_pool_balance") or 0),
+            "sales_amount": int(row.get("sales_amount") or 0),
+            "prize_total_amount": int(row.get("prize_total_amount") or 0),
             "prize_breakdown": list(prizes or []),
             "date": draw_date,
             "updated_at": updated_at or 0,

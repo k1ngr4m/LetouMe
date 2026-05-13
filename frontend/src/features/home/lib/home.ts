@@ -195,6 +195,14 @@ export function normalizeDraw(draw: LotteryDraw): LotteryDraw {
       draw.jackpot_pool_balance === undefined || draw.jackpot_pool_balance === null
         ? undefined
         : Number(draw.jackpot_pool_balance),
+    sales_amount:
+      draw.sales_amount === undefined || draw.sales_amount === null
+        ? undefined
+        : Number(draw.sales_amount),
+    prize_total_amount:
+      draw.prize_total_amount === undefined || draw.prize_total_amount === null
+        ? undefined
+        : Number(draw.prize_total_amount),
     previous_jackpot_pool:
       draw.previous_jackpot_pool === undefined || draw.previous_jackpot_pool === null
         ? undefined

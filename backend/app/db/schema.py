@@ -354,6 +354,8 @@ _LOTTERY_SPLIT_SCHEMA_TEMPLATES = [
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         issue_id BIGINT NOT NULL UNIQUE,
         jackpot_pool_balance BIGINT NOT NULL DEFAULT 0,
+        sales_amount BIGINT NOT NULL DEFAULT 0,
+        prize_total_amount BIGINT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_{fk_prefix}_draw_result_issue FOREIGN KEY (issue_id) REFERENCES {table_prefix}_draw_issue(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

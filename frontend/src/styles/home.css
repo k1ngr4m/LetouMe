@@ -1634,6 +1634,48 @@
   background: linear-gradient(135deg, #566072, #7a869b);
 }
 
+.historical-draws-table-shell {
+  border: 1px solid color-mix(in srgb, var(--border-1) 76%, transparent);
+  border-radius: 8px;
+}
+
+.historical-draws-table {
+  min-width: 58rem;
+  font-size: 0.84rem;
+}
+
+.historical-draws-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-align: center;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--panel-card-bg) 94%, rgba(91, 141, 239, 0.22));
+  border-right: 1px solid color-mix(in srgb, var(--border-1) 58%, transparent);
+}
+
+.historical-draws-table tbody td {
+  text-align: center;
+  border-right: 1px solid color-mix(in srgb, var(--border-1) 48%, transparent);
+  white-space: nowrap;
+}
+
+.historical-draws-table tbody td:nth-child(3) {
+  min-width: 13rem;
+}
+
+.historical-draws-table__numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
+.historical-draws-table__numbers .number-ball {
+  width: 1.72rem;
+  height: 1.72rem;
+  font-size: 0.72rem;
+}
+
 .number-ball.is-hit {
   outline: 2px solid #ffd27f;
   outline-offset: 2px;

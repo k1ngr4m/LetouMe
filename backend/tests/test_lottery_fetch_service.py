@@ -127,7 +127,9 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["period"], "26051")
         self.assertEqual(data[0]["red_balls"], ["13", "18", "28", "32", "33"])
         self.assertEqual(data[0]["blue_balls"], ["02", "11"])
+        self.assertEqual(data[0]["sales_amount"], 356000000)
         self.assertEqual(data[0]["jackpot_pool_balance"], 799000000)
+        self.assertEqual(data[0]["prize_total_amount"], 275000000)
         self.assertEqual(data[0]["prize_breakdown"][0]["prize_level"], "一等奖")
         self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 4)
         self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 9612284)
@@ -150,7 +152,9 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["period"], "26053")
         self.assertEqual(data[0]["digits"], ["04", "03", "03", "02", "01", "08", "12"])
+        self.assertEqual(data[0]["sales_amount"], 16936000)
         self.assertEqual(data[0]["jackpot_pool_balance"], 288000000)
+        self.assertEqual(data[0]["prize_total_amount"], 8516600)
         self.assertEqual(data[0]["prize_breakdown"][1]["prize_amount"], 75904)
 
     def test_parse_pl3_data_prefers_row_jackpot_column(self) -> None:

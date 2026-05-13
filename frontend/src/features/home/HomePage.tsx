@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { toPng } from 'html-to-image'
@@ -480,6 +480,137 @@ function formatJackpotInYiYuan(value: number | undefined) {
   return `${(numeric / 100000000).toFixed(2)} 亿元`
 }
 
+function formatCompactYuan(value: number | undefined) {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric) || numeric <= 0) return '-'
+  if (numeric >= 100000000) return `${(numeric / 100000000).toFixed(2)}亿`
+  if (numeric >= 10000) return `${(numeric / 10000).toFixed(2)}万`
+  return numeric.toLocaleString('zh-CN')
+}
+
+function formatPlainNumber(value: number | undefined) {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric) || numeric <= 0) return '-'
+  return numeric.toLocaleString('zh-CN')
+}
+
+function getHistoryDrawPrizeLevels(lotteryCode: LotteryCode, draws: LotteryDraw[]) {
+  const fallback = lotteryCode === 'pl3'
+    ? ['直选', '组选3', '组选6']
+    : lotteryCode === 'pl5'
+      ? ['直选']
+      : ['一等奖', '二等奖', '三等奖']
+  const levels = [...new Set(draws.flatMap((draw) => (draw.prize_breakdown || []).map((item) => item.prize_level).filter(Boolean)))]
+  return (levels.length ? levels : fallback).slice(0, lotteryCode === 'pl5' ? 1 : 3)
+}
+
+function getDrawNumbers(draw: LotteryDraw, lotteryCode: LotteryCode) {
+  if (lotteryCode === 'dlt') {
+    return {
+      front: draw.red_balls || [],
+      back: draw.blue_balls || [],
+    }
+  }
+  const digits = draw.digits?.length ? draw.digits : draw.red_balls || []
+  if (lotteryCode === 'qxc') {
+    return {
+      front: digits.slice(0, 6),
+      back: digits.slice(6),
+    }
+  }
+  return {
+    front: digits,
+    back: [],
+  }
+}
+
+function getPrizeByLevel(draw: LotteryDraw, prizeLevel: string) {
+  return (draw.prize_breakdown || []).find((item) => item.prize_level === prizeLevel && item.prize_type === 'basic')
+}
+
+function HistoricalDrawsTable({ lotteryCode, draws, isLoading }: { lotteryCode: LotteryCode; draws: LotteryDraw[]; isLoading: boolean }) {
+  const prizeLevels = getHistoryDrawPrizeLevels(lotteryCode, draws)
+  const lotteryLabel = getLotteryDisplayName(lotteryCode)
+  return (
+    <StatusCard title="历史开奖记录" subtitle={`展示${lotteryLabel}近期开奖、销量、奖池与主要奖级。`}>
+      <div className="table-shell historical-draws-table-shell">
+        <table className="history-table historical-draws-table">
+          <thead>
+            <tr>
+              <th rowSpan={2}>期次</th>
+              <th rowSpan={2}>开奖时间</th>
+              <th rowSpan={2}>开奖号码</th>
+              <th rowSpan={2}>本期销量</th>
+              <th rowSpan={2}>奖池滚存</th>
+              <th rowSpan={2}>中奖合计</th>
+              {prizeLevels.map((level) => (
+                <th key={`history-draw-prize-head-${level}`} colSpan={2}>{level}</th>
+              ))}
+            </tr>
+            <tr>
+              {prizeLevels.map((level) => (
+                <Fragment key={`history-draw-prize-subhead-${level}`}>
+                  <th>注数</th>
+                  <th>中奖（元）</th>
+                </Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6 + prizeLevels.length * 2}>历史开奖记录加载中...</td>
+              </tr>
+            ) : draws.length ? (
+              draws.map((draw) => {
+                const numbers = getDrawNumbers(draw, lotteryCode)
+                const prizeTotal = Number(draw.prize_total_amount || 0) || (draw.prize_breakdown || []).reduce((total, prize) => total + Number(prize.total_amount || 0), 0)
+                return (
+                  <tr key={`historical-draw-${lotteryCode}-${draw.period}`}>
+                    <td>{draw.period}</td>
+                    <td>{draw.date || '-'}</td>
+                    <td>
+                      <div className="historical-draws-table__numbers">
+                        {numbers.front.map((number, index) => (
+                          <NumberBall key={`front-${draw.period}-${number}-${index}`} value={number} color={resolveDigitBallColor(lotteryCode, index, numbers.front.length + numbers.back.length)} size="sm" />
+                        ))}
+                        {numbers.back.map((number, index) => (
+                          <NumberBall
+                            key={`back-${draw.period}-${number}-${index}`}
+                            value={number}
+                            color={lotteryCode === 'dlt' ? 'dlt-back' : lotteryCode === 'qxc' ? 'qxc-back' : resolveDigitBallColor(lotteryCode, numbers.front.length + index, numbers.front.length + numbers.back.length)}
+                            size="sm"
+                          />
+                        ))}
+                      </div>
+                    </td>
+                    <td>{formatCompactYuan(draw.sales_amount)}</td>
+                    <td>{formatCompactYuan(draw.jackpot_pool_balance)}</td>
+                    <td>{formatCompactYuan(prizeTotal)}</td>
+                    {prizeLevels.map((level) => {
+                      const prize = getPrizeByLevel(draw, level)
+                      return (
+                        <Fragment key={`history-draw-prize-${draw.period}-${level}`}>
+                          <td>{formatPlainNumber(prize?.winner_count)}</td>
+                          <td>{formatPlainNumber(prize?.prize_amount)}</td>
+                        </Fragment>
+                      )
+                    })}
+                  </tr>
+                )
+              })
+            ) : (
+              <tr>
+                <td colSpan={6 + prizeLevels.length * 2}>暂无历史开奖记录，请先在数据维护中初始化近期开奖数据。</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </StatusCard>
+  )
+}
+
 function sanitizeDownloadFileName(value: string) {
   return value
     .trim()
@@ -724,19 +855,19 @@ export function HomePage() {
   const historyQueryPage = activeTab === 'charts' ? 1 : historyPage
   const historyQueryPageSize = activeTab === 'charts' ? chartHistoryFetchPageSize : historyPageSize
 
-  const { currentPredictions, lotteryCharts, predictionsHistory } = useHomeData(
+  const { currentPredictions, lotteryCharts, predictionsHistory, pagedLotteryHistory } = useHomeData(
     selectedLottery,
     historyQueryPage,
     historyQueryPageSize,
     historyStrategyFilters,
     historyPlayTypeFilters,
     1,
-    10,
+    100,
     {
       enableCurrentPredictions: true,
       enableLotteryCharts: true,
       enablePredictionsHistory: activeTab === 'charts' || activeTab === 'history' || activeTab === 'prediction',
-      enablePagedLotteryHistory: false,
+      enablePagedLotteryHistory: activeTab === 'history',
     },
   )
   const lotteryLabel = getLotteryDisplayName(selectedLottery)
@@ -752,6 +883,7 @@ export function HomePage() {
     [allModels, dltPredictionMode, pl3PredictionMode, selectedLottery],
   )
   const history = predictionsHistory.data
+  const historicalDraws = pagedLotteryHistory.data?.data || []
   const chartDraws = lotteryCharts.data?.data || []
   const validPinnedModelIds = pinnedModelIds.filter((modelId) => models.some((model) => model.model_id === modelId))
   const {
@@ -2335,6 +2467,8 @@ export function HomePage() {
               onNext={() => setHistoryPage((value) => Math.min(totalHistoryPages, value + 1))}
             />
           </StatusCard>
+
+          <HistoricalDrawsTable lotteryCode={selectedLottery} draws={historicalDraws} isLoading={pagedLotteryHistory.isLoading} />
         </div>
       ) : null}
 

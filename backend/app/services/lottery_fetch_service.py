@@ -245,7 +245,9 @@ class LotteryFetchService:
                         "red_balls": [value.zfill(2) for value in numbers[:5]],
                         "blue_balls": [value.zfill(2) for value in numbers[5:7]],
                         "date": cols[1].strip(),
+                        "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
                         "prize_breakdown": self._build_lskj_prize_breakdown(cols, ["一等奖", "二等奖", "三等奖"], start_index=6),
                     }
                 )
@@ -258,7 +260,9 @@ class LotteryFetchService:
                         "period": period,
                         "digits": normalize_digit_balls(numbers[:3]),
                         "date": cols[1].strip(),
+                        "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
                         "prize_breakdown": build_pl3_prize_breakdown(),
                     }
                 )
@@ -271,7 +275,9 @@ class LotteryFetchService:
                         "period": period,
                         "digits": normalize_digit_balls(numbers[:5]),
                         "date": cols[1].strip(),
+                        "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
                         "prize_breakdown": build_pl5_prize_breakdown(),
                     }
                 )
@@ -284,7 +290,9 @@ class LotteryFetchService:
                         "period": period,
                         "digits": normalize_digit_balls(numbers[:7]),
                         "date": cols[1].strip(),
+                        "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
                         "prize_breakdown": self._build_lskj_prize_breakdown(cols, ["一等奖", "二等奖", "三等奖"], start_index=6)
                         or build_qxc_prize_breakdown(),
                     }
@@ -572,7 +580,9 @@ class LotteryFetchService:
             "blue_balls": list(existing_draw.get("blue_balls") or []),
             "digits": list(existing_draw.get("digits") or []),
             "date": str(detail_payload.get("draw_date") or existing_draw.get("date") or ""),
+            "sales_amount": int(existing_draw.get("sales_amount") or 0),
             "jackpot_pool_balance": int(detail_payload.get("jackpot_pool_balance") or existing_draw.get("jackpot_pool_balance") or 0),
+            "prize_total_amount": int(existing_draw.get("prize_total_amount") or 0),
             "prize_breakdown": prize_breakdown,
         }
         saved_draws = self.lottery_service.save_draws([refreshed_draw], lottery_code=self.lottery_code)

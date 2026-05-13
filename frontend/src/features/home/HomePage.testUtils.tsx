@@ -352,6 +352,14 @@ vi.mock('./hooks/useHomeData', () => ({
           date: `2026-03-${String(10 - index).padStart(2, '0')}`,
           red_balls: ['01', '02', '03', '04', '05'],
           blue_balls: ['06', '07'],
+          sales_amount: 356000000,
+          jackpot_pool_balance: 799000000,
+          prize_total_amount: 275000000,
+          prize_breakdown: [
+            { prize_level: '一等奖', prize_type: 'basic', winner_count: 4, prize_amount: 9612284, total_amount: 38449136 },
+            { prize_level: '二等奖', prize_type: 'basic', winner_count: 135, prize_amount: 137851, total_amount: 18609885 },
+            { prize_level: '三等奖', prize_type: 'basic', winner_count: 1232, prize_amount: 6666, total_amount: 8212512 },
+          ],
         })),
       [],
     )

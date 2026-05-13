@@ -21,6 +21,7 @@ class SchemaSplitModeTests(unittest.TestCase):
 
         for lottery_code in SUPPORTED_LOTTERY_CODES:
             self.assertTrue(any(f"CREATE TABLE IF NOT EXISTS {lottery_code}_draw_issue" in statement for statement in statements))
+            self.assertTrue(any(f"CREATE TABLE IF NOT EXISTS {lottery_code}_draw_result" in statement and "sales_amount" in statement and "prize_total_amount" in statement for statement in statements))
             self.assertTrue(any(f"CREATE TABLE IF NOT EXISTS {lottery_code}_simulation_ticket_number" in statement for statement in statements))
             self.assertTrue(any(f"CREATE TABLE IF NOT EXISTS {lottery_code}_my_bet_record_line_number" in statement for statement in statements))
 

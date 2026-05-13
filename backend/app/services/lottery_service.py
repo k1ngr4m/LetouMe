@@ -92,6 +92,8 @@ class LotteryService:
             "digits": normalize_digit_balls(draw.get("digits", [])),
             "date": self.serialize_draw_date(draw.get("date")),
             "jackpot_pool_balance": int(draw.get("jackpot_pool_balance") or 0),
+            "sales_amount": int(draw.get("sales_amount") or 0),
+            "prize_total_amount": int(draw.get("prize_total_amount") or 0),
             "prize_breakdown": prize_breakdown,
             "prize_breakdown_ready": self.is_prize_breakdown_ready({**draw, "prize_breakdown": prize_breakdown}, normalized_code),
         }

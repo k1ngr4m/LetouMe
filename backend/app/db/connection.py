@@ -435,4 +435,15 @@ def ensure_schema() -> None:
                 schema_statements = get_schema_statements() if settings.db_driver == "mysql" else get_sqlite_schema_statements()
                 for statement in schema_statements:
                     cursor.execute(statement)
+                _ensure_compat_columns(cursor, settings.db_driver)
         _schema_ready = True
+
+
+def _ensure_compat_columns(cursor: MySQLCursorAdapter | SQLiteCursorAdapter, db_driver: str) -> None:
+    integer_type = "BIGINT" if db_driver == "mysql" else "INTEGER"
+    for lottery_code in ("dlt", "pl3", "pl5", "qxc"):
+        table_name = f"{lottery_code}_draw_result"
+        for column_name in ("sales_amount", "prize_total_amount"):
+            cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE '{column_name}'")
+            if cursor.fetchone() is None:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {integer_type} NOT NULL DEFAULT 0")

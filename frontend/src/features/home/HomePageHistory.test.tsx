@@ -30,6 +30,21 @@ describe('HomePage history dashboard', () => {
     expect(within(firstHistoryCard as HTMLElement).getByText('300 元')).toBeInTheDocument()
   }, 10000)
 
+  it('shows historical draw table with sales and prize data at the bottom', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
+    const drawTableSection = await screen.findByRole('heading', { name: '历史开奖记录' })
+    const drawTable = drawTableSection.closest('section')
+    expect(drawTable).not.toBeNull()
+
+    expect(within(drawTable as HTMLElement).getByRole('columnheader', { name: '本期销量' })).toBeInTheDocument()
+    expect(within(drawTable as HTMLElement).getAllByText('3.56亿').length).toBeGreaterThan(0)
+    expect(within(drawTable as HTMLElement).getAllByText('7.99亿').length).toBeGreaterThan(0)
+    expect(within(drawTable as HTMLElement).getAllByText('2.75亿').length).toBeGreaterThan(0)
+    expect(within(drawTable as HTMLElement).getAllByText('9,612,284').length).toBeGreaterThan(0)
+  })
+
   it('exports a single history record card png', async () => {
     const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderPage()

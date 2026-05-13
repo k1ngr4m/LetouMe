@@ -320,6 +320,8 @@ SQLITE_SCHEMA_STATEMENTS = [
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             issue_id INTEGER NOT NULL UNIQUE,
             jackpot_pool_balance INTEGER NOT NULL DEFAULT 0,
+            sales_amount INTEGER NOT NULL DEFAULT 0,
+            prize_total_amount INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (issue_id) REFERENCES dlt_draw_issue(id) ON DELETE CASCADE
         )
@@ -529,6 +531,8 @@ SQLITE_SCHEMA_STATEMENTS = [
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             issue_id INTEGER NOT NULL UNIQUE,
             jackpot_pool_balance INTEGER NOT NULL DEFAULT 0,
+            sales_amount INTEGER NOT NULL DEFAULT 0,
+            prize_total_amount INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (issue_id) REFERENCES pl3_draw_issue(id) ON DELETE CASCADE
         )
@@ -738,6 +742,8 @@ SQLITE_SCHEMA_STATEMENTS = [
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             issue_id INTEGER NOT NULL UNIQUE,
             jackpot_pool_balance INTEGER NOT NULL DEFAULT 0,
+            sales_amount INTEGER NOT NULL DEFAULT 0,
+            prize_total_amount INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (issue_id) REFERENCES pl5_draw_issue(id) ON DELETE CASCADE
         )
@@ -947,6 +953,8 @@ SQLITE_SCHEMA_STATEMENTS = [
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             issue_id INTEGER NOT NULL UNIQUE,
             jackpot_pool_balance INTEGER NOT NULL DEFAULT 0,
+            sales_amount INTEGER NOT NULL DEFAULT 0,
+            prize_total_amount INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (issue_id) REFERENCES qxc_draw_issue(id) ON DELETE CASCADE
         )
