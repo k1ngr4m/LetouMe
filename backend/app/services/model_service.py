@@ -152,9 +152,9 @@ class ModelService:
         normalized = str(provider or "").strip().lower()
         if normalized == "deepseek" or normalized.startswith("deepseek_"):
             return "deepseek"
-        if normalized in {"aihubmix", "aimixhub"} or normalized.startswith("aihubmix_") or normalized.startswith("aimixhub_"):
+        if normalized in {"aihubmix"} or normalized.startswith("aihubmix_"):
             return "aihubmix"
-        if normalized in {"xiaomi_token_plan", "xiaomi"} or normalized.startswith("xiaomi_token_plan_") or normalized.startswith("xiaomi_"):
+        if normalized in {"xiaomi_token_plan"} or normalized.startswith("xiaomi_token_plan_"):
             return "xiaomi_token_plan"
         return normalized
 

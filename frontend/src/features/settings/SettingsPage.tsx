@@ -484,9 +484,7 @@ function getProviderTemplate(providerCode: string): ManagedProviderTemplate | nu
   if (providerCode === 'deepseek' || providerCode.startsWith('deepseek_')) return 'deepseek'
   if (
     providerCode === 'aihubmix' ||
-    providerCode.startsWith('aihubmix_') ||
-    providerCode === 'aimixhub' ||
-    providerCode.startsWith('aimixhub_')
+    providerCode.startsWith('aihubmix_')
   ) return 'aihubmix'
   if (
     providerCode === 'xiaomi_token_plan' ||
@@ -772,15 +770,15 @@ function EyeIcon({ open }: { open: boolean }) {
   )
 }
 
-function AccountLinkIcon() {
-  return (
-    <SvgIcon>
-      <path d="M7 8.2h-1a3 3 0 1 0 0 6h1" />
-      <path d="M13 8.2h1a3 3 0 0 1 0 6h-1" />
-      <path d="M7.8 11.2h4.4" />
-    </SvgIcon>
-  )
-}
+// function AccountLinkIcon() {
+//   return (
+//     <SvgIcon>
+//       <path d="M7 8.2h-1a3 3 0 1 0 0 6h1" />
+//       <path d="M13 8.2h1a3 3 0 0 1 0 6h-1" />
+//       <path d="M7.8 11.2h4.4" />
+//     </SvgIcon>
+//   )
+// }
 
 function KeySettingIcon() {
   return (
@@ -1269,9 +1267,9 @@ export function SettingsPage() {
       if (previous.provider) return previous
       const deepseekProvider = providerList.find((provider) => provider.code === 'deepseek')
       const lmStudioProvider = providerList.find((provider) => provider.code === LMSTUDIO_PROVIDER_CODE)
-      const aiMixHubProvider = providerList.find((provider) => provider.code === 'aihubmix')
+      const aiHubMixProvider = providerList.find((provider) => provider.code === 'aihubmix')
       const customProvider = providerList.find((provider) => !provider.is_system_preset && provider.code !== 'deepseek' && provider.code !== 'aihubmix' && provider.code !== LMSTUDIO_PROVIDER_CODE)
-      const firstProvider = customProvider || lmStudioProvider || deepseekProvider || aiMixHubProvider || providerList[0]
+      const firstProvider = customProvider || lmStudioProvider || deepseekProvider || aiHubMixProvider || providerList[0]
       return {
         ...previous,
         provider: firstProvider.code,
