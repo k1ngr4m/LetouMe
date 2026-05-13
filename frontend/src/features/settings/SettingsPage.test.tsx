@@ -1140,12 +1140,12 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '数据维护' }))
-    await userEvent.click(screen.getByRole('button', { name: '初始化全部历史' }))
+    await userEvent.click(screen.getByRole('button', { name: '初始化近100期' }))
 
     expect(apiClientMock.bootstrapSettingsLotteryHistory).toHaveBeenCalledWith({
       lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
-      chunk_size: 500,
-      detail_mode: 'all',
+      chunk_size: 100,
+      detail_mode: 'none',
       resume: true,
     })
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('bootstrap-task-1'), { timeout: 2500 })

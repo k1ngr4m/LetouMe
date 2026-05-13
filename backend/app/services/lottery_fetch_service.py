@@ -22,6 +22,12 @@ from backend.app.services.message_service import MessageService
 
 
 class LotteryFetchService:
+    LSKJ_URLS = {
+        "dlt": "https://www.500.com/kaijiang/dlt/lskj/",
+        "pl3": "https://www.500.com/kaijiang/p3/lskj/",
+        "pl5": "https://www.500.com/kaijiang/p5/lskj/",
+        "qxc": "https://www.500.com/kaijiang/qxc/lskj/",
+    }
     DETAIL_URL_TEMPLATES = {
         "dlt": "https://kaijiang.500.com/shtml/dlt/{period}.shtml",
         "pl3": "https://kaijiang.500.com/shtml/pls/{period}.shtml",
@@ -141,6 +147,31 @@ class LotteryFetchService:
         self.logger.info("Fetched and saved lottery history", extra={"context": summary})
         return summary
 
+    def fetch_lskj_and_save(self, *, limit: int = 100) -> dict[str, Any]:
+        started_at = time.perf_counter()
+        url = self.LSKJ_URLS.get(self.lottery_code)
+        if not url:
+            raise ValueError(f"不支持的历史开奖列表源：{self.lottery_code}")
+        soup = self.fetch_page(url)
+        if not soup:
+            raise ValueError("获取开奖历史页面失败")
+        lottery_data = self.parse_lskj_data(soup)
+        if not lottery_data:
+            raise ValueError("未解析到开奖数据")
+        lottery_data = lottery_data[: max(1, int(limit))]
+        saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        summary = {
+            "lottery_code": self.lottery_code,
+            "fetched_count": len(lottery_data),
+            "saved_count": len(saved_draws),
+            "message_generated_count": 0,
+            "latest_period": saved_draws[0]["period"] if saved_draws else None,
+            "duration_ms": duration_ms,
+        }
+        self.logger.info("Fetched and saved lottery lskj history", extra={"context": summary})
+        return summary
+
     def fetch_page(self, url: str, retry: int = 3) -> BeautifulSoup | None:
         for attempt in range(retry):
             try:
@@ -194,6 +225,92 @@ class LotteryFetchService:
 
         self.logger.info("Parsed lottery draws", extra={"context": {"count": len(data_list)}})
         return data_list
+
+    def parse_lskj_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        data_list: list[dict[str, Any]] = []
+        for row in soup.find_all("tr"):
+            cols = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
+            if len(cols) < 3:
+                continue
+            period = cols[0].strip()
+            if not period.isdigit():
+                continue
+            numbers = re.findall(r"\d{1,2}", cols[2])
+            if self.lottery_code == "dlt":
+                if len(numbers) < 7:
+                    continue
+                data_list.append(
+                    {
+                        "period": period,
+                        "red_balls": [value.zfill(2) for value in numbers[:5]],
+                        "blue_balls": [value.zfill(2) for value in numbers[5:7]],
+                        "date": cols[1].strip(),
+                        "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_breakdown": self._build_lskj_prize_breakdown(cols, ["一等奖", "二等奖", "三等奖"], start_index=6),
+                    }
+                )
+                continue
+            if self.lottery_code == "pl3":
+                if len(numbers) < 3:
+                    continue
+                data_list.append(
+                    {
+                        "period": period,
+                        "digits": normalize_digit_balls(numbers[:3]),
+                        "date": cols[1].strip(),
+                        "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_breakdown": build_pl3_prize_breakdown(),
+                    }
+                )
+                continue
+            if self.lottery_code == "pl5":
+                if len(numbers) < 5:
+                    continue
+                data_list.append(
+                    {
+                        "period": period,
+                        "digits": normalize_digit_balls(numbers[:5]),
+                        "date": cols[1].strip(),
+                        "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_breakdown": build_pl5_prize_breakdown(),
+                    }
+                )
+                continue
+            if self.lottery_code == "qxc":
+                if len(numbers) < 7:
+                    continue
+                data_list.append(
+                    {
+                        "period": period,
+                        "digits": normalize_digit_balls(numbers[:7]),
+                        "date": cols[1].strip(),
+                        "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
+                        "prize_breakdown": self._build_lskj_prize_breakdown(cols, ["一等奖", "二等奖", "三等奖"], start_index=6)
+                        or build_qxc_prize_breakdown(),
+                    }
+                )
+        self.logger.info("Parsed lskj lottery draws", extra={"context": {"count": len(data_list), "lottery_code": self.lottery_code}})
+        return data_list
+
+    def _build_lskj_prize_breakdown(self, cols: list[str], prize_levels: list[str], *, start_index: int) -> list[dict[str, Any]]:
+        breakdown: list[dict[str, Any]] = []
+        for offset, prize_level in enumerate(prize_levels):
+            count_index = start_index + offset * 2
+            amount_index = count_index + 1
+            if amount_index >= len(cols):
+                break
+            winner_count = self.parse_money_value(cols[count_index])
+            prize_amount = self.parse_money_value(cols[amount_index])
+            breakdown.append(
+                {
+                    "prize_level": prize_level,
+                    "prize_type": "basic",
+                    "winner_count": winner_count,
+                    "prize_amount": prize_amount,
+                    "total_amount": winner_count * prize_amount,
+                }
+            )
+        return breakdown
 
     def parse_pl3_data(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         data_list: list[dict[str, Any]] = []

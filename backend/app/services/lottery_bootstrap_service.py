@@ -21,7 +21,7 @@ class LotteryBootstrapService:
     DETAIL_LOTTERY_CODES = {"dlt", "qxc"}
     DETAIL_THROTTLE_SECONDS = 1.5
     DETAIL_RETRY = 2
-    DEFAULT_BASE_LIMIT = 100000
+    DEFAULT_BASE_LIMIT = 100
 
     def __init__(
         self,
@@ -37,8 +37,8 @@ class LotteryBootstrapService:
         self,
         *,
         lottery_codes: list[str] | None = None,
-        chunk_size: int = 500,
-        detail_mode: str = "all",
+        chunk_size: int = 100,
+        detail_mode: str = "none",
         resume: bool = True,
         progress_callback: ProgressCallback | None = None,
         cancel_callback: CancelCallback | None = None,
@@ -121,7 +121,7 @@ class LotteryBootstrapService:
             message_service=_NoopBootstrapMessageService(),
         )
         limit = max(chunk_size, self.DEFAULT_BASE_LIMIT)
-        return fetch_service.fetch_and_save(limit=limit)
+        return fetch_service.fetch_lskj_and_save(limit=limit)
 
     def _backfill_details(
         self,
@@ -267,8 +267,8 @@ class LotteryBootstrapTaskService:
         self,
         *,
         lottery_codes: list[str] | None = None,
-        chunk_size: int = 500,
-        detail_mode: str = "all",
+        chunk_size: int = 100,
+        detail_mode: str = "none",
         resume: bool = True,
         on_update=None,
     ) -> dict[str, Any]:

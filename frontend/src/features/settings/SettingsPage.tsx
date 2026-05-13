@@ -1990,13 +1990,13 @@ export function SettingsPage() {
   const bootstrapLotteryMutation = useMutation({
     mutationFn: () => apiClient.bootstrapSettingsLotteryHistory({
       lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
-      chunk_size: 500,
-      detail_mode: 'all',
+      chunk_size: 100,
+      detail_mode: 'none',
       resume: true,
     }),
     onSuccess: (task) => {
       setLotteryBootstrapTask(task)
-      setMessage('全彩种历史开奖记录初始化任务已创建，正在后台慢速补齐详情。')
+      setMessage('全彩种近 100 期开奖记录初始化任务已创建，正在后台执行。')
       setMessageType('success')
       void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
     },
@@ -3494,7 +3494,7 @@ export function SettingsPage() {
                     <div className="panel-card__header">
                       <div>
                         <h2 className="panel-card__title">全量初始化</h2>
-                        <p className="panel-card__subtitle">首次部署时批量导入全部彩种历史开奖，并慢速补齐大乐透与七星彩奖金明细。</p>
+                        <p className="panel-card__subtitle">首次部署时从 500 历史开奖列表批量导入全部彩种近 100 期数据。</p>
                       </div>
                       <button
                         className="primary-button"
@@ -3502,7 +3502,7 @@ export function SettingsPage() {
                         disabled={bootstrapLotteryMutation.isPending || Boolean(lotteryBootstrapTask && ['queued', 'running'].includes(lotteryBootstrapTask.status))}
                         onClick={() => bootstrapLotteryMutation.mutate()}
                       >
-                        {bootstrapLotteryMutation.isPending || (lotteryBootstrapTask && ['queued', 'running'].includes(lotteryBootstrapTask.status)) ? '初始化中...' : '初始化全部历史'}
+                        {bootstrapLotteryMutation.isPending || (lotteryBootstrapTask && ['queued', 'running'].includes(lotteryBootstrapTask.status)) ? '初始化中...' : '初始化近100期'}
                       </button>
                     </div>
                     {lotteryBootstrapTask ? (
@@ -3536,7 +3536,7 @@ export function SettingsPage() {
                       <div className="settings-schedule-list-summary settings-maintenance-bootstrap-summary">
                         <span>默认处理 大乐透、排列3、排列5、七星彩</span>
                         <span>断点续跑已开启</span>
-                        <span>详情请求间隔 1.5 秒</span>
+                        <span>使用 500 历史开奖列表</span>
                       </div>
                     )}
                   </div>

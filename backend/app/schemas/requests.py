@@ -122,8 +122,8 @@ class LotteryFetchTaskPayload(BaseModel):
 
 class LotteryBootstrapPayload(BaseModel):
     lottery_codes: list[str] = Field(default_factory=lambda: ["dlt", "pl3", "pl5", "qxc"])
-    chunk_size: int = Field(default=500, ge=1, le=5000)
-    detail_mode: Literal["all", "none"] = "all"
+    chunk_size: int = Field(default=100, ge=1, le=5000)
+    detail_mode: Literal["all", "none"] = "none"
     resume: bool = True
 
 

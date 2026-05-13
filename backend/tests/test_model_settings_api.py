@@ -551,8 +551,8 @@ class ModelSettingsApiTests(unittest.TestCase):
         self.assertEqual(response.json()["task_id"], "bootstrap-task-1")
         create_task.assert_called_once_with(
             lottery_codes=["dlt", "pl3", "pl5", "qxc"],
-            chunk_size=500,
-            detail_mode="all",
+            chunk_size=100,
+            detail_mode="none",
             resume=True,
         )
 

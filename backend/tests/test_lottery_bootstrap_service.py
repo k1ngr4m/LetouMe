@@ -30,7 +30,7 @@ class LotteryBootstrapServiceTests(unittest.TestCase):
             ]
             fetch_service = fetch_service_class.return_value
 
-            summary = service.bootstrap(progress_callback=progress_updates.append)
+            summary = service.bootstrap(detail_mode="all", progress_callback=progress_updates.append)
 
         self.assertEqual(fetch_base_history.call_count, 4)
         self.assertEqual([call.args[0] for call in fetch_base_history.call_args_list], ["dlt", "pl3", "pl5", "qxc"])
@@ -52,7 +52,7 @@ class LotteryBootstrapServiceTests(unittest.TestCase):
 
         with patch("backend.app.services.lottery_bootstrap_service.LotteryFetchService") as fetch_service_class, patch("backend.app.services.lottery_bootstrap_service.time.sleep"):
             fetch_service = fetch_service_class.return_value
-            summary = service.bootstrap(lottery_codes=["dlt"], resume=True)
+            summary = service.bootstrap(lottery_codes=["dlt"], detail_mode="all", resume=True)
 
         fetch_service.backfill_draw_detail.assert_called_once_with("26001")
         self.assertEqual(summary["detail_processed"], 1)
@@ -69,7 +69,7 @@ class LotteryBootstrapServiceTests(unittest.TestCase):
 
         with patch.object(service, "_backfill_detail_with_retry") as backfill_detail, patch("backend.app.services.lottery_bootstrap_service.LotteryFetchService"), patch("backend.app.services.lottery_bootstrap_service.time.sleep"):
             backfill_detail.side_effect = [ValueError("blocked"), None]
-            summary = service.bootstrap(lottery_codes=["dlt"], resume=True)
+            summary = service.bootstrap(lottery_codes=["dlt"], detail_mode="all", resume=True)
 
         self.assertEqual(summary["detail_processed"], 1)
         self.assertEqual(summary["detail_failed"], 1)
