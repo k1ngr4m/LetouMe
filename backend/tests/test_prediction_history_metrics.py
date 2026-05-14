@@ -747,6 +747,37 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(hit_result["total_hits"], 1)
         self.assertTrue(hit_result["is_exact_match"])
 
+    def test_calculate_hit_result_pl3_compound_uses_position_selections(self) -> None:
+        hit_result = self.service.calculate_hit_result(
+            {
+                "play_type": "pl3_compound",
+                "position_selections": [
+                    ["00", "01", "02", "03", "04"],
+                    ["02", "03", "04", "05", "06"],
+                    ["05", "06", "07", "08", "09"],
+                ],
+            },
+            {"lottery_code": "pl3", "digits": ["01", "03", "09"]},
+            lottery_code="pl3",
+        )
+
+        self.assertEqual(hit_result["digit_hit_count"], 3)
+        self.assertEqual(hit_result["winning_bet_count"], 1)
+        self.assertEqual(hit_result["bet_count"], 125)
+        self.assertEqual(hit_result["best_prize_level"], "直选")
+
+    def test_pl3_compound_cost_and_bet_count_use_position_product(self) -> None:
+        group = {
+            "play_type": "pl3_compound",
+            "position_selections": [
+                ["00", "01", "02", "03", "04"],
+                ["02", "03", "04", "05", "06"],
+                ["05", "06", "07", "08", "09"],
+            ],
+        }
+        self.assertEqual(self.service._resolve_prediction_group_cost(group, "pl3"), 250)
+        self.assertEqual(self.service._resolve_prediction_group_bet_count(group, "pl3"), 125)
+
     def test_calculate_hit_result_qxc_counts_all_compound_sixth_prize_wins(self) -> None:
         hit_result = self.service.calculate_hit_result(
             {

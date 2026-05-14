@@ -995,7 +995,9 @@ function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: ScheduleP
 
 function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predictionPlayMode: ModelPredictionPlayMode): ModelPredictionPlayMode {
   if (lotteryCode === 'pl3') {
-    return predictionPlayMode === 'direct_sum' ? 'direct_sum' : 'direct'
+    if (predictionPlayMode === 'direct_sum') return 'direct_sum'
+    if (predictionPlayMode === 'dantuo') return 'dantuo'
+    return 'direct'
   }
   if (lotteryCode === 'qxc') {
     return predictionPlayMode === 'compound' ? 'compound' : 'direct'
@@ -1011,7 +1013,9 @@ function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predict
 function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode, lotteryCode: LotteryCode) {
   const normalizedMode = normalizePredictionPlayModeForLottery(lotteryCode, predictionPlayMode)
   if (lotteryCode === 'pl3') {
-    return normalizedMode === 'direct_sum' ? '和值' : '直选'
+    if (normalizedMode === 'direct_sum') return '和值'
+    if (normalizedMode === 'dantuo') return '复式'
+    return '直选'
   }
   if (lotteryCode === 'dlt') {
     if (normalizedMode === 'dantuo') return '胆拖'
@@ -1081,7 +1085,7 @@ export function SettingsPage() {
   const [customHeaderEditorOpen, setCustomHeaderEditorOpen] = useState(false)
   const [customHeaderDrafts, setCustomHeaderDrafts] = useState<CustomBodyParamDraft[]>([])
   const [customHeaderError, setCustomHeaderError] = useState<string | null>(null)
-  const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState('deepseek')
+  const [selectedManagedProviderCode, setSelectedManagedProviderCode] = useState(ALL_PROVIDER_CODE)
   const [providerSourceDrafts, setProviderSourceDrafts] = useState<ManagedProvider[]>([])
   const [providerSourceMenuOpen, setProviderSourceMenuOpen] = useState(false)
   const [providerDraft, setProviderDraft] = useState({
@@ -2237,7 +2241,7 @@ export function SettingsPage() {
     })
     if (selectedManagedProviderCode === providerCode) {
       const fallbackProvider = managedProviders.find((provider) => provider.code !== providerCode)
-      setSelectedManagedProviderCode(fallbackProvider?.code || 'deepseek')
+      setSelectedManagedProviderCode(fallbackProvider?.code || ALL_PROVIDER_CODE)
     }
   }
 
@@ -2254,7 +2258,7 @@ export function SettingsPage() {
         setMessageType('success')
         if (selectedManagedProviderCode === provider.code) {
           const fallbackProvider = managedProviders.find((item) => item.code !== provider.code)
-          setSelectedManagedProviderCode(fallbackProvider?.code || 'deepseek')
+          setSelectedManagedProviderCode(fallbackProvider?.code || ALL_PROVIDER_CODE)
         }
         void queryClient.invalidateQueries({ queryKey: ['settings-providers'] })
       })
@@ -3195,7 +3199,7 @@ export function SettingsPage() {
                         className="provider-source-item__select"
                         onClick={() => {
                           setSelectedManagedProviderCode(ALL_PROVIDER_CODE)
-                          setModelStatusFilter('all')
+                          setModelStatusFilter('active')
                         }}
                       >
                         <span className="provider-source-item__logo provider-source-item__logo--all">ALL</span>
@@ -4919,6 +4923,7 @@ export function SettingsPage() {
                               <>
                                 <option value="direct">直选</option>
                                 <option value="direct_sum">和值</option>
+                                <option value="dantuo">复式</option>
                               </>
                             ) : scheduleForm.lottery_code === 'qxc' ? (
                               <>
@@ -5162,6 +5167,7 @@ export function SettingsPage() {
                           <>
                             <option value="direct">直选预测</option>
                             <option value="direct_sum">和值预测</option>
+                            <option value="dantuo">复式预测</option>
                           </>
                         ) : generationForm.lotteryCode === 'qxc' ? (
                           <>

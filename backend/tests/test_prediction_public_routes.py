@@ -22,6 +22,11 @@ class PredictionPublicRoutesTests(unittest.TestCase):
 
         self.assertEqual(payload.play_type_filters, ["qxc_compound"])
 
+    def test_history_payload_accepts_pl3_compound_filter(self) -> None:
+        payload = PredictionsHistoryListPayload(play_type_filters=["pl3_compound"])
+
+        self.assertEqual(payload.play_type_filters, ["pl3_compound"])
+
     def test_get_prediction_backtest_summary_hides_inactive_models(self) -> None:
         with patch.object(routes.prediction_service, "get_backtest_summary_payload") as mocked_get_backtest:
             mocked_get_backtest.return_value = {

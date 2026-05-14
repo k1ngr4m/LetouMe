@@ -1095,6 +1095,7 @@ describe('getPredictionPlayTypeLabel', () => {
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct', red_balls: [], blue_balls: [], digits: ['01', '02', '03'] })).toBe('直选')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'direct_sum', sum_value: '10', red_balls: [], blue_balls: [], digits: [] })).toBe('和值')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'pl3_dantuo', red_balls: [], blue_balls: [], digits: [] })).toBe('直选胆拖')
+    expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'pl3_compound', red_balls: [], blue_balls: [], digits: [], position_selections: [['01'], ['02'], ['03']] })).toBe('直选定位复式')
     expect(getPredictionPlayTypeLabel({ group_id: 1, play_type: 'group3', red_balls: [], blue_balls: [], digits: ['01', '01', '03'] })).toBe('组选3')
     expect(getPredictionPlayTypeLabel({ group_id: 1, red_balls: ['01', '02', '03', '04', '05'], blue_balls: ['06', '07'] })).toBe('普通')
     expect(
@@ -1172,6 +1173,14 @@ describe('normalizePredictionModelPlayMode', () => {
         model_name: 'Model 5',
         model_provider: 'openai',
         predictions: [{ group_id: 1, play_type: 'pl3_dantuo', red_balls: [], blue_balls: [] }],
+      }),
+    ).toBe('dantuo')
+    expect(
+      normalizePredictionModelPlayMode({
+        model_id: 'm6',
+        model_name: 'Model 6',
+        model_provider: 'openai',
+        predictions: [{ group_id: 1, play_type: 'pl3_compound', red_balls: [], blue_balls: [], position_selections: [['01'], ['02'], ['03']] }],
       }),
     ).toBe('dantuo')
   })

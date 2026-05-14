@@ -21,6 +21,7 @@ class MessageService:
         "dlt_dantuo": "胆拖投注",
         "direct": "直选",
         "pl3_dantuo": "直选组合胆拖",
+        "pl3_compound": "直选定位复式",
         "group3": "组选3",
         "group6": "组选6",
         "direct_sum": "直选和值",

@@ -21,6 +21,23 @@ class SimulationTicketServiceTests(unittest.TestCase):
         )
         self.assertEqual(direct_sum_payload["bet_count"], 10)
 
+    def test_build_pl3_compound_ticket_payload_uses_position_product(self) -> None:
+        service = SimulationTicketService()
+        payload = service._build_pl3_ticket_payload(
+            {
+                "play_type": "pl3_compound",
+                "position_selections": [
+                    ["00", "01", "02", "03", "04"],
+                    ["02", "03", "04", "05", "06"],
+                    ["05", "06", "07", "08", "09"],
+                ],
+            }
+        )
+
+        self.assertEqual(payload["play_type"], "pl3_compound")
+        self.assertEqual(payload["bet_count"], 125)
+        self.assertEqual(payload["amount"], 250)
+
     def test_build_pl3_group_sum_rejects_empty_or_zero_bet_sum_values(self) -> None:
         service = SimulationTicketService()
 

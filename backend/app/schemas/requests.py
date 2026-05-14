@@ -19,7 +19,7 @@ class PredictionsHistoryListPayload(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
     strategy_filters: list[str] = Field(default_factory=list)
-    play_type_filters: list[Literal["direct", "direct_sum", "group3", "group6", "pl3_dantuo", "dlt_dantuo", "dlt_compound", "qxc_compound"]] = Field(default_factory=list)
+    play_type_filters: list[Literal["direct", "direct_sum", "group3", "group6", "pl3_dantuo", "pl3_compound", "dlt_dantuo", "dlt_compound", "qxc_compound"]] = Field(default_factory=list)
     strategy_match_mode: Literal["all"] = "all"
 
 
@@ -27,7 +27,7 @@ class PredictionBacktestSummaryPayload(BaseModel):
     lottery_code: str = "dlt"
     recent_period_count: int | None = Field(default=20, ge=1, le=500)
     model_codes: list[str] = Field(default_factory=list)
-    play_type_filters: list[Literal["direct", "direct_sum", "group3", "group6", "pl3_dantuo", "dlt_dantuo", "dlt_compound", "qxc_compound"]] = Field(default_factory=list)
+    play_type_filters: list[Literal["direct", "direct_sum", "group3", "group6", "pl3_dantuo", "pl3_compound", "dlt_dantuo", "dlt_compound", "qxc_compound"]] = Field(default_factory=list)
     strategy_filters: list[str] = Field(default_factory=list)
 
 

@@ -1,7 +1,7 @@
 import type { LotteryCode, LotteryDraw, SimulationTicketRecord } from '../../../shared/types/api'
 import { padBall } from '../../../shared/lib/format'
 
-export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
+export type SimulationPlayType = 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'pl3_compound' | 'qxc_compound'
 export type PrizeLevel =
   | '一等奖'
   | '二等奖'
@@ -215,6 +215,11 @@ export function calculateBetCount(selection: SimulationSelection) {
       hasIntersection(selection.directUnitsDan || [], selection.directUnitsTuo || [])
     ) return 0
     return counts[0] * counts[1] * counts[2]
+  }
+  if (selection.playType === 'pl3_compound') {
+    const positionSelections = (selection.positionSelections || []).slice(0, 3)
+    if (positionSelections.length !== 3 || positionSelections.some((values) => !values.length)) return 0
+    return positionSelections.reduce((product, values) => product * values.length, 1)
   }
   if (selection.playType === 'group3') {
     const count = selection.groupNumbers.length
@@ -431,6 +436,34 @@ export function createRandomSelection(lotteryCode: LotteryCode, playType: Simula
     }
   }
 
+  if (playType === 'pl3_compound') {
+    const digits = buildBallRange(10, 0)
+    return {
+      lotteryCode,
+      playType,
+      frontNumbers: [],
+      backNumbers: [],
+      frontDan: [],
+      frontTuo: [],
+      backDan: [],
+      backTuo: [],
+      directTenThousands: [],
+      directThousands: [],
+      directHundreds: [],
+      directTens: [],
+      directUnits: [],
+      directHundredsDan: [],
+      directHundredsTuo: [],
+      directTensDan: [],
+      directTensTuo: [],
+      directUnitsDan: [],
+      directUnitsTuo: [],
+      groupNumbers: [],
+      sumValues: [],
+      positionSelections: [pickRandomBalls(digits, 5), pickRandomBalls(digits, 5), pickRandomBalls(digits, 5)],
+    }
+  }
+
   const groupSize = playType === 'group3' ? 2 : 3
   return {
     lotteryCode,
@@ -564,9 +597,11 @@ function buildDigitMatches(selection: SimulationSelection, draws: LotteryDraw[],
           ? (selection.positionSelections || [])
           : selection.lotteryCode === 'pl5'
           ? [selection.directTenThousands, selection.directThousands, selection.directHundreds, selection.directTens, selection.directUnits]
+          : selection.playType === 'pl3_compound'
+          ? (selection.positionSelections || [])
           : [selection.directHundreds, selection.directTens, selection.directUnits]
       ).map((values) => values.map(padBall))
-      const digitHitIndexes = selection.playType === 'direct' || (selection.lotteryCode === 'qxc' && selection.playType === 'qxc_compound')
+      const digitHitIndexes = selection.playType === 'direct' || selection.playType === 'pl3_compound' || (selection.lotteryCode === 'qxc' && selection.playType === 'qxc_compound')
         ? actualDigits.reduce<number[]>((indexes, digit, index) => {
             if (directDigits[index]?.includes(digit)) {
               indexes.push(index)
@@ -790,6 +825,15 @@ function calculatePl3PrizeBreakdown(selection: SimulationSelection, actualDigits
       [...(selection.directHundredsDan || []), ...(selection.directHundredsTuo || [])].includes(actualDigits[0]) &&
       [...(selection.directTensDan || []), ...(selection.directTensTuo || [])].includes(actualDigits[1]) &&
       [...(selection.directUnitsDan || []), ...(selection.directUnitsTuo || [])].includes(actualDigits[2])
+    return matched ? [{ level: '直选', count: 1 }] : []
+  }
+
+  if (selection.playType === 'pl3_compound') {
+    const positionSelections = (selection.positionSelections || []).slice(0, 3)
+    const matched =
+      (positionSelections[0] || []).includes(actualDigits[0]) &&
+      (positionSelections[1] || []).includes(actualDigits[1]) &&
+      (positionSelections[2] || []).includes(actualDigits[2])
     return matched ? [{ level: '直选', count: 1 }] : []
   }
 

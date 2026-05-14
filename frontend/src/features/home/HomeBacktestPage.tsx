@@ -27,7 +27,7 @@ const PLAY_TYPE_OPTIONS: Record<LotteryCode, Array<{ value: PredictionPlayType; 
   pl3: [
     { value: 'direct', label: '直选' },
     { value: 'direct_sum', label: '和值' },
-    { value: 'pl3_dantuo', label: '胆拖' },
+    { value: 'pl3_compound', label: '复式' },
   ],
   pl5: [{ value: 'direct', label: '直选' }],
   qxc: [
@@ -52,9 +52,9 @@ function getLotteryDisplayName(lotteryCode: LotteryCode) {
   return '七星彩'
 }
 
-function getPlayModeLabel(value?: string | null) {
+function getPlayModeLabel(value?: string | null, lotteryCode: LotteryCode = 'dlt') {
   if (value === 'compound') return '复式'
-  if (value === 'dantuo') return '胆拖'
+  if (value === 'dantuo') return lotteryCode === 'pl3' ? '复式' : '胆拖'
   if (value === 'direct_sum') return '和值'
   return '直选/普通'
 }
@@ -193,11 +193,12 @@ export function HomeBacktestPage() {
           {overview && data?.periods.length ? (
             <>
               <BacktestOverviewGrid data={data} />
-              <BacktestRankingTable data={data} />
+              <BacktestRankingTable data={data} lotteryCode={selectedLottery} />
               <BacktestTrend data={data} maxTrendProfit={maxTrendProfit} />
               {data.strategy_breakdown.length ? <BacktestStrategyGrid data={data} /> : null}
               <BacktestPeriodList
                 periods={data.periods}
+                lotteryCode={data.lottery_code}
                 expandedPeriod={expandedPeriod}
                 onToggleExpanded={(period) => setExpandedPeriod((current) => (current === period ? null : period))}
               />
@@ -238,7 +239,7 @@ function BacktestOverviewGrid({ data }: { data: BacktestSummaryResponse }) {
   )
 }
 
-function BacktestRankingTable({ data }: { data: BacktestSummaryResponse }) {
+function BacktestRankingTable({ data, lotteryCode }: { data: BacktestSummaryResponse; lotteryCode: LotteryCode }) {
   return (
     <section className="backtest-section">
       <div className="backtest-section__header">
@@ -263,7 +264,7 @@ function BacktestRankingTable({ data }: { data: BacktestSummaryResponse }) {
             {data.model_rankings.map((model) => (
               <tr key={`${model.model_id}-${model.prediction_play_mode}`}>
                 <td><strong>{model.model_name}</strong><span>{model.model_id}</span></td>
-                <td>{getPlayModeLabel(model.prediction_play_mode)}</td>
+                <td>{getPlayModeLabel(model.prediction_play_mode, lotteryCode)}</td>
                 <td>{model.overall_score}</td>
                 <td>{formatPercent(model.win_rate_by_period)}</td>
                 <td>{formatPercent(model.win_rate_by_bet)}</td>
@@ -332,10 +333,12 @@ function BacktestStrategyGrid({ data }: { data: BacktestSummaryResponse }) {
 
 function BacktestPeriodList({
   periods,
+  lotteryCode,
   expandedPeriod,
   onToggleExpanded,
 }: {
   periods: BacktestPeriod[]
+  lotteryCode: LotteryCode
   expandedPeriod: string | null
   onToggleExpanded: (period: string) => void
 }) {
@@ -363,7 +366,7 @@ function BacktestPeriodList({
             {expandedPeriod === period.target_period ? (
               <div className="backtest-period-card__models">
                 {period.models.map((model) => (
-                  <PeriodModelRow key={`${period.target_period}-${model.model_id}-${model.prediction_play_mode}`} model={model} />
+                  <PeriodModelRow key={`${period.target_period}-${model.model_id}-${model.prediction_play_mode}`} model={model} lotteryCode={lotteryCode} />
                 ))}
               </div>
             ) : null}
@@ -386,11 +389,11 @@ function ActualNumbers({ period }: { period: BacktestPeriod }) {
   )
 }
 
-function PeriodModelRow({ model }: { model: BacktestPeriodModel }) {
+function PeriodModelRow({ model, lotteryCode }: { model: BacktestPeriodModel; lotteryCode: LotteryCode }) {
   return (
     <div className="backtest-period-model">
       <strong>{model.model_name}</strong>
-      <span>{getPlayModeLabel(model.prediction_play_mode)} · 最佳 {model.best_hit_count}</span>
+      <span>{getPlayModeLabel(model.prediction_play_mode, lotteryCode)} · 最佳 {model.best_hit_count}</span>
       <span>{model.winning_bet_count}/{model.bet_count} 注</span>
       <span className={clsx(model.net_profit >= 0 ? 'is-positive' : 'is-negative')}>{formatCurrency(model.net_profit)}</span>
     </div>

@@ -24,6 +24,7 @@ DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "dlt_prompt2
 PL3_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_prompt.md"
 PL3_SUM_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_sum_prompt.md"
 PL3_DANTUO_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_dantuo_prompt.md"
+PL3_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl3_compound_prompt.md"
 PL5_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "pl5_prompt.md"
 QXC_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_prompt.md"
 QXC_COMPOUND_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "qxc_compound_prompt.md"
@@ -941,7 +942,7 @@ class PredictionGenerationService:
             else:
                 path = DEFAULT_PROMPT_PATH
         elif normalized_code == "pl3":
-            path = PL3_DANTUO_PROMPT_PATH if normalized_play_mode == "dantuo" else PL3_SUM_PROMPT_PATH if normalized_play_mode == "direct_sum" else PL3_PROMPT_PATH
+            path = PL3_COMPOUND_PROMPT_PATH if normalized_play_mode == "dantuo" else PL3_SUM_PROMPT_PATH if normalized_play_mode == "direct_sum" else PL3_PROMPT_PATH
         elif normalized_code == "pl5":
             path = PL5_PROMPT_PATH
         elif normalized_code == "qxc":
@@ -1284,7 +1285,7 @@ class PredictionGenerationService:
         if normalized_code == "dlt":
             expected_group_count = 1 if normalized_play_mode == "dantuo" else 4 if normalized_play_mode == "compound" else 5
         elif normalized_code == "pl3" and normalized_play_mode in {"direct_sum", "dantuo"}:
-            expected_group_count = 3
+            expected_group_count = 1 if normalized_play_mode == "dantuo" else 3
         else:
             expected_group_count = 5
         if len(groups) != expected_group_count:
@@ -1304,20 +1305,13 @@ class PredictionGenerationService:
                     if int(sum_value) < 0 or int(sum_value) > 27:
                         return False
                 elif normalized_play_mode == "dantuo":
-                    if play_type != "pl3_dantuo":
+                    if play_type != "pl3_compound":
                         return False
-                    for position, dan_key, tuo_key in (
-                        ("百位", "direct_hundreds_dan", "direct_hundreds_tuo"),
-                        ("十位", "direct_tens_dan", "direct_tens_tuo"),
-                        ("个位", "direct_units_dan", "direct_units_tuo"),
-                    ):
-                        dan_values = PredictionService._normalize_pl3_dantuo_position(group.get(dan_key))
-                        tuo_values = PredictionService._normalize_pl3_dantuo_position(group.get(tuo_key))
-                        if dan_values is None or tuo_values is None:
-                            return False
-                        if len(dan_values) > 1 or len(tuo_values) < 1:
-                            return False
-                        if set(dan_values) & set(tuo_values):
+                    position_selections = PredictionService._normalize_pl3_compound_position_selections(group.get("position_selections"))
+                    if len(position_selections) != 3:
+                        return False
+                    for values in position_selections:
+                        if len(values) != 5:
                             return False
                 else:
                     if play_type != "direct":
@@ -1492,7 +1486,7 @@ class PredictionGenerationService:
         if normalized_play_mode == "direct_sum":
             return "direct_sum" in play_types
         if normalized_play_mode == "dantuo":
-            return "pl3_dantuo" in play_types
+            return "pl3_compound" in play_types or "pl3_dantuo" in play_types
         return "direct" in play_types
 
     @classmethod
@@ -1553,7 +1547,7 @@ class PredictionGenerationService:
                 if isinstance(group, dict)
             )
             has_dantuo = any(
-                str(group.get("play_type") or "").strip().lower() == "pl3_dantuo"
+                str(group.get("play_type") or "").strip().lower() in {"pl3_dantuo", "pl3_compound"}
                 for group in groups
                 if isinstance(group, dict)
             )

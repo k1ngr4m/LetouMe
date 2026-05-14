@@ -194,6 +194,31 @@ describe('simulation helpers', () => {
         sumValues: [],
       }),
     ).toBe(4)
+
+    expect(
+      calculateBetCount({
+        lotteryCode: 'pl3',
+        playType: 'pl3_compound',
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
+        directTenThousands: [],
+        directThousands: [],
+        directHundreds: [],
+        directTens: [],
+        directUnits: [],
+        groupNumbers: [],
+        sumValues: [],
+        positionSelections: [
+          ['00', '01', '02', '03', '04'],
+          ['02', '03', '04', '05', '06'],
+          ['05', '06', '07', '08', '09'],
+        ],
+      }),
+    ).toBe(125)
   })
 
   it('matches pl3 direct and group prizes', () => {
@@ -221,6 +246,36 @@ describe('simulation helpers', () => {
     expect(directMatches[0].topPrizeLevel).toBe('直选')
     expect(directMatches[0].digitHits).toEqual(['04', '05', '06'])
     expect(directMatches[0].digitHitIndexes).toEqual([0, 1, 2])
+
+    const compoundMatches = buildSimulationMatches(
+      {
+        lotteryCode: 'pl3',
+        playType: 'pl3_compound',
+        frontNumbers: [],
+        backNumbers: [],
+        frontDan: [],
+        frontTuo: [],
+        backDan: [],
+        backTuo: [],
+        directTenThousands: [],
+        directThousands: [],
+        directHundreds: [],
+        directTens: [],
+        directUnits: [],
+        groupNumbers: [],
+        sumValues: [],
+        positionSelections: [
+          ['00', '01', '02', '03', '04'],
+          ['02', '03', '04', '05', '06'],
+          ['05', '06', '07', '08', '09'],
+        ],
+      },
+      [{ period: '26001', date: '2026-01-01', red_balls: ['04', '05', '06'], blue_balls: [] }],
+      30,
+    )
+    expect(compoundMatches[0].topPrizeLevel).toBe('直选')
+    expect(compoundMatches[0].digitHits).toEqual(['04', '05', '06'])
+    expect(compoundMatches[0].digitHitIndexes).toEqual([0, 1, 2])
 
     const groupMatches = buildSimulationMatches(
       {

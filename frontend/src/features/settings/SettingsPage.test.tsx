@@ -108,6 +108,13 @@ function renderPage(initialEntry = '/settings/profile') {
   )
 }
 
+async function selectManagedProvider(name: string | RegExp) {
+  const providerSidebar = await screen.findByLabelText('供应商')
+  const buttons = await within(providerSidebar).findAllByRole('button', { name })
+  const selectButton = buttons.find((button) => !button.getAttribute('aria-label')?.startsWith('删除供应商源')) || buttons[0]
+  await userEvent.click(selectButton)
+}
+
 describe('SettingsPage model management view switch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -208,6 +215,8 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByRole('button', { name: '预测记录' })).not.toBeInTheDocument()
     expect(screen.queryByText(/已选 \d+/)).not.toBeInTheDocument()
     expect(await screen.findByText('提供商源')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '全部模型' })).toBeInTheDocument()
+    await selectManagedProvider(/DSDeepSeek/)
     expect(screen.getByRole('heading', { name: 'DeepSeek' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /AIHubMix/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('DeepSeek-V3.2')).toBeInTheDocument()
@@ -302,6 +311,7 @@ describe('SettingsPage model management view switch', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    expect(screen.getByRole('heading', { name: '全部模型' })).toBeInTheDocument()
     expect(screen.getByText('EnabledModel')).toBeInTheDocument()
     expect(screen.queryByText('InactiveModel')).not.toBeInTheDocument()
     expect(screen.queryByText('DeletedModel')).not.toBeInTheDocument()
@@ -423,16 +433,13 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    await screen.findByRole('heading', { name: 'DeepSeek' })
-    const providerSidebar = screen.getByLabelText('供应商')
-    await userEvent.click(within(providerSidebar).getByRole('button', { name: /ALL全部所有已配置模型/ }))
-    expect(screen.getByRole('heading', { name: '全部模型' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '全部模型' })).toBeInTheDocument()
+    expect(await screen.findByText('DeepSeek Active')).toBeInTheDocument()
     expect(screen.getByText('已配置 3 个 · 启用 2 个 · 停用 1 个')).toBeInTheDocument()
     expect(screen.queryByText('API Key')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '获取模型列表' })).not.toBeInTheDocument()
-    expect(screen.getByText('DeepSeek Active')).toBeInTheDocument()
     expect(screen.getByText('AIHubMix Active')).toBeInTheDocument()
-    expect(screen.getByText('Inactive Aggregate Model')).toBeInTheDocument()
+    expect(screen.queryByText('Inactive Aggregate Model')).not.toBeInTheDocument()
     expect(screen.queryByText('Deleted Aggregate Model')).not.toBeInTheDocument()
     expect(screen.getAllByText('DeepSeek').length).toBeGreaterThan(0)
     expect(screen.getAllByText('AIHubMix').length).toBeGreaterThan(0)
@@ -440,7 +447,7 @@ describe('SettingsPage model management view switch', () => {
 
     await userEvent.click(screen.getByLabelText('全选模型'))
     await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
-    expect(await screen.findByText('已自动跳过 1 个停用模型。')).toBeInTheDocument()
+    expect(screen.queryByText('已自动跳过 1 个停用模型。')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
     await waitFor(() => expect(apiClientMock.bulkGenerateSettingsModelPredictions).toHaveBeenCalled())
     const bulkPayload = apiClientMock.bulkGenerateSettingsModelPredictions.mock.calls[0][0]
@@ -519,6 +526,7 @@ describe('SettingsPage model management view switch', () => {
 
     expect(await screen.findByText('deepseek_1')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /OpenRouter/ })).not.toBeInTheDocument()
+    await selectManagedProvider(/deepseek_1/)
     expect(screen.getByRole('button', { name: '获取模型列表' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '保存并获取模型' })).not.toBeInTheDocument()
 
@@ -639,6 +647,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
+    await selectManagedProvider(/DSDeepSeek/)
     expect(await screen.findByText('X-Trace')).toBeInTheDocument()
     const headerField = screen.getByText('自定义请求头').closest('.provider-config-field') as HTMLElement
     await userEvent.click(within(headerField).getByRole('button', { name: '修改' }))
@@ -681,7 +690,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    await screen.findByRole('heading', { name: 'DeepSeek' })
+    await selectManagedProvider(/DSDeepSeek/)
     const headerField = screen.getByText('自定义请求头').closest('.provider-config-field') as HTMLElement
     await userEvent.click(within(headerField).getByRole('button', { name: '修改' }))
 
@@ -751,7 +760,8 @@ describe('SettingsPage model management view switch', () => {
     renderPage('/settings/account')
 
     await screen.findByRole('heading', { name: '账户管理' })
-    expect(screen.getByRole('heading', { name: '绑定的登录方式' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '登录密码' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '邮箱验证' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '修改密码' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '修改密码' }))
     expect(screen.getByLabelText('当前密码')).toBeInTheDocument()
@@ -1297,6 +1307,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
+    await selectManagedProvider(/DSDeepSeek/)
     await screen.findByRole('button', { name: '自定义模型' })
     await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
 
@@ -1328,6 +1339,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
+    await selectManagedProvider(/DSDeepSeek/)
     await screen.findByRole('button', { name: '自定义模型' })
     await userEvent.click(screen.getByRole('button', { name: '自定义模型' }))
     const paramSummary = screen.getByText('自定义请求体参数').closest('.model-config-modal__param-summary') as HTMLElement
@@ -1902,7 +1914,7 @@ describe('SettingsPage model management view switch', () => {
 
     renderPage('/settings/models')
 
-    await screen.findByRole('heading', { name: 'DeepSeek' })
+    expect(await screen.findByRole('heading', { name: '全部模型' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '新增' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /XiaoMi Token Plan/ }))
 

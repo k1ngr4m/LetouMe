@@ -23,7 +23,7 @@ import type {
   MyBetTextFilterOperator,
 } from '../../shared/types/api'
 
-type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo'
+type Pl3PlayType = 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'pl3_compound'
 type DltPlayType = 'dlt' | 'dlt_dantuo'
 type QxcPlayType = 'qxc_compound'
 type LinePlayType = DltPlayType | Pl3PlayType | QxcPlayType
@@ -1106,6 +1106,7 @@ function formatPlayType(playType: string) {
   if (playType === 'qxc_compound') return '七星彩复式'
   if (playType === 'dlt_dantuo') return '胆拖'
   if (playType === 'pl3_dantuo') return '直选组合胆拖'
+  if (playType === 'pl3_compound') return '直选定位复式'
   if (playType === 'group3') return '组选3'
   if (playType === 'group6') return '组选6'
   if (playType === 'direct_sum') return '直选和值'
@@ -1318,6 +1319,26 @@ function renderLineNumbers(recordId: number, line: MyBetLine, lotteryCode: Lotte
               const hitSet = segment.label.startsWith('百') ? hitHundreds : segment.label.startsWith('十') ? hitTens : hitUnits
               return <NumberBall key={`${recordId}-${line.line_no}-${segment.label}-${ball}`} value={ball} color={digitColor} size="sm" isHit={hitSet.has(ball)} tone={resolveTone(hitSet.has(ball))} />
             })}
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (line.play_type === 'pl3_compound') {
+    const positions = [
+      { label: '百位', values: line.position_selections?.[0] || line.direct_hundreds || [], hits: hitHundreds },
+      { label: '十位', values: line.position_selections?.[1] || line.direct_tens || [], hits: hitTens },
+      { label: '个位', values: line.position_selections?.[2] || line.direct_units || [], hits: hitUnits },
+    ]
+    return (
+      <div className="number-row number-row--tight">
+        {positions.map((segment, index) => (
+          <span key={`${recordId}-line-${line.line_no}-compound-${segment.label}`} className="number-row__segment">
+            {index > 0 ? <span className="number-row__divider" /> : null}
+            <span className="number-row__segment-label">{segment.label}</span>
+            {segment.values.map((ball) => (
+              <NumberBall key={`${recordId}-${line.line_no}-${segment.label}-${ball}`} value={ball} color={digitColor} size="sm" isHit={segment.hits.has(ball)} tone={resolveTone(segment.hits.has(ball))} />
+            ))}
           </span>
         ))}
       </div>

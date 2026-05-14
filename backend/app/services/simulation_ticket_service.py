@@ -185,8 +185,8 @@ class SimulationTicketService:
 
     def _build_pl3_ticket_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         play_type = str(payload.get("play_type") or "").strip().lower()
-        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum", "pl3_dantuo"}:
-            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum / pl3_dantuo")
+        if play_type not in {"direct", "group3", "group6", "direct_sum", "group_sum", "pl3_dantuo", "pl3_compound"}:
+            raise ValueError("排列3玩法仅支持 direct / group3 / group6 / direct_sum / group_sum / pl3_dantuo / pl3_compound")
 
         if play_type == "direct":
             hundreds = self._normalize_pl3_numbers(payload.get("direct_hundreds"))
@@ -232,6 +232,32 @@ class SimulationTicketService:
                 "direct_units_tuo": ",".join(units_tuo),
                 "group_numbers": None,
                 "sum_values": None,
+                "bet_count": bet_count,
+                "amount": bet_count * 2,
+            }
+
+        if play_type == "pl3_compound":
+            raw_positions = payload.get("position_selections")
+            if not isinstance(raw_positions, list) or len(raw_positions) != 3:
+                raise ValueError("直选定位复式需包含百位、十位、个位 3 个位置")
+            positions = [self._normalize_pl3_numbers(values) for values in raw_positions[:3]]
+            if any(not values for values in positions):
+                raise ValueError("直选定位复式每位至少选择 1 个号码")
+            bet_count = 1
+            for values in positions:
+                bet_count *= len(values)
+            return {
+                "play_type": "pl3_compound",
+                "front_numbers": "",
+                "back_numbers": "",
+                "direct_ten_thousands": None,
+                "direct_thousands": None,
+                "direct_hundreds": ",".join(positions[0]),
+                "direct_tens": ",".join(positions[1]),
+                "direct_units": ",".join(positions[2]),
+                "group_numbers": None,
+                "sum_values": None,
+                "position_selections": positions,
                 "bet_count": bet_count,
                 "amount": bet_count * 2,
             }

@@ -58,7 +58,7 @@ export type PredictionHitResult = {
 
 export type PredictionGroup = {
   group_id: number
-  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_dantuo' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
+  play_type?: 'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_dantuo' | 'pl3_compound' | 'dlt_dantuo' | 'dlt_compound' | 'qxc_compound'
   sum_value?: string
   cost_amount?: number
   strategy?: string
@@ -310,7 +310,7 @@ export type BacktestSummaryResponse = {
 
 export type SimulationTicketPayload = {
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'pl3_compound' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -336,7 +336,7 @@ export type SimulationTicketPayload = {
 export type SimulationTicketRecord = {
   id: number
   lottery_code?: LotteryCode
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'pl3_compound' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -372,7 +372,7 @@ export type SimulationTicketCreateResponse = {
 
 export type SimulationTicketQuoteResponse = {
   lottery_code: LotteryCode
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'group_sum' | 'pl3_dantuo' | 'pl3_compound' | 'qxc_compound'
   bet_count: number
   amount: number
 }
@@ -380,7 +380,7 @@ export type SimulationTicketQuoteResponse = {
 export type MyBetRecordPayload = {
   lottery_code?: LotteryCode
   target_period: string
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'pl3_compound' | 'group_sum' | 'qxc_compound'
   front_numbers?: string[]
   back_numbers?: string[]
   front_dan?: string[]
@@ -451,7 +451,7 @@ export type MyBetRecordListPayload = {
 }
 
 export type MyBetLinePayload = {
-  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
+  play_type?: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'pl3_compound' | 'group_sum' | 'qxc_compound'
   front_numbers?: string[]
   back_numbers?: string[]
   front_dan?: string[]
@@ -478,7 +478,7 @@ export type MyBetLinePayload = {
 
 export type MyBetLine = {
   line_no: number
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'pl3_compound' | 'group_sum' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]
@@ -519,7 +519,7 @@ export type MyBetRecord = {
   id: number
   lottery_code: LotteryCode
   target_period: string
-  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'group_sum' | 'qxc_compound'
+  play_type: 'dlt' | 'dlt_dantuo' | 'direct' | 'group3' | 'group6' | 'direct_sum' | 'pl3_dantuo' | 'pl3_compound' | 'group_sum' | 'qxc_compound'
   front_numbers: string[]
   back_numbers: string[]
   front_dan?: string[]

@@ -919,6 +919,15 @@ class PredictionRepository:
         if play_type == "direct_sum":
             return [("digit", index, value) for index, value in enumerate(hit_values, start=1)]
 
+        if play_type == "pl3_compound":
+            rows: list[tuple[str, int | None, str]] = []
+            for index, values in enumerate(list(hit_result.get("position_hits") or []), start=1):
+                if not isinstance(values, list):
+                    continue
+                for value in values:
+                    rows.append((f"position_{index}", 1, str(value).zfill(2)))
+            return rows
+
         remaining_hits = list(hit_values)
         predicted_group = normalize_group_digits(group.get("digits", group.get("red_balls", [])))
         rows: list[tuple[str, int | None, str]] = []
@@ -1292,7 +1301,7 @@ class PredictionRepository:
             number_group_ids = [
                 int(row["id"])
                 for row in group_rows
-                if str(row.get("play_type") or "").strip().lower() in {"dlt_dantuo", "dlt_compound", "pl3_dantuo"}
+                if str(row.get("play_type") or "").strip().lower() in {"dlt_dantuo", "dlt_compound", "pl3_dantuo", "pl3_compound"}
             ]
             numbers_by_group = self._fetch_group_numbers(cursor, number_group_ids)
             hit_by_group: dict[int, dict[str, Any]] = {}

@@ -199,6 +199,13 @@ class PredictionGenerationServiceTests(unittest.TestCase):
                 prediction_play_mode="dantuo",
             )
         )
+        self.assertTrue(
+            PredictionGenerationService._prediction_matches_play_mode(
+                {"predictions": [{"play_type": "pl3_compound"}]},
+                lottery_code="pl3",
+                prediction_play_mode="dantuo",
+            )
+        )
 
     def test_prediction_matches_play_mode_for_dlt(self) -> None:
         self.assertTrue(
@@ -209,23 +216,36 @@ class PredictionGenerationServiceTests(unittest.TestCase):
             )
         )
 
-    def test_validate_prediction_accepts_pl3_dantuo_groups(self) -> None:
+    def test_validate_prediction_accepts_pl3_compound_group(self) -> None:
         service = PredictionGenerationService()
         prediction = {
             "predictions": [
                 {
                     "group_id": 1,
-                    "play_type": "pl3_dantuo",
-                    "direct_hundreds_dan": ["01"],
-                    "direct_hundreds_tuo": ["02"],
-                    "direct_tens_dan": [],
-                    "direct_tens_tuo": ["03", "04"],
-                    "direct_units_dan": ["05"],
-                    "direct_units_tuo": ["06"],
+                    "play_type": "pl3_compound",
+                    "position_selections": [
+                        ["00", "01", "02", "03", "04"],
+                        ["02", "03", "04", "05", "06"],
+                        ["05", "06", "07", "08", "09"],
+                    ],
                 }
-            ] * 3
+            ]
         }
         self.assertTrue(service._validate_prediction(prediction, lottery_code="pl3", prediction_play_mode="dantuo"))
+        invalid_prediction = {
+            "predictions": [
+                {
+                    "group_id": 1,
+                    "play_type": "pl3_compound",
+                    "position_selections": [
+                        ["00", "01", "02", "03"],
+                        ["02", "03", "04", "05", "06"],
+                        ["05", "06", "07", "08", "09"],
+                    ],
+                }
+            ]
+        }
+        self.assertFalse(service._validate_prediction(invalid_prediction, lottery_code="pl3", prediction_play_mode="dantuo"))
         self.assertFalse(
             PredictionGenerationService._prediction_matches_play_mode(
                 {"predictions": [{"play_type": "dlt_dantuo"}]},
@@ -516,6 +536,35 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         ]
         for phrase in required_phrases:
             self.assertIn(phrase, template)
+
+    def test_pl3_dantuo_mode_loads_compound_prompt_template(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("pl3", prediction_play_mode="dantuo")
+        self.assertIn("直选定位复式", template)
+        self.assertIn("pl3_compound", template)
+        self.assertIn("5x5x5", template)
+        self.assertIn("position_selections", template)
+
+    def test_pl3_compound_prompt_template_can_be_formatted(self) -> None:
+        template = PredictionGenerationService._load_prompt_template("pl3", prediction_play_mode="dantuo")
+        rendered = template.format(
+            target_period="26119",
+            target_date="2026年05月14日",
+            lottery_history=json.dumps(
+                [
+                    {"period": "26118", "date": "2026-05-13", "digits": ["01", "02", "03"]},
+                    {"period": "26117", "date": "2026-05-12", "digits": ["04", "05", "06"]},
+                ],
+                ensure_ascii=False,
+                indent=2,
+            ),
+            prediction_date="2026-05-14",
+            model_id="pl3_compound_model_demo",
+            model_name="PL3 Compound Demo Model",
+        )
+        self.assertIn("目标期号：26119", rendered)
+        self.assertIn("模型：PL3 Compound Demo Model (pl3_compound_model_demo)", rendered)
+        self.assertIn('"predictions"', rendered)
+        self.assertIn('"period": "26118"', rendered)
 
     def test_qxc_compound_prompt_template_can_be_formatted(self) -> None:
         template = PredictionGenerationService._load_prompt_template("qxc", prediction_play_mode="compound")

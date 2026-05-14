@@ -119,7 +119,13 @@ class PredictionService:
             units_dan = self._normalize_pl3_dantuo_position(group.get("direct_units_dan")) or []
             units_tuo = self._normalize_pl3_dantuo_position(group.get("direct_units_tuo")) or []
             red_balls = sorted(str(item).zfill(2) for item in group.get("red_balls", []))
-            position_selections = self._normalize_qxc_position_selections(group.get("position_selections")) if normalized_code == "qxc" else []
+            position_selections = (
+                self._normalize_qxc_position_selections(group.get("position_selections"))
+                if normalized_code == "qxc"
+                else self._normalize_pl3_compound_position_selections(group.get("position_selections"))
+                if normalized_code == "pl3" and play_type == "pl3_compound"
+                else []
+            )
             if normalized_code == "dlt" and play_type == "dlt_dantuo":
                 red_balls = sorted({*front_dan, *front_tuo})
                 blue_balls = sorted({*back_dan, *back_tuo})
@@ -585,6 +591,8 @@ class PredictionService:
                     "total_hits": 1 if is_exact_match else 0,
                     "is_exact_match": is_exact_match,
                 }
+            if play_type == "pl3_compound":
+                return cls._calculate_pl3_compound_hit_result(prediction_group, actual_result)
             digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
             if play_type == "direct":
                 digit_hits = [digit for digit, actual in zip(digits, actual_digits) if digit == actual]
@@ -889,6 +897,51 @@ class PredictionService:
             "best_prize_level": "直选" if exact_match else None,
         }
 
+    @classmethod
+    def _calculate_pl3_compound_hit_result(cls, prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> dict[str, Any]:
+        actual_digits = normalize_digit_balls(actual_result.get("digits", actual_result.get("red_balls", [])))[:3]
+        position_selections = cls._normalize_pl3_compound_position_selections(prediction_group.get("position_selections"))
+        if len(actual_digits) != 3 or len(position_selections) != 3 or any(not values for values in position_selections):
+            return {
+                "digit_hits": [],
+                "digit_hit_count": 0,
+                "position_hits": [[], [], []],
+                "red_hits": [],
+                "red_hit_count": 0,
+                "blue_hits": [],
+                "blue_hit_count": 0,
+                "total_hits": 0,
+                "is_exact_match": False,
+                "winning_bet_count": 0,
+                "bet_count": 0,
+                "best_prize_level": None,
+            }
+        position_hits = [
+            [actual_digits[index]]
+            if actual_digits[index] in position_selections[index]
+            else []
+            for index in range(3)
+        ]
+        digit_hits = [values[0] for values in position_hits if values]
+        exact_match = len(digit_hits) == 3
+        bet_count = 1
+        for values in position_selections:
+            bet_count *= len(values)
+        return {
+            "digit_hits": digit_hits,
+            "digit_hit_count": len(digit_hits),
+            "position_hits": position_hits,
+            "red_hits": [],
+            "red_hit_count": 0,
+            "blue_hits": [],
+            "blue_hit_count": 0,
+            "total_hits": len(digit_hits),
+            "is_exact_match": exact_match,
+            "winning_bet_count": 1 if exact_match else 0,
+            "bet_count": bet_count,
+            "best_prize_level": "直选" if exact_match else None,
+        }
+
     @staticmethod
     def _calculate_pl3_trend_hit_count(prediction_group: dict[str, Any], actual_result: dict[str, Any]) -> int:
         play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
@@ -901,6 +954,9 @@ class PredictionService:
                 return 0
             actual_sum = sum(int(item) for item in actual_digits if str(item).isdigit())
             return 1 if predicted_sum == actual_sum else 0
+        if play_type == "pl3_compound":
+            hit_result = PredictionService._calculate_pl3_compound_hit_result(prediction_group, actual_result)
+            return int(hit_result.get("digit_hit_count") or 0)
         digits = normalize_digit_balls(prediction_group.get("digits", prediction_group.get("red_balls", [])))
 
         if play_type == "direct":
@@ -1051,6 +1107,16 @@ class PredictionService:
         if normalized_code != "pl3":
             return cls.BET_COST
         play_type = str(prediction_group.get("play_type") or "direct").strip().lower()
+        if play_type == "pl3_compound":
+            position_selections = cls._normalize_pl3_compound_position_selections(prediction_group.get("position_selections"))
+            if len(position_selections) != 3:
+                return cls.BET_COST
+            bet_count = 1
+            for values in position_selections:
+                if not values:
+                    return cls.BET_COST
+                bet_count *= len(values)
+            return max(1, int(bet_count)) * cls.BET_COST
         if play_type != "direct_sum":
             return cls.BET_COST
         sum_value = prediction_group.get("sum_value")
@@ -1070,6 +1136,12 @@ class PredictionService:
     ) -> int:
         normalized_code = normalize_lottery_code(lottery_code or prediction_group.get("lottery_code") or "dlt")
         if normalized_code != "dlt":
+            if normalized_code == "pl3" and str(prediction_group.get("play_type") or "").strip().lower() == "pl3_compound":
+                if isinstance(hit_result, dict):
+                    resolved = int(hit_result.get("bet_count") or 0)
+                    if resolved > 0:
+                        return resolved
+                return max(1, cls._resolve_prediction_group_cost(prediction_group, normalized_code) // cls.BET_COST)
             return 1
         play_type = str(prediction_group.get("play_type") or "").strip().lower()
         if play_type == "dlt_compound":
@@ -1744,7 +1816,7 @@ class PredictionService:
                     play_types.add(play_type)
         if "dlt_dantuo" in play_types:
             return "dantuo"
-        if "pl3_dantuo" in play_types:
+        if "pl3_dantuo" in play_types or "pl3_compound" in play_types:
             return "dantuo"
         if "dlt_compound" in play_types:
             return "compound"
@@ -1770,6 +1842,20 @@ class PredictionService:
         if any((not number.isdigit()) or int(number) not in range(0, 10) for number in normalized):
             return None
         return normalized
+
+    @staticmethod
+    def _normalize_pl3_compound_position_selections(value: Any) -> list[list[str]]:
+        if not isinstance(value, list):
+            return []
+        result: list[list[str]] = []
+        for row in value[:3]:
+            if not isinstance(row, list):
+                result.append([])
+                continue
+            normalized = sorted({str(item).zfill(2) for item in row if str(item).strip()}, key=int)
+            normalized = [item for item in normalized if item.isdigit() and 0 <= int(item) <= 9]
+            result.append(normalized)
+        return result
 
     def _get_model_score_profile(self, score_profiles: dict[str, dict[str, Any]], model: dict[str, Any]) -> dict[str, Any]:
         model_key = self._build_model_identity_key(model)
@@ -2094,7 +2180,7 @@ class PredictionService:
     def _normalize_play_type_filters(values: list[str] | None) -> list[str]:
         if not values:
             return []
-        allowed_play_types = {"direct", "direct_sum", "group3", "group6", "pl3_dantuo", "dlt_dantuo", "dlt_compound"}
+        allowed_play_types = {"direct", "direct_sum", "group3", "group6", "pl3_dantuo", "pl3_compound", "dlt_dantuo", "dlt_compound", "qxc_compound"}
         normalized = [str(value or "").strip().lower() for value in values]
         return [play_type for play_type in dict.fromkeys(normalized) if play_type in allowed_play_types]
 
@@ -2186,6 +2272,11 @@ class PredictionService:
                     is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 1
                 return "和值" if bool(is_exact_match) else None
             if play_type == "direct":
+                is_exact_match = hit_result.get("is_exact_match")
+                if is_exact_match is None:
+                    is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 3
+                return "直选" if bool(is_exact_match) else None
+            if play_type == "pl3_compound":
                 is_exact_match = hit_result.get("is_exact_match")
                 if is_exact_match is None:
                     is_exact_match = int(hit_result.get("digit_hit_count") or 0) == 3
