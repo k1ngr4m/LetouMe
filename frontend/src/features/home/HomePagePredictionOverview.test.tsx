@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import {
+  simulatePl3CompoundCurrentPredictions,
   simulateJackpotPoolData,
   renderPage,
 } from './HomePage.testUtils'
@@ -40,6 +41,25 @@ it('shows standalone summary cards between disclaimer and model list on predicti
     expect(screen.getByRole('heading', { name: '模型列表' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '预测统计' })).toBeInTheDocument()
     expect(screen.queryByText('评分加权')).not.toBeInTheDocument()
+  })
+
+  it('shows pl3 compound position selections in prediction summary stats', async () => {
+    simulatePl3CompoundCurrentPredictions.current = true
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '复式' })[0])
+
+    const firstPosition = screen.getByText('第一位（百位）统计').closest('.summary-list')
+    const secondPosition = screen.getByText('第二位（十位）统计').closest('.summary-list')
+    const thirdPosition = screen.getByText('第三位（个位）统计').closest('.summary-list')
+    expect(firstPosition).not.toBeNull()
+    expect(secondPosition).not.toBeNull()
+    expect(thirdPosition).not.toBeNull()
+    expect(within(firstPosition as HTMLElement).getByText('01')).toBeInTheDocument()
+    expect(within(firstPosition as HTMLElement).getByText('出现 2/2')).toBeInTheDocument()
+    expect(within(secondPosition as HTMLElement).getByText('00')).toBeInTheDocument()
+    expect(within(thirdPosition as HTMLElement).getByText('05')).toBeInTheDocument()
   })
 
   it('filters model list with model provider, tag and score range', async () => {

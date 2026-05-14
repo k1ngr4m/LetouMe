@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getPredictionsHistoryDetail,
   simulateDltDantuoCurrentPredictions,
+  simulatePl3CompoundHistory,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
   renderPage,
@@ -886,5 +887,66 @@ describe('HomePage history detail', () => {
     expect(within(card as HTMLElement).queryByText('第一位（百位）统计')).not.toBeInTheDocument()
     expect(within(card as HTMLElement).queryByText('第二位（十位）统计')).not.toBeInTheDocument()
     expect(within(card as HTMLElement).queryByText('第三位（个位）统计')).not.toBeInTheDocument()
+  })
+
+  it('shows pl3 compound position statistics in history period summary', async () => {
+    simulatePl3CompoundHistory.current = true
+    getPredictionsHistoryDetail.mockResolvedValue({
+      predictions_history: [
+        {
+          prediction_date: '2026-03-12',
+          target_period: '2026031',
+          actual_result: {
+            period: '2026031',
+            date: '2026-03-10',
+            red_balls: ['01', '00', '05'],
+            blue_balls: [],
+            digits: ['01', '00', '05'],
+            lottery_code: 'pl3',
+          },
+          models: [
+            {
+              model_id: 'model-a',
+              model_name: '模型A',
+              model_provider: 'openai_compatible',
+              prediction_play_mode: 'dantuo',
+              predictions: [
+                {
+                  group_id: 1,
+                  play_type: 'pl3_compound',
+                  red_balls: [],
+                  blue_balls: [],
+                  digits: [],
+                  position_selections: [
+                    ['01', '02', '03', '04', '05'],
+                    ['00', '01', '02', '03', '04'],
+                    ['05', '06', '07', '08', '09'],
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      total_count: 1,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: '排列3' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '复式' })[0])
+    await userEvent.click(screen.getByRole('button', { name: '开奖回溯' }))
+    const card = screen.getByText('第 2026031 期').closest('.history-record-card')
+    expect(card).not.toBeNull()
+    await userEvent.click(within(card as HTMLElement).getByRole('button', { name: '显示该期预测统计：第 2026031 期' }))
+
+    await waitFor(() => expect(getPredictionsHistoryDetail).toHaveBeenCalledWith('2026031', 'pl3'))
+    const firstPosition = within(card as HTMLElement).getByText('第一位（百位）统计').closest('.summary-list')
+    const secondPosition = within(card as HTMLElement).getByText('第二位（十位）统计').closest('.summary-list')
+    const thirdPosition = within(card as HTMLElement).getByText('第三位（个位）统计').closest('.summary-list')
+    expect(within(firstPosition as HTMLElement).getByText('01')).toBeInTheDocument()
+    expect(within(secondPosition as HTMLElement).getByText('00')).toBeInTheDocument()
+    expect(within(thirdPosition as HTMLElement).getByText('05')).toBeInTheDocument()
+    expect(within(firstPosition as HTMLElement).getAllByText('出现 1/1').length).toBeGreaterThan(0)
   })
 })

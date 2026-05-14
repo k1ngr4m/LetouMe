@@ -786,6 +786,77 @@ describe('buildSummary', () => {
     expect(result.blue).toEqual([])
   })
 
+  it('builds pl3 compound summary from position selections', () => {
+    const result = buildSummary(
+      [
+        {
+          model_id: 'm1',
+          model_name: 'Model 1',
+          model_provider: 'openai',
+          predictions: [
+            {
+              group_id: 1,
+              play_type: 'pl3_compound',
+              red_balls: [],
+              blue_balls: [],
+              digits: [],
+              position_selections: [
+                ['01', '02', '03', '04', '05'],
+                ['00', '01', '02', '03', '04'],
+                ['05', '06', '07', '08', '09'],
+              ],
+            },
+          ],
+        },
+        {
+          model_id: 'm2',
+          model_name: 'Model 2',
+          model_provider: 'gemini',
+          predictions: [
+            {
+              group_id: 1,
+              play_type: 'pl3_compound',
+              red_balls: [],
+              blue_balls: [],
+              digits: [],
+              position_selections: [
+                ['01', '06', '07', '08', '09'],
+                ['00', '05', '06', '07', '08'],
+                ['02', '03', '04', '05', '06'],
+              ],
+            },
+          ],
+        },
+      ],
+      {},
+      ['m1', 'm2'],
+      false,
+      false,
+      [],
+      ['pl3_compound'],
+    )
+
+    expect(result.positions).toHaveLength(3)
+    expect(result.positions[0][0]).toMatchObject({
+      ball: '01',
+      appearanceCount: 2,
+      totalGroupCount: 2,
+      matchedModelCount: 2,
+    })
+    expect(result.positions[1][0]).toMatchObject({
+      ball: '00',
+      appearanceCount: 2,
+      matchedModelCount: 2,
+    })
+    expect(result.positions[2].find((item) => item.ball === '05')).toMatchObject({
+      appearanceCount: 2,
+      matchedModelCount: 2,
+    })
+    expect(result.red).toEqual([])
+    expect(result.blue).toEqual([])
+    expect(result.sums).toEqual([])
+  })
+
   it('builds pl3 direct_sum summary by sum values', () => {
     const result = buildSummary(
       [

@@ -19,6 +19,8 @@ const hoistedMocks = vi.hoisted(() => ({
   simulateDltCompoundCurrentPredictions: { current: false },
   simulateDltDantuoCurrentPredictions: { current: false },
   simulateDltInactiveHistoryModel: { current: false },
+  simulatePl3CompoundCurrentPredictions: { current: false },
+  simulatePl3CompoundHistory: { current: false },
   simulatePl3SumCurrentPredictions: { current: false },
   simulatePl3SumHistoryMislabel: { current: false },
   simulateJackpotPoolData: { current: false },
@@ -51,6 +53,8 @@ export const {
   simulateDltCompoundCurrentPredictions,
   simulateDltDantuoCurrentPredictions,
   simulateDltInactiveHistoryModel,
+  simulatePl3CompoundCurrentPredictions,
+  simulatePl3CompoundHistory,
   simulatePl3SumCurrentPredictions,
   simulatePl3SumHistoryMislabel,
   simulateJackpotPoolData,
@@ -158,7 +162,7 @@ vi.mock('./hooks/useHomeData', () => ({
     historyPage = 1,
     historyPageSize = 10,
     historyStrategyFilters: string[] = [],
-    historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'dlt_dantuo' | 'dlt_compound'> = [],
+    historyPlayTypeFilters: Array<'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_compound' | 'dlt_dantuo' | 'dlt_compound'> = [],
     lotteryPage = 1,
     lotteryPageSize = 10,
   ) => {
@@ -288,6 +292,33 @@ vi.mock('./hooks/useHomeData', () => ({
               ],
             }
           }
+          if (isPl3 && simulatePl3CompoundHistory.current) {
+            return {
+              ...recordWithInactiveHistoryModel,
+              actual_result: {
+                ...recordWithInactiveHistoryModel.actual_result,
+                red_balls: ['01', '00', '05'],
+                blue_balls: [],
+                digits: ['01', '00', '05'],
+                lottery_code: 'pl3',
+              },
+              models: [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  prediction_play_mode: 'dantuo',
+                  play_type: 'pl3_compound',
+                  best_hit_count: 3,
+                  bet_count: 125,
+                  cost_amount: 250,
+                  winning_bet_count: 1,
+                  prize_amount: 1040,
+                  hit_period_win: true,
+                },
+              ],
+            }
+          }
           if (!isPl3 || !simulatePl3SumHistoryMislabel.current) return recordWithInactiveHistoryModel
           return {
             ...recordWithInactiveHistoryModel,
@@ -318,7 +349,7 @@ vi.mock('./hooks/useHomeData', () => ({
                 return modelPlayMode === 'direct'
               }
               const modelPlayType = String((model as { play_type?: string }).play_type || 'direct').trim().toLowerCase()
-              return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6')
+              return historyPlayTypeFilters.includes(modelPlayType as 'direct' | 'direct_sum' | 'group3' | 'group6' | 'pl3_compound')
             })
             const periodSummary = models.reduce(
               (accumulator, model) => ({
@@ -553,7 +584,54 @@ vi.mock('./hooks/useHomeData', () => ({
     )
     const currentModels = useMemo(() => (isPl3
       ? [
-          ...(simulatePl3SumCurrentPredictions.current
+          ...(simulatePl3CompoundCurrentPredictions.current
+            ? [
+                {
+                  model_id: 'model-a',
+                  model_name: '模型A',
+                  model_provider: 'openai_compatible',
+                  model_tags: ['reasoning'],
+                  model_api_model: 'model-a-api',
+                  prediction_play_mode: 'dantuo',
+                  predictions: [
+                    {
+                      group_id: 1,
+                      play_type: 'pl3_compound',
+                      red_balls: [],
+                      blue_balls: [],
+                      digits: [],
+                      position_selections: [
+                        ['01', '02', '03', '04', '05'],
+                        ['00', '01', '02', '03', '04'],
+                        ['05', '06', '07', '08', '09'],
+                      ],
+                    },
+                  ],
+                },
+                {
+                  model_id: 'model-b',
+                  model_name: '模型B',
+                  model_provider: 'deepseek',
+                  model_tags: ['fast'],
+                  model_api_model: 'model-b-api',
+                  prediction_play_mode: 'dantuo',
+                  predictions: [
+                    {
+                      group_id: 1,
+                      play_type: 'pl3_compound',
+                      red_balls: [],
+                      blue_balls: [],
+                      digits: [],
+                      position_selections: [
+                        ['01', '06', '07', '08', '09'],
+                        ['00', '05', '06', '07', '08'],
+                        ['02', '03', '04', '05', '06'],
+                      ],
+                    },
+                  ],
+                },
+              ]
+            : simulatePl3SumCurrentPredictions.current
             ? [
                 {
                   model_id: 'model-a',
@@ -1012,6 +1090,8 @@ beforeEach(() => {
   simulateDltModeCoexistCurrentPredictions.current = false
   simulateDltCompoundCurrentPredictions.current = false
   simulateDltDantuoCurrentPredictions.current = false
+  simulatePl3CompoundCurrentPredictions.current = false
+  simulatePl3CompoundHistory.current = false
   simulatePl3SumCurrentPredictions.current = false
   simulatePl3SumHistoryMislabel.current = false
   simulateJackpotPoolData.current = false
