@@ -89,9 +89,11 @@ class LotteryBootstrapTaskServiceTests(unittest.TestCase):
         self.assertEqual(result["task_id"], "task-1")
         call_kwargs = service.runner.create_task.call_args.kwargs
         self.assertEqual(call_kwargs["initial_task"]["lottery_code"], "all")
+        self.assertEqual(call_kwargs["initial_task"]["progress_summary"]["detail_mode"], "main")
         worker = call_kwargs["worker"]
         worker(None, lambda: False)
         bootstrap_service.bootstrap.assert_called_once()
+        self.assertEqual(bootstrap_service.bootstrap.call_args.kwargs["detail_mode"], "main")
         log_repository.create_log.assert_called_once_with(
             task_id="task-1",
             lottery_code="all",

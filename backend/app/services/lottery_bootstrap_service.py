@@ -38,7 +38,7 @@ class LotteryBootstrapService:
         *,
         lottery_codes: list[str] | None = None,
         chunk_size: int = 100,
-        detail_mode: str = "none",
+        detail_mode: str = "main",
         resume: bool = True,
         progress_callback: ProgressCallback | None = None,
         cancel_callback: CancelCallback | None = None,
@@ -268,7 +268,7 @@ class LotteryBootstrapTaskService:
         *,
         lottery_codes: list[str] | None = None,
         chunk_size: int = 100,
-        detail_mode: str = "none",
+        detail_mode: str = "main",
         resume: bool = True,
         on_update=None,
     ) -> dict[str, Any]:

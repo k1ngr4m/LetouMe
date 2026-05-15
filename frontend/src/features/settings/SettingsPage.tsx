@@ -1995,7 +1995,7 @@ export function SettingsPage() {
     mutationFn: () => apiClient.bootstrapSettingsLotteryHistory({
       lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
       chunk_size: 100,
-      detail_mode: 'none',
+      detail_mode: 'main',
       resume: true,
     }),
     onSuccess: (task) => {

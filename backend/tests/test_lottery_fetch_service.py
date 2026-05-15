@@ -157,6 +157,53 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["prize_total_amount"], 8516600)
         self.assertEqual(data[0]["prize_breakdown"][1]["prize_amount"], 75904)
 
+    def test_parse_lskj_pl3_data_saves_main_prize_levels(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26124</td><td>2026-05-14</td><td>07 08 05</td><td>-</td><td>-</td><td>-</td><td>12</td><td>1,040</td><td>5</td><td>346</td><td>8</td><td>173</td><td>开奖信息</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl3"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26124")
+        self.assertEqual(data[0]["digits"], ["07", "08", "05"])
+        self.assertEqual([item["prize_level"] for item in data[0]["prize_breakdown"]], ["直选", "组选3", "组选6"])
+        self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 12)
+        self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 1040)
+        self.assertEqual(data[0]["prize_breakdown"][1]["prize_amount"], 346)
+        self.assertEqual(data[0]["prize_breakdown"][2]["prize_amount"], 173)
+
+    def test_parse_lskj_pl5_data_saves_direct_prize_level(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26124</td><td>2026-05-14</td><td>07 08 05 03 02</td><td>-</td><td>7572.68万</td><td>-</td><td>6</td><td>100,000</td><td>开奖信息</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26124")
+        self.assertEqual(data[0]["digits"], ["07", "08", "05", "03", "02"])
+        self.assertEqual(data[0]["jackpot_pool_balance"], 75726800)
+        self.assertEqual([item["prize_level"] for item in data[0]["prize_breakdown"]], ["直选"])
+        self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 6)
+        self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 100000)
+
     def test_parse_pl3_data_prefers_row_jackpot_column(self) -> None:
         html = """
         <table>

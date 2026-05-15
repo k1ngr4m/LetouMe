@@ -552,7 +552,7 @@ class ModelSettingsApiTests(unittest.TestCase):
         create_task.assert_called_once_with(
             lottery_codes=["dlt", "pl3", "pl5", "qxc"],
             chunk_size=100,
-            detail_mode="none",
+            detail_mode="main",
             resume=True,
         )
 

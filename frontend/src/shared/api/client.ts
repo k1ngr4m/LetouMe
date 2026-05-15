@@ -540,7 +540,7 @@ export const apiClient = {
       body: JSON.stringify({ lottery_code: lotteryCode, limit }),
     })
   },
-  bootstrapSettingsLotteryHistory(payload?: { lottery_codes?: LotteryCode[]; chunk_size?: number; detail_mode?: 'all' | 'none'; resume?: boolean }) {
+  bootstrapSettingsLotteryHistory(payload?: { lottery_codes?: LotteryCode[]; chunk_size?: number; detail_mode?: 'main' | 'all' | 'none'; resume?: boolean }) {
     return requestJson<LotteryFetchTask>('/api/settings/lottery/bootstrap', {
       method: 'POST',
       body: JSON.stringify(payload || {}),

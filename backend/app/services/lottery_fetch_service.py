@@ -160,12 +160,26 @@ class LotteryFetchService:
             raise ValueError("未解析到开奖数据")
         lottery_data = lottery_data[: max(1, int(limit))]
         saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
+        generated_message_count = 0
+        message_service = getattr(self, "message_service", None)
+        if message_service:
+            recent_periods = [str(item.get("period") or "").strip() for item in saved_draws if str(item.get("period") or "").strip()]
+            generated_message_count += message_service.generate_messages_for_periods(
+                lottery_code=self.lottery_code,
+                periods=recent_periods,
+            )
+            generated_message_count += message_service.generate_messages_for_recent_draws(
+                lottery_code=self.lottery_code,
+                recent_days=30,
+                limit=500,
+                excluded_periods=set(recent_periods),
+            )
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
         summary = {
             "lottery_code": self.lottery_code,
             "fetched_count": len(lottery_data),
             "saved_count": len(saved_draws),
-            "message_generated_count": 0,
+            "message_generated_count": generated_message_count,
             "latest_period": saved_draws[0]["period"] if saved_draws else None,
             "duration_ms": duration_ms,
         }
@@ -255,6 +269,7 @@ class LotteryFetchService:
             if self.lottery_code == "pl3":
                 if len(numbers) < 3:
                     continue
+                prize_breakdown = self._build_lskj_prize_breakdown(cols, ["直选", "组选3", "组选6"], start_index=6)
                 data_list.append(
                     {
                         "period": period,
@@ -263,13 +278,14 @@ class LotteryFetchService:
                         "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
                         "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
-                        "prize_breakdown": build_pl3_prize_breakdown(),
+                        "prize_breakdown": prize_breakdown or build_pl3_prize_breakdown(),
                     }
                 )
                 continue
             if self.lottery_code == "pl5":
                 if len(numbers) < 5:
                     continue
+                prize_breakdown = self._build_lskj_prize_breakdown(cols, ["直选"], start_index=6)
                 data_list.append(
                     {
                         "period": period,
@@ -278,7 +294,7 @@ class LotteryFetchService:
                         "sales_amount": self.parse_money_value(cols[3]) if len(cols) > 3 else 0,
                         "jackpot_pool_balance": self.parse_money_value(cols[4]) if len(cols) > 4 else 0,
                         "prize_total_amount": self.parse_money_value(cols[5]) if len(cols) > 5 else 0,
-                        "prize_breakdown": build_pl5_prize_breakdown(),
+                        "prize_breakdown": prize_breakdown or build_pl5_prize_breakdown(),
                     }
                 )
                 continue

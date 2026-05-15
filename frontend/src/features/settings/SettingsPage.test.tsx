@@ -1155,7 +1155,7 @@ describe('SettingsPage model management view switch', () => {
     expect(apiClientMock.bootstrapSettingsLotteryHistory).toHaveBeenCalledWith({
       lottery_codes: ['dlt', 'pl3', 'pl5', 'qxc'],
       chunk_size: 100,
-      detail_mode: 'none',
+      detail_mode: 'main',
       resume: true,
     })
     await waitFor(() => expect(apiClientMock.getLotteryFetchTaskDetail).toHaveBeenCalledWith('bootstrap-task-1'), { timeout: 2500 })

@@ -41,7 +41,7 @@ class LotteryFetchTaskService:
                     "duration_ms": 0,
                 }
             },
-            worker=lambda _progress_callback: fetch_service.fetch_and_save(limit=limit),
+            worker=lambda _progress_callback: fetch_service.fetch_lskj_and_save(limit=limit or 30),
             on_update=lambda state: self._handle_task_update(
                 state,
                 schedule_task_code=schedule_task_code,

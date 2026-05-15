@@ -962,7 +962,7 @@ export type LotteryFetchTask = {
     current_lottery?: LotteryCode | null
     current_lottery_index?: number
     phase?: string
-    detail_mode?: 'all' | 'none' | string
+    detail_mode?: 'main' | 'all' | 'none' | string
     chunk_size?: number
     resume?: boolean
     base_fetched?: number
