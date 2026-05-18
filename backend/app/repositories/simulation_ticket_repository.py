@@ -20,7 +20,8 @@ class SimulationTicketRepository:
                             play_type,
                             bet_count,
                             amount,
-                            created_at
+                            created_at,
+                            updated_at
                         FROM simulation_ticket
                         WHERE user_id = ?
                         ORDER BY created_at DESC, id DESC
@@ -45,8 +46,10 @@ class SimulationTicketRepository:
                             user_id,
                             play_type,
                             bet_count,
-                            amount
-                        ) VALUES (?, ?, ?, ?)
+                            amount,
+                            created_at,
+                            updated_at
+                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                         (
                             user_id,
@@ -71,7 +74,8 @@ class SimulationTicketRepository:
                             play_type,
                             bet_count,
                             amount,
-                            created_at
+                            created_at,
+                            updated_at
                         FROM simulation_ticket
                         WHERE id = ? AND user_id = ?
                         LIMIT 1

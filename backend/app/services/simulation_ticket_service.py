@@ -395,7 +395,7 @@ class SimulationTicketService:
 
     @staticmethod
     def _serialize_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
-        created_at = SimulationTicketService._normalize_ticket_created_at(ticket.get("created_at"))
+        created_at = SimulationTicketService._normalize_ticket_created_at(ticket.get("created_at")) or SimulationTicketService._normalize_ticket_created_at(ticket.get("updated_at"))
         return {
             "id": int(ticket.get("id") or 0),
             "lottery_code": str(ticket.get("lottery_code") or "dlt"),

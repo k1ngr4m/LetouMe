@@ -79,6 +79,23 @@ class SimulationTicketServiceTests(unittest.TestCase):
 
         self.assertEqual(payload["created_at"], 1776130200)
 
+    def test_serialize_ticket_falls_back_to_updated_at_when_created_at_missing(self) -> None:
+        payload = SimulationTicketService._serialize_ticket(
+            {
+                "id": 9,
+                "lottery_code": "dlt",
+                "play_type": "dlt",
+                "front_numbers": "01,02,03,04,05",
+                "back_numbers": "06,07",
+                "bet_count": 1,
+                "amount": 2,
+                "created_at": None,
+                "updated_at": "2026-04-14 09:30:00",
+            }
+        )
+
+        self.assertEqual(payload["created_at"], 1776130200)
+
 
 if __name__ == "__main__":
     unittest.main()

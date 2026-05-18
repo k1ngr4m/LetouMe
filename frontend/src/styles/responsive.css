@@ -59,9 +59,9 @@
     font-size: 0.78rem;
   }
 
-  .history-heatmap__header,
-  .history-heatmap__row {
-    grid-template-columns: 88px minmax(0, 1fr);
+  .history-heatmap {
+    --history-heatmap-label-width: 7.75rem;
+    --history-heatmap-cell-width: 3.8rem;
   }
 }
 
