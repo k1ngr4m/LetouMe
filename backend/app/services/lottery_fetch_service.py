@@ -4,6 +4,7 @@ import re
 import time
 from datetime import date, datetime, timedelta
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,11 +23,32 @@ from backend.app.services.message_service import MessageService
 
 
 class LotteryFetchService:
-    LSKJ_URLS = {
-        "dlt": "https://www.500.com/kaijiang/dlt/lskj/",
-        "pl3": "https://www.500.com/kaijiang/p3/lskj/",
-        "pl5": "https://www.500.com/kaijiang/p5/lskj/",
-        "qxc": "https://www.500.com/kaijiang/qxc/lskj/",
+    SPORTTERY_HISTORY_URL = "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry"
+    SPORTTERY_GAME_NUMS = {
+        "dlt": "85",
+        "pl3": "35",
+        "pl5": "350133",
+        "qxc": "04",
+    }
+    SPORTTERY_REFERERS = {
+        "dlt": "https://m.lottery.gov.cn/zst/dlt/",
+        "pl3": "https://m.lottery.gov.cn/zst/pls/",
+        "pl5": "https://m.lottery.gov.cn/zst/plw/",
+        "qxc": "https://m.lottery.gov.cn/zst/qxc/",
+    }
+    SPORTTERY_DETAIL_PAGE_SIZE = 100
+    SPORTTERY_DETAIL_MAX_PAGES = 40
+    FALLBACK_HISTORY_URLS = {
+        "dlt": "https://datachart.500.com/dlt/history/newinc/history.php",
+        "pl3": "https://datachart.500.com/pls/history/inc/history.php",
+        "pl5": "https://datachart.500.com/plw/history/inc/history.php",
+        "qxc": "https://datachart.500.com/qxc/history/inc/history.php",
+    }
+    FALLBACK_HISTORY_REFERERS = {
+        "dlt": "https://datachart.500.com/dlt/history/history.shtml",
+        "pl3": "https://datachart.500.com/pls/history/history.shtml",
+        "pl5": "https://datachart.500.com/plw/history/history.shtml",
+        "qxc": "https://datachart.500.com/qxc/history/history.shtml",
     }
     DETAIL_URL_TEMPLATES = {
         "dlt": "https://kaijiang.500.com/shtml/dlt/{period}.shtml",
@@ -55,35 +77,20 @@ class LotteryFetchService:
         message_service: MessageService | None = None,
     ) -> None:
         self.lottery_code = normalize_lottery_code(lottery_code)
-        self.base_url = (
-            "https://datachart.500.com/dlt/history/newinc/history.php"
-            if self.lottery_code == "dlt"
-            else "https://www.500.com/kaijiang/p3/lskj/"
-            if self.lottery_code == "pl3"
-            else "https://datachart.500.com/plw/history/inc/history.php"
-            if self.lottery_code == "pl5"
-            else "https://www.500.com/lottery/qxc/"
-        )
+        self.base_url = self.FALLBACK_HISTORY_URLS.get(self.lottery_code, self.SPORTTERY_HISTORY_URL)
         self.headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/91.0.4472.124 Safari/537.36"
             ),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Referer": (
-                "https://datachart.500.com/dlt/history/history.shtml"
-                if self.lottery_code == "dlt"
-                else "https://www.500.com/kaijiang/p3/lskj/"
-                if self.lottery_code == "pl3"
-                else "https://datachart.500.com/plw/history/history.shtml"
-                if self.lottery_code == "pl5"
-                else "https://www.500.com/lottery/qxc/"
-            ),
+            "Referer": self.SPORTTERY_REFERERS.get(self.lottery_code, "https://m.lottery.gov.cn/zst/tbsj/"),
         }
         self.session = requests.Session()
         self.session.headers.update(self.headers)
+        self._sporttery_history_page_cache: dict[tuple[int, int], list[dict[str, Any]]] = {}
         ensure_schema()
         self.lottery_service = lottery_service or LotteryService()
         self.message_service = message_service or MessageService()
@@ -97,29 +104,13 @@ class LotteryFetchService:
         limit: int | None = 30,
     ) -> dict[str, Any]:
         started_at = time.perf_counter()
-        url = self.base_url
-        params: list[str] = []
-        if start:
-            params.append(f"start={start}")
-        if end:
-            params.append(f"end={end}")
-        if limit is not None:
-            params.append(f"limit={max(1, int(limit))}")
-        if params:
-            url = f"{url}?{'&'.join(params)}"
-
-        soup = self.fetch_page(url)
-        if not soup:
-            raise ValueError("获取开奖历史页面失败")
-
-        lottery_data = self.parse_lottery_data(soup)
+        normalized_limit = max(1, int(limit or 30))
+        lottery_data = self.fetch_history_with_fallback(limit=normalized_limit, start=start, end=end)
         if not lottery_data:
             raise ValueError("未解析到开奖数据")
-        if self.lottery_code == "qxc" and limit is not None and len(lottery_data) < max(1, int(limit)):
-            lottery_data = self._backfill_qxc_draws(lottery_data, target_count=max(1, int(limit)))
-        if limit is not None:
-            lottery_data = lottery_data[: max(1, int(limit))]
-
+        if self.lottery_code == "qxc" and len(lottery_data) < normalized_limit:
+            lottery_data = self._backfill_qxc_draws(lottery_data, target_count=normalized_limit)
+        lottery_data = lottery_data[:normalized_limit]
         saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
         generated_message_count = 0
         message_service = getattr(self, "message_service", None)
@@ -149,16 +140,13 @@ class LotteryFetchService:
 
     def fetch_lskj_and_save(self, *, limit: int = 100) -> dict[str, Any]:
         started_at = time.perf_counter()
-        url = self.LSKJ_URLS.get(self.lottery_code)
-        if not url:
-            raise ValueError(f"不支持的历史开奖列表源：{self.lottery_code}")
-        soup = self.fetch_page(url)
-        if not soup:
-            raise ValueError("获取开奖历史页面失败")
-        lottery_data = self.parse_lskj_data(soup)
+        normalized_limit = max(1, int(limit))
+        lottery_data = self.fetch_history_with_fallback(limit=normalized_limit)
         if not lottery_data:
             raise ValueError("未解析到开奖数据")
-        lottery_data = lottery_data[: max(1, int(limit))]
+        if self.lottery_code == "qxc" and len(lottery_data) < normalized_limit:
+            lottery_data = self._backfill_qxc_draws(lottery_data, target_count=normalized_limit)
+        lottery_data = lottery_data[:normalized_limit]
         saved_draws = self.lottery_service.save_draws(lottery_data, lottery_code=self.lottery_code)
         generated_message_count = 0
         message_service = getattr(self, "message_service", None)
@@ -185,6 +173,235 @@ class LotteryFetchService:
         }
         self.logger.info("Fetched and saved lottery lskj history", extra={"context": summary})
         return summary
+
+    def fetch_history_with_fallback(
+        self,
+        *,
+        limit: int,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> list[dict[str, Any]]:
+        normalized_limit = max(1, int(limit))
+        try:
+            lottery_data = self.fetch_sporttery_history(limit=normalized_limit)
+        except Exception as exc:
+            lottery_data = []
+            self.logger.warning(
+                "Sporttery lottery history failed; falling back to 500 datachart",
+                extra={"context": {"lottery_code": self.lottery_code, "error": str(exc)}},
+            )
+        if lottery_data:
+            return lottery_data[:normalized_limit]
+
+        self.logger.warning(
+            "Sporttery lottery history returned no draws; falling back to 500 datachart",
+            extra={"context": {"lottery_code": self.lottery_code, "limit": normalized_limit}},
+        )
+        return self.fetch_fallback_history(limit=normalized_limit, start=start, end=end)[:normalized_limit]
+
+    def fetch_sporttery_history(self, *, limit: int) -> list[dict[str, Any]]:
+        rows = self.fetch_sporttery_history_page(page_no=1, page_size=max(1, int(limit)))
+        parsed = [self.parse_sporttery_draw(row) for row in rows]
+        return [item for item in parsed if item][: max(1, int(limit))]
+
+    def fetch_sporttery_history_page(self, *, page_no: int = 1, page_size: int = 30) -> list[dict[str, Any]]:
+        cache_key = (max(1, int(page_no)), max(1, int(page_size)))
+        cache = getattr(self, "_sporttery_history_page_cache", None)
+        if cache is None:
+            cache = {}
+            self._sporttery_history_page_cache = cache
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        game_no = self.SPORTTERY_GAME_NUMS.get(self.lottery_code)
+        if not game_no:
+            raise ValueError(f"不支持的历史开奖列表源：{self.lottery_code}")
+        url = self.build_sporttery_history_url(page_no=cache_key[0], page_size=cache_key[1])
+        if hasattr(self, "session"):
+            self.session.headers.update(
+                {"Referer": self.SPORTTERY_REFERERS.get(self.lottery_code, "https://m.lottery.gov.cn/zst/tbsj/")}
+            )
+        payload = self.fetch_json(url)
+        value = payload.get("value") if isinstance(payload, dict) else None
+        rows = list((value or {}).get("list") or []) if isinstance(value, dict) else []
+        cache[cache_key] = rows
+        return rows
+
+    def build_sporttery_history_url(self, *, page_no: int = 1, page_size: int = 30) -> str:
+        game_no = self.SPORTTERY_GAME_NUMS.get(self.lottery_code)
+        if not game_no:
+            raise ValueError(f"不支持的历史开奖列表源：{self.lottery_code}")
+        query = urlencode(
+            {
+                "gameNo": game_no,
+                "provinceId": 0,
+                "pageSize": max(1, int(page_size)),
+                "isVerify": 1,
+                "pageNo": max(1, int(page_no)),
+            }
+        )
+        return f"{self.SPORTTERY_HISTORY_URL}?{query}"
+
+    def fetch_fallback_history(
+        self,
+        *,
+        limit: int,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> list[dict[str, Any]]:
+        url = self.build_fallback_history_url(limit=limit, start=start, end=end)
+        if not url:
+            raise ValueError(f"不支持的历史开奖列表兜底源：{self.lottery_code}")
+        referer = self.FALLBACK_HISTORY_REFERERS.get(self.lottery_code)
+        if referer and hasattr(self, "session"):
+            self.session.headers.update({"Referer": referer})
+        soup = self.fetch_page(url)
+        if not soup:
+            return []
+        parsed = self.parse_lskj_data(soup)
+        return parsed[: max(1, int(limit))]
+
+    def build_fallback_history_url(
+        self,
+        *,
+        limit: int | None = None,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> str | None:
+        base_url = getattr(self, "base_url", None) or self.FALLBACK_HISTORY_URLS.get(self.lottery_code)
+        if not base_url:
+            return None
+        params: dict[str, Any] = {}
+        if start:
+            params["start"] = start
+        if end:
+            params["end"] = end
+        if limit is not None:
+            params["limit"] = max(1, int(limit))
+        if not params:
+            return base_url
+        separator = "&" if "?" in base_url else "?"
+        return f"{base_url}{separator}{urlencode(params)}"
+
+    def fetch_json(self, url: str, retry: int = 3) -> dict[str, Any]:
+        for attempt in range(retry):
+            try:
+                self.logger.info(
+                    "Fetching lottery history json",
+                    extra={"context": {"attempt": attempt + 1, "retry": retry, "url": url}},
+                )
+                response = self.session.get(url, timeout=30)
+                if response.status_code == 200:
+                    try:
+                        payload = response.json()
+                    except ValueError:
+                        payload = None
+                    if isinstance(payload, dict) and str(payload.get("errorCode")) == "0":
+                        return payload
+                    self.logger.warning(
+                        "Unexpected lottery json payload",
+                        extra={
+                            "context": {
+                                "status_code": response.status_code,
+                                "content_type": response.headers.get("Content-Type"),
+                                "error_code": payload.get("errorCode") if isinstance(payload, dict) else None,
+                            }
+                        },
+                    )
+                else:
+                    self.logger.warning("Unexpected HTTP status", extra={"context": {"status_code": response.status_code}})
+            except requests.exceptions.RequestException as exc:
+                self.logger.warning("Lottery history request failed", extra={"context": {"error": str(exc)}})
+            if attempt < retry - 1:
+                time.sleep(2)
+        return {}
+
+    def parse_sporttery_draw(self, row: dict[str, Any]) -> dict[str, Any] | None:
+        period = str(row.get("lotteryDrawNum") or "").strip()
+        draw_result = str(row.get("lotteryDrawResult") or "").strip()
+        if not period or not draw_result:
+            return None
+        numbers = re.findall(r"\d{1,2}", draw_result)
+        if self.lottery_code == "dlt":
+            if len(numbers) < 7:
+                return None
+            return {
+                "period": period,
+                "red_balls": [value.zfill(2) for value in numbers[:5]],
+                "blue_balls": [value.zfill(2) for value in numbers[5:7]],
+                "date": self._normalize_sporttery_draw_date(row.get("lotteryDrawTime")),
+                "sales_amount": self.parse_money_value(str(row.get("totalSaleAmount") or "")),
+                "jackpot_pool_balance": self.parse_money_value(str(row.get("poolBalanceAfterdraw") or row.get("poolBalance") or "")),
+                "prize_total_amount": self._sum_sporttery_prize_total(row.get("prizeLevelList")),
+                "prize_breakdown": self.parse_sporttery_prize_breakdown(row.get("prizeLevelList")),
+            }
+        if self.lottery_code in {"pl3", "pl5", "qxc"}:
+            expected_count = 3 if self.lottery_code == "pl3" else 5 if self.lottery_code == "pl5" else 7
+            if len(numbers) < expected_count:
+                return None
+            fallback_breakdown = (
+                build_pl3_prize_breakdown()
+                if self.lottery_code == "pl3"
+                else build_pl5_prize_breakdown()
+                if self.lottery_code == "pl5"
+                else build_qxc_prize_breakdown()
+            )
+            return {
+                "period": period,
+                "digits": normalize_digit_balls(numbers[:expected_count]),
+                "date": self._normalize_sporttery_draw_date(row.get("lotteryDrawTime")),
+                "sales_amount": self.parse_money_value(str(row.get("totalSaleAmount") or "")),
+                "jackpot_pool_balance": self.parse_money_value(str(row.get("poolBalanceAfterdraw") or row.get("poolBalance") or "")),
+                "prize_total_amount": self._sum_sporttery_prize_total(row.get("prizeLevelList")),
+                "prize_breakdown": self.parse_sporttery_prize_breakdown(row.get("prizeLevelList")) or fallback_breakdown,
+            }
+        return None
+
+    def parse_sporttery_prize_breakdown(self, prize_rows: Any) -> list[dict[str, Any]]:
+        breakdown: list[dict[str, Any]] = []
+        for prize in list(prize_rows or []):
+            if not isinstance(prize, dict):
+                continue
+            prize_level = str(prize.get("prizeLevel") or "").strip()
+            if not prize_level:
+                continue
+            breakdown.append(
+                {
+                    "prize_level": prize_level.replace("(追加)", ""),
+                    "prize_type": "additional" if "追加" in prize_level else "basic",
+                    "winner_count": self.parse_money_value(str(prize.get("stakeCount") or "")),
+                    "prize_amount": self.parse_money_value(str(prize.get("stakeAmountFormat") or prize.get("stakeAmount") or "")),
+                    "total_amount": self.parse_money_value(str(prize.get("totalPrizeamount") or "")),
+                }
+            )
+        return breakdown
+
+    def _default_prize_breakdown(self) -> list[dict[str, Any]]:
+        if self.lottery_code == "pl3":
+            return build_pl3_prize_breakdown()
+        if self.lottery_code == "pl5":
+            return build_pl5_prize_breakdown()
+        if self.lottery_code == "qxc":
+            return build_qxc_prize_breakdown()
+        return []
+
+    def _sum_sporttery_prize_total(self, prize_rows: Any) -> int:
+        return sum(
+            self.parse_money_value(str(prize.get("totalPrizeamount") or ""))
+            for prize in list(prize_rows or [])
+            if isinstance(prize, dict)
+        )
+
+    @staticmethod
+    def _normalize_sporttery_draw_date(value: Any) -> str:
+        raw_value = str(value or "").strip()
+        if not raw_value:
+            return ""
+        normalized = raw_value[:10].replace("/", "-").replace(".", "-")
+        date_match = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", normalized)
+        if not date_match:
+            return ""
+        return f"{int(date_match.group(1)):04d}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
 
     def fetch_page(self, url: str, retry: int = 3) -> BeautifulSoup | None:
         for attempt in range(retry):
@@ -248,6 +465,10 @@ class LotteryFetchService:
                 continue
             period = cols[0].strip()
             if not period.isdigit():
+                continue
+            parsed_row = self._parse_datachart_lskj_row(cols)
+            if parsed_row:
+                data_list.append(parsed_row)
                 continue
             numbers = re.findall(r"\d{1,2}", cols[2])
             if self.lottery_code == "dlt":
@@ -315,6 +536,85 @@ class LotteryFetchService:
                 )
         self.logger.info("Parsed lskj lottery draws", extra={"context": {"count": len(data_list), "lottery_code": self.lottery_code}})
         return data_list
+
+    def _parse_datachart_lskj_row(self, cols: list[str]) -> dict[str, Any] | None:
+        period = cols[0].strip()
+        if not period.isdigit():
+            return None
+        if len(cols) > 1 and self._looks_like_date(cols[1]):
+            return None
+        if self.lottery_code == "dlt":
+            if len(cols) < 15:
+                return None
+            red_balls = [value.strip().zfill(2) for value in cols[1:6]]
+            blue_balls = [value.strip().zfill(2) for value in cols[6:8]]
+            if not self._are_numeric_values(red_balls + blue_balls):
+                return None
+            return {
+                "period": period,
+                "red_balls": red_balls,
+                "blue_balls": blue_balls,
+                "date": cols[14].strip(),
+                "sales_amount": self.parse_money_value(cols[13]),
+                "jackpot_pool_balance": self.parse_money_value(cols[8]),
+                "prize_total_amount": 0,
+                "prize_breakdown": self._build_lskj_prize_breakdown(cols, ["一等奖", "二等奖"], start_index=9),
+            }
+        if self.lottery_code == "pl3":
+            if len(cols) < 11:
+                return None
+            digits = re.findall(r"\d", cols[1])
+            if len(digits) < 3:
+                return None
+            prize_breakdown = self._build_lskj_prize_breakdown(cols, ["直选", "组选3", "组选6"], start_index=4)
+            return {
+                "period": period,
+                "digits": normalize_digit_balls(digits[:3]),
+                "date": cols[10].strip(),
+                "sales_amount": self.parse_money_value(cols[3]),
+                "jackpot_pool_balance": 0,
+                "prize_total_amount": 0,
+                "prize_breakdown": prize_breakdown or build_pl3_prize_breakdown(),
+            }
+        if self.lottery_code == "pl5":
+            if len(cols) < 5:
+                return None
+            digits = re.findall(r"\d", cols[1])
+            if len(digits) < 5:
+                return None
+            return {
+                "period": period,
+                "digits": normalize_digit_balls(digits[:5]),
+                "date": cols[4].strip(),
+                "sales_amount": self.parse_money_value(cols[3]),
+                "jackpot_pool_balance": 0,
+                "prize_total_amount": 0,
+                "prize_breakdown": build_pl5_prize_breakdown(),
+            }
+        if self.lottery_code == "qxc":
+            if len(cols) < 5:
+                return None
+            digits = re.findall(r"\d{1,2}", cols[1])
+            if len(digits) < 7:
+                return None
+            return {
+                "period": period,
+                "digits": normalize_digit_balls(digits[:7]),
+                "date": cols[4].strip(),
+                "sales_amount": self.parse_money_value(cols[3]),
+                "jackpot_pool_balance": 0,
+                "prize_total_amount": 0,
+                "prize_breakdown": build_qxc_prize_breakdown(),
+            }
+        return None
+
+    @staticmethod
+    def _are_numeric_values(values: list[str]) -> bool:
+        return all(str(value or "").strip().isdigit() for value in values)
+
+    @staticmethod
+    def _looks_like_date(value: str) -> bool:
+        return bool(re.fullmatch(r"\d{4}[-/.]\d{1,2}[-/.]\d{1,2}", str(value or "").strip()))
 
     def _build_lskj_prize_breakdown(self, cols: list[str], prize_levels: list[str], *, start_index: int) -> list[dict[str, Any]]:
         breakdown: list[dict[str, Any]] = []
@@ -554,20 +854,14 @@ class LotteryFetchService:
     def fetch_qxc_draw_by_period(self, period: str) -> dict[str, Any] | None:
         if self.lottery_code != "qxc":
             return None
-        detail_url = self.build_detail_url(period)
-        if not detail_url:
-            return None
-        soup = self.fetch_page(detail_url, retry=2)
-        if not soup:
-            return None
-        digits = self.parse_qxc_digits(soup)
+        row = self.fetch_sporttery_draw_by_period(period)
+        parsed = self.parse_sporttery_draw(row) if row else None
+        if parsed:
+            return parsed
+        detail_payload = self.fetch_fallback_draw_detail(period)
+        digits = list(detail_payload.get("digits") or [])
         if len(digits) < 7:
             return None
-        detail_payload = {
-            "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
-            "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
-            "draw_date": self.parse_draw_date(soup),
-        }
         return {
             "period": str(period),
             "digits": normalize_digit_balls(digits[:7]),
@@ -623,47 +917,78 @@ class LotteryFetchService:
         }
 
     def fetch_draw_detail(self, period: str) -> dict[str, Any]:
-        detail_url = self.build_detail_url(period)
-        if not detail_url:
-            return {"prize_breakdown": [], "jackpot_pool_balance": 0}
-        if self.lottery_code in {"pl3", "pl5"}:
-            soup = self.fetch_page(detail_url, retry=2)
-            if not soup:
-                return {
-                    "prize_breakdown": build_pl3_prize_breakdown() if self.lottery_code == "pl3" else build_pl5_prize_breakdown(),
-                    "jackpot_pool_balance": 0,
-                }
-            return {
-                "prize_breakdown": build_pl3_prize_breakdown() if self.lottery_code == "pl3" else build_pl5_prize_breakdown(),
-                "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
-            }
-        if self.lottery_code == "qxc":
-            soup = self.fetch_page(detail_url, retry=2)
-            if not soup:
-                return {
-                    "prize_breakdown": build_qxc_prize_breakdown(),
-                    "jackpot_pool_balance": 0,
-                    "draw_date": "",
-                }
-            return {
-                "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
-                "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
-                "draw_date": self.parse_draw_date(soup),
-            }
-        soup = self.fetch_page(detail_url, retry=2)
-        if not soup:
-            return {"prize_breakdown": [], "jackpot_pool_balance": 0}
-        parsed = self.parse_prize_breakdown(soup)
+        row = self.fetch_sporttery_draw_by_period(period)
+        if not row:
+            return self.fetch_fallback_draw_detail(period)
+        prize_breakdown = self.parse_sporttery_prize_breakdown(row.get("prizeLevelList"))
+        if not prize_breakdown:
+            fallback_payload = self.fetch_fallback_draw_detail(period)
+            if fallback_payload.get("prize_breakdown"):
+                return fallback_payload
         return {
-            "prize_breakdown": parsed,
-            "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+            "prize_breakdown": prize_breakdown or self._default_prize_breakdown(),
+            "jackpot_pool_balance": self.parse_money_value(str(row.get("poolBalanceAfterdraw") or row.get("poolBalance") or "")),
+            "draw_date": self._normalize_sporttery_draw_date(row.get("lotteryDrawTime")),
         }
+
+    def fetch_sporttery_draw_by_period(self, period: str) -> dict[str, Any] | None:
+        normalized_period = str(period or "").strip()
+        if not normalized_period:
+            return None
+        page_size = self.SPORTTERY_DETAIL_PAGE_SIZE
+        for page_no in range(1, self.SPORTTERY_DETAIL_MAX_PAGES + 1):
+            rows = self.fetch_sporttery_history_page(page_no=page_no, page_size=page_size)
+            if not rows:
+                return None
+            for row in rows:
+                if str(row.get("lotteryDrawNum") or "").strip() == normalized_period:
+                    return row
+            last_periods = [int(str(row.get("lotteryDrawNum") or "0")) for row in rows if str(row.get("lotteryDrawNum") or "").isdigit()]
+            if normalized_period.isdigit() and last_periods and int(normalized_period) > max(last_periods):
+                return None
+        return None
 
     def build_detail_url(self, period: str) -> str | None:
         template = self.DETAIL_URL_TEMPLATES.get(self.lottery_code)
         if not template:
             return None
         return template.format(period=period)
+
+    def fetch_fallback_draw_detail(self, period: str) -> dict[str, Any]:
+        detail_url = self.build_detail_url(period)
+        if not detail_url:
+            return {
+                "prize_breakdown": self._default_prize_breakdown(),
+                "jackpot_pool_balance": 0,
+                "draw_date": "",
+            }
+        if hasattr(self, "session"):
+            self.session.headers.update({"Referer": self.FALLBACK_HISTORY_REFERERS.get(self.lottery_code, "https://www.500.com/")})
+        soup = self.fetch_page(detail_url, retry=2)
+        if not soup:
+            return {
+                "prize_breakdown": self._default_prize_breakdown(),
+                "jackpot_pool_balance": 0,
+                "draw_date": "",
+            }
+        if self.lottery_code in {"pl3", "pl5"}:
+            return {
+                "prize_breakdown": self._default_prize_breakdown(),
+                "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+                "draw_date": self.parse_draw_date(soup),
+            }
+        if self.lottery_code == "qxc":
+            return {
+                "digits": self.parse_qxc_digits(soup),
+                "prize_breakdown": self.parse_qxc_prize_breakdown(soup),
+                "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+                "draw_date": self.parse_draw_date(soup),
+            }
+        return {
+            "prize_breakdown": self.parse_prize_breakdown(soup),
+            "jackpot_pool_balance": self.parse_jackpot_pool_balance(soup),
+            "draw_date": self.parse_draw_date(soup),
+        }
 
     def parse_prize_breakdown(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         for table in soup.find_all("table"):

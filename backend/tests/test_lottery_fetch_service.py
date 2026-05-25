@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 from bs4 import BeautifulSoup
 
-from backend.app.lotteries import build_qxc_prize_breakdown
+from backend.app.lotteries import build_pl5_prize_breakdown, build_qxc_prize_breakdown
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.lottery_fetch_service import LotteryFetchService
 
@@ -134,6 +134,32 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 4)
         self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 9612284)
 
+    def test_parse_lskj_dlt_datachart_row(self) -> None:
+        html = """
+        <table>
+          <tbody id="tdata">
+            <tr><td>26056</td><td>06</td><td>07</td><td>18</td><td>21</td><td>30</td><td>01</td><td>05</td><td>767,589,410</td><td>6</td><td>7,155,614</td><td>151</td><td>114,339</td><td>368,991,091</td><td>2026-05-23</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26056")
+        self.assertEqual(data[0]["red_balls"], ["06", "07", "18", "21", "30"])
+        self.assertEqual(data[0]["blue_balls"], ["01", "05"])
+        self.assertEqual(data[0]["date"], "2026-05-23")
+        self.assertEqual(data[0]["jackpot_pool_balance"], 767589410)
+        self.assertEqual(data[0]["sales_amount"], 368991091)
+        self.assertEqual([item["prize_level"] for item in data[0]["prize_breakdown"]], ["一等奖", "二等奖"])
+        self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 6)
+        self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 7155614)
+
     def test_parse_lskj_digit_lottery_data(self) -> None:
         html = """
         <table>
@@ -156,6 +182,27 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["jackpot_pool_balance"], 288000000)
         self.assertEqual(data[0]["prize_total_amount"], 8516600)
         self.assertEqual(data[0]["prize_breakdown"][1]["prize_amount"], 75904)
+
+    def test_parse_lskj_qxc_datachart_row(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26058</td><td>3 7 4 1 2 3 1</td><td>21</td><td>17054062</td><td>2026-05-24</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26058")
+        self.assertEqual(data[0]["digits"], ["03", "07", "04", "01", "02", "03", "01"])
+        self.assertEqual(data[0]["sales_amount"], 17054062)
+        self.assertEqual(data[0]["date"], "2026-05-24")
 
     def test_parse_lskj_pl3_data_saves_main_prize_levels(self) -> None:
         html = """
@@ -181,6 +228,29 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual(data[0]["prize_breakdown"][1]["prize_amount"], 346)
         self.assertEqual(data[0]["prize_breakdown"][2]["prize_amount"], 173)
 
+    def test_parse_lskj_pl3_datachart_row(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26134</td><td>5 1 5</td><td>11</td><td>38,656,728</td><td>10859</td><td>1,040</td><td>16063</td><td>346</td><td>&nbsp;</td><td>&nbsp;</td><td>2026-05-24</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl3"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26134")
+        self.assertEqual(data[0]["digits"], ["05", "01", "05"])
+        self.assertEqual(data[0]["date"], "2026-05-24")
+        self.assertEqual(data[0]["sales_amount"], 38656728)
+        self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 10859)
+        self.assertEqual(data[0]["prize_breakdown"][1]["winner_count"], 16063)
+
     def test_parse_lskj_pl5_data_saves_direct_prize_level(self) -> None:
         html = """
         <table>
@@ -203,6 +273,166 @@ class LotteryFetchServiceTests(unittest.TestCase):
         self.assertEqual([item["prize_level"] for item in data[0]["prize_breakdown"]], ["直选"])
         self.assertEqual(data[0]["prize_breakdown"][0]["winner_count"], 6)
         self.assertEqual(data[0]["prize_breakdown"][0]["prize_amount"], 100000)
+
+    def test_parse_lskj_pl5_datachart_row(self) -> None:
+        html = """
+        <table>
+          <tbody>
+            <tr><td>26134</td><td>5 1 5 3 3</td><td>17</td><td>21,711,392</td><td>2026-05-24</td></tr>
+          </tbody>
+        </table>
+        """
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        soup = BeautifulSoup(html, "html.parser")
+
+        data = service.parse_lskj_data(soup)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["period"], "26134")
+        self.assertEqual(data[0]["digits"], ["05", "01", "05", "03", "03"])
+        self.assertEqual(data[0]["sales_amount"], 21711392)
+        self.assertEqual(data[0]["date"], "2026-05-24")
+        self.assertEqual(data[0]["prize_breakdown"], build_pl5_prize_breakdown())
+
+    def test_parse_sporttery_dlt_draw_extracts_numbers_and_prizes(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        row = {
+            "lotteryDrawNum": "26056",
+            "lotteryDrawResult": "06 07 18 21 30 01 05",
+            "lotteryDrawTime": "2026-05-23",
+            "totalSaleAmount": "368,991,091",
+            "poolBalanceAfterdraw": "767,589,409.76",
+            "prizeLevelList": [
+                {
+                    "prizeLevel": "一等奖",
+                    "stakeCount": "6",
+                    "stakeAmountFormat": "7155614",
+                    "totalPrizeamount": "42,933,684",
+                },
+                {
+                    "prizeLevel": "一等奖(追加)",
+                    "stakeCount": "2",
+                    "stakeAmountFormat": "5724491",
+                    "totalPrizeamount": "11,448,982",
+                },
+            ],
+        }
+
+        data = service.parse_sporttery_draw(row)
+
+        self.assertIsNotNone(data)
+        assert data is not None
+        self.assertEqual(data["period"], "26056")
+        self.assertEqual(data["red_balls"], ["06", "07", "18", "21", "30"])
+        self.assertEqual(data["blue_balls"], ["01", "05"])
+        self.assertEqual(data["date"], "2026-05-23")
+        self.assertEqual(data["sales_amount"], 368991091)
+        self.assertEqual(data["jackpot_pool_balance"], 767589409)
+        self.assertEqual(data["prize_total_amount"], 54382666)
+        self.assertEqual(data["prize_breakdown"][1]["prize_level"], "一等奖")
+        self.assertEqual(data["prize_breakdown"][1]["prize_type"], "additional")
+
+    def test_parse_sporttery_digit_draw_uses_default_prizes_when_missing(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        row = {
+            "lotteryDrawNum": "26134",
+            "lotteryDrawResult": "5 1 5 3 3",
+            "lotteryDrawTime": "2026-05-24 20:30:00",
+            "totalSaleAmount": "21,711,392",
+            "poolBalanceAfterdraw": "",
+            "prizeLevelList": [],
+        }
+
+        data = service.parse_sporttery_draw(row)
+
+        self.assertIsNotNone(data)
+        assert data is not None
+        self.assertEqual(data["period"], "26134")
+        self.assertEqual(data["digits"], ["05", "01", "05", "03", "03"])
+        self.assertEqual(data["date"], "2026-05-24")
+        self.assertEqual(data["sales_amount"], 21711392)
+        self.assertEqual(data["prize_breakdown"], build_pl5_prize_breakdown())
+
+    def test_fetch_lskj_and_save_uses_sporttery_history_with_limit(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        service.fetch_history_with_fallback = Mock(
+            return_value=[
+                {"period": "1", "digits": ["01", "02", "03", "04", "05"], "date": "2026-03-01", "prize_breakdown": []},
+            ]
+        )
+        service.lottery_service = Mock()
+        service.lottery_service.save_draws.return_value = [{"period": "1"}]
+        service.message_service = Mock()
+        service.message_service.generate_messages_for_periods.return_value = 0
+        service.message_service.generate_messages_for_recent_draws.return_value = 0
+
+        result = service.fetch_lskj_and_save(limit=1)
+
+        service.fetch_history_with_fallback.assert_called_once_with(limit=1)
+        self.assertEqual(result["fetched_count"], 1)
+        self.assertEqual(service.lottery_service.save_draws.call_args.args[0][0]["period"], "1")
+
+    def test_fetch_history_with_fallback_uses_500_when_sporttery_empty(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "pl5"
+        service.logger = Mock()
+        service.fetch_sporttery_history = Mock(return_value=[])
+        service.fetch_fallback_history = Mock(
+            return_value=[
+                {"period": "1", "digits": ["01", "02", "03", "04", "05"], "date": "2026-03-01", "prize_breakdown": []},
+            ]
+        )
+
+        data = service.fetch_history_with_fallback(limit=1)
+
+        service.fetch_sporttery_history.assert_called_once_with(limit=1)
+        service.fetch_fallback_history.assert_called_once_with(limit=1, start=None, end=None)
+        self.assertEqual(data[0]["period"], "1")
+
+    def test_fetch_draw_detail_falls_back_to_500_when_sporttery_missing(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "dlt"
+        service.fetch_sporttery_draw_by_period = Mock(return_value=None)
+        service.fetch_fallback_draw_detail = Mock(
+            return_value={
+                "draw_date": "2026-04-08",
+                "jackpot_pool_balance": 757000000,
+                "prize_breakdown": [
+                    {"prize_level": "六等奖", "prize_type": "basic", "winner_count": 1, "prize_amount": 15, "total_amount": 15},
+                ],
+            }
+        )
+
+        detail = service.fetch_draw_detail("26037")
+
+        service.fetch_fallback_draw_detail.assert_called_once_with("26037")
+        self.assertEqual(detail["jackpot_pool_balance"], 757000000)
+
+    def test_fetch_qxc_draw_by_period_falls_back_to_500_detail(self) -> None:
+        service = LotteryFetchService.__new__(LotteryFetchService)
+        service.lottery_code = "qxc"
+        service.fetch_sporttery_draw_by_period = Mock(return_value=None)
+        service.fetch_fallback_draw_detail = Mock(
+            return_value={
+                "digits": ["9", "9", "6", "9", "4", "0", "1"],
+                "draw_date": "2026-04-05",
+                "jackpot_pool_balance": 289159709,
+                "prize_breakdown": build_qxc_prize_breakdown(),
+            }
+        )
+
+        draw = service.fetch_qxc_draw_by_period("26037")
+
+        self.assertIsNotNone(draw)
+        assert draw is not None
+        self.assertEqual(draw["period"], "26037")
+        self.assertEqual(draw["digits"], ["09", "09", "06", "09", "04", "00", "01"])
 
     def test_parse_pl3_data_prefers_row_jackpot_column(self) -> None:
         html = """
@@ -287,7 +517,7 @@ class LotteryFetchServiceTests(unittest.TestCase):
         service.session = Mock()
         service.session.get.return_value = response
 
-        soup = service.fetch_page("https://datachart.500.com/plw/history/inc/history.php", retry=1)
+        soup = service.fetch_page("https://example.test/history.html", retry=1)
 
         self.assertIsNotNone(soup)
         self.assertEqual(response.encoding, "gb2312")
@@ -300,7 +530,7 @@ class LotteryFetchServiceTests(unittest.TestCase):
         service.session = Mock()
         service.session.get.return_value = response
 
-        soup = service.fetch_page("https://www.500.com/lottery/qxc/", retry=1)
+        soup = service.fetch_page("https://example.test/qxc.html", retry=1)
 
         self.assertIsNotNone(soup)
         self.assertEqual(response.encoding, "gb2312")
@@ -390,10 +620,8 @@ class LotteryFetchServiceTests(unittest.TestCase):
     def test_fetch_and_save_applies_limit(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
         service.lottery_code = "pl5"
-        service.base_url = "https://example.com"
         service.logger = Mock()
-        service.fetch_page = Mock(return_value=BeautifulSoup("<html></html>", "html.parser"))
-        service.parse_lottery_data = Mock(
+        service.fetch_history_with_fallback = Mock(
             return_value=[
                 {"period": "1", "digits": ["01", "02", "03", "04", "05"], "date": "2026-03-01", "prize_breakdown": []},
                 {"period": "2", "digits": ["02", "03", "04", "05", "06"], "date": "2026-03-02", "prize_breakdown": []},
@@ -405,8 +633,7 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
         result = service.fetch_and_save(limit=2)
 
-        fetch_page_call_args = service.fetch_page.call_args
-        self.assertEqual(fetch_page_call_args.args[0], "https://example.com?limit=2")
+        service.fetch_history_with_fallback.assert_called_once_with(limit=2, start=None, end=None)
         save_call_args = service.lottery_service.save_draws.call_args
         self.assertEqual(len(save_call_args.args[0]), 2)
         self.assertEqual(result["fetched_count"], 2)
@@ -415,10 +642,8 @@ class LotteryFetchServiceTests(unittest.TestCase):
     def test_fetch_and_save_qxc_backfills_to_requested_limit(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
         service.lottery_code = "qxc"
-        service.base_url = "https://example.com"
         service.logger = Mock()
-        service.fetch_page = Mock(return_value=BeautifulSoup("<html></html>", "html.parser"))
-        service.parse_lottery_data = Mock(
+        service.fetch_history_with_fallback = Mock(
             return_value=[
                 {"period": str(26038 - index), "digits": ["01", "02", "03", "04", "05", "06", "07"], "date": "2026-04-08", "prize_breakdown": []}
                 for index in range(10)
@@ -457,10 +682,8 @@ class LotteryFetchServiceTests(unittest.TestCase):
     def test_fetch_and_save_uses_default_limit_30(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
         service.lottery_code = "pl5"
-        service.base_url = "https://example.com"
         service.logger = Mock()
-        service.fetch_page = Mock(return_value=BeautifulSoup("<html></html>", "html.parser"))
-        service.parse_lottery_data = Mock(
+        service.fetch_history_with_fallback = Mock(
             return_value=[
                 {"period": "1", "digits": ["01", "02", "03", "04", "05"], "date": "2026-03-01", "prize_breakdown": []}
             ]
@@ -470,8 +693,7 @@ class LotteryFetchServiceTests(unittest.TestCase):
 
         service.fetch_and_save()
 
-        fetch_page_call_args = service.fetch_page.call_args
-        self.assertEqual(fetch_page_call_args.args[0], "https://example.com?limit=30")
+        service.fetch_history_with_fallback.assert_called_once_with(limit=30, start=None, end=None)
 
     def test_backfill_draw_detail_overwrites_existing_draw_with_latest_detail(self) -> None:
         service = LotteryFetchService.__new__(LotteryFetchService)
