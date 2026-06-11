@@ -186,5 +186,105 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(updated["permission_name"], "基础资料")
         self.assertEqual(updated["permission_description"], "允许用户查看账号信息并修改昵称与密码。")
 
+    def test_update_provider_syncs_inherited_model_api_key_and_base_url(self) -> None:
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
+
+        create_provider_response = self.client.post(
+            "/api/settings/providers/create",
+            json={
+                "code": "sync-provider",
+                "name": "Sync Provider",
+                "api_format": "openai_compatible",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "provider-key-v1",
+                "model_configs": [{"model_id": "sync-model", "display_name": "Sync Model"}],
+            },
+        )
+        self.assertEqual(create_provider_response.status_code, 200)
+
+        create_model_response = self.client.post(
+            "/api/settings/models/create",
+            json={
+                "model_code": "sync-provider-model",
+                "display_name": "Sync Provider Model",
+                "provider": "sync-provider",
+                "api_model_name": "sync-model",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "provider-key-v1",
+                "app_code": "",
+                "temperature": 0.3,
+                "is_active": True,
+            },
+        )
+        self.assertEqual(create_model_response.status_code, 200)
+
+        update_provider_response = self.client.post(
+            "/api/settings/providers/update",
+            json={
+                "provider_code": "sync-provider",
+                "name": "Sync Provider",
+                "api_format": "openai_compatible",
+                "base_url": "https://api.example.test/v2",
+                "api_key": "provider-key-v2",
+                "model_configs": [{"model_id": "sync-model", "display_name": "Sync Model"}],
+            },
+        )
+        self.assertEqual(update_provider_response.status_code, 200)
+
+        model_detail_response = self.client.post("/api/settings/model/detail", json={"model_code": "sync-provider-model"})
+        self.assertEqual(model_detail_response.status_code, 200)
+        self.assertEqual(model_detail_response.json()["api_key"], "provider-key-v2")
+        self.assertEqual(model_detail_response.json()["base_url"], "https://api.example.test/v2")
+
+    def test_update_provider_does_not_override_model_level_api_key_or_base_url(self) -> None:
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
+
+        create_provider_response = self.client.post(
+            "/api/settings/providers/create",
+            json={
+                "code": "override-provider",
+                "name": "Override Provider",
+                "api_format": "openai_compatible",
+                "base_url": "https://api.example.test/v1",
+                "api_key": "provider-key-v1",
+                "model_configs": [{"model_id": "override-model", "display_name": "Override Model"}],
+            },
+        )
+        self.assertEqual(create_provider_response.status_code, 200)
+
+        create_model_response = self.client.post(
+            "/api/settings/models/create",
+            json={
+                "model_code": "override-provider-model",
+                "display_name": "Override Provider Model",
+                "provider": "override-provider",
+                "api_model_name": "override-model",
+                "base_url": "https://custom.example.test/v1",
+                "api_key": "custom-model-key",
+                "app_code": "",
+                "temperature": 0.3,
+                "is_active": True,
+            },
+        )
+        self.assertEqual(create_model_response.status_code, 200)
+
+        update_provider_response = self.client.post(
+            "/api/settings/providers/update",
+            json={
+                "provider_code": "override-provider",
+                "name": "Override Provider",
+                "api_format": "openai_compatible",
+                "base_url": "https://api.example.test/v2",
+                "api_key": "provider-key-v2",
+                "model_configs": [{"model_id": "override-model", "display_name": "Override Model"}],
+            },
+        )
+        self.assertEqual(update_provider_response.status_code, 200)
+
+        model_detail_response = self.client.post("/api/settings/model/detail", json={"model_code": "override-provider-model"})
+        self.assertEqual(model_detail_response.status_code, 200)
+        self.assertEqual(model_detail_response.json()["api_key"], "custom-model-key")
+        self.assertEqual(model_detail_response.json()["base_url"], "https://custom.example.test/v1")
+
 if __name__ == "__main__":
     unittest.main()

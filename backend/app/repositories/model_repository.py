@@ -335,13 +335,15 @@ class ModelRepository:
         normalized = self._normalize_provider_payload(payload, is_create=False)
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT id, is_deleted FROM model_provider WHERE provider_code = ?", (provider_code,))
+                cursor.execute("SELECT id, api_key, base_url, is_deleted FROM model_provider WHERE provider_code = ?", (provider_code,))
                 row = cursor.fetchone()
                 if not row:
                     raise KeyError(provider_code)
                 if bool(row.get("is_deleted")):
                     raise ValueError("供应商已删除")
                 provider_id = int(row["id"])
+                previous_api_key = str(row.get("api_key") or "")
+                previous_base_url = str(row.get("base_url") or "")
                 cursor.execute(
                     """
                     UPDATE model_provider
@@ -367,6 +369,14 @@ class ModelRepository:
                 if "model_configs" in normalized:
                     self._replace_provider_model_configs(cursor, provider_id, normalized["model_configs"])
                 self._replace_provider_options(cursor, provider_id, normalized["extra_options"])
+                self._sync_inherited_provider_defaults(
+                    cursor,
+                    provider_id,
+                    previous_api_key=previous_api_key,
+                    next_api_key=normalized["api_key"],
+                    previous_base_url=previous_base_url,
+                    next_base_url=normalized["base_url"],
+                )
         invalidate_model_registry_cache()
         return self.get_provider(provider_code) or {}
 
@@ -936,6 +946,52 @@ class ModelRepository:
                 VALUES (?, ?, ?)
                 """,
                 (provider_id, str(option_key), json.dumps(option_value, ensure_ascii=False)),
+            )
+
+    @staticmethod
+    def _sync_inherited_provider_defaults(
+        cursor,
+        provider_id: int,
+        *,
+        previous_api_key: str,
+        next_api_key: str,
+        previous_base_url: str,
+        next_base_url: str,
+    ) -> None:
+        api_key_changed = previous_api_key != next_api_key
+        base_url_changed = previous_base_url != next_base_url
+        if not api_key_changed and not base_url_changed:
+            return
+        cursor.execute(
+            """
+            SELECT am.id, am.api_key, am.base_url
+            FROM ai_model am
+            INNER JOIN provider_model_config pmc ON pmc.id = am.provider_model_id
+            WHERE pmc.provider_id = ?
+            """,
+            (provider_id,),
+        )
+        for row in cursor.fetchall():
+            assignments: list[str] = []
+            params: list[Any] = []
+            if api_key_changed and str(row.get("api_key") or "") == previous_api_key:
+                assignments.append("api_key = ?")
+                params.append(next_api_key)
+            if base_url_changed and str(row.get("base_url") or "") == previous_base_url:
+                assignments.append("base_url = ?")
+                params.append(next_base_url)
+            if not assignments:
+                continue
+            assignments.append("updated_at = ?")
+            params.append(now_ts())
+            params.append(int(row["id"]))
+            cursor.execute(
+                f"""
+                UPDATE ai_model
+                SET {", ".join(assignments)}
+                WHERE id = ?
+                """,
+                tuple(params),
             )
 
     @staticmethod
