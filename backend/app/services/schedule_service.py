@@ -17,6 +17,7 @@ from backend.app.repositories.schedule_repository import ScheduleRepository
 from backend.app.services.lottery_fetch_task_service import lottery_fetch_task_service
 from backend.app.services.prediction_generation_service import PredictionGenerationService
 from backend.app.services.prediction_generation_task_service import prediction_generation_task_service
+from backend.app.services.worldcup_fetch_task_service import worldcup_fetch_task_service
 from backend.app.time_utils import ensure_timestamp
 
 
@@ -28,6 +29,8 @@ UTC = timezone.utc
 ACTIVE_MODEL_CODES_CACHE_TTL_SECONDS = 60
 SCHEDULE_TASK_DISPATCH_JITTER_SECONDS = 0.4
 SCHEDULE_MODEL_PARALLELISM_LIMIT = 2
+WORLDCUP_HOURLY_FETCH_TASK_CODE = "system-worldcup-hourly-fetch"
+WORLDCUP_HOURLY_FETCH_CRON = "0 * * * *"
 
 
 class ScheduleService:
@@ -50,6 +53,7 @@ class ScheduleService:
         with self._lock:
             if self._started:
                 return
+            self._ensure_worldcup_hourly_fetch_task()
             self._refresh_active_task_next_runs()
             self._thread = Thread(target=self._loop, daemon=True)
             self._thread.start()
@@ -154,6 +158,14 @@ class ScheduleService:
             )
             return
 
+        if task["task_type"] == "worldcup_fetch":
+            worldcup_fetch_task_service.create_task(
+                schedule_task_code=task["task_code"],
+                trigger_type=trigger_type,
+                on_update=handle_update,
+            )
+            return
+
         model_codes = [str(code).strip() for code in task.get("model_codes") or [] if str(code).strip()]
         active_model_codes = self._get_active_model_codes_cached()
         filtered_model_codes = [code for code in model_codes if code in active_model_codes]
@@ -207,12 +219,16 @@ class ScheduleService:
 
     def _normalize_payload(self, payload: dict[str, Any], *, task_code: str) -> dict[str, Any]:
         task_type = str(payload.get("task_type") or "").strip()
-        if task_type not in {"lottery_fetch", "prediction_generate"}:
+        if task_type not in {"lottery_fetch", "prediction_generate", "worldcup_fetch"}:
             raise ValueError("不支持的任务类型")
         task_name = str(payload.get("task_name") or "").strip()
         if not task_name:
             raise ValueError("任务名称不能为空")
-        lottery_code = normalize_lottery_code(str(payload.get("lottery_code") or "dlt"))
+        lottery_code = (
+            "worldcup"
+            if task_type == "worldcup_fetch"
+            else normalize_lottery_code(str(payload.get("lottery_code") or "dlt"))
+        )
         schedule_mode = str(payload.get("schedule_mode") or "").strip()
         if schedule_mode not in {"preset", "cron"}:
             raise ValueError("不支持的时间规则")
@@ -273,6 +289,50 @@ class ScheduleService:
             self._compute_next_run(normalized, base_time=self._utc_now()) if normalized["is_active"] else None
         )
         return normalized
+
+    def _ensure_worldcup_hourly_fetch_task(self) -> None:
+        existing = self.repository.get_task(WORLDCUP_HOURLY_FETCH_TASK_CODE)
+        payload = {
+            "task_name": "世界杯赛程赔率整点同步",
+            "task_type": "worldcup_fetch",
+            "lottery_code": "worldcup",
+            "fetch_limit": 30,
+            "model_codes": [],
+            "generation_mode": "current",
+            "prediction_play_mode": "direct",
+            "overwrite_existing": False,
+            "schedule_mode": "cron",
+            "preset_type": None,
+            "time_of_day": None,
+            "weekdays": [],
+            "cron_expression": WORLDCUP_HOURLY_FETCH_CRON,
+            "is_active": True if not existing else bool(existing.get("is_active")),
+        }
+        normalized = self._normalize_payload(payload, task_code=WORLDCUP_HOURLY_FETCH_TASK_CODE)
+        if not existing:
+            self.repository.create_task(normalized)
+            return
+        if self._worldcup_hourly_fetch_task_needs_update(existing, normalized):
+            self.repository.update_task(WORLDCUP_HOURLY_FETCH_TASK_CODE, normalized)
+
+    @staticmethod
+    def _worldcup_hourly_fetch_task_needs_update(existing: dict[str, Any], normalized: dict[str, Any]) -> bool:
+        fields = [
+            "task_name",
+            "task_type",
+            "lottery_code",
+            "fetch_limit",
+            "generation_mode",
+            "prediction_play_mode",
+            "overwrite_existing",
+            "schedule_mode",
+            "preset_type",
+            "time_of_day",
+            "weekdays",
+            "cron_expression",
+            "is_active",
+        ]
+        return any(existing.get(field) != normalized.get(field) for field in fields)
 
     @staticmethod
     def _normalize_prediction_play_mode(

@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.app.services.schedule_service import ScheduleService
+from backend.app.services.schedule_service import (
+    WORLDCUP_HOURLY_FETCH_CRON,
+    WORLDCUP_HOURLY_FETCH_TASK_CODE,
+    ScheduleService,
+)
 
 
 class ScheduleServiceTestCase(unittest.TestCase):
@@ -149,6 +153,98 @@ class ScheduleServiceTestCase(unittest.TestCase):
         create_task.assert_called_once()
         kwargs = create_task.call_args.kwargs
         self.assertEqual(kwargs["limit"], 120)
+
+    def test_normalize_payload_accepts_worldcup_fetch_task(self) -> None:
+        payload = {
+            "task_name": "世界杯赛程赔率整点同步",
+            "task_type": "worldcup_fetch",
+            "lottery_code": "worldcup",
+            "model_codes": [],
+            "generation_mode": "current",
+            "prediction_play_mode": "direct",
+            "overwrite_existing": False,
+            "schedule_mode": "cron",
+            "cron_expression": WORLDCUP_HOURLY_FETCH_CRON,
+            "is_active": True,
+        }
+
+        normalized = self.service._normalize_payload(payload, task_code=WORLDCUP_HOURLY_FETCH_TASK_CODE)
+
+        self.assertEqual(normalized["task_type"], "worldcup_fetch")
+        self.assertEqual(normalized["lottery_code"], "worldcup")
+        self.assertEqual(normalized["cron_expression"], "0 * * * *")
+        self.assertEqual(normalized["model_codes"], [])
+        self.assertIsNotNone(normalized["next_run_at"])
+
+    def test_start_creates_default_worldcup_hourly_fetch_task(self) -> None:
+        self.repository.get_task.return_value = None
+        self.repository.list_tasks.return_value = []
+
+        with patch("backend.app.services.schedule_service.Thread") as thread_class:
+            self.service.start()
+
+        self.repository.create_task.assert_called_once()
+        created_payload = self.repository.create_task.call_args.args[0]
+        self.assertEqual(created_payload["task_code"], WORLDCUP_HOURLY_FETCH_TASK_CODE)
+        self.assertEqual(created_payload["task_type"], "worldcup_fetch")
+        self.assertEqual(created_payload["lottery_code"], "worldcup")
+        self.assertEqual(created_payload["cron_expression"], WORLDCUP_HOURLY_FETCH_CRON)
+        self.assertTrue(created_payload["is_active"])
+        thread_class.return_value.start.assert_called_once()
+
+    def test_ensure_worldcup_hourly_fetch_task_preserves_disabled_state(self) -> None:
+        self.repository.get_task.return_value = {
+            "task_code": WORLDCUP_HOURLY_FETCH_TASK_CODE,
+            "task_name": "旧名称",
+            "task_type": "worldcup_fetch",
+            "lottery_code": "worldcup",
+            "fetch_limit": 30,
+            "model_codes": [],
+            "generation_mode": "current",
+            "prediction_play_mode": "direct",
+            "overwrite_existing": False,
+            "schedule_mode": "cron",
+            "preset_type": None,
+            "time_of_day": None,
+            "weekdays": [],
+            "cron_expression": "15 * * * *",
+            "is_active": False,
+        }
+
+        self.service._ensure_worldcup_hourly_fetch_task()
+
+        self.repository.update_task.assert_called_once()
+        updated_payload = self.repository.update_task.call_args.args[1]
+        self.assertFalse(updated_payload["is_active"])
+        self.assertEqual(updated_payload["cron_expression"], WORLDCUP_HOURLY_FETCH_CRON)
+
+    def test_trigger_task_runs_worldcup_fetch_service(self) -> None:
+        task = {
+            "task_code": WORLDCUP_HOURLY_FETCH_TASK_CODE,
+            "task_name": "世界杯赛程赔率整点同步",
+            "task_type": "worldcup_fetch",
+            "lottery_code": "worldcup",
+            "fetch_limit": 30,
+            "model_codes": [],
+            "generation_mode": "current",
+            "prediction_play_mode": "direct",
+            "overwrite_existing": False,
+            "schedule_mode": "cron",
+            "preset_type": None,
+            "time_of_day": None,
+            "weekdays": [],
+            "cron_expression": WORLDCUP_HOURLY_FETCH_CRON,
+            "is_active": True,
+        }
+
+        with patch("backend.app.services.schedule_service.worldcup_fetch_task_service.create_task") as create_task:
+            self.service._trigger_task(task)
+
+        create_task.assert_called_once()
+        kwargs = create_task.call_args.kwargs
+        self.assertEqual(kwargs["schedule_task_code"], WORLDCUP_HOURLY_FETCH_TASK_CODE)
+        self.assertEqual(kwargs["trigger_type"], "schedule")
+        self.assertTrue(callable(kwargs["on_update"]))
 
 
 if __name__ == "__main__":
