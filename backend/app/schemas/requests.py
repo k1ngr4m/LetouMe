@@ -182,6 +182,88 @@ class SimulationTicketDeletePayload(BaseModel):
     lottery_code: str = "dlt"
 
 
+class WorldCupMatchListPayload(BaseModel):
+    date_start: str | None = None
+    date_end: str | None = None
+    team_query: str | None = None
+    status_filter: Literal["all", "scheduled", "live", "finished"] = "all"
+
+
+class WorldCupRecommendationListPayload(BaseModel):
+    match_id: str | None = None
+    date_start: str | None = None
+    date_end: str | None = None
+    play_type_filter: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
+    risk_level_filter: Literal["all", "low", "medium", "high"] = "all"
+
+
+class WorldCupRecommendationDetailPayload(BaseModel):
+    recommendation_id: str
+
+
+class WorldCupFavoritePayload(BaseModel):
+    recommendation_id: str
+    favorite: bool = True
+
+
+class WorldCupToSimulationPayload(BaseModel):
+    recommendation_id: str
+
+
+class WorldCupSimulationTicketListPayload(BaseModel):
+    status_filter: Literal["all", "draft", "active", "settled", "archived"] = "all"
+
+
+class WorldCupSimulationTicketCreateItemPayload(BaseModel):
+    match_id: str
+    play_type: Literal["win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"]
+    selection: str
+    recommendation_id: str | None = None
+    odds_value: str | None = None
+    odds_snapshot: dict[str, Any] = Field(default_factory=dict)
+    confidence_level: Literal["low", "medium", "high"] | None = None
+    amount: int = Field(default=0, ge=0)
+
+
+class WorldCupSimulationTicketCreatePayload(BaseModel):
+    title: str | None = None
+    status: Literal["draft", "active", "settled", "archived"] = "draft"
+    total_amount: int = Field(default=0, ge=0)
+    multiplier: int = Field(default=1, ge=1, le=999)
+    note: str | None = None
+    source_recommendation_id: str | None = None
+    items: list[WorldCupSimulationTicketCreateItemPayload] = Field(default_factory=list, min_length=1)
+
+
+class WorldCupSimulationTicketUpdatePayload(BaseModel):
+    ticket_id: int | None = Field(default=None, ge=1)
+    status: Literal["draft", "active", "settled", "archived"] | None = None
+    total_amount: int | None = Field(default=None, ge=0)
+    multiplier: int | None = Field(default=None, ge=1, le=999)
+    note: str | None = None
+
+
+class WorldCupSimulationTicketDeletePayload(BaseModel):
+    ticket_id: int = Field(ge=1)
+
+
+class WorldCupRecommendationToSimulationPayload(BaseModel):
+    multiplier: int = Field(default=1, ge=1, le=999)
+
+
+class WorldCupHistoryPayload(BaseModel):
+    date_start: str | None = None
+    date_end: str | None = None
+    status_filter: Literal["all", "finished", "pending"] = "all"
+    play_type_filter: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
+
+
+class WorldCupPredictionGeneratePayload(BaseModel):
+    model_code: str
+    play_type: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
+    overwrite: bool = False
+
+
 class MyBetRecordListPayload(BaseModel):
     lottery_code: str = "dlt"
     limit: int = Field(default=20, ge=1, le=500)

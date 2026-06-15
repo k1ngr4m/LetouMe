@@ -27,7 +27,7 @@ import { useTheme } from '../theme/ThemeProvider'
 import { DISCLAIMER_TEXT } from './SiteDisclaimer'
 import { UserAvatar } from './UserAvatar'
 import { AssistantDrawer } from './AssistantDrawer'
-import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../../features/home/navigation'
+import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH, WORLDCUP_TAB_PATHS } from '../../features/home/navigation'
 import { useLotterySelection } from '../lottery/LotterySelectionProvider'
 import { loadSidebarCollapsePreference, saveSidebarCollapsePreference } from '../lib/storage'
 import { apiClient } from '../api/client'
@@ -105,6 +105,10 @@ function LotterySwitchIcon({ code, label }: { code: LotteryCode; label: string }
   return <img className="crm-lottery-picker__logo" src={getLotteryLogoSrc(code)} alt={label} loading="lazy" />
 }
 
+function WorldCupSwitchIcon() {
+  return <img className="crm-lottery-picker__logo" src="/lottery/worldcup.svg" alt="世界杯" loading="lazy" />
+}
+
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -132,6 +136,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const isMessageCenterRoute = location.pathname === MESSAGE_CENTER_PATH
   const isPredictionRoute = location.pathname === HOME_TAB_PATHS.prediction
   const isMyBetsRoute = location.pathname === HOME_TAB_PATHS['my-bets']
+  const isWorldCupRoute = location.pathname.startsWith(HOME_TAB_PATHS.worldcup)
   const activePredictionSubsection = location.hash === '#weights' ? 'weights' : 'models'
   const [sidebarMode, setSidebarMode] = useState<SidebarPanelMode>(
     canOpenSettings && isSettingsRoute ? 'settings' : 'workspace',
@@ -143,6 +148,7 @@ export function AppShell({ children }: PropsWithChildren) {
     () => LOTTERY_OPTIONS.find((item) => item.code === selectedLottery)?.label || '大乐透',
     [selectedLottery],
   )
+  const pickerLabel = isWorldCupRoute ? '世界杯' : selectedLotteryLabel
   const messageUnreadCountQuery = useQuery({
     queryKey: ['messages', 'unread-count'],
     queryFn: async () => {
@@ -166,6 +172,9 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '设置中心'
+    if (location.pathname === WORLDCUP_TAB_PATHS.simulation) return '世界杯模拟试玩'
+    if (location.pathname === WORLDCUP_TAB_PATHS.history) return '世界杯开奖回溯'
+    if (location.pathname === WORLDCUP_TAB_PATHS.overview) return '世界杯预测总览'
     if (location.pathname === HOME_TAB_PATHS.charts) return '图表中心'
     if (location.pathname === HOME_TAB_PATHS.history) return '开奖回溯'
     if (location.pathname === HOME_TAB_PATHS.simulation) return '模拟试玩'
@@ -178,8 +187,9 @@ export function AppShell({ children }: PropsWithChildren) {
   const pageSubtitle = useMemo(() => {
     if (location.pathname.startsWith('/settings')) return '模型、用户与任务管理'
     if (location.pathname === MESSAGE_CENTER_PATH) return '开奖通知与站内信'
+    if (isWorldCupRoute) return '世界杯赛事推荐'
     return '预测工作台'
-  }, [location.pathname])
+  }, [isWorldCupRoute, location.pathname])
 
   const assistantContext = useMemo<AssistantContext>(() => {
     return {
@@ -279,7 +289,7 @@ export function AppShell({ children }: PropsWithChildren) {
   function openWorkspaceCenter() {
     setSidebarMode('workspace')
     setIsSidebarOpen(false)
-    navigate(HOME_TAB_PATHS.prediction)
+    navigate(isWorldCupRoute ? WORLDCUP_TAB_PATHS.overview : HOME_TAB_PATHS.prediction)
   }
 
   function openChartCenter() {
@@ -298,6 +308,16 @@ export function AppShell({ children }: PropsWithChildren) {
   function handleLotterySelect(lotteryCode: LotteryCode) {
     setSelectedLottery(lotteryCode)
     setIsLotteryMenuOpen(false)
+    if (isWorldCupRoute) {
+      navigate(HOME_TAB_PATHS.prediction)
+    }
+  }
+
+  function openWorldCupFromLotteryMenu() {
+    setIsLotteryMenuOpen(false)
+    setSidebarMode('workspace')
+    setIsSidebarOpen(false)
+    navigate(WORLDCUP_TAB_PATHS.overview)
   }
 
   function onWorkspaceNavigate() {
@@ -392,13 +412,13 @@ export function AppShell({ children }: PropsWithChildren) {
                   className="crm-lottery-picker__trigger"
                   type="button"
                   aria-label="彩种切换"
-                  title={`彩种切换：${selectedLotteryLabel}`}
+                  title={`彩种切换：${pickerLabel}`}
                   aria-expanded={isLotteryMenuOpen}
                   aria-haspopup="menu"
                   onClick={() => setIsLotteryMenuOpen((current) => !current)}
                 >
-                  <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />
-                  <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
+                  {isWorldCupRoute ? <WorldCupSwitchIcon /> : <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />}
+                  <span className="crm-lottery-picker__label">{pickerLabel}</span>
                   <ChevronDown size={14} aria-hidden="true" />
                 </button>
                 {isLotteryMenuOpen ? (
@@ -417,6 +437,16 @@ export function AppShell({ children }: PropsWithChildren) {
                         {item.label}
                       </button>
                     ))}
+                    <button
+                      className={clsx('crm-lottery-picker__option', isWorldCupRoute && 'is-active')}
+                      type="button"
+                      role="menuitem"
+                      title="世界杯"
+                      onClick={openWorldCupFromLotteryMenu}
+                    >
+                      <WorldCupSwitchIcon />
+                      世界杯
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -500,13 +530,13 @@ export function AppShell({ children }: PropsWithChildren) {
                     className="crm-lottery-picker__trigger"
                     type="button"
                     aria-label="彩种切换"
-                    title={`彩种切换：${selectedLotteryLabel}`}
+                    title={`彩种切换：${pickerLabel}`}
                     aria-expanded={isLotteryMenuOpen}
                     aria-haspopup="menu"
                     onClick={() => setIsLotteryMenuOpen((current) => !current)}
                   >
-                    <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />
-                    <span className="crm-lottery-picker__label">{selectedLotteryLabel}</span>
+                    {isWorldCupRoute ? <WorldCupSwitchIcon /> : <LotterySwitchIcon code={selectedLottery} label={selectedLotteryLabel} />}
+                    <span className="crm-lottery-picker__label">{pickerLabel}</span>
                     <ChevronDown size={14} aria-hidden="true" />
                   </button>
                   {isLotteryMenuOpen ? (
@@ -525,75 +555,104 @@ export function AppShell({ children }: PropsWithChildren) {
                           {item.label}
                         </button>
                       ))}
+                      <button
+                        className={clsx('crm-lottery-picker__option', isWorldCupRoute && 'is-active')}
+                        type="button"
+                        role="menuitem"
+                        title="世界杯"
+                        onClick={openWorldCupFromLotteryMenu}
+                      >
+                        <WorldCupSwitchIcon />
+                        世界杯
+                      </button>
                     </div>
                   ) : null}
                 </div>
               ) : null}
-              {isPredictionRoute ? (
-                <div className="crm-nav-item crm-nav-item--with-toggle is-active" title="预测总览">
-                  <button className="crm-nav-item__main" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
+              {isWorldCupRoute ? (
+                <>
+                  <NavLink end className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={WORLDCUP_TAB_PATHS.overview} onClick={onWorkspaceNavigate} title="预测总览">
                     <Sparkles size={16} aria-hidden="true" />
                     <span>预测总览</span>
-                  </button>
-                  <button
-                    className={clsx('crm-nav-submenu__toggle', isPredictionSubmenuOpen && 'is-open')}
-                    type="button"
-                    aria-label={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
-                    title={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
-                    aria-controls="prediction-submenu"
-                    aria-expanded={isPredictionSubmenuOpen}
-                    onClick={() => setIsPredictionSubmenuOpen((current) => !current)}
-                  >
-                    <ChevronDown size={14} aria-hidden="true" />
-                  </button>
-                </div>
+                  </NavLink>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={WORLDCUP_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
+                    <CircleDollarSign size={16} aria-hidden="true" />
+                    <span>模拟试玩</span>
+                  </NavLink>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={WORLDCUP_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="开奖回溯">
+                    <History size={16} aria-hidden="true" />
+                    <span>开奖回溯</span>
+                  </NavLink>
+                </>
               ) : (
-                <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate} title="预测总览">
-                  <Sparkles size={16} aria-hidden="true" />
-                  <span>预测总览</span>
-                </NavLink>
+                <>
+                  {isPredictionRoute ? (
+                    <div className="crm-nav-item crm-nav-item--with-toggle is-active" title="预测总览">
+                      <button className="crm-nav-item__main" type="button" onClick={() => navigate(HOME_TAB_PATHS.prediction)}>
+                        <Sparkles size={16} aria-hidden="true" />
+                        <span>预测总览</span>
+                      </button>
+                      <button
+                        className={clsx('crm-nav-submenu__toggle', isPredictionSubmenuOpen && 'is-open')}
+                        type="button"
+                        aria-label={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
+                        title={isPredictionSubmenuOpen ? '收起二级菜单' : '展开二级菜单'}
+                        aria-controls="prediction-submenu"
+                        aria-expanded={isPredictionSubmenuOpen}
+                        onClick={() => setIsPredictionSubmenuOpen((current) => !current)}
+                      >
+                        <ChevronDown size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ) : (
+                    <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.prediction} onClick={onWorkspaceNavigate} title="预测总览">
+                      <Sparkles size={16} aria-hidden="true" />
+                      <span>预测总览</span>
+                    </NavLink>
+                  )}
+                  {isPredictionRoute ? (
+                    <div
+                      className={clsx('crm-nav-submenu', !isPredictionSubmenuOpen && 'is-collapsed')}
+                      id="prediction-submenu"
+                      aria-label="预测总览二级菜单"
+                      aria-hidden={!isPredictionSubmenuOpen}
+                    >
+                      <NavLink
+                        className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'models' && 'is-active')}
+                        to={`${HOME_TAB_PATHS.prediction}#models`}
+                        onClick={onWorkspaceNavigate}
+                        title="模型列表"
+                      >
+                        模型列表
+                      </NavLink>
+                      <NavLink
+                        className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'weights' && 'is-active')}
+                        to={`${HOME_TAB_PATHS.prediction}#weights`}
+                        onClick={onWorkspaceNavigate}
+                        title="预测统计"
+                      >
+                        预测统计
+                      </NavLink>
+                    </div>
+                  ) : null}
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
+                    <CircleDollarSign size={16} aria-hidden="true" />
+                    <span>模拟试玩</span>
+                  </NavLink>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="开奖回溯">
+                    <History size={16} aria-hidden="true" />
+                    <span>开奖回溯</span>
+                  </NavLink>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS['my-bets']} onClick={onWorkspaceNavigate} title="我的投注">
+                    <WalletCards size={16} aria-hidden="true" />
+                    <span>我的投注</span>
+                  </NavLink>
+                  <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_RULES_PATH} onClick={onWorkspaceNavigate} title="规则说明">
+                    <BookOpen size={16} aria-hidden="true" />
+                    <span>规则说明</span>
+                  </NavLink>
+                </>
               )}
-              {isPredictionRoute ? (
-                <div
-                  className={clsx('crm-nav-submenu', !isPredictionSubmenuOpen && 'is-collapsed')}
-                  id="prediction-submenu"
-                  aria-label="预测总览二级菜单"
-                  aria-hidden={!isPredictionSubmenuOpen}
-                >
-                  <NavLink
-                    className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'models' && 'is-active')}
-                    to={`${HOME_TAB_PATHS.prediction}#models`}
-                    onClick={onWorkspaceNavigate}
-                    title="模型列表"
-                  >
-                    模型列表
-                  </NavLink>
-                  <NavLink
-                    className={clsx('crm-nav-submenu__item', activePredictionSubsection === 'weights' && 'is-active')}
-                    to={`${HOME_TAB_PATHS.prediction}#weights`}
-                    onClick={onWorkspaceNavigate}
-                    title="预测统计"
-                  >
-                    预测统计
-                  </NavLink>
-                </div>
-              ) : null}
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.simulation} onClick={onWorkspaceNavigate} title="模拟试玩">
-                <CircleDollarSign size={16} aria-hidden="true" />
-                <span>模拟试玩</span>
-              </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS.history} onClick={onWorkspaceNavigate} title="开奖回溯">
-                <History size={16} aria-hidden="true" />
-                <span>开奖回溯</span>
-              </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_TAB_PATHS['my-bets']} onClick={onWorkspaceNavigate} title="我的投注">
-                <WalletCards size={16} aria-hidden="true" />
-                <span>我的投注</span>
-              </NavLink>
-              <NavLink className={({ isActive }) => `crm-nav-item${isActive ? ' is-active' : ''}`} to={HOME_RULES_PATH} onClick={onWorkspaceNavigate} title="规则说明">
-                <BookOpen size={16} aria-hidden="true" />
-                <span>规则说明</span>
-              </NavLink>
             </>
           ) : canOpenSettings ? (
             <>

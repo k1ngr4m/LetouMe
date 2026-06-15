@@ -64,6 +64,14 @@ import type {
   SiteMessageListResponse,
   SiteMessageUnreadCountResponse,
   SuccessResponse,
+  WorldCupFavoriteResponse,
+  WorldCupHistoryResponse,
+  WorldCupMatchListResponse,
+  WorldCupRecommendationDetailResponse,
+  WorldCupRecommendationListResponse,
+  WorldCupSimulationDraftResponse,
+  WorldCupSimulationTicketCreateResponse,
+  WorldCupSimulationTicketListResponse,
   UserListResponse,
   RegisterPayload,
   LotteryCode,
@@ -486,6 +494,89 @@ export const apiClient = {
       body: JSON.stringify({ ticket_id: ticketId, lottery_code: lotteryCode }),
     })
   },
+  getWorldCupMatches(payload?: { date_start?: string; date_end?: string; team_query?: string; status_filter?: 'all' | 'scheduled' | 'live' | 'finished' }) {
+    return requestJson<WorldCupMatchListResponse>('/api/worldcup/matches/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getWorldCupRecommendations(payload?: {
+    match_id?: string
+    date_start?: string
+    date_end?: string
+    play_type_filter?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'
+    risk_level_filter?: 'all' | 'low' | 'medium' | 'high'
+  }) {
+    return requestJson<WorldCupRecommendationListResponse>('/api/worldcup/recommendations/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  getWorldCupRecommendationDetail(recommendationId: string) {
+    return requestJson<WorldCupRecommendationDetailResponse>('/api/worldcup/recommendations/detail', {
+      method: 'POST',
+      body: JSON.stringify({ recommendation_id: recommendationId }),
+    })
+  },
+  favoriteWorldCupRecommendation(recommendationId: string, favorite = true) {
+    return requestJson<WorldCupFavoriteResponse>('/api/worldcup/recommendations/favorite', {
+      method: 'POST',
+      body: JSON.stringify({ recommendation_id: recommendationId, favorite }),
+    })
+  },
+  worldCupRecommendationToSimulation(recommendationId: string) {
+    return requestJson<WorldCupSimulationDraftResponse>('/api/worldcup/recommendations/to-simulation', {
+      method: 'POST',
+      body: JSON.stringify({ recommendation_id: recommendationId }),
+    })
+  },
+  listWorldCupSimulationTickets(payload?: { status_filter?: 'all' | 'draft' | 'active' | 'settled' | 'archived' }) {
+    return requestJson<WorldCupSimulationTicketListResponse>('/api/worldcup/simulation/tickets/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  createWorldCupSimulationFromRecommendation(recommendationId: string, payload?: { multiplier?: number }) {
+    return requestJson<WorldCupSimulationTicketCreateResponse>(`/api/worldcup/recommendations/${encodeURIComponent(recommendationId)}/simulation`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  updateWorldCupSimulationTicket(ticketId: number, payload: { status?: 'draft' | 'active' | 'settled' | 'archived'; total_amount?: number; multiplier?: number; note?: string | null }) {
+    return requestJson<WorldCupSimulationTicketCreateResponse>('/api/worldcup/simulation/tickets/update', {
+      method: 'POST',
+      body: JSON.stringify({ ticket_id: ticketId, ...payload }),
+    })
+  },
+  deleteWorldCupSimulationTicket(ticketId: number) {
+    return requestJson<SuccessResponse>('/api/worldcup/simulation/tickets/delete', {
+      method: 'POST',
+      body: JSON.stringify({ ticket_id: ticketId }),
+    })
+  },
+  getWorldCupHistory(payload?: {
+    date_start?: string
+    date_end?: string
+    status_filter?: 'all' | 'finished' | 'pending'
+    play_type_filter?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'
+  }) {
+    return requestJson<WorldCupHistoryResponse>('/api/worldcup/history/list', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    })
+  },
+  fetchSettingsWorldCup() {
+    return requestJson<LotteryFetchTask>('/api/settings/worldcup/fetch', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  },
+  generateSettingsWorldCupPredictions(payload: { model_code: string; play_type?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'; overwrite?: boolean }) {
+    return requestJson<PredictionGenerationTask>('/api/settings/worldcup/predictions/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
   getSettingsModels(includeDeleted = false, lotteryCode?: LotteryCode) {
     return requestJson<SettingsModelListResponse>('/api/settings/models/list', {
       method: 'POST',
@@ -552,7 +643,7 @@ export const apiClient = {
       body: JSON.stringify({ task_id: taskId }),
     })
   },
-  listMaintenanceRunLogs(payload?: { lottery_code?: LotteryCode; limit?: number; offset?: number }) {
+  listMaintenanceRunLogs(payload?: { lottery_code?: LotteryCode | 'worldcup'; limit?: number; offset?: number }) {
     return requestJson<MaintenanceRunLogListResponse>('/api/settings/lottery/fetch/logs', {
       method: 'POST',
       body: JSON.stringify(payload || {}),

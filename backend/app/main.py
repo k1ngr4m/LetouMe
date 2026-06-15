@@ -16,6 +16,17 @@ from backend.app.services.schedule_service import schedule_service
 from backend.core.model_config import bootstrap_default_models
 
 
+def build_cors_origins(frontend_origin: str) -> list[str]:
+    configured_origins = [origin.strip().rstrip("/") for origin in frontend_origin.split(",") if origin.strip()]
+    origins = set(configured_origins)
+    for origin in configured_origins:
+        if origin == "http://localhost:5173":
+            origins.add("http://127.0.0.1:5173")
+        if origin == "http://127.0.0.1:5173":
+            origins.add("http://localhost:5173")
+    return sorted(origins)
+
+
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging(settings)
@@ -23,7 +34,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="LetouMe API")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[origin.strip() for origin in settings.frontend_origin.split(",") if origin.strip()],
+        allow_origins=build_cors_origins(settings.frontend_origin),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

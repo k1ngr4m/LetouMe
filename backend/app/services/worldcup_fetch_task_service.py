@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+from time import perf_counter
+from typing import Any
+
+from backend.app.logging_utils import get_logger
+from backend.app.repositories.maintenance_run_log_repository import MaintenanceRunLogRepository
+from backend.app.services.task_runner import BackgroundTaskRunner
+from backend.app.services.worldcup_fetch_service import WorldCupFetchService
+
+
+class WorldCupFetchTaskService:
+    def __init__(
+        self,
+        fetch_service: WorldCupFetchService | None = None,
+        maintenance_log_repository: MaintenanceRunLogRepository | None = None,
+    ) -> None:
+        self.fetch_service = fetch_service or WorldCupFetchService()
+        self.runner = BackgroundTaskRunner("services.worldcup_fetch_task")
+        self.maintenance_log_repository = maintenance_log_repository or MaintenanceRunLogRepository()
+        self.logger = get_logger("services.worldcup_fetch_task")
+
+    def create_task(self, *, trigger_type: str = "manual", schedule_task_code: str | None = None, on_update=None) -> dict[str, Any]:
+        def worker(_progress_callback):
+            started_at = perf_counter()
+            summary = self.fetch_service.fetch_and_save()
+            summary["duration_ms"] = round((perf_counter() - started_at) * 1000, 2)
+            return summary
+
+        task = self.runner.create_task(
+            initial_task={
+                "lottery_code": "worldcup",
+                "progress_summary": {
+                    "lottery_code": "worldcup",
+                    "fetched_count": 0,
+                    "saved_count": 0,
+                    "match_count": 0,
+                    "odds_count": 0,
+                    "latest_period": None,
+                    "duration_ms": 0,
+                },
+            },
+            worker=worker,
+            on_update=lambda state: self._handle_task_update(
+                state,
+                schedule_task_code=schedule_task_code,
+                trigger_type=trigger_type,
+                on_update=on_update,
+            ),
+        )
+        self.maintenance_log_repository.create_log(
+            task_id=str(task["task_id"]),
+            lottery_code="worldcup",
+            schedule_task_code=schedule_task_code,
+            trigger_type=trigger_type,
+            task_type="worldcup_fetch",
+            status=str(task["status"]),
+            created_at=task.get("created_at"),
+        )
+        return task
+
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        return self.runner.get_task(task_id)
+
+    def _handle_task_update(
+        self,
+        state: dict[str, Any],
+        *,
+        schedule_task_code: str | None,
+        trigger_type: str,
+        on_update=None,
+    ) -> None:
+        task_id = str(state.get("task_id") or "")
+        if not task_id:
+            return
+        summary = state.get("progress_summary") if isinstance(state.get("progress_summary"), dict) else {}
+        payload = {
+            "task_type": "worldcup_fetch",
+            "status": str(state.get("status") or "queued"),
+            "started_at": state.get("started_at"),
+            "finished_at": state.get("finished_at"),
+            "fetched_count": int(summary.get("fetched_count") or 0),
+            "saved_count": int(summary.get("saved_count") or 0),
+            "latest_period": summary.get("latest_period"),
+            "duration_ms": float(summary.get("duration_ms") or 0),
+            "error_message": state.get("error_message"),
+        }
+        try:
+            self.maintenance_log_repository.update_by_task_id(task_id, payload)
+        except KeyError:
+            self.maintenance_log_repository.create_log(
+                task_id=task_id,
+                lottery_code="worldcup",
+                schedule_task_code=schedule_task_code,
+                trigger_type=trigger_type,
+                task_type="worldcup_fetch",
+                status=payload["status"],
+                created_at=state.get("created_at"),
+            )
+            self.maintenance_log_repository.update_by_task_id(task_id, payload)
+        except Exception:
+            self.logger.exception("Persist worldcup maintenance run log failed", extra={"context": {"task_id": task_id}})
+        if on_update:
+            on_update(dict(state))
+
+
+worldcup_fetch_task_service = WorldCupFetchTaskService()

@@ -447,3 +447,49 @@ def _ensure_compat_columns(cursor: MySQLCursorAdapter | SQLiteCursorAdapter, db_
             cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE '{column_name}'")
             if cursor.fetchone() is None:
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {integer_type} NOT NULL DEFAULT 0")
+
+    text_type = "TEXT"
+    json_type = "JSON" if db_driver == "mysql" else "TEXT"
+    double_type = "DOUBLE" if db_driver == "mysql" else "REAL"
+    datetime_type = "DATETIME" if db_driver == "mysql" else "TEXT"
+    worldcup_match_columns = {
+        "sporttery_match_id": "VARCHAR(64)" if db_driver == "mysql" else text_type,
+        "match_num": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "match_num_str": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "match_num_date": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "tax_date_no": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "league_name": "VARCHAR(128)" if db_driver == "mysql" else text_type,
+        "business_date": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "sell_status": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "remark": text_type,
+        "data_sources_json": json_type,
+        "source_updated_at": datetime_type,
+    }
+    _ensure_table_columns(cursor, "worldcup_match", worldcup_match_columns)
+    worldcup_recommendation_columns = {
+        "odds_value": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "implied_probability": double_type,
+        "input_summary_json": json_type,
+        "ai_payload_json": json_type,
+        "model_code": "VARCHAR(128)" if db_driver == "mysql" else text_type,
+        "model_name": "VARCHAR(255)" if db_driver == "mysql" else text_type,
+    }
+    _ensure_table_columns(cursor, "worldcup_recommendation", worldcup_recommendation_columns)
+    worldcup_simulation_ticket_columns = {
+        "multiplier": integer_type,
+        "note": text_type,
+        "source_recommendation_id": "VARCHAR(64)" if db_driver == "mysql" else text_type,
+    }
+    _ensure_table_columns(cursor, "worldcup_simulation_ticket", worldcup_simulation_ticket_columns)
+    worldcup_simulation_item_columns = {
+        "odds_snapshot_json": json_type,
+        "confidence_level": "VARCHAR(16)" if db_driver == "mysql" else text_type,
+    }
+    _ensure_table_columns(cursor, "worldcup_simulation_ticket_item", worldcup_simulation_item_columns)
+
+
+def _ensure_table_columns(cursor: MySQLCursorAdapter | SQLiteCursorAdapter, table_name: str, columns: dict[str, str]) -> None:
+    for column_name, column_type in columns.items():
+        cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE '{column_name}'")
+        if cursor.fetchone() is None:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type} NULL")

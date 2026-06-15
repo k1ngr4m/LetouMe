@@ -213,6 +213,131 @@ SCHEMA_STATEMENTS = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS worldcup_match (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        match_id VARCHAR(64) NOT NULL UNIQUE,
+        sporttery_match_id VARCHAR(64) NULL,
+        match_num VARCHAR(32) NULL,
+        match_num_str VARCHAR(32) NULL,
+        match_num_date VARCHAR(32) NULL,
+        tax_date_no VARCHAR(32) NULL,
+        home_team VARCHAR(128) NOT NULL,
+        away_team VARCHAR(128) NOT NULL,
+        kickoff_at DATETIME NOT NULL,
+        stage VARCHAR(64) NOT NULL DEFAULT '世界杯',
+        league_name VARCHAR(128) NULL,
+        business_date VARCHAR(32) NULL,
+        sell_status VARCHAR(32) NULL,
+        match_status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
+        score VARCHAR(32) NULL,
+        remark TEXT NULL,
+        data_sources_json JSON NULL,
+        source_updated_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_worldcup_match_sporttery (sporttery_match_id),
+        INDEX idx_worldcup_match_kickoff (kickoff_at),
+        INDEX idx_worldcup_match_status_kickoff (match_status, kickoff_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_odds_snapshot (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        odds_id VARCHAR(96) NOT NULL UNIQUE,
+        match_id VARCHAR(64) NOT NULL,
+        play_type VARCHAR(32) NOT NULL,
+        odds_json JSON NOT NULL,
+        goal_line VARCHAR(32) NULL,
+        single_status VARCHAR(16) NULL,
+        sell_status VARCHAR(32) NULL,
+        source VARCHAR(64) NOT NULL DEFAULT 'sporttery',
+        source_updated_at DATETIME NULL,
+        fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_worldcup_odds_match FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE,
+        INDEX idx_worldcup_odds_match_play (match_id, play_type),
+        INDEX idx_worldcup_odds_fetched (fetched_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_recommendation (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        recommendation_id VARCHAR(64) NOT NULL UNIQUE,
+        match_id VARCHAR(64) NOT NULL,
+        play_type VARCHAR(32) NOT NULL,
+        selection VARCHAR(128) NOT NULL,
+        odds_value VARCHAR(32) NULL,
+        implied_probability DOUBLE NULL,
+        confidence_level VARCHAR(16) NOT NULL DEFAULT 'medium',
+        risk_level VARCHAR(16) NOT NULL DEFAULT 'medium',
+        budget_min INT NOT NULL DEFAULT 0,
+        budget_max INT NOT NULL DEFAULT 0,
+        reason TEXT NOT NULL,
+        input_summary_json JSON NULL,
+        ai_payload_json JSON NULL,
+        model_code VARCHAR(128) NULL,
+        model_name VARCHAR(255) NULL,
+        model_sources_json JSON NULL,
+        risk_tags_json JSON NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'published',
+        compliance_notice TEXT NOT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_worldcup_recommendation_match FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE,
+        INDEX idx_worldcup_recommendation_match (match_id),
+        INDEX idx_worldcup_recommendation_status_risk (status, risk_level, updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_favorite (
+        user_id BIGINT NOT NULL,
+        recommendation_id VARCHAR(64) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, recommendation_id),
+        CONSTRAINT fk_worldcup_favorite_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        CONSTRAINT fk_worldcup_favorite_recommendation FOREIGN KEY (recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE CASCADE,
+        INDEX idx_worldcup_favorite_user_created (user_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_simulation_ticket (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'draft',
+        total_amount INT NOT NULL DEFAULT 0,
+        multiplier INT NOT NULL DEFAULT 1,
+        note TEXT NULL,
+        source_recommendation_id VARCHAR(64) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_worldcup_simulation_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+        CONSTRAINT fk_worldcup_simulation_recommendation FOREIGN KEY (source_recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE SET NULL,
+        INDEX idx_worldcup_simulation_user_updated (user_id, updated_at),
+        INDEX idx_worldcup_simulation_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_simulation_ticket_item (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        ticket_id BIGINT NOT NULL,
+        match_id VARCHAR(64) NOT NULL,
+        recommendation_id VARCHAR(64) NULL,
+        play_type VARCHAR(32) NOT NULL,
+        selection VARCHAR(128) NOT NULL,
+        odds_value VARCHAR(32) NULL,
+        odds_snapshot_json JSON NULL,
+        confidence_level VARCHAR(16) NULL,
+        amount INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_worldcup_simulation_item_ticket FOREIGN KEY (ticket_id) REFERENCES worldcup_simulation_ticket(id) ON DELETE CASCADE,
+        CONSTRAINT fk_worldcup_simulation_item_match FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE,
+        CONSTRAINT fk_worldcup_simulation_item_recommendation FOREIGN KEY (recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE SET NULL,
+        INDEX idx_worldcup_simulation_item_ticket (ticket_id),
+        INDEX idx_worldcup_simulation_item_match (match_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS assistant_conversation (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         conversation_id VARCHAR(64) NOT NULL UNIQUE,

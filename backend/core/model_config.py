@@ -81,7 +81,8 @@ class ModelDefinition:
         return all(t.lower() in tags for t in include_tags)
 
     def supports_lottery(self, lottery_code: str) -> bool:
-        code = normalize_lottery_code(lottery_code)
+        raw_code = str(lottery_code or "").strip().lower()
+        code = "worldcup" if raw_code == "worldcup" else normalize_lottery_code(raw_code)
         return code in (self.lottery_codes or ["dlt"])
 
 

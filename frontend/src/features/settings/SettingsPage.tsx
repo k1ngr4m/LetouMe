@@ -37,6 +37,7 @@ import type {
   SettingsProvider,
   SettingsProviderPayload,
   LotteryCode,
+  ModelLotteryCode,
 } from '../../shared/types/api'
 import {
   buildMonthLabel,
@@ -48,6 +49,8 @@ import {
 type SettingsTab = 'profile' | 'account' | 'models' | 'maintenance' | 'schedules' | 'users' | 'roles'
 type ModelPredictionMode = 'current' | 'history'
 type ModelPredictionPlayMode = 'direct' | 'direct_sum' | 'compound' | 'dantuo'
+type WorldCupPredictionPlayMode = 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'
+type GenerationLotteryCode = ModelLotteryCode
 type GenerationHistoryRangeMode = 'custom' | 'recent'
 type GenerationRecentPeriodCount = '1' | '5' | '10' | '20'
 type GenerationPromptHistoryPeriodCount = '30' | '50' | '100'
@@ -85,7 +88,7 @@ type KeyValueEditorModalProps = {
 }
 type ScheduleTaskFilter = 'all' | 'lottery_fetch' | 'prediction_generate'
 type ScheduleListView = 'list' | 'calendar'
-type MaintenanceLogFilter = 'all' | LotteryCode
+type MaintenanceLogFilter = 'all' | ModelLotteryCode
 type BulkEditForm = {
   providerEnabled: boolean
   provider: string
@@ -329,11 +332,12 @@ const EMPTY_ROLE_FORM: RolePayload = {
 }
 
 const EMPTY_GENERATION_FORM = {
-  lotteryCode: 'dlt' as LotteryCode,
+  lotteryCode: 'dlt' as GenerationLotteryCode,
   modelCodes: [] as string[],
   displayName: '',
   mode: 'current' as ModelPredictionMode,
   predictionPlayMode: 'direct' as ModelPredictionPlayMode,
+  worldCupPlayMode: 'all' as WorldCupPredictionPlayMode,
   historyRangeMode: 'custom' as GenerationHistoryRangeMode,
   recentPeriodCount: '5' as GenerationRecentPeriodCount,
   promptHistoryPeriodCount: '50' as GenerationPromptHistoryPeriodCount,
@@ -385,6 +389,8 @@ const EMPTY_SCHEDULE_FORM: ScheduleForm = {
   is_active: true,
 }
 const DEFAULT_SETTINGS_LOTTERY: LotteryCode = 'dlt'
+const MODEL_LOTTERY_OPTIONS: GenerationLotteryCode[] = ['dlt', 'pl3', 'pl5', 'qxc', 'worldcup']
+const MAINTENANCE_LOTTERY_OPTIONS: GenerationLotteryCode[] = ['dlt', 'pl3', 'pl5', 'qxc', 'worldcup']
 
 const EMPTY_MODELS: SettingsModel[] = []
 const EMPTY_PROVIDERS: SettingsProvider[] = []
@@ -664,8 +670,9 @@ const MAINTENANCE_COLUMN_MIN_WIDTHS: Record<MaintenanceColumnKey, number> = {
   actions: 118,
 }
 
-function getLotteryLabel(lotteryCode: LotteryCode | 'all') {
+function getLotteryLabel(lotteryCode: ModelLotteryCode | 'all') {
   if (lotteryCode === 'all') return '全部彩种'
+  if (lotteryCode === 'worldcup') return '世界杯'
   return lotteryCode === 'dlt' ? '大乐透' : lotteryCode === 'pl3' ? '排列3' : lotteryCode === 'pl5' ? '排列5' : '七星彩'
 }
 
@@ -993,7 +1000,8 @@ function getScheduleModeLabel(scheduleMode: ScheduleMode, presetType?: ScheduleP
   return presetType === 'weekly' ? '每周' : '每日'
 }
 
-function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predictionPlayMode: ModelPredictionPlayMode): ModelPredictionPlayMode {
+function normalizePredictionPlayModeForLottery(lotteryCode: GenerationLotteryCode, predictionPlayMode: ModelPredictionPlayMode): ModelPredictionPlayMode {
+  if (lotteryCode === 'worldcup') return 'direct'
   if (lotteryCode === 'pl3') {
     if (predictionPlayMode === 'direct_sum') return 'direct_sum'
     if (predictionPlayMode === 'dantuo') return 'dantuo'
@@ -1010,7 +1018,8 @@ function normalizePredictionPlayModeForLottery(lotteryCode: LotteryCode, predict
   return 'direct'
 }
 
-function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode, lotteryCode: LotteryCode) {
+function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode, lotteryCode: GenerationLotteryCode) {
+  if (lotteryCode === 'worldcup') return '竞彩'
   const normalizedMode = normalizePredictionPlayModeForLottery(lotteryCode, predictionPlayMode)
   if (lotteryCode === 'pl3') {
     if (normalizedMode === 'direct_sum') return '和值'
@@ -1026,6 +1035,15 @@ function getPredictionPlayModeLabel(predictionPlayMode: ModelPredictionPlayMode,
     return normalizedMode === 'compound' ? '复式' : '直选'
   }
   return '直选'
+}
+
+function getWorldCupPlayModeLabel(playMode: WorldCupPredictionPlayMode) {
+  if (playMode === 'win_draw_win') return '胜平负'
+  if (playMode === 'handicap_win_draw_win') return '让球胜平负'
+  if (playMode === 'total_goals') return '总进球数'
+  if (playMode === 'correct_score') return '比分'
+  if (playMode === 'half_full_time') return '半全场'
+  return '全部玩法'
 }
 
 function getSchedulePredictionPlayModeLabel(task: Pick<ScheduleTask, 'task_type' | 'lottery_code' | 'prediction_play_mode'>) {
@@ -1112,7 +1130,7 @@ export function SettingsPage() {
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
-  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<LotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null, qxc: null })
+  const [lotteryFetchTasks, setLotteryFetchTasks] = useState<Record<ModelLotteryCode, LotteryFetchTask | null>>({ dlt: null, pl3: null, pl5: null, qxc: null, worldcup: null })
   const [lotteryBootstrapTask, setLotteryBootstrapTask] = useState<LotteryFetchTask | null>(null)
   const [lotteryFetchLimitInputs, setLotteryFetchLimitInputs] = useState<Record<LotteryCode, string>>(() => {
     const persisted = loadSettingsLotteryFetchLimits()
@@ -1454,6 +1472,32 @@ export function SettingsPage() {
     }, 1200)
     return () => window.clearTimeout(timer)
   }, [lotteryFetchTasks.qxc, queryClient])
+
+  useEffect(() => {
+    const task = lotteryFetchTasks.worldcup
+    if (!task || !['queued', 'running'].includes(task.status)) return undefined
+    const timer = window.setTimeout(async () => {
+      try {
+        const nextTask = await apiClient.getLotteryFetchTaskDetail(task.task_id)
+        setLotteryFetchTasks((previous) => ({ ...previous, worldcup: nextTask }))
+        if (nextTask.status === 'succeeded') {
+          const summary = nextTask.progress_summary
+          setMessage(`世界杯数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
+          setMessageType('success')
+          void queryClient.invalidateQueries({ queryKey: ['worldcup'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        } else if (nextTask.status === 'failed') {
+          setMessage(nextTask.error_message || '世界杯数据更新失败')
+          setMessageType('error')
+          void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '读取世界杯抓取任务状态失败')
+        setMessageType('error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [lotteryFetchTasks.worldcup, queryClient])
 
   useEffect(() => {
     const task = lotteryBootstrapTask
@@ -1867,6 +1911,13 @@ export function SettingsPage() {
 
   const generatePredictionMutation = useMutation({
     mutationFn: () => {
+      if (generationForm.lotteryCode === 'worldcup') {
+        return apiClient.generateSettingsWorldCupPredictions({
+          model_code: generationForm.modelCodes[0] || '',
+          play_type: generationForm.worldCupPlayMode,
+          overwrite: generationForm.overwrite,
+        })
+      }
       const parallelism = Number(generationForm.parallelism.trim())
       const historyRangePayload =
         generationForm.mode === 'history'
@@ -1987,6 +2038,20 @@ export function SettingsPage() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : '创建七星彩数据更新任务失败')
+      setMessageType('error')
+    },
+  })
+
+  const fetchWorldCupMutation = useMutation({
+    mutationFn: () => apiClient.fetchSettingsWorldCup(),
+    onSuccess: (task) => {
+      setLotteryFetchTasks((previous) => ({ ...previous, worldcup: task }))
+      setMessage('世界杯赛程与中国竞彩网赔率抓取任务已创建，正在后台执行。')
+      setMessageType('success')
+      void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : '创建世界杯数据更新任务失败')
       setMessageType('error')
     },
   })
@@ -2448,6 +2513,7 @@ export function SettingsPage() {
       displayName,
       mode: 'current',
       predictionPlayMode: 'direct',
+      worldCupPlayMode: 'all',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2482,6 +2548,7 @@ export function SettingsPage() {
       displayName: `已选 ${sourceModelCodes.length} 个模型`,
       mode: 'current',
       predictionPlayMode: 'direct',
+      worldCupPlayMode: 'all',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2702,6 +2769,16 @@ export function SettingsPage() {
       setMessageType('error')
       return
     }
+    if (generationForm.lotteryCode === 'worldcup' && generationForm.modelCodes.length > 1) {
+      setMessage('世界杯预测当前请单模型生成')
+      setMessageType('error')
+      return
+    }
+    if (generationForm.lotteryCode === 'worldcup' && generationForm.mode !== 'current') {
+      setMessage('世界杯预测暂不支持历史重算')
+      setMessageType('error')
+      return
+    }
     const parsedParallelism = Number(generationForm.parallelism.trim())
     if (!Number.isInteger(parsedParallelism) || parsedParallelism < 1 || parsedParallelism > 8) {
       setMessage('并发线程数必须为 1 到 8 的整数')
@@ -2725,7 +2802,7 @@ export function SettingsPage() {
     generatePredictionMutation.mutate()
   }
 
-  function handleGenerationLotteryChange(nextLottery: LotteryCode) {
+  function handleGenerationLotteryChange(nextLottery: GenerationLotteryCode) {
     const nextModelCodes = generationSourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationFilterNotice(
       generationSourceModelCodes.length > nextModelCodes.length ? `已移除 ${generationSourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null,
@@ -2735,6 +2812,7 @@ export function SettingsPage() {
       lotteryCode: nextLottery,
       modelCodes: nextModelCodes,
       predictionPlayMode: normalizePredictionPlayModeForLottery(nextLottery, previous.predictionPlayMode),
+      mode: nextLottery === 'worldcup' ? 'current' : previous.mode,
     }))
   }
 
@@ -3587,13 +3665,21 @@ export function SettingsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((lotteryCode) => {
+                          {MAINTENANCE_LOTTERY_OPTIONS.map((lotteryCode) => {
                             const task = lotteryFetchTasks[lotteryCode]
-                            const mutation = lotteryCode === 'pl3' ? fetchPl3LotteryMutation : lotteryCode === 'pl5' ? fetchPl5LotteryMutation : lotteryCode === 'qxc' ? fetchQxcLotteryMutation : fetchDltLotteryMutation
-                            const limitInput = lotteryFetchLimitInputs[lotteryCode] || String(LOTTERY_FETCH_LIMIT_DEFAULT)
+                            const mutationPending = lotteryCode === 'worldcup'
+                              ? fetchWorldCupMutation.isPending
+                              : lotteryCode === 'pl3'
+                                ? fetchPl3LotteryMutation.isPending
+                                : lotteryCode === 'pl5'
+                                  ? fetchPl5LotteryMutation.isPending
+                                  : lotteryCode === 'qxc'
+                                    ? fetchQxcLotteryMutation.isPending
+                                    : fetchDltLotteryMutation.isPending
+                            const limitInput = lotteryCode === 'worldcup' ? '' : lotteryFetchLimitInputs[lotteryCode] || String(LOTTERY_FETCH_LIMIT_DEFAULT)
                             const parsedLimit = parseFetchLimitInput(limitInput)
-                            const hasInvalidLimit = parsedLimit === null
-                            const running = mutation.isPending || Boolean(task && ['queued', 'running'].includes(task.status))
+                            const hasInvalidLimit = lotteryCode !== 'worldcup' && parsedLimit === null
+                            const running = mutationPending || Boolean(task && ['queued', 'running'].includes(task.status))
                             return (
                               <tr key={lotteryCode}>
                                 <td className="settings-maintenance-table__col-lottery" style={{ width: maintenanceColumnWidths.lottery, minWidth: maintenanceColumnWidths.lottery }}>{getLotteryLabel(lotteryCode)}</td>
@@ -3608,34 +3694,47 @@ export function SettingsPage() {
                                 <td className="settings-maintenance-table__col-time" style={{ width: maintenanceColumnWidths.created, minWidth: maintenanceColumnWidths.created }}>{task ? formatDateTimeLocal(task.created_at) : '-'}</td>
                                 <td className="settings-maintenance-table__col-actions" style={{ width: maintenanceColumnWidths.actions, minWidth: maintenanceColumnWidths.actions }}>
                                   <div className="settings-maintenance-action-controls">
-                                    <input
-                                      className="settings-maintenance-action-controls__input"
-                                      type="number"
-                                      min={1}
-                                      max={500}
-                                      step={1}
-                                      list="lottery-fetch-limit-presets"
-                                      aria-label={`${getLotteryLabel(lotteryCode)}抓取期数`}
-                                      title="抓取期数（1-500）"
-                                      value={limitInput}
-                                      onChange={(event) =>
-                                        setLotteryFetchLimitInputs((previous) => ({
-                                          ...previous,
-                                          [lotteryCode]: event.target.value,
-                                        }))
-                                      }
-                                    />
-                                    <span className="settings-maintenance-action-controls__unit">期</span>
+                                    {lotteryCode === 'worldcup' ? (
+                                      <span className="settings-maintenance-action-controls__unit">赛程/赔率</span>
+                                    ) : (
+                                      <>
+                                        <input
+                                          className="settings-maintenance-action-controls__input"
+                                          type="number"
+                                          min={1}
+                                          max={500}
+                                          step={1}
+                                          list="lottery-fetch-limit-presets"
+                                          aria-label={`${getLotteryLabel(lotteryCode)}抓取期数`}
+                                          title="抓取期数（1-500）"
+                                          value={limitInput}
+                                          onChange={(event) =>
+                                            setLotteryFetchLimitInputs((previous) => ({
+                                              ...previous,
+                                              [lotteryCode]: event.target.value,
+                                            }))
+                                          }
+                                        />
+                                        <span className="settings-maintenance-action-controls__unit">期</span>
+                                      </>
+                                    )}
                                     <button
                                       className="secondary-button"
                                       type="button"
                                       onClick={() => {
+                                        if (lotteryCode === 'worldcup') {
+                                          fetchWorldCupMutation.mutate()
+                                          return
+                                        }
                                         if (parsedLimit === null) {
                                           setMessage('抓取期数需为 1-500 的整数')
                                           setMessageType('error')
                                           return
                                         }
-                                        mutation.mutate(parsedLimit)
+                                        if (lotteryCode === 'pl3') fetchPl3LotteryMutation.mutate(parsedLimit)
+                                        else if (lotteryCode === 'pl5') fetchPl5LotteryMutation.mutate(parsedLimit)
+                                        else if (lotteryCode === 'qxc') fetchQxcLotteryMutation.mutate(parsedLimit)
+                                        else fetchDltLotteryMutation.mutate(parsedLimit)
                                       }}
                                       disabled={running || hasInvalidLimit}
                                     >
@@ -4559,7 +4658,7 @@ export function SettingsPage() {
                   <div className="field model-config-modal__lottery-field">
                     <span>适用彩种</span>
                     <div className="filter-chip-group">
-                      {(['dlt', 'pl3', 'pl5', 'qxc'] as LotteryCode[]).map((code) => {
+                      {MODEL_LOTTERY_OPTIONS.map((code) => {
                         const active = modelForm.lottery_codes.includes(code)
                         return (
                           <button
@@ -5127,6 +5226,7 @@ export function SettingsPage() {
                   <h3>{generationDisplayName}</h3>
                   <p className="generation-modal__lottery">
                     当前生成彩种：{getLotteryLabel(generationForm.lotteryCode)}
+                    {generationForm.lotteryCode === 'worldcup' ? ` · ${getWorldCupPlayModeLabel(generationForm.worldCupPlayMode)}` : ''}
                   </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
@@ -5139,11 +5239,12 @@ export function SettingsPage() {
                 <div className="generation-modal__grid">
                   <label className="field">
                     <span>彩种</span>
-                    <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as LotteryCode)}>
+                    <select value={generationForm.lotteryCode} aria-label="生成彩种" onChange={(event) => handleGenerationLotteryChange(event.target.value as GenerationLotteryCode)}>
                       <option value="dlt">大乐透</option>
                       <option value="pl3">排列3</option>
                       <option value="pl5">排列5</option>
                       <option value="qxc">七星彩</option>
+                      <option value="worldcup">世界杯</option>
                     </select>
                   </label>
                   <label className="field">
@@ -5151,11 +5252,28 @@ export function SettingsPage() {
                     <select
                       value={generationForm.mode}
                       onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
+                      disabled={generationForm.lotteryCode === 'worldcup'}
                     >
                       <option value="current">当前期生成</option>
                       <option value="history">历史重算</option>
                     </select>
                   </label>
+                  {generationForm.lotteryCode === 'worldcup' ? (
+                    <label className="field">
+                      <span>世界杯预测玩法</span>
+                      <select
+                        value={generationForm.worldCupPlayMode}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, worldCupPlayMode: event.target.value as WorldCupPredictionPlayMode }))}
+                      >
+                        <option value="all">全部玩法</option>
+                        <option value="win_draw_win">胜平负</option>
+                        <option value="handicap_win_draw_win">让球胜平负</option>
+                        <option value="total_goals">总进球数</option>
+                        <option value="correct_score">比分</option>
+                        <option value="half_full_time">半全场</option>
+                      </select>
+                    </label>
+                  ) : null}
                   {generationForm.lotteryCode === 'pl3' || generationForm.lotteryCode === 'dlt' || generationForm.lotteryCode === 'qxc' ? (
                     <label className="field">
                       <span>{generationForm.lotteryCode === 'pl3' ? '排列3预测玩法' : generationForm.lotteryCode === 'qxc' ? '七星彩预测玩法' : '大乐透预测玩法'}</span>

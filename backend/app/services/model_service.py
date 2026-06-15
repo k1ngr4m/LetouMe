@@ -363,13 +363,30 @@ class ModelService:
         normalized["temperature"] = ModelService._normalize_temperature(
             normalized["extra_options"].get("custom_body_params", {}).get("temperature")
         )
-        normalized["lottery_codes"] = [
-            normalize_lottery_code(str(item))
-            for item in (payload.get("lottery_codes") or ["dlt"])
-            if str(item).strip()
-        ] or ["dlt"]
+        normalized["lottery_codes"] = ModelService._normalize_model_lottery_codes(payload.get("lottery_codes"))
         normalized["is_active"] = bool(payload.get("is_active", True))
         return normalized
+
+    @staticmethod
+    def _normalize_model_lottery_codes(value: Any) -> list[str]:
+        if value is None:
+            return ["dlt"]
+        items = value if isinstance(value, list) else [value]
+        normalized: list[str] = []
+        for item in items:
+            raw_code = str(item or "").strip().lower()
+            if not raw_code:
+                continue
+            if raw_code == "worldcup":
+                code = "worldcup"
+            else:
+                try:
+                    code = normalize_lottery_code(raw_code)
+                except ValueError as exc:
+                    raise ValueError(f"不支持的彩种: {raw_code}") from exc
+            if code not in normalized:
+                normalized.append(code)
+        return normalized or ["dlt"]
 
     @staticmethod
     def _normalize_temperature(value: Any) -> float:
@@ -441,11 +458,7 @@ class ModelService:
             if key in {"provider", "base_url", "api_key"}:
                 normalized[key] = str(value or "").strip()
             elif key == "lottery_codes":
-                normalized[key] = [
-                    normalize_lottery_code(str(item))
-                    for item in (value or [])
-                    if str(item).strip()
-                ] or ["dlt"]
+                normalized[key] = ModelService._normalize_model_lottery_codes(value)
             elif key == "is_active":
                 normalized[key] = bool(value)
         return normalized

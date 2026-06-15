@@ -167,6 +167,142 @@ class SimulationTicketQuoteResponse(BaseModel):
     amount: int = 0
 
 
+class WorldCupOddsSnapshotResponse(BaseModel):
+    play_type: str
+    play_label: str
+    odds: dict[str, str] = Field(default_factory=dict)
+    goal_line: str | None = None
+    single_status: str | None = None
+    sell_status: str | None = None
+    source: str | None = None
+    source_updated_at: int | None = None
+    fetched_at: int | None = None
+
+
+class WorldCupMatchResponse(BaseModel):
+    match_id: str
+    sporttery_match_id: str | None = None
+    match_num_str: str | None = None
+    home_team: str
+    away_team: str
+    kickoff_at: int
+    stage: str
+    status: str = "scheduled"
+    score: str | None = None
+    sell_status: str | None = None
+    latest_odds: dict[str, str] = Field(default_factory=dict)
+    odds_snapshots: list[WorldCupOddsSnapshotResponse] = Field(default_factory=list)
+    odds_fetched_at: int | None = None
+    recommendation_count: int = 0
+
+
+class WorldCupRecommendationResponse(BaseModel):
+    recommendation_id: str
+    match: WorldCupMatchResponse
+    play_type: str
+    selection: str
+    odds_value: str | None = None
+    implied_probability: float | None = None
+    confidence_level: str = "medium"
+    risk_level: str = "medium"
+    budget_min: int = 0
+    budget_max: int = 0
+    reason: str
+    latest_odds: dict[str, str] = Field(default_factory=dict)
+    odds_fetched_at: int | None = None
+    model_sources: list[str] = Field(default_factory=list)
+    risk_tags: list[str] = Field(default_factory=list)
+    is_favorite: bool = False
+    compliance_notice: str
+    updated_at: int
+    created_at: int
+
+
+class WorldCupMatchListResponse(BaseModel):
+    matches: list[WorldCupMatchResponse] = Field(default_factory=list)
+    total_count: int = 0
+
+
+class WorldCupRecommendationListResponse(BaseModel):
+    recommendations: list[WorldCupRecommendationResponse] = Field(default_factory=list)
+    total_count: int = 0
+    compliance_notice: str
+
+
+class WorldCupRecommendationDetailResponse(BaseModel):
+    recommendation: WorldCupRecommendationResponse
+
+
+class WorldCupFavoriteResponse(BaseModel):
+    recommendation_id: str
+    is_favorite: bool
+
+
+class WorldCupSimulationDraftResponse(BaseModel):
+    recommendation_id: str
+    match_id: str
+    title: str
+    checklist: str
+    amount: int
+    ticket_id: int | None = None
+    compliance_notice: str
+
+
+class WorldCupSimulationTicketItemResponse(BaseModel):
+    id: int
+    match: WorldCupMatchResponse
+    recommendation_id: str | None = None
+    play_type: str
+    selection: str
+    odds_value: str | None = None
+    odds_snapshot: dict[str, str] = Field(default_factory=dict)
+    confidence_level: str | None = None
+    amount: int = 0
+
+
+class WorldCupSimulationTicketResponse(BaseModel):
+    id: int
+    title: str
+    status: str
+    total_amount: int = 0
+    multiplier: int = 1
+    note: str | None = None
+    source_recommendation_id: str | None = None
+    items: list[WorldCupSimulationTicketItemResponse] = Field(default_factory=list)
+    created_at: int
+    updated_at: int
+    compliance_notice: str
+
+
+class WorldCupSimulationTicketListResponse(BaseModel):
+    tickets: list[WorldCupSimulationTicketResponse] = Field(default_factory=list)
+    total_count: int = 0
+    compliance_notice: str
+
+
+class WorldCupSimulationTicketCreateResponse(BaseModel):
+    ticket: WorldCupSimulationTicketResponse
+
+
+class WorldCupHistoryRecommendationResponse(BaseModel):
+    recommendation: WorldCupRecommendationResponse
+    result_status: str
+    hit: bool | None = None
+    actual_result: str | None = None
+    settlement_note: str
+
+
+class WorldCupHistoryMatchResponse(BaseModel):
+    match: WorldCupMatchResponse
+    recommendations: list[WorldCupHistoryRecommendationResponse] = Field(default_factory=list)
+
+
+class WorldCupHistoryResponse(BaseModel):
+    records: list[WorldCupHistoryMatchResponse] = Field(default_factory=list)
+    total_count: int = 0
+    compliance_notice: str
+
+
 class MyBetRecordResponse(BaseModel):
     id: int
     lottery_code: str = "dlt"

@@ -1,6 +1,7 @@
 import type { PredictionPlayMode } from '../../shared/types/api'
 
-export type HomeTab = 'prediction' | 'charts' | 'backtest' | 'history' | 'simulation' | 'my-bets'
+export type HomeTab = 'prediction' | 'worldcup' | 'charts' | 'backtest' | 'history' | 'simulation' | 'my-bets'
+export type WorldCupTab = 'overview' | 'simulation' | 'history'
 export type HomeModelView = 'card' | 'list' | 'score'
 export type ScoreViewSortKey =
   | 'overallScore'
@@ -48,6 +49,7 @@ export type HomeRulesRouteState = {
 
 export const HOME_TAB_PATHS: Record<HomeTab, string> = {
   prediction: '/dashboard/prediction',
+  worldcup: '/dashboard/worldcup',
   charts: '/dashboard/charts',
   backtest: '/dashboard/backtest',
   history: '/dashboard/history',
@@ -56,6 +58,11 @@ export const HOME_TAB_PATHS: Record<HomeTab, string> = {
 }
 export const HOME_RULES_PATH = '/dashboard/rules'
 export const MESSAGE_CENTER_PATH = '/dashboard/messages'
+export const WORLDCUP_TAB_PATHS: Record<WorldCupTab, string> = {
+  overview: '/dashboard/worldcup',
+  simulation: '/dashboard/worldcup/simulation',
+  history: '/dashboard/worldcup/history',
+}
 
 export function getDashboardPath(tab: HomeTab) {
   return HOME_TAB_PATHS[tab]
@@ -64,4 +71,10 @@ export function getDashboardPath(tab: HomeTab) {
 export function getHomeTabFromPath(pathname: string): HomeTab {
   const matchedTab = (Object.entries(HOME_TAB_PATHS) as Array<[HomeTab, string]>).find(([, path]) => path === pathname)
   return matchedTab?.[0] || 'prediction'
+}
+
+export function getWorldCupTabFromPath(pathname: string): WorldCupTab {
+  if (pathname === WORLDCUP_TAB_PATHS.simulation) return 'simulation'
+  if (pathname === WORLDCUP_TAB_PATHS.history) return 'history'
+  return 'overview'
 }

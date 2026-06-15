@@ -1008,10 +1008,14 @@ class ModelRepository:
         items = value if isinstance(value, list) else [value]
         normalized: list[str] = []
         for item in items:
-            try:
-                code = normalize_lottery_code(str(item))
-            except ValueError:
-                continue
+            raw_code = str(item or "").strip().lower()
+            if raw_code == "worldcup":
+                code = "worldcup"
+            else:
+                try:
+                    code = normalize_lottery_code(raw_code)
+                except ValueError:
+                    continue
             if code not in normalized:
                 normalized.append(code)
         return normalized or ["dlt"]
@@ -1061,7 +1065,7 @@ class ModelRepository:
             if not normalized_lottery_codes:
                 raise ValueError("至少选择一个适用彩种")
             for code in normalized_lottery_codes:
-                if code not in SUPPORTED_LOTTERY_CODES:
+                if code != "worldcup" and code not in SUPPORTED_LOTTERY_CODES:
                     raise ValueError(f"不支持的彩种: {code}")
         return
 

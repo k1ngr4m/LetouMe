@@ -7,7 +7,7 @@ import { MotionProvider } from '../shared/theme/MotionProvider'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { LotterySelectionProvider } from '../shared/lottery/LotterySelectionProvider'
 import { ToastProvider } from '../shared/feedback/ToastProvider'
-import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH } from '../features/home/navigation'
+import { HOME_RULES_PATH, HOME_TAB_PATHS, MESSAGE_CENTER_PATH, WORLDCUP_TAB_PATHS } from '../features/home/navigation'
 
 const BASIC_PROFILE_PERMISSION = 'basic_profile'
 const MODEL_MANAGEMENT_PERMISSION = 'model_management'
@@ -19,6 +19,9 @@ const LoginPage = lazy(() => import('../features/auth/LoginPage').then((module) 
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage').then((module) => ({ default: module.RegisterPage })))
 const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })))
 const HomePage = lazy(() => import('../features/home/HomePage').then((module) => ({ default: module.HomePage })))
+const WorldCupPage = lazy(() => import('../features/worldcup/WorldCupPage').then((module) => ({ default: module.WorldCupPage })))
+const WorldCupSimulationPage = lazy(() => import('../features/worldcup/WorldCupSimulationPage').then((module) => ({ default: module.WorldCupSimulationPage })))
+const WorldCupHistoryPage = lazy(() => import('../features/worldcup/WorldCupHistoryPage').then((module) => ({ default: module.WorldCupHistoryPage })))
 const HomeModelDetailPage = lazy(() =>
   import('../features/home/HomeModelDetailPage').then((module) => ({ default: module.HomeModelDetailPage })),
 )
@@ -51,6 +54,36 @@ export function App() {
                 <ProtectedRoute>
                   <AppShell>
                     <HomePage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={WORLDCUP_TAB_PATHS.overview}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <WorldCupPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={WORLDCUP_TAB_PATHS.simulation}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <WorldCupSimulationPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={WORLDCUP_TAB_PATHS.history}
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <WorldCupHistoryPage />
                   </AppShell>
                 </ProtectedRoute>
               }

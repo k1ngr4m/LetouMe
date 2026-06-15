@@ -92,6 +92,18 @@ from backend.app.schemas.requests import (
     SimulationTicketPayload,
     RoleCodePayload,
     RolePayload,
+    WorldCupFavoritePayload,
+    WorldCupHistoryPayload,
+    WorldCupMatchListPayload,
+    WorldCupPredictionGeneratePayload,
+    WorldCupRecommendationToSimulationPayload,
+    WorldCupRecommendationDetailPayload,
+    WorldCupRecommendationListPayload,
+    WorldCupSimulationTicketCreatePayload,
+    WorldCupSimulationTicketDeletePayload,
+    WorldCupSimulationTicketListPayload,
+    WorldCupSimulationTicketUpdatePayload,
+    WorldCupToSimulationPayload,
 )
 from backend.app.schemas.responses import (
     AssistantConversationDetailResponse,
@@ -117,6 +129,14 @@ from backend.app.schemas.responses import (
     SettingsPredictionRecordDetailResponse,
     SettingsPredictionRecordListResponse,
     SimulationTicketCreateResponse,
+    WorldCupFavoriteResponse,
+    WorldCupHistoryResponse,
+    WorldCupMatchListResponse,
+    WorldCupRecommendationDetailResponse,
+    WorldCupRecommendationListResponse,
+    WorldCupSimulationDraftResponse,
+    WorldCupSimulationTicketCreateResponse,
+    WorldCupSimulationTicketListResponse,
     SimulationTicketQuoteResponse,
     SimulationTicketListResponse,
     SuccessResponse,
@@ -135,6 +155,9 @@ from backend.app.services.message_service import MessageService
 from backend.app.services.my_bet_service import MyBetService
 from backend.app.services.assistant_service import assistant_service
 from backend.app.services.simulation_ticket_service import SimulationTicketService
+from backend.app.services.worldcup_service import WorldCupService
+from backend.app.services.worldcup_fetch_task_service import worldcup_fetch_task_service
+from backend.app.services.worldcup_prediction_task_service import worldcup_prediction_task_service
 
 
 router = APIRouter(prefix="/api")
@@ -143,6 +166,7 @@ prediction_service = PredictionService()
 model_service = ModelService()
 prediction_generation_service = PredictionGenerationService()
 simulation_ticket_service = SimulationTicketService()
+worldcup_service = WorldCupService()
 my_bet_service = MyBetService()
 message_service = MessageService()
 BEIJING_TZ = ZoneInfo("Asia/Shanghai")
@@ -320,6 +344,151 @@ def delete_simulation_ticket(payload: SimulationTicketDeletePayload, current_use
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="方案不存在") from exc
     return {"success": True}
+
+
+@router.post("/worldcup/matches/list", response_model=WorldCupMatchListResponse)
+def list_worldcup_matches(payload: WorldCupMatchListPayload, _: dict = Depends(require_current_user)) -> dict:
+    return worldcup_service.list_matches(payload.model_dump())
+
+
+@router.post("/worldcup/recommendations/list", response_model=WorldCupRecommendationListResponse)
+def list_worldcup_recommendations(payload: WorldCupRecommendationListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return worldcup_service.list_recommendations(int(current_user["id"]), payload.model_dump())
+
+
+@router.post("/worldcup/recommendations/detail", response_model=WorldCupRecommendationDetailResponse)
+def get_worldcup_recommendation(payload: WorldCupRecommendationDetailPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.get_recommendation(int(current_user["id"]), payload.recommendation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="推荐不存在") from exc
+
+
+@router.post("/worldcup/recommendations/favorite", response_model=WorldCupFavoriteResponse)
+def favorite_worldcup_recommendation(payload: WorldCupFavoritePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.set_favorite(int(current_user["id"]), payload.recommendation_id, payload.favorite)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="推荐不存在") from exc
+
+
+@router.post("/worldcup/recommendations/to-simulation", response_model=WorldCupSimulationDraftResponse)
+def worldcup_recommendation_to_simulation(payload: WorldCupToSimulationPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.build_simulation_draft(int(current_user["id"]), payload.recommendation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="推荐不存在") from exc
+
+
+@router.get("/worldcup/simulation/tickets", response_model=WorldCupSimulationTicketListResponse)
+def get_worldcup_simulation_tickets(status_filter: str = "all", current_user: dict = Depends(require_current_user)) -> dict:
+    return worldcup_service.list_simulation_tickets(int(current_user["id"]), {"status_filter": status_filter})
+
+
+@router.post("/worldcup/simulation/tickets/list", response_model=WorldCupSimulationTicketListResponse)
+def list_worldcup_simulation_tickets(payload: WorldCupSimulationTicketListPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return worldcup_service.list_simulation_tickets(int(current_user["id"]), payload.model_dump())
+
+
+@router.post("/worldcup/simulation/tickets", response_model=WorldCupSimulationTicketCreateResponse)
+def create_worldcup_simulation_ticket(payload: WorldCupSimulationTicketCreatePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.create_simulation_ticket(int(current_user["id"]), payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="比赛或推荐不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/worldcup/simulation/tickets/{ticket_id}", response_model=WorldCupSimulationTicketCreateResponse)
+def patch_worldcup_simulation_ticket(ticket_id: int, payload: WorldCupSimulationTicketUpdatePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.update_simulation_ticket(int(current_user["id"]), ticket_id, payload.model_dump(exclude_unset=True))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="模拟方案不存在") from exc
+
+
+@router.post("/worldcup/simulation/tickets/update", response_model=WorldCupSimulationTicketCreateResponse)
+def update_worldcup_simulation_ticket(payload: WorldCupSimulationTicketUpdatePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    if payload.ticket_id is None:
+        raise HTTPException(status_code=400, detail="ticket_id 不能为空")
+    try:
+        return worldcup_service.update_simulation_ticket(int(current_user["id"]), payload.ticket_id, payload.model_dump(exclude_unset=True))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="模拟方案不存在") from exc
+
+
+@router.delete("/worldcup/simulation/tickets/{ticket_id}", response_model=SuccessResponse)
+def delete_worldcup_simulation_ticket_rest(ticket_id: int, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        worldcup_service.delete_simulation_ticket(int(current_user["id"]), ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="模拟方案不存在") from exc
+    return {"success": True}
+
+
+@router.post("/worldcup/simulation/tickets/delete", response_model=SuccessResponse)
+def delete_worldcup_simulation_ticket(payload: WorldCupSimulationTicketDeletePayload, current_user: dict = Depends(require_current_user)) -> dict:
+    try:
+        worldcup_service.delete_simulation_ticket(int(current_user["id"]), payload.ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="模拟方案不存在") from exc
+    return {"success": True}
+
+
+@router.post("/worldcup/recommendations/{recommendation_id}/simulation", response_model=WorldCupSimulationTicketCreateResponse)
+def create_worldcup_simulation_from_recommendation(
+    recommendation_id: str,
+    payload: WorldCupRecommendationToSimulationPayload,
+    current_user: dict = Depends(require_current_user),
+) -> dict:
+    try:
+        return worldcup_service.create_simulation_from_recommendation(int(current_user["id"]), recommendation_id, payload.multiplier)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="推荐不存在") from exc
+
+
+@router.get("/worldcup/history", response_model=WorldCupHistoryResponse)
+def get_worldcup_history(
+    date_start: str | None = None,
+    date_end: str | None = None,
+    status_filter: str = "all",
+    play_type_filter: str = "all",
+    current_user: dict = Depends(require_current_user),
+) -> dict:
+    return worldcup_service.list_history(
+        int(current_user["id"]),
+        {
+            "date_start": date_start,
+            "date_end": date_end,
+            "status_filter": status_filter,
+            "play_type_filter": play_type_filter,
+        },
+    )
+
+
+@router.post("/worldcup/history/list", response_model=WorldCupHistoryResponse)
+def list_worldcup_history(payload: WorldCupHistoryPayload, current_user: dict = Depends(require_current_user)) -> dict:
+    return worldcup_service.list_history(int(current_user["id"]), payload.model_dump())
+
+
+@router.post("/settings/worldcup/fetch", response_model=LotteryFetchTaskResponse)
+def fetch_settings_worldcup(_: dict = Depends(require_super_admin)) -> dict:
+    return worldcup_fetch_task_service.create_task()
+
+
+@router.post("/settings/worldcup/predictions/generate", response_model=PredictionGenerationTaskResponse)
+def generate_settings_worldcup_predictions(payload: WorldCupPredictionGeneratePayload, _: dict = Depends(require_model_management_permission)) -> dict:
+    try:
+        return worldcup_prediction_task_service.create_task(
+            model_code=payload.model_code,
+            play_type=payload.play_type,
+            overwrite=payload.overwrite,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="模型不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/my-bets/list", response_model=MyBetRecordListResponse)
@@ -708,6 +877,10 @@ def get_settings_lottery_fetch_task(
     if not task:
         task = lottery_bootstrap_task_service.get_task(payload.task_id)
     if not task:
+        task = worldcup_fetch_task_service.get_task(payload.task_id)
+    if not task:
+        task = worldcup_prediction_task_service.get_task(payload.task_id)
+    if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task
 
@@ -717,7 +890,7 @@ def list_settings_lottery_fetch_logs(
     payload: MaintenanceRunLogListPayload,
     _: dict = Depends(require_super_admin),
 ) -> dict:
-    normalized_code = normalize_lottery_code(payload.lottery_code) if payload.lottery_code else None
+    normalized_code = "worldcup" if payload.lottery_code == "worldcup" else normalize_lottery_code(payload.lottery_code) if payload.lottery_code else None
     return lottery_fetch_task_service.list_logs(
         lottery_code=normalized_code,
         limit=payload.limit,

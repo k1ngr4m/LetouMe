@@ -193,6 +193,119 @@ SQLITE_SCHEMA_STATEMENTS = [
         )
     """,
     """
+    CREATE TABLE IF NOT EXISTS worldcup_match (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id TEXT NOT NULL UNIQUE,
+            sporttery_match_id TEXT NULL,
+            match_num TEXT NULL,
+            match_num_str TEXT NULL,
+            match_num_date TEXT NULL,
+            tax_date_no TEXT NULL,
+            home_team TEXT NOT NULL,
+            away_team TEXT NOT NULL,
+            kickoff_at TEXT NOT NULL,
+            stage TEXT NOT NULL DEFAULT '世界杯',
+            league_name TEXT NULL,
+            business_date TEXT NULL,
+            sell_status TEXT NULL,
+            match_status TEXT NOT NULL DEFAULT 'scheduled',
+            score TEXT NULL,
+            remark TEXT NULL,
+            data_sources_json TEXT NULL,
+            source_updated_at TEXT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_odds_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            odds_id TEXT NOT NULL UNIQUE,
+            match_id TEXT NOT NULL,
+            play_type TEXT NOT NULL,
+            odds_json TEXT NOT NULL,
+            goal_line TEXT NULL,
+            single_status TEXT NULL,
+            sell_status TEXT NULL,
+            source TEXT NOT NULL DEFAULT 'sporttery',
+            source_updated_at TEXT NULL,
+            fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE
+        )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_recommendation (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recommendation_id TEXT NOT NULL UNIQUE,
+            match_id TEXT NOT NULL,
+            play_type TEXT NOT NULL,
+            selection TEXT NOT NULL,
+            odds_value TEXT NULL,
+            implied_probability REAL NULL,
+            confidence_level TEXT NOT NULL DEFAULT 'medium',
+            risk_level TEXT NOT NULL DEFAULT 'medium',
+            budget_min INTEGER NOT NULL DEFAULT 0,
+            budget_max INTEGER NOT NULL DEFAULT 0,
+            reason TEXT NOT NULL,
+            input_summary_json TEXT NULL,
+            ai_payload_json TEXT NULL,
+            model_code TEXT NULL,
+            model_name TEXT NULL,
+            model_sources_json TEXT NULL,
+            risk_tags_json TEXT NULL,
+            status TEXT NOT NULL DEFAULT 'published',
+            compliance_notice TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE
+        )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_favorite (
+            user_id INTEGER NOT NULL,
+            recommendation_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, recommendation_id),
+            FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+            FOREIGN KEY (recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE CASCADE
+        )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_simulation_ticket (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft',
+            total_amount INTEGER NOT NULL DEFAULT 0,
+            multiplier INTEGER NOT NULL DEFAULT 1,
+            note TEXT NULL,
+            source_recommendation_id TEXT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE SET NULL
+        )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS worldcup_simulation_ticket_item (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            match_id TEXT NOT NULL,
+            recommendation_id TEXT NULL,
+            play_type TEXT NOT NULL,
+            selection TEXT NOT NULL,
+            odds_value TEXT NULL,
+            odds_snapshot_json TEXT NULL,
+            confidence_level TEXT NULL,
+            amount INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES worldcup_simulation_ticket(id) ON DELETE CASCADE,
+            FOREIGN KEY (match_id) REFERENCES worldcup_match(match_id) ON DELETE CASCADE,
+            FOREIGN KEY (recommendation_id) REFERENCES worldcup_recommendation(recommendation_id) ON DELETE SET NULL
+        )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS assistant_conversation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             conversation_id TEXT NOT NULL UNIQUE,

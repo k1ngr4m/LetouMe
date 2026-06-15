@@ -1,0 +1,703 @@
+.worldcup-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.worldcup-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border-1);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(160deg, rgba(20, 28, 44, 0.92), rgba(13, 18, 31, 0.94)),
+    radial-gradient(circle at top right, rgba(255, 215, 0, 0.15), transparent 35%);
+}
+
+.worldcup-hero--compact {
+  align-items: center;
+}
+
+.worldcup-hero__copy,
+.worldcup-hero__stats,
+.worldcup-column,
+.worldcup-card,
+.worldcup-gate__card,
+.worldcup-detail__card {
+  min-width: 0;
+}
+
+.worldcup-hero__title {
+  margin: 0.2rem 0 0.5rem;
+  font-size: 2rem;
+}
+
+.worldcup-hero__description,
+.worldcup-card__reason,
+.worldcup-card__notice,
+.worldcup-detail__card p {
+  color: var(--text-2);
+}
+
+.worldcup-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(100%, 24rem);
+}
+
+.worldcup-hero__stats div,
+.worldcup-match-card,
+.worldcup-card,
+.worldcup-gate__card,
+.worldcup-detail__card,
+.worldcup-empty {
+  border: 1px solid var(--border-1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.worldcup-hero__stats div {
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.worldcup-hero__stats strong {
+  font-size: 1.3rem;
+}
+
+.worldcup-toolbar,
+.worldcup-card__meta,
+.worldcup-card__actions,
+.worldcup-card__tags,
+.worldcup-match-list,
+.worldcup-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.worldcup-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.worldcup-grid {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+}
+
+.worldcup-column {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.worldcup-column--wide {
+  min-width: 0;
+}
+
+.worldcup-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.worldcup-match-card,
+.worldcup-card {
+  padding: 0.95rem;
+}
+
+.worldcup-match-card {
+  text-align: left;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.worldcup-match-card.is-active {
+  border-color: rgba(255, 208, 96, 0.5);
+}
+
+.worldcup-match-card__main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.worldcup-match-card__main > div {
+  min-width: 0;
+}
+
+.worldcup-match-card__main span {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.worldcup-card__header,
+.worldcup-card__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.worldcup-card__meta {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.worldcup-card__meta span,
+.worldcup-card__tags span,
+.worldcup-card__copy-state {
+  font-size: 0.88rem;
+  color: var(--text-2);
+}
+
+.worldcup-card__odds {
+  margin: 0.6rem 0 0;
+  color: #ffd36a;
+  font-size: 0.9rem;
+}
+
+.worldcup-card__odds-snapshot {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.7rem;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.worldcup-card__odds-snapshot {
+  margin-top: 0.7rem;
+}
+
+.worldcup-card__odds-snapshot > span {
+  color: var(--text-2);
+  font-size: 0.86rem;
+}
+
+.worldcup-odds-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.worldcup-odds-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-1);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.worldcup-match-card__odds-action {
+  display: flex;
+  align-items: center;
+  min-height: 2.55rem;
+  width: 100%;
+  padding: 0 0.7rem;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-2);
+  font-weight: 700;
+}
+
+button.worldcup-match-card__odds-action {
+  cursor: pointer;
+}
+
+.worldcup-match-card__odds-action.is-ready {
+  border-style: solid;
+  border-color: rgba(92, 188, 132, 0.34);
+  background: rgba(92, 188, 132, 0.1);
+  color: #bdf1ce;
+}
+
+.worldcup-odds-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.worldcup-odds-modal__panel {
+  width: min(94vw, 48rem);
+  max-height: min(92vh, 58rem);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 1.1rem;
+  background: #ffffff;
+  color: #252525;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.34);
+}
+
+.worldcup-odds-modal__topline {
+  padding: 0.9rem 1rem 0.7rem;
+  text-align: center;
+  color: #666;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.worldcup-odds-modal__match-hero {
+  position: relative;
+  min-height: 4.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 0.8rem 1rem;
+  overflow: hidden;
+  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(7, 43, 64, 0.9), rgba(0, 92, 85, 0.82), rgba(7, 43, 64, 0.9)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 6.2rem),
+    linear-gradient(180deg, #0b314b, #075446);
+}
+
+.worldcup-odds-modal__match-hero::before,
+.worldcup-odds-modal__match-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.worldcup-odds-modal__match-hero::before {
+  background:
+    radial-gradient(ellipse at center, transparent 0 16%, rgba(255, 255, 255, 0.16) 16.5% 17.2%, transparent 17.6%),
+    linear-gradient(90deg, transparent 49.8%, rgba(255, 255, 255, 0.15) 50%, transparent 50.2%);
+  opacity: 0.8;
+}
+
+.worldcup-odds-modal__match-hero::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 45%, rgba(0, 0, 0, 0.18));
+}
+
+.worldcup-odds-modal__match-hero span,
+.worldcup-odds-modal__match-hero strong,
+.worldcup-odds-modal__match-hero b,
+.worldcup-odds-modal__match-hero svg {
+  position: relative;
+  z-index: 1;
+}
+
+.worldcup-odds-modal__match-hero span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.96rem;
+}
+
+.worldcup-odds-modal__match-hero strong {
+  font-size: clamp(1.25rem, 4vw, 1.85rem);
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.worldcup-odds-modal__match-hero b {
+  font-size: 1.28rem;
+  text-transform: uppercase;
+}
+
+.worldcup-odds-modal__body {
+  display: grid;
+  gap: 1.1rem;
+  overflow-y: auto;
+  padding: 1.25rem 1.55rem 1rem;
+}
+
+.worldcup-odds-modal__section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.worldcup-odds-modal__section.is-priority {
+  padding: 0.75rem;
+  margin: -0.75rem;
+  border-radius: 0.8rem;
+  background: rgba(55, 142, 255, 0.08);
+}
+
+.worldcup-odds-modal__section-header,
+.worldcup-odds-modal__section-title,
+.worldcup-odds-modal__badges,
+.worldcup-odds-modal__section-body.has-goal-line {
+  display: flex;
+  align-items: center;
+}
+
+.worldcup-odds-modal__section-header {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.worldcup-odds-modal__section-title {
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.worldcup-odds-modal__section-title > span {
+  width: 0.22rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: #55b976;
+}
+
+.worldcup-odds-modal__section--handicap_win_draw_win .worldcup-odds-modal__section-title > span,
+.worldcup-odds-modal__section--win_draw_win .worldcup-odds-modal__section-title > span {
+  background: #5e9fd5;
+}
+
+.worldcup-odds-modal__section--correct_score .worldcup-odds-modal__section-title > span {
+  background: #4cbec7;
+}
+
+.worldcup-odds-modal__section--half_full_time .worldcup-odds-modal__section-title > span {
+  background: #f0a94d;
+}
+
+.worldcup-odds-modal__section-title h3 {
+  margin: 0;
+  color: #222;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.worldcup-odds-modal__section-title svg {
+  color: #b7b7b7;
+}
+
+.worldcup-odds-modal__badges {
+  gap: 0.35rem;
+}
+
+.worldcup-odds-modal__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: #b7b7b7;
+  color: #fff;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.worldcup-odds-modal__badge--single {
+  background: #ff6060;
+}
+
+.worldcup-odds-modal__section-body {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.worldcup-odds-modal__section-body.has-goal-line {
+  gap: 0.8rem;
+}
+
+.worldcup-odds-modal__goal-line {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  min-height: 3rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #e7f8ee, #d7f1e2);
+  color: #06ae75;
+  font-size: 1.35rem;
+  font-weight: 700;
+  box-shadow: 0 0.2rem 0.8rem rgba(16, 149, 92, 0.15);
+}
+
+.worldcup-odds-modal__tiles {
+  width: 100%;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.worldcup-odds-modal__tiles--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.worldcup-odds-modal__tiles--goals {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.worldcup-odds-modal__tiles--score {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.worldcup-odds-modal__tile {
+  min-width: 0;
+  min-height: 4.45rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.15rem;
+  padding: 0.55rem 0.4rem;
+  border: 1px solid #e7e7e7;
+  border-radius: 0.52rem;
+  background: linear-gradient(180deg, #fff, #f6f6f6);
+  box-shadow: inset 0 -0.2rem 0.8rem rgba(0, 0, 0, 0.025);
+}
+
+.worldcup-odds-modal__tile.is-wide {
+  grid-column: span 2;
+}
+
+.worldcup-odds-modal__tile span,
+.worldcup-odds-modal__tile strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.worldcup-odds-modal__tile span {
+  color: #444;
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
+.worldcup-odds-modal__tile strong {
+  color: #666;
+  font-size: 1.08rem;
+}
+
+.worldcup-odds-modal__footer {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #e8e8e8;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.worldcup-odds-modal__footer button {
+  width: 100%;
+  min-height: 2.8rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #222;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.worldcup-card__tags {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.worldcup-card__tags span {
+  padding: 0.36rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.worldcup-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--border-1);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.worldcup-icon-btn.is-active {
+  color: #ffcc62;
+  border-color: rgba(255, 204, 98, 0.5);
+}
+
+.worldcup-gate,
+.worldcup-detail {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.7);
+  display: grid;
+  place-items: center;
+  z-index: 120;
+}
+
+.worldcup-gate__card,
+.worldcup-detail__card {
+  width: min(92vw, 34rem);
+  padding: 1.2rem;
+}
+
+.worldcup-empty {
+  padding: 1.2rem;
+}
+
+.worldcup-ticket-list,
+.worldcup-history-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.worldcup-ticket,
+.worldcup-history-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border-1);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.worldcup-ticket__items,
+.worldcup-history-card__rows {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.worldcup-ticket__item,
+.worldcup-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border-1);
+  border-radius: 0.55rem;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.worldcup-history-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.worldcup-history-row p,
+.worldcup-ticket__item span {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.worldcup-status-pill,
+.worldcup-result-pill,
+.worldcup-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.worldcup-status-pill.is-active,
+.worldcup-result-pill.is-hit {
+  color: #92f2b3;
+  border-color: rgba(146, 242, 179, 0.45);
+  background: rgba(146, 242, 179, 0.12);
+}
+
+.worldcup-status-pill.is-settled {
+  color: #9fc3ff;
+  border-color: rgba(159, 195, 255, 0.45);
+  background: rgba(159, 195, 255, 0.12);
+}
+
+.worldcup-status-pill.is-archived,
+.worldcup-result-pill.is-miss {
+  color: #ffb2a7;
+  border-color: rgba(255, 178, 167, 0.45);
+  background: rgba(255, 178, 167, 0.1);
+}
+
+.worldcup-card--flat {
+  margin-top: 1rem;
+}
+
+@media (max-width: 980px) {
+  .worldcup-hero,
+  .worldcup-grid {
+    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+  }
+
+  .worldcup-match-card__main {
+    align-items: flex-start;
+  }
+
+  .worldcup-card__meta,
+  .worldcup-card__tags {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .worldcup-ticket__item,
+  .worldcup-history-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .worldcup-odds-modal {
+    padding: 0.55rem;
+  }
+
+  .worldcup-odds-modal__panel {
+    width: 100%;
+    max-height: 96vh;
+    border-radius: 1rem;
+  }
+
+  .worldcup-odds-modal__topline {
+    font-size: 0.95rem;
+  }
+
+  .worldcup-odds-modal__match-hero {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .worldcup-odds-modal__body {
+    padding: 1rem 0.85rem 0.85rem;
+  }
+
+  .worldcup-odds-modal__section-header {
+    align-items: flex-start;
+  }
+
+  .worldcup-odds-modal__tiles--score {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .worldcup-odds-modal__tiles--goals,
+  .worldcup-odds-modal__tiles--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .worldcup-odds-modal__section-body.has-goal-line {
+    align-items: flex-start;
+  }
+
+  .worldcup-odds-modal__tile {
+    min-height: 4.2rem;
+  }
+}

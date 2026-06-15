@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { BookOpen, ChartColumnIncreasing, CircleDollarSign, Gauge, History, Sparkles, WalletCards } from 'lucide-react'
 import { HOME_RULES_PATH, getDashboardPath } from './navigation'
 
-type DashboardActiveTab = 'prediction' | 'simulation' | 'charts' | 'backtest' | 'history' | 'my-bets' | 'rules'
+type DashboardActiveTab = 'prediction' | 'worldcup' | 'simulation' | 'charts' | 'backtest' | 'history' | 'my-bets' | 'rules'
 
 export function HomeDashboardTabStrip({
   activeTab,

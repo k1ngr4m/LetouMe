@@ -1,4 +1,5 @@
 export type LotteryCode = 'dlt' | 'pl3' | 'pl5' | 'qxc'
+export type ModelLotteryCode = LotteryCode | 'worldcup'
 
 export type MyBetTextFilterOperator = 'eq' | 'ne' | 'contains' | 'empty' | 'not_empty'
 export type MyBetEnumFilterOperator = 'eq' | 'ne' | 'empty' | 'not_empty'
@@ -377,6 +378,146 @@ export type SimulationTicketQuoteResponse = {
   amount: number
 }
 
+export type WorldCupPlayType = 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'
+export type WorldCupRiskLevel = 'low' | 'medium' | 'high'
+export type WorldCupConfidenceLevel = 'low' | 'medium' | 'high'
+
+export type WorldCupOddsSnapshot = {
+  play_type: WorldCupPlayType
+  play_label: string
+  odds: Record<string, string>
+  goal_line?: string | null
+  single_status?: string | null
+  sell_status?: string | null
+  source?: string | null
+  source_updated_at?: number | null
+  fetched_at?: number | null
+}
+
+export type WorldCupMatch = {
+  match_id: string
+  sporttery_match_id?: string | null
+  match_num_str?: string | null
+  home_team: string
+  away_team: string
+  kickoff_at: number
+  stage: string
+  status: 'scheduled' | 'live' | 'finished'
+  score?: string | null
+  sell_status?: string | null
+  latest_odds: Record<string, string>
+  odds_snapshots?: WorldCupOddsSnapshot[]
+  odds_fetched_at?: number | null
+  recommendation_count: number
+}
+
+export type WorldCupRecommendation = {
+  recommendation_id: string
+  match: WorldCupMatch
+  play_type: WorldCupPlayType
+  selection: string
+  odds_value?: string | null
+  implied_probability?: number | null
+  confidence_level: WorldCupConfidenceLevel
+  risk_level: WorldCupRiskLevel
+  budget_min: number
+  budget_max: number
+  reason: string
+  latest_odds: Record<string, string>
+  odds_fetched_at?: number | null
+  model_sources: string[]
+  risk_tags: string[]
+  is_favorite: boolean
+  compliance_notice: string
+  updated_at: number
+  created_at: number
+}
+
+export type WorldCupMatchListResponse = {
+  matches: WorldCupMatch[]
+  total_count: number
+}
+
+export type WorldCupRecommendationListResponse = {
+  recommendations: WorldCupRecommendation[]
+  total_count: number
+  compliance_notice: string
+}
+
+export type WorldCupRecommendationDetailResponse = {
+  recommendation: WorldCupRecommendation
+}
+
+export type WorldCupFavoriteResponse = {
+  recommendation_id: string
+  is_favorite: boolean
+}
+
+export type WorldCupSimulationDraftResponse = {
+  recommendation_id: string
+  match_id: string
+  title: string
+  checklist: string
+  amount: number
+  ticket_id?: number
+  compliance_notice: string
+}
+
+export type WorldCupSimulationTicketItem = {
+  id: number
+  match: WorldCupMatch
+  recommendation_id?: string | null
+  play_type: WorldCupPlayType
+  selection: string
+  odds_value?: string | null
+  odds_snapshot: Record<string, string>
+  confidence_level?: WorldCupConfidenceLevel | null
+  amount: number
+}
+
+export type WorldCupSimulationTicket = {
+  id: number
+  title: string
+  status: 'draft' | 'active' | 'settled' | 'archived'
+  total_amount: number
+  multiplier: number
+  note?: string | null
+  source_recommendation_id?: string | null
+  items: WorldCupSimulationTicketItem[]
+  created_at: number
+  updated_at: number
+  compliance_notice: string
+}
+
+export type WorldCupSimulationTicketListResponse = {
+  tickets: WorldCupSimulationTicket[]
+  total_count: number
+  compliance_notice: string
+}
+
+export type WorldCupSimulationTicketCreateResponse = {
+  ticket: WorldCupSimulationTicket
+}
+
+export type WorldCupHistoryRecommendation = {
+  recommendation: WorldCupRecommendation
+  result_status: 'pending' | 'settled' | 'unknown'
+  hit?: boolean | null
+  actual_result?: string | null
+  settlement_note: string
+}
+
+export type WorldCupHistoryRecord = {
+  match: WorldCupMatch
+  recommendations: WorldCupHistoryRecommendation[]
+}
+
+export type WorldCupHistoryResponse = {
+  records: WorldCupHistoryRecord[]
+  total_count: number
+  compliance_notice: string
+}
+
 export type MyBetRecordPayload = {
   lottery_code?: LotteryCode
   target_period: string
@@ -670,7 +811,7 @@ export type AssistantModel = {
   tags?: string[]
   is_active?: boolean
   is_deleted?: boolean
-  lottery_codes: LotteryCode[]
+  lottery_codes: ModelLotteryCode[]
 }
 
 export type AssistantMessage = {
@@ -757,7 +898,7 @@ export type SettingsModel = {
   extra_options?: Record<string, unknown>
   is_active: boolean
   is_deleted: boolean
-  lottery_codes: LotteryCode[]
+  lottery_codes: ModelLotteryCode[]
   updated_at: number
 }
 
@@ -827,7 +968,7 @@ export type SettingsModelPayload = {
   temperature?: number | null
   extra_options?: Record<string, unknown>
   is_active: boolean
-  lottery_codes: LotteryCode[]
+  lottery_codes: ModelLotteryCode[]
 }
 
 export type SettingsModelConnectivityTestPayload = {
@@ -951,15 +1092,15 @@ export type PredictionGenerationTask = {
 
 export type LotteryFetchTask = {
   task_id: string
-  lottery_code?: LotteryCode | 'all'
+  lottery_code?: ModelLotteryCode | 'all'
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   created_at: number
   started_at?: number | null
   finished_at?: number | null
   progress_summary: {
-    lottery_codes?: LotteryCode[]
+    lottery_codes?: ModelLotteryCode[]
     total_lotteries?: number
-    current_lottery?: LotteryCode | null
+    current_lottery?: ModelLotteryCode | null
     current_lottery_index?: number
     phase?: string
     detail_mode?: 'main' | 'all' | 'none' | string
@@ -984,9 +1125,9 @@ export type MaintenanceRunLog = {
   id: number
   task_id: string
   schedule_task_code?: string | null
-  lottery_code: LotteryCode | 'all'
+  lottery_code: ModelLotteryCode | 'all'
   trigger_type: 'manual' | 'schedule'
-  task_type?: 'lottery_fetch' | 'prediction_generate' | 'lottery_bootstrap'
+  task_type?: 'lottery_fetch' | 'prediction_generate' | 'lottery_bootstrap' | 'worldcup_fetch' | 'worldcup_prediction_generate'
   mode?: 'current' | 'history' | string | null
   model_code?: string | null
   status: 'queued' | 'running' | 'succeeded' | 'failed'

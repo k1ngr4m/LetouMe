@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -269,6 +270,65 @@ class ModelSettingsApiTests(unittest.TestCase):
         restore_response = self.client.post("/api/settings/models/restore", json={"model_code": "custom-model-renamed"})
         self.assertEqual(restore_response.status_code, 200)
         self.assertFalse(restore_response.json()["is_deleted"])
+
+    def test_create_model_accepts_worldcup_lottery_code(self) -> None:
+        model_code = f"worldcup-model-{uuid4().hex[:8]}"
+        response = self.client.post(
+            "/api/settings/models/create",
+            json={
+                "model_code": model_code,
+                "display_name": "WorldCup Model",
+                "provider": "openai_compatible",
+                "api_model_name": "worldcup-api-model",
+                "base_url": "https://example.test/v1",
+                "api_key": "secret-key",
+                "lottery_codes": ["worldcup"],
+                "is_active": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["lottery_codes"], ["worldcup"])
+
+    def test_update_model_accepts_worldcup_lottery_code(self) -> None:
+        model_code = f"worldcup-update-{uuid4().hex[:8]}"
+        self._ensure_test_model(model_code)
+
+        response = self.client.post(
+            "/api/settings/models/update",
+            json={
+                "original_model_code": model_code,
+                "model_code": model_code,
+                "display_name": "WorldCup Updated Model",
+                "provider": "openai_compatible",
+                "api_model_name": "worldcup-updated-api-model",
+                "base_url": "https://example.test/v1",
+                "api_key": "secret-key",
+                "lottery_codes": ["dlt", "worldcup", "worldcup"],
+                "is_active": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["lottery_codes"], ["dlt", "worldcup"])
+
+    def test_create_model_rejects_unknown_lottery_code(self) -> None:
+        response = self.client.post(
+            "/api/settings/models/create",
+            json={
+                "model_code": f"invalid-lottery-{uuid4().hex[:8]}",
+                "display_name": "Invalid Lottery Model",
+                "provider": "openai_compatible",
+                "api_model_name": "invalid-lottery-api-model",
+                "base_url": "https://example.test/v1",
+                "api_key": "secret-key",
+                "lottery_codes": ["unknown"],
+                "is_active": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("不支持的彩种", response.json()["detail"])
 
     def test_patch_status_toggles_active_flag(self) -> None:
         self._ensure_test_model("test-status-model")
