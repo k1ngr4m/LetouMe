@@ -1059,7 +1059,7 @@ export type PredictionGenerationFailureDetail = {
 
 export type PredictionGenerationTask = {
   task_id: string
-  lottery_code?: LotteryCode
+  lottery_code?: ModelLotteryCode
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   mode: 'current' | 'history'
   model_code: string
@@ -1069,6 +1069,7 @@ export type PredictionGenerationTask = {
   progress_summary: {
     mode: string
     model_code: string
+    match_date?: string | null
     target_period?: string | null
     parallelism?: number
     selected_count?: number

@@ -97,6 +97,16 @@ const recommendation: WorldCupRecommendation = {
   created_at: 1781492400,
 }
 
+const matchWithoutWinDrawWinOdds: WorldCupMatch = {
+  ...match,
+  latest_odds: {},
+  odds_snapshots: match.odds_snapshots?.map((snapshot) => (
+    snapshot.play_type === 'win_draw_win'
+      ? { ...snapshot, odds: {}, sell_status: 'Closed' }
+      : snapshot
+  )),
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -130,10 +140,16 @@ describe('WorldCupPage odds display', () => {
     renderPage()
 
     expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '赔率已同步' })).toBeInTheDocument()
+    const oddsButton = screen.getByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    expect(within(oddsButton).getAllByText('主胜').length).toBeGreaterThan(0)
+    expect(within(oddsButton).getByText('1.80')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('3.20')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('4.60')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('-2')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('全部玩法')).toBeInTheDocument()
     expect(screen.queryByText('负其它')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '赔率已同步' }))
+    await userEvent.click(oddsButton)
 
     const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
     expect(within(dialog).getByText('周一 013 世界杯 06-16 00:00')).toBeInTheDocument()
@@ -150,6 +166,30 @@ describe('WorldCupPage odds display', () => {
     expect(screen.queryByRole('dialog', { name: '世界杯赔率' })).not.toBeInTheDocument()
   })
 
+  it('shows a closed win-draw-win row when that play has no odds', async () => {
+    vi.mocked(apiClient.getWorldCupMatches).mockResolvedValueOnce({ matches: [matchWithoutWinDrawWinOdds], total_count: 1 })
+    vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
+      recommendations: [],
+      total_count: 0,
+      compliance_notice: recommendation.compliance_notice,
+    })
+    renderPage()
+
+    expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
+    const oddsButton = screen.getByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    expect(within(oddsButton).getByText('胜平负游戏未开售')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('-2')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('1.54')).toBeInTheDocument()
+    expect(within(oddsButton).queryByText('1.80')).not.toBeInTheDocument()
+
+    await userEvent.click(oddsButton)
+
+    const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
+    expect(within(dialog).queryByText('胜平负游戏未开售')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('让球胜平负')).toBeInTheDocument()
+    expect(within(dialog).getByText('主胜')).toBeInTheDocument()
+  })
+
   it('keeps match odds visible while play type filters recommendations', async () => {
     renderPage()
     expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
@@ -161,9 +201,11 @@ describe('WorldCupPage odds display', () => {
         expect.objectContaining({ play_type_filter: 'total_goals' }),
       )
     })
-    expect(screen.getByRole('button', { name: '赔率已同步' })).toBeInTheDocument()
+    const oddsButton = screen.getByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    expect(within(oddsButton).getByText('1.80')).toBeInTheDocument()
+    expect(within(oddsButton).getByText('-2')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '赔率已同步' }))
+    await userEvent.click(oddsButton)
     const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
     expect(within(dialog).getByText('胜平负')).toBeInTheDocument()
     expect(within(dialog).getByText('总进球数')).toBeInTheDocument()

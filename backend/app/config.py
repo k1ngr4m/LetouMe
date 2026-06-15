@@ -52,6 +52,10 @@ class Settings:
     smtp_from_name: str = "LetouMe"
     auth_email_code_expire_minutes: int = 10
     auth_email_code_cooldown_seconds: int = 60
+    worldcup_news_search_enabled: bool = True
+    worldcup_news_search_max_results: int = 3
+    worldcup_news_search_max_matches: int = 24
+    worldcup_news_search_timeout_seconds: int = 6
 
     @property
     def sqlite_source_path(self) -> Path:
@@ -86,6 +90,25 @@ def _normalize_db_driver(value: str | None) -> str:
     if driver not in {"sqlite", "mysql"}:
         return "sqlite"
     return driver
+
+
+def _parse_bool_env(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    text = value.strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _parse_int_env(value: str | None, default: int, *, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(str(value).strip()) if value is not None else default
+    except ValueError:
+        parsed = default
+    return max(minimum, min(maximum, parsed))
 
 
 def load_settings() -> Settings:
@@ -157,4 +180,8 @@ def load_settings() -> Settings:
         smtp_from_name=os.getenv("SMTP_FROM_NAME", "LetouMe"),
         auth_email_code_expire_minutes=int(os.getenv("AUTH_EMAIL_CODE_EXPIRE_MINUTES", "10")),
         auth_email_code_cooldown_seconds=int(os.getenv("AUTH_EMAIL_CODE_COOLDOWN_SECONDS", "60")),
+        worldcup_news_search_enabled=_parse_bool_env(os.getenv("WORLDCUP_NEWS_SEARCH_ENABLED"), True),
+        worldcup_news_search_max_results=_parse_int_env(os.getenv("WORLDCUP_NEWS_SEARCH_MAX_RESULTS"), 3, minimum=1, maximum=10),
+        worldcup_news_search_max_matches=_parse_int_env(os.getenv("WORLDCUP_NEWS_SEARCH_MAX_MATCHES"), 24, minimum=1, maximum=200),
+        worldcup_news_search_timeout_seconds=_parse_int_env(os.getenv("WORLDCUP_NEWS_SEARCH_TIMEOUT_SECONDS"), 6, minimum=1, maximum=30),
     )

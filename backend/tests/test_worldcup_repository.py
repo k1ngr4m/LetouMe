@@ -9,9 +9,11 @@ from backend.app.repositories.worldcup_repository import WorldCupRepository
 class _Cursor:
     def __init__(self) -> None:
         self.queries: list[str] = []
+        self.params: list[tuple] = []
 
     def execute(self, query: str, params=None) -> None:
         self.queries.append(query)
+        self.params.append(tuple(params or ()))
 
     def fetchall(self) -> list[dict]:
         return []
@@ -57,6 +59,16 @@ class WorldCupRepositoryTests(unittest.TestCase):
         rendered_sql = "\n".join(cursor.queries)
         self.assertNotIn("worldcup_match match", rendered_sql)
         self.assertIn("worldcup_match m", rendered_sql)
+
+    def test_recent_matches_with_odds_filters_by_kickoff_date_range(self) -> None:
+        cursor = _Cursor()
+        with patch("backend.app.repositories.worldcup_repository.get_connection", return_value=_ConnectionContext(cursor)):
+            WorldCupRepository().list_recent_matches_with_odds(limit=20, match_date="2026-06-16")
+
+        rendered_sql = "\n".join(cursor.queries)
+        self.assertIn("m.kickoff_at >= ?", rendered_sql)
+        self.assertIn("m.kickoff_at < ?", rendered_sql)
+        self.assertEqual(cursor.params[-1], ("2026-06-16 00:00:00", "2026-06-17 00:00:00", 20))
 
 
 if __name__ == "__main__":

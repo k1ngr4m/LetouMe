@@ -571,7 +571,7 @@ export const apiClient = {
       body: JSON.stringify({}),
     })
   },
-  generateSettingsWorldCupPredictions(payload: { model_code: string; play_type?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'; overwrite?: boolean }) {
+  generateSettingsWorldCupPredictions(payload: { model_code: string; play_type?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'; overwrite?: boolean; match_date?: string }) {
     return requestJson<PredictionGenerationTask>('/api/settings/worldcup/predictions/generate', {
       method: 'POST',
       body: JSON.stringify(payload),

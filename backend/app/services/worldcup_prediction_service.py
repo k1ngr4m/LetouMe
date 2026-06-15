@@ -9,6 +9,7 @@ from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.model_repository import ModelRepository
 from backend.app.repositories.worldcup_repository import WORLDCUP_COMPLIANCE_NOTICE, WorldCupRepository
+from backend.app.services.worldcup_news_search_service import WorldCupNewsSearchService
 from backend.core.model_config import load_model_registry
 from backend.core.model_factory import ModelFactory
 
@@ -22,9 +23,11 @@ class WorldCupPredictionService:
         self,
         repository: WorldCupRepository | None = None,
         model_repository: ModelRepository | None = None,
+        news_search_service: WorldCupNewsSearchService | None = None,
     ) -> None:
         self.repository = repository or WorldCupRepository()
         self.model_repository = model_repository or ModelRepository()
+        self.news_search_service = news_search_service or WorldCupNewsSearchService()
         self.logger = get_logger("services.worldcup_prediction")
 
     def generate_for_model(
@@ -33,6 +36,7 @@ class WorldCupPredictionService:
         model_code: str,
         play_type: str = "all",
         overwrite: bool = False,
+        match_date: str | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
@@ -40,12 +44,13 @@ class WorldCupPredictionService:
         model_def = load_model_registry().get(model_code)
         if not model_def.supports_lottery("worldcup"):
             raise ValueError("该模型未配置世界杯")
-        rows = self.repository.list_recent_matches_with_odds(limit=200)
+        rows = self.repository.list_recent_matches_with_odds(limit=200, match_date=match_date)
         match_context = self._build_match_context(rows, play_type=play_type)
         summary = {
             "lottery_code": "worldcup",
             "mode": "current",
             "model_code": model_code,
+            "match_date": match_date,
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
@@ -58,6 +63,7 @@ class WorldCupPredictionService:
             if progress_callback:
                 progress_callback(summary)
             return summary
+        match_context = self._enrich_match_context_with_news(match_context)
         prompt = WORLDCUP_PROMPT_PATH.read_text(encoding="utf-8").format(
             prediction_date=datetime.now().strftime("%Y-%m-%d"),
             model_name=model_def.name,
@@ -125,7 +131,7 @@ class WorldCupPredictionService:
                     "remark": row.get("remark"),
                     "official_odds_source": "中国竞彩网",
                     "team_context": {
-                        "status": "未接入第三方 API，当前仅使用赛程与官方赔率进行分析。",
+                        "status": "等待球队最新资讯搜索；官方赔率仅用于玩法校验、赔率展示和风险提示。",
                     },
                     "odds": {},
                 },
@@ -138,6 +144,18 @@ class WorldCupPredictionService:
                 "fetched_at": str(row.get("odds_fetched_at") or ""),
             }
         return list(matches.values())
+
+    def _enrich_match_context_with_news(self, match_context: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        try:
+            return self.news_search_service.enrich_matches(match_context)
+        except Exception as exc:
+            self.logger.warning(
+                "WorldCup news enrichment failed; continuing without news",
+                extra={"context": {"error": str(exc)[:240]}},
+            )
+            for match in match_context:
+                self._attach_unavailable_news(match, error=str(exc))
+            return match_context
 
     def _normalize_ai_recommendations(
         self,
@@ -162,6 +180,11 @@ class WorldCupPredictionService:
             if match_id not in context_by_match or play_type not in WORLDCUP_PLAY_TYPES or not selection:
                 continue
             odds_value = str(row.get("odds_value") or "").strip()
+            model_sources = self._normalize_string_list(row.get("model_sources"))
+            if not model_sources:
+                model_sources = ["中国竞彩网赔率", "世界杯赛程"]
+                if self._match_has_news(context_by_match[match_id]):
+                    model_sources.append("球队最新资讯")
             result.append(
                 {
                     "recommendation_id": f"wc-ai-{model_code}-{match_id}-{play_type}",
@@ -174,18 +197,45 @@ class WorldCupPredictionService:
                     "risk_level": self._normalize_level(row.get("risk_level"), default="medium"),
                     "budget_min": self._bounded_int(row.get("budget_min"), minimum=0, maximum=200, default=0),
                     "budget_max": self._bounded_int(row.get("budget_max"), minimum=0, maximum=300, default=30),
-                    "reason": str(row.get("reason") or "基于中国竞彩网官方赔率和当前可用赛程数据生成。").strip(),
+                    "reason": str(row.get("reason") or "基于当前可用赛程与球队资讯生成，赔率仅作展示参考。").strip(),
                     "input_summary": context_by_match[match_id],
                     "ai_payload": row,
                     "model_code": model_code,
                     "model_name": model_name,
-                    "model_sources": self._normalize_string_list(row.get("model_sources")) or ["中国竞彩网赔率", "世界杯赛程"],
+                    "model_sources": model_sources,
                     "risk_tags": self._normalize_string_list(row.get("risk_tags")),
                     "status": "published",
                     "compliance_notice": WORLDCUP_COMPLIANCE_NOTICE,
                 }
             )
         return result
+
+    @staticmethod
+    def _attach_unavailable_news(match: dict[str, Any], *, error: str) -> None:
+        home_team = str(match.get("home_team") or "").strip()
+        away_team = str(match.get("away_team") or "").strip()
+        query = f"{home_team} {away_team} 世界杯 阵容 伤停 最新 team news".strip()
+        team_context = match.setdefault("team_context", {})
+        if not isinstance(team_context, dict):
+            team_context = {}
+            match["team_context"] = team_context
+        team_context["status"] = "球队资讯搜索暂不可用；官方赔率仅用于玩法校验、赔率展示和风险提示。"
+        team_context["news"] = {
+            "status": "unavailable",
+            "query": query,
+            "provider": "none",
+            "fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "results": [],
+            "error": str(error)[:300],
+        }
+
+    @staticmethod
+    def _match_has_news(match: dict[str, Any]) -> bool:
+        team_context = match.get("team_context")
+        if not isinstance(team_context, dict):
+            return False
+        news = team_context.get("news")
+        return isinstance(news, dict) and str(news.get("status") or "") == "available" and bool(news.get("results"))
 
     @staticmethod
     def _decode_json_object(value: Any) -> dict[str, Any]:

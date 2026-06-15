@@ -172,6 +172,65 @@ function getOrderedOddsEntries(snapshot: WorldCupOddsSnapshot) {
   return entries
 }
 
+type MatchCardOddsRow = {
+  entries: ReturnType<typeof getOrderedOddsEntries>
+  snapshot: WorldCupOddsSnapshot
+  unavailableLabel?: string
+}
+
+function getMatchCardOddsRows(match: WorldCupMatch, activePlayType: 'all' | WorldCupPlayType): MatchCardOddsRow[] {
+  const snapshots = sortOddsSnapshots(match.odds_snapshots || [], activePlayType)
+  const snapshotsWithOdds = snapshots.filter((snapshot) => getOddsEntries(snapshot).length > 0)
+  if (snapshotsWithOdds.length === 0) {
+    return []
+  }
+
+  const snapshotByType = new Map(snapshots.map((snapshot) => [snapshot.play_type, snapshot]))
+  const winDrawWinSnapshot: WorldCupOddsSnapshot = snapshotByType.get('win_draw_win') || {
+    play_type: 'win_draw_win',
+    play_label: '胜平负',
+    odds: {},
+  }
+  const rows: MatchCardOddsRow[] = []
+  const winDrawWinEntries = getOrderedOddsEntries(winDrawWinSnapshot).slice(0, 3)
+  rows.push({
+    entries: winDrawWinEntries,
+    snapshot: winDrawWinSnapshot,
+    unavailableLabel: winDrawWinEntries.length === 0 ? '胜平负游戏未开售' : undefined,
+  })
+
+  const handicapSnapshot = snapshotByType.get('handicap_win_draw_win')
+  const handicapEntries = handicapSnapshot ? getOrderedOddsEntries(handicapSnapshot).slice(0, 3) : []
+  if (handicapSnapshot && handicapEntries.length > 0) {
+    rows.push({
+      entries: handicapEntries,
+      snapshot: handicapSnapshot,
+    })
+  }
+
+  const usedPlayTypes = new Set(rows.map((row) => row.snapshot.play_type))
+  for (const snapshot of snapshotsWithOdds) {
+    if (rows.length >= 2) break
+    if (usedPlayTypes.has(snapshot.play_type)) continue
+    rows.push({
+      entries: getOrderedOddsEntries(snapshot).slice(0, 3),
+      snapshot,
+    })
+    usedPlayTypes.add(snapshot.play_type)
+  }
+  return rows.slice(0, 2)
+}
+
+function getMatchCardGoalLine(snapshot: WorldCupOddsSnapshot) {
+  if (snapshot.play_type === 'handicap_win_draw_win' && snapshot.goal_line) {
+    return formatGoalLine(snapshot.goal_line)
+  }
+  if (snapshot.play_type === 'win_draw_win') {
+    return '-'
+  }
+  return snapshot.play_label || formatPlayType(snapshot.play_type)
+}
+
 function isTruthyStatus(value?: string | null) {
   const text = String(value || '').trim().toLowerCase()
   return ['1', 'true', 'yes', 'y', 'single', '单场', '单关'].includes(text)
@@ -219,6 +278,53 @@ function OddsPlaySection({ active, snapshot }: { active: boolean; snapshot: Worl
         </div>
       </div>
     </section>
+  )
+}
+
+function MatchCardOddsPreview({ activePlayType, match, onOpen }: {
+  activePlayType: 'all' | WorldCupPlayType
+  match: WorldCupMatch
+  onOpen: (match: WorldCupMatch) => void
+}) {
+  const rows = getMatchCardOddsRows(match, activePlayType)
+  if (rows.length === 0) {
+    return <div className="worldcup-match-card__odds-action">赔率待同步</div>
+  }
+  return (
+    <button
+      className="worldcup-match-card__odds-preview"
+      type="button"
+      onClick={() => onOpen(match)}
+      aria-label={`${match.home_team} vs ${match.away_team} 查看全部赔率`}
+    >
+      <div className="worldcup-match-card__odds-rows">
+        {rows.map(({ entries, snapshot, unavailableLabel }) => {
+          return (
+            <div
+              key={snapshot.play_type}
+              className={clsx('worldcup-match-card__odds-row', activePlayType !== 'all' && activePlayType === snapshot.play_type && 'is-priority')}
+            >
+              <span className={clsx('worldcup-match-card__goal-line', snapshot.play_type === 'win_draw_win' && 'is-neutral')}>
+                {getMatchCardGoalLine(snapshot)}
+              </span>
+              <div className="worldcup-match-card__odds-grid">
+                {unavailableLabel ? (
+                  <span className="worldcup-match-card__odds-unavailable">{unavailableLabel}</span>
+                ) : (
+                  entries.map((entry) => (
+                    <span key={entry.label} className="worldcup-match-card__odds-tile">
+                      <b>{entry.displayLabel}</b>
+                      <strong>{entry.value}</strong>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <span className="worldcup-match-card__all-odds">全部玩法</span>
+    </button>
   )
 }
 
@@ -464,13 +570,7 @@ export function WorldCupPage() {
                     <p>{match.match_num_str ? `${match.match_num_str} · ` : ''}{match.stage} · {formatDateTimeLocal(match.kickoff_at)}</p>
                   </div>
                 </button>
-                {hasAnyOdds(match) ? (
-                  <button className="worldcup-match-card__odds-action is-ready" type="button" onClick={() => openOddsModal(match)}>
-                    赔率已同步
-                  </button>
-                ) : (
-                  <div className="worldcup-match-card__odds-action">赔率待同步</div>
-                )}
+                <MatchCardOddsPreview activePlayType={playTypeFilter} match={match} onOpen={openOddsModal} />
               </article>
             ))}
           </div>

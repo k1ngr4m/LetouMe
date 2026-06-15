@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.app.schemas.model_settings import ModelSettingsPayload, ProviderSettingsPayload
 
@@ -262,6 +262,18 @@ class WorldCupPredictionGeneratePayload(BaseModel):
     model_code: str
     play_type: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
     overwrite: bool = False
+    match_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @field_validator("match_date")
+    @classmethod
+    def validate_match_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("比赛日期格式必须为 YYYY-MM-DD") from exc
+        return value
 
 
 class MyBetRecordListPayload(BaseModel):

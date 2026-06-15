@@ -338,6 +338,7 @@ const EMPTY_GENERATION_FORM = {
   mode: 'current' as ModelPredictionMode,
   predictionPlayMode: 'direct' as ModelPredictionPlayMode,
   worldCupPlayMode: 'all' as WorldCupPredictionPlayMode,
+  worldCupMatchDate: '',
   historyRangeMode: 'custom' as GenerationHistoryRangeMode,
   recentPeriodCount: '5' as GenerationRecentPeriodCount,
   promptHistoryPeriodCount: '50' as GenerationPromptHistoryPeriodCount,
@@ -1238,6 +1239,23 @@ export function SettingsPage() {
     queryFn: () => apiClient.listPermissions(),
     enabled: canManageRoles,
   })
+  const worldCupMatchesQuery = useQuery({
+    queryKey: ['settings-worldcup-matches', 'generation'],
+    queryFn: () => apiClient.getWorldCupMatches({ status_filter: 'all' }),
+    enabled: generationModalOpen && generationForm.lotteryCode === 'worldcup',
+  })
+  const worldCupDateOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const match of worldCupMatchesQuery.data?.matches ?? []) {
+      if (match.status === 'finished') continue
+      const dateKey = formatDateTimeLocal(match.kickoff_at).slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue
+      counts.set(dateKey, (counts.get(dateKey) || 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([value, count]) => ({ value, label: `${value}（${count}场）` }))
+  }, [worldCupMatchesQuery.data?.matches])
 
   const availableTabs = useMemo(() => {
     const tabs: Array<{ id: SettingsTab; label: string }> = [
@@ -1274,6 +1292,16 @@ export function SettingsPage() {
     showToast(message, messageType)
     setMessage(null)
   }, [message, messageType, showToast])
+
+  useEffect(() => {
+    if (!generationModalOpen || generationForm.lotteryCode !== 'worldcup') return
+    const isCurrentDateAvailable = worldCupDateOptions.some((option) => option.value === generationForm.worldCupMatchDate)
+    if (isCurrentDateAvailable) return
+    setGenerationForm((previous) => ({
+      ...previous,
+      worldCupMatchDate: worldCupDateOptions[0]?.value || '',
+    }))
+  }, [generationForm.lotteryCode, generationForm.worldCupMatchDate, generationModalOpen, worldCupDateOptions])
 
   useEffect(() => {
     if (!providerSourceMenuOpen) return undefined
@@ -1485,6 +1513,7 @@ export function SettingsPage() {
           setMessage(`世界杯数据更新完成：抓取 ${summary.fetched_count} 条，写入 ${summary.saved_count} 条。`)
           setMessageType('success')
           void queryClient.invalidateQueries({ queryKey: ['worldcup'] })
+          void queryClient.invalidateQueries({ queryKey: ['settings-worldcup-matches'] })
           void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (nextTask.status === 'failed') {
           setMessage(nextTask.error_message || '世界杯数据更新失败')
@@ -1916,6 +1945,7 @@ export function SettingsPage() {
           model_code: generationForm.modelCodes[0] || '',
           play_type: generationForm.worldCupPlayMode,
           overwrite: generationForm.overwrite,
+          match_date: generationForm.worldCupMatchDate,
         })
       }
       const parallelism = Number(generationForm.parallelism.trim())
@@ -2514,6 +2544,7 @@ export function SettingsPage() {
       mode: 'current',
       predictionPlayMode: 'direct',
       worldCupPlayMode: 'all',
+      worldCupMatchDate: '',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2549,6 +2580,7 @@ export function SettingsPage() {
       mode: 'current',
       predictionPlayMode: 'direct',
       worldCupPlayMode: 'all',
+      worldCupMatchDate: '',
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2779,6 +2811,11 @@ export function SettingsPage() {
       setMessageType('error')
       return
     }
+    if (generationForm.lotteryCode === 'worldcup' && !generationForm.worldCupMatchDate) {
+      setMessage('请选择世界杯比赛日期；如无可选日期，请先抓取赛程/赔率。')
+      setMessageType('error')
+      return
+    }
     const parsedParallelism = Number(generationForm.parallelism.trim())
     if (!Number.isInteger(parsedParallelism) || parsedParallelism < 1 || parsedParallelism > 8) {
       setMessage('并发线程数必须为 1 到 8 的整数')
@@ -2813,6 +2850,7 @@ export function SettingsPage() {
       modelCodes: nextModelCodes,
       predictionPlayMode: normalizePredictionPlayModeForLottery(nextLottery, previous.predictionPlayMode),
       mode: nextLottery === 'worldcup' ? 'current' : previous.mode,
+      worldCupMatchDate: nextLottery === 'worldcup' ? previous.worldCupMatchDate : '',
     }))
   }
 
@@ -5227,6 +5265,7 @@ export function SettingsPage() {
                   <p className="generation-modal__lottery">
                     当前生成彩种：{getLotteryLabel(generationForm.lotteryCode)}
                     {generationForm.lotteryCode === 'worldcup' ? ` · ${getWorldCupPlayModeLabel(generationForm.worldCupPlayMode)}` : ''}
+                    {generationForm.lotteryCode === 'worldcup' && generationForm.worldCupMatchDate ? ` · ${generationForm.worldCupMatchDate}` : ''}
                   </p>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setGenerationModalOpen(false)}>关闭</button>
@@ -5234,7 +5273,7 @@ export function SettingsPage() {
               <section className="generation-modal__section generation-modal__section--config">
                 <div className="generation-modal__section-title">
                   <strong>任务参数</strong>
-                  <span>设置彩种、模式、覆盖策略与并发线程数。</span>
+                  <span>{generationForm.lotteryCode === 'worldcup' ? '设置彩种、比赛日期、玩法与覆盖策略。' : '设置彩种、模式、覆盖策略与并发线程数。'}</span>
                 </div>
                 <div className="generation-modal__grid">
                   <label className="field">
@@ -5247,17 +5286,32 @@ export function SettingsPage() {
                       <option value="worldcup">世界杯</option>
                     </select>
                   </label>
-                  <label className="field">
-                    <span>生成模式</span>
-                    <select
-                      value={generationForm.mode}
-                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
-                      disabled={generationForm.lotteryCode === 'worldcup'}
-                    >
-                      <option value="current">当前期生成</option>
-                      <option value="history">历史重算</option>
-                    </select>
-                  </label>
+                  {generationForm.lotteryCode === 'worldcup' ? (
+                    <label className="field">
+                      <span>比赛日期</span>
+                      <select
+                        value={generationForm.worldCupMatchDate}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, worldCupMatchDate: event.target.value }))}
+                        disabled={worldCupMatchesQuery.isLoading || worldCupDateOptions.length === 0}
+                      >
+                        <option value="" disabled>{worldCupMatchesQuery.isLoading ? '加载比赛日期中' : worldCupDateOptions.length ? '请选择比赛日期' : '暂无可生成比赛日期'}</option>
+                        {worldCupDateOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="field">
+                      <span>生成模式</span>
+                      <select
+                        value={generationForm.mode}
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, mode: event.target.value as ModelPredictionMode }))}
+                      >
+                        <option value="current">当前期生成</option>
+                        <option value="history">历史重算</option>
+                      </select>
+                    </label>
+                  )}
                   {generationForm.lotteryCode === 'worldcup' ? (
                     <label className="field">
                       <span>世界杯预测玩法</span>
@@ -5324,18 +5378,20 @@ export function SettingsPage() {
                       placeholder="默认 3"
                     />
                   </label>
-                  <label className="field">
-                    <span>Prompt历史期数</span>
-                    <select
-                      value={generationForm.promptHistoryPeriodCount}
-                      aria-label="Prompt历史期数"
-                      onChange={(event) => setGenerationForm((previous) => ({ ...previous, promptHistoryPeriodCount: event.target.value as GenerationPromptHistoryPeriodCount }))}
-                    >
-                      {GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
+                  {generationForm.lotteryCode !== 'worldcup' ? (
+                    <label className="field">
+                      <span>Prompt历史期数</span>
+                      <select
+                        value={generationForm.promptHistoryPeriodCount}
+                        aria-label="Prompt历史期数"
+                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, promptHistoryPeriodCount: event.target.value as GenerationPromptHistoryPeriodCount }))}
+                      >
+                        {GENERATION_PROMPT_HISTORY_PERIOD_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
                 {generationForm.mode === 'history' ? (
                   <div className="generation-modal__history-grid">
@@ -5496,7 +5552,13 @@ export function SettingsPage() {
                 </section>
               ) : null}
               <div className="form-actions generation-modal__actions">
-                <button className="primary-button" type="submit" disabled={generatePredictionMutation.isPending || generationForm.modelCodes.length === 0}>创建任务</button>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={generatePredictionMutation.isPending || generationForm.modelCodes.length === 0 || (generationForm.lotteryCode === 'worldcup' && !generationForm.worldCupMatchDate)}
+                >
+                  创建任务
+                </button>
               </div>
             </form>
           </div>

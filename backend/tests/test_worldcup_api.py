@@ -319,6 +319,83 @@ class WorldCupApiTests(unittest.TestCase):
         }
         self.assertTrue(result_statuses.intersection({"settled", "unknown"}))
 
+    def test_worldcup_prediction_generate_accepts_match_date(self) -> None:
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
+        with patch("backend.app.api.routes.worldcup_prediction_task_service.create_task") as create_task:
+            create_task.return_value = {
+                "lottery_code": "worldcup",
+                "task_id": "worldcup-task-1",
+                "status": "queued",
+                "mode": "current",
+                "model_code": "worldcup-model",
+                "created_at": 0,
+                "started_at": None,
+                "finished_at": None,
+                "progress_summary": {
+                    "lottery_code": "worldcup",
+                    "mode": "current",
+                    "model_code": "worldcup-model",
+                    "match_date": "2026-06-16",
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                    "failed_periods": [],
+                },
+                "error_message": None,
+            }
+
+            response = self.client.post(
+                "/api/settings/worldcup/predictions/generate",
+                json={
+                    "model_code": "worldcup-model",
+                    "play_type": "all",
+                    "overwrite": False,
+                    "match_date": "2026-06-16",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["progress_summary"]["match_date"], "2026-06-16")
+        create_task.assert_called_once_with(
+            model_code="worldcup-model",
+            play_type="all",
+            overwrite=False,
+            match_date="2026-06-16",
+        )
+
+    def test_prediction_task_detail_reads_worldcup_prediction_task(self) -> None:
+        self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
+        task_payload = {
+            "lottery_code": "worldcup",
+            "task_id": "worldcup-task-1",
+            "status": "running",
+            "mode": "current",
+            "model_code": "worldcup-model",
+            "created_at": 0,
+            "started_at": 1,
+            "finished_at": None,
+            "progress_summary": {
+                "lottery_code": "worldcup",
+                "mode": "current",
+                "model_code": "worldcup-model",
+                "match_date": "2026-06-16",
+                "processed_count": 0,
+                "skipped_count": 0,
+                "failed_count": 0,
+                "failed_periods": [],
+            },
+            "error_message": None,
+        }
+        with patch("backend.app.api.routes.prediction_generation_task_service.get_task", return_value=None), patch(
+            "backend.app.api.routes.worldcup_prediction_task_service.get_task",
+            return_value=task_payload,
+        ):
+            response = self.client.post("/api/settings/models/predictions/task-detail", json={"task_id": "worldcup-task-1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["lottery_code"], "worldcup")
+        self.assertEqual(response.json()["progress_summary"]["match_date"], "2026-06-16")
+
 
 if __name__ == "__main__":
     unittest.main()

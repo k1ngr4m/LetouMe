@@ -19,16 +19,18 @@ class WorldCupPredictionTaskService:
         self.maintenance_log_repository = maintenance_log_repository or MaintenanceRunLogRepository()
         self.logger = get_logger("services.worldcup_prediction_task")
 
-    def create_task(self, *, model_code: str, play_type: str = "all", overwrite: bool = False) -> dict[str, Any]:
+    def create_task(self, *, model_code: str, play_type: str = "all", overwrite: bool = False, match_date: str | None = None) -> dict[str, Any]:
         task = self.runner.create_task(
             initial_task={
                 "lottery_code": "worldcup",
                 "mode": "current",
                 "model_code": model_code,
+                "match_date": match_date,
                 "progress_summary": {
                     "lottery_code": "worldcup",
                     "mode": "current",
                     "model_code": model_code,
+                    "match_date": match_date,
                     "processed_count": 0,
                     "skipped_count": 0,
                     "failed_count": 0,
@@ -42,6 +44,7 @@ class WorldCupPredictionTaskService:
                 model_code=model_code,
                 play_type=play_type,
                 overwrite=overwrite,
+                match_date=match_date,
                 progress_callback=progress_callback,
             ),
             on_update=self._handle_task_update,

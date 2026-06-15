@@ -26,7 +26,9 @@ const { apiClientMock } = vi.hoisted(() => ({
     bulkUpdateSettingsModels: vi.fn(),
     generateSettingsModelPredictions: vi.fn(),
     bulkGenerateSettingsModelPredictions: vi.fn(),
+    generateSettingsWorldCupPredictions: vi.fn(),
     getPredictionGenerationTaskDetail: vi.fn(),
+    getWorldCupMatches: vi.fn(),
     fetchSettingsLotteryHistory: vi.fn(),
     bootstrapSettingsLotteryHistory: vi.fn(),
     getLotteryFetchTaskDetail: vi.fn(),
@@ -963,6 +965,123 @@ describe('SettingsPage model management view switch', () => {
         start_period: '26050',
         end_period: '26052',
         prompt_history_period_count: 50,
+      }),
+    )
+  })
+
+  it('uses match date instead of generation mode for worldcup prediction tasks', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'worldcup-deepseek',
+          display_name: 'WorldCup DeepSeek',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['worldcup'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'worldcup',
+          lottery_codes: ['dlt', 'worldcup'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.getWorldCupMatches.mockResolvedValue({
+      matches: [
+        {
+          match_id: 'worldcup-match-1',
+          home_team: '西班牙',
+          away_team: '佛得角',
+          kickoff_at: Date.UTC(2026, 5, 16, 4, 0, 0) / 1000,
+          stage: '世界杯',
+          status: 'scheduled',
+          latest_odds: {},
+          recommendation_count: 0,
+        },
+        {
+          match_id: 'worldcup-match-2',
+          home_team: '葡萄牙',
+          away_team: '摩洛哥',
+          kickoff_at: Date.UTC(2026, 5, 16, 12, 0, 0) / 1000,
+          stage: '世界杯',
+          status: 'live',
+          latest_odds: {},
+          recommendation_count: 0,
+        },
+        {
+          match_id: 'worldcup-match-3',
+          home_team: '法国',
+          away_team: '日本',
+          kickoff_at: Date.UTC(2026, 5, 17, 4, 0, 0) / 1000,
+          stage: '世界杯',
+          status: 'scheduled',
+          latest_odds: {},
+          recommendation_count: 0,
+        },
+        {
+          match_id: 'worldcup-match-finished',
+          home_team: '德国',
+          away_team: '美国',
+          kickoff_at: Date.UTC(2026, 5, 18, 4, 0, 0) / 1000,
+          stage: '世界杯',
+          status: 'finished',
+          latest_odds: {},
+          recommendation_count: 0,
+        },
+      ],
+      total_count: 4,
+    })
+    apiClientMock.generateSettingsWorldCupPredictions.mockResolvedValue({
+      task_id: 'worldcup-task-1',
+      lottery_code: 'worldcup',
+      status: 'queued',
+      mode: 'current',
+      model_code: 'worldcup-deepseek',
+      created_at: Date.UTC(2026, 5, 15) / 1000,
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: 'worldcup-deepseek',
+        match_date: '2026-06-17',
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('button', { name: '生成预测数据：WorldCup DeepSeek' }))
+    await userEvent.selectOptions(screen.getByLabelText('生成彩种'), 'worldcup')
+
+    const matchDateSelect = await screen.findByLabelText('比赛日期')
+    expect(screen.queryByLabelText('生成模式')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Prompt历史期数')).not.toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: '2026-06-16（2场）' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: '2026-06-18（1场）' })).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(matchDateSelect, '2026-06-17')
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.generateSettingsWorldCupPredictions).toHaveBeenCalledWith({
+        model_code: 'worldcup-deepseek',
+        play_type: 'all',
+        overwrite: false,
+        match_date: '2026-06-17',
       }),
     )
   })

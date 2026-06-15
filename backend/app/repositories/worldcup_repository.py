@@ -401,11 +401,25 @@ class WorldCupRepository:
                 )
                 return cursor.fetchall()
 
-    def list_recent_matches_with_odds(self, *, limit: int = 12) -> list[dict[str, Any]]:
+    def list_recent_matches_with_odds(self, *, limit: int = 12, match_date: str | None = None) -> list[dict[str, Any]]:
+        conditions = ["m.match_status != 'finished'"]
+        params: list[Any] = []
+        if match_date:
+            try:
+                start_at = datetime.strptime(match_date, "%Y-%m-%d")
+            except ValueError as exc:
+                raise ValueError("比赛日期格式必须为 YYYY-MM-DD") from exc
+            end_at = start_at + timedelta(days=1)
+            conditions.extend(["m.kickoff_at >= ?", "m.kickoff_at < ?"])
+            params.extend([
+                start_at.strftime("%Y-%m-%d %H:%M:%S"),
+                end_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        params.append(max(1, int(limit)))
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT
                         m.*,
                         odds.play_type,
@@ -416,11 +430,11 @@ class WorldCupRepository:
                         odds.fetched_at AS odds_fetched_at
                     FROM worldcup_match m
                     INNER JOIN worldcup_odds_snapshot odds ON odds.match_id = m.match_id
-                    WHERE m.match_status != 'finished'
+                    WHERE {" AND ".join(conditions)}
                     ORDER BY m.kickoff_at ASC, odds.play_type ASC
                     LIMIT ?
                     """,
-                    (max(1, int(limit)),),
+                    tuple(params),
                 )
                 return cursor.fetchall()
 
