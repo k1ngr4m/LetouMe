@@ -461,6 +461,13 @@ class _FakeModelRepository:
                 "is_deleted": False,
                 "lottery_codes": ["pl3"],
             },
+            {
+                "model_code": "model-worldcup-only",
+                "display_name": "世界杯专属模型",
+                "is_active": "model-worldcup-only" in self.active_model_codes,
+                "is_deleted": False,
+                "lottery_codes": ["worldcup"],
+            },
         ]
         return [item for item in all_models if include_deleted or not item["is_deleted"]]
 
@@ -860,6 +867,19 @@ class PredictionHistoryMetricsTests(unittest.TestCase):
         self.assertEqual(model_c["periods"], 0)
         self.assertEqual(model_c["bet_count"], 0)
         self.assertEqual(model_c["prize_amount"], 0)
+
+    def test_history_payload_ignores_worldcup_only_models_for_digit_lottery(self) -> None:
+        service = PredictionService(
+            prediction_repository=_FakePredictionRepository(),
+            model_repository=_FakeModelRepository({"model-a", "model-worldcup-only"}),
+        )
+
+        payload = service.get_history_list_payload(lottery_code="dlt", include_inactive_models=False)
+
+        model_stats_ids = [item["model_id"] for item in payload["model_stats"]]
+        self.assertEqual(payload["total_count"], 1)
+        self.assertIn("model-a", model_stats_ids)
+        self.assertNotIn("model-worldcup-only", model_stats_ids)
 
     def test_history_detail_returns_none_when_only_inactive_models_remain(self) -> None:
         service = PredictionService(

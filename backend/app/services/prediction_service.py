@@ -2232,11 +2232,14 @@ class PredictionService:
                 if not bool(model.get("is_active")):
                     continue
                 model_lottery_codes = model.get("lottery_codes") or ["dlt"]
-                normalized_lotteries = {
-                    normalize_lottery_code(code)
-                    for code in model_lottery_codes
-                    if str(code or "").strip()
-                }
+                normalized_lotteries = set()
+                for code in model_lottery_codes:
+                    if not str(code or "").strip():
+                        continue
+                    try:
+                        normalized_lotteries.add(normalize_lottery_code(code))
+                    except ValueError:
+                        continue
                 if normalized_code not in normalized_lotteries:
                     continue
                 model_id = str(model.get("model_code") or "").strip()
