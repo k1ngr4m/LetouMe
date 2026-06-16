@@ -438,6 +438,22 @@ class WorldCupRepository:
                 )
                 return cursor.fetchall()
 
+    def get_match(self, match_id: str) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        m.*
+                    FROM worldcup_match m
+                    WHERE m.match_id = ?
+                    LIMIT 1
+                    """,
+                    (match_id,),
+                )
+                row = cursor.fetchone()
+                return row if isinstance(row, dict) else None
+
     def get_recommendation(self, recommendation_id: str, *, user_id: int) -> dict[str, Any] | None:
         rows = self.list_recommendations(user_id=user_id)
         return next((row for row in rows if str(row.get("recommendation_id")) == recommendation_id), None)

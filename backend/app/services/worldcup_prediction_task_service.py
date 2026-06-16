@@ -88,6 +88,25 @@ class WorldCupPredictionTaskService:
         }
         try:
             self.maintenance_log_repository.update_by_task_id(task_id, payload)
+        except KeyError:
+            try:
+                self.maintenance_log_repository.create_log(
+                    task_id=task_id,
+                    lottery_code="worldcup",
+                    schedule_task_code=None,
+                    trigger_type="manual",
+                    task_type="worldcup_prediction_generate",
+                    mode="current",
+                    model_code=payload["model_code"],
+                    status=payload["status"],
+                    created_at=state.get("created_at"),
+                )
+                self.maintenance_log_repository.update_by_task_id(task_id, payload)
+            except Exception:
+                self.logger.exception(
+                    "Persist worldcup prediction log failed after create fallback",
+                    extra={"context": {"task_id": task_id}},
+                )
         except Exception:
             self.logger.exception("Persist worldcup prediction log failed", extra={"context": {"task_id": task_id}})
 

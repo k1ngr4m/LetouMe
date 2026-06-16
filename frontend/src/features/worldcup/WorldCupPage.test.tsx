@@ -11,6 +11,7 @@ import { WorldCupPage } from './WorldCupPage'
 const { apiClientMock } = vi.hoisted(() => ({
   apiClientMock: {
     getWorldCupMatches: vi.fn(),
+    getWorldCupBaiduAnalysis: vi.fn(),
     getWorldCupRecommendations: vi.fn(),
   },
 }))
@@ -107,6 +108,24 @@ const matchWithoutWinDrawWinOdds: WorldCupMatch = {
   )),
 }
 
+const yesterdayMatch: WorldCupMatch = {
+  ...match,
+  match_id: 'worldcup-match-yesterday',
+  match_num_str: '周日012',
+  home_team: '昨天队',
+  away_team: '旧数据队',
+  kickoff_at: 1781452800,
+}
+
+const tomorrowMatch: WorldCupMatch = {
+  ...match,
+  match_id: 'worldcup-match-tomorrow',
+  match_num_str: '周二014',
+  home_team: '法国',
+  away_team: '塞内加尔',
+  kickoff_at: 1781625600,
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -129,18 +148,58 @@ describe('WorldCupPage odds display', () => {
       total_count: 1,
       compliance_notice: recommendation.compliance_notice,
     })
+    vi.mocked(apiClient.getWorldCupBaiduAnalysis).mockResolvedValue({
+      match_id: match.match_id,
+      match,
+      analysis: {
+        status: 'available',
+        provider: 'baidu_tiyu',
+        recent_records: [
+          {
+            scope: 'all',
+            team_name: '西班牙',
+            title: '西班牙近期战绩',
+            result: '5胜1平0负',
+            probability: ['胜率 83%', '赢盘率 50%', '大球率 100%'],
+            matches: [
+              {
+                date: '2026-06-09',
+                match: '国际友谊',
+                score: '西班牙 3 - 1 北爱尔兰',
+                handicap: { value: '2.0', desc: '走盘' },
+                total_goals: { value: '3.25', desc: '大球' },
+              },
+            ],
+          },
+        ],
+        pre_match_prediction: {
+          sample_count: '71955',
+          percentage: { victory: '68%', draw: '20%', lost: '12%' },
+        },
+        positive_intelligence: [
+          { team_name: '西班牙', items: ['西班牙6场比赛5胜1平，状态出色。'] },
+          { team_name: '佛得角', items: ['佛得角近10场正赛主场7胜3平0负，表现出色。'] },
+        ],
+        negative_intelligence: [],
+        squad_status: {
+          status: '阵容名单已获取，首发待确认',
+          court: '波士顿体育场',
+          referee: '皮埃尔·吉斯兰·阿乔',
+        },
+      },
+    })
   })
 
   afterEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('opens a full odds modal from compact match cards', async () => {
     renderPage()
 
-    expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
-    const oddsButton = screen.getByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
     expect(within(oddsButton).getAllByText('主胜').length).toBeGreaterThan(0)
     expect(within(oddsButton).getByText('1.80')).toBeInTheDocument()
     expect(within(oddsButton).getByText('3.20')).toBeInTheDocument()
@@ -166,8 +225,21 @@ describe('WorldCupPage odds display', () => {
     expect(screen.queryByRole('dialog', { name: '世界杯赔率' })).not.toBeInTheDocument()
   })
 
+  it('shows baidu pre-match analysis for the selected match', async () => {
+    renderPage()
+
+    expect(await screen.findByText('赛前分析')).toBeInTheDocument()
+    expect(screen.getByText('Baidu 体育')).toBeInTheDocument()
+    expect(await screen.findByText('68%')).toBeInTheDocument()
+    expect(screen.getByText('71955 样本')).toBeInTheDocument()
+    expect(screen.getByText('西班牙近期战绩')).toBeInTheDocument()
+    expect(screen.getByText('胜率 83%')).toBeInTheDocument()
+    expect(screen.getByText('西班牙6场比赛5胜1平，状态出色。')).toBeInTheDocument()
+    expect(screen.getByText('阵容名单已获取，首发待确认')).toBeInTheDocument()
+  })
+
   it('shows a closed win-draw-win row when that play has no odds', async () => {
-    vi.mocked(apiClient.getWorldCupMatches).mockResolvedValueOnce({ matches: [matchWithoutWinDrawWinOdds], total_count: 1 })
+    vi.mocked(apiClient.getWorldCupMatches).mockResolvedValue({ matches: [matchWithoutWinDrawWinOdds], total_count: 1 })
     vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
       recommendations: [],
       total_count: 0,
@@ -175,8 +247,7 @@ describe('WorldCupPage odds display', () => {
     })
     renderPage()
 
-    expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
-    const oddsButton = screen.getByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
     expect(within(oddsButton).getByText('胜平负游戏未开售')).toBeInTheDocument()
     expect(within(oddsButton).getByText('-2')).toBeInTheDocument()
     expect(within(oddsButton).getByText('1.54')).toBeInTheDocument()
@@ -192,11 +263,16 @@ describe('WorldCupPage odds display', () => {
 
   it('keeps match odds visible while play type filters recommendations', async () => {
     renderPage()
-    expect(await screen.findByText('西班牙 vs 佛得角')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '全部风险' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '低风险' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '总进球数' }))
 
     await waitFor(() => {
+      expect(apiClient.getWorldCupRecommendations).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ risk_level_filter: expect.anything() }),
+      )
       expect(apiClient.getWorldCupRecommendations).toHaveBeenLastCalledWith(
         expect.objectContaining({ play_type_filter: 'total_goals' }),
       )
@@ -209,5 +285,51 @@ describe('WorldCupPage odds display', () => {
     const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
     expect(within(dialog).getByText('胜平负')).toBeInTheDocument()
     expect(within(dialog).getByText('总进球数')).toBeInTheDocument()
+  })
+
+  it('shows the latest odds update time when odds are newer than recommendations', async () => {
+    const newerOddsMatch: WorldCupMatch = {
+      ...match,
+      odds_fetched_at: 1781578800,
+      odds_snapshots: match.odds_snapshots?.map((snapshot) => ({
+        ...snapshot,
+        fetched_at: 1781578800,
+      })),
+    }
+    vi.mocked(apiClient.getWorldCupMatches).mockResolvedValue({ matches: [newerOddsMatch], total_count: 1 })
+    vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
+      recommendations: [{ ...recommendation, match: newerOddsMatch, updated_at: 1781492400 }],
+      total_count: 1,
+      compliance_notice: recommendation.compliance_notice,
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('2026-06-16 11:00')).toBeInTheDocument()
+  })
+
+  it('defaults the schedule odds view to tomorrow instead of today', async () => {
+    vi.mocked(apiClient.getWorldCupMatches).mockImplementation((payload) => {
+      if (payload?.date_start) {
+        return Promise.resolve({ matches: [tomorrowMatch], total_count: 1 })
+      }
+      return Promise.resolve({ matches: [yesterdayMatch, match, tomorrowMatch], total_count: 3 })
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('赛程赔率')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '法国 vs 塞内加尔 查看全部赔率' })).toBeInTheDocument()
+    expect(screen.getByText(/2026-06-17\s+·\s+1\s+场/)).toBeInTheDocument()
+    expect(screen.queryByText('昨天队 vs 旧数据队')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(apiClient.getWorldCupMatches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          date_start: '2026-06-17 00:00:00',
+          date_end: '2026-06-17 23:59:59',
+        }),
+      )
+    })
   })
 })

@@ -94,6 +94,7 @@ from backend.app.schemas.requests import (
     RolePayload,
     WorldCupFavoritePayload,
     WorldCupHistoryPayload,
+    WorldCupBaiduAnalysisPayload,
     WorldCupMatchListPayload,
     WorldCupPredictionGeneratePayload,
     WorldCupRecommendationToSimulationPayload,
@@ -130,6 +131,7 @@ from backend.app.schemas.responses import (
     SettingsPredictionRecordListResponse,
     SimulationTicketCreateResponse,
     WorldCupFavoriteResponse,
+    WorldCupBaiduAnalysisResponse,
     WorldCupHistoryResponse,
     WorldCupMatchListResponse,
     WorldCupRecommendationDetailResponse,
@@ -362,6 +364,16 @@ def get_worldcup_recommendation(payload: WorldCupRecommendationDetailPayload, cu
         return worldcup_service.get_recommendation(int(current_user["id"]), payload.recommendation_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="推荐不存在") from exc
+
+
+@router.post("/worldcup/matches/baidu-analysis", response_model=WorldCupBaiduAnalysisResponse)
+def get_worldcup_baidu_analysis(payload: WorldCupBaiduAnalysisPayload, _: dict = Depends(require_current_user)) -> dict:
+    try:
+        return worldcup_service.get_baidu_analysis(payload.match_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="比赛不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/worldcup/recommendations/favorite", response_model=WorldCupFavoriteResponse)

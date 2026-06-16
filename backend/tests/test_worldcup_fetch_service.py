@@ -64,6 +64,52 @@ class WorldCupFetchServiceTests(unittest.TestCase):
         self.assertNotIn("s00s01f", odds[1]["odds"])
         self.assertNotIn("0:2", odds[1]["odds"])
 
+    def test_merge_baidu_matches_keeps_sporttery_id_and_adds_baidu_only_schedule(self) -> None:
+        service = WorldCupFetchService()
+        sporttery_matches = [
+            {
+                "match_id": "sporttery-2040174",
+                "sporttery_match_id": "2040174",
+                "home_team": "西班牙",
+                "away_team": "佛得角",
+                "kickoff_at": "2026-06-16 00:00:00",
+                "match_status": "scheduled",
+                "score": None,
+                "data_sources": ["sporttery"],
+                "source_updated_at": "2026-06-15 11:00:00",
+            }
+        ]
+        baidu_matches = [
+            {
+                "match_id": "baidu-a",
+                "home_team": "西班牙",
+                "away_team": "佛得角",
+                "kickoff_at": "2026-06-16 00:00:00",
+                "match_status": "scheduled",
+                "score": None,
+                "data_sources": {"sources": ["baidu_tiyu"], "baidu_tiyu": {"encoded_match_id": "encoded-a"}},
+                "source_updated_at": "2026-06-16 11:00:00",
+            },
+            {
+                "match_id": "baidu-b",
+                "home_team": "法国",
+                "away_team": "塞内加尔",
+                "kickoff_at": "2026-06-17 03:00:00",
+                "match_status": "scheduled",
+                "score": None,
+                "data_sources": {"sources": ["baidu_tiyu"], "baidu_tiyu": {"encoded_match_id": "encoded-b"}},
+                "source_updated_at": "2026-06-16 11:00:00",
+            },
+        ]
+
+        merged = service._merge_baidu_matches(sporttery_matches, baidu_matches)
+
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0]["match_id"], "sporttery-2040174")
+        self.assertEqual(merged[0]["data_sources"]["sources"], ["sporttery", "baidu_tiyu"])
+        self.assertEqual(merged[0]["data_sources"]["baidu_tiyu"]["encoded_match_id"], "encoded-a")
+        self.assertEqual(merged[1]["match_id"], "baidu-b")
+
 
 if __name__ == "__main__":
     unittest.main()

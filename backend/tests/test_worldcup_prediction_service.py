@@ -111,6 +111,26 @@ class _FailingNewsSearchService:
         raise RuntimeError("news backend unavailable")
 
 
+class _FakeBaiduSportsService:
+    def __init__(self) -> None:
+        self.called = False
+
+    def enrich_matches(self, matches: list[dict]) -> list[dict]:
+        self.called = True
+        for match in matches:
+            match["team_context"]["baidu_sports"] = {
+                "status": "available",
+                "provider": "baidu_tiyu",
+                "recent_records": [{"team_name": "西班牙", "result": "4胜1平1负"}],
+                "pre_match_prediction": {"sample_count": "12504", "percentage": {"victory": "65%", "draw": "20%", "lost": "15%"}},
+                "positive_intelligence": [{"team_name": "西班牙", "items": ["西班牙近期控球稳定。"]}],
+                "negative_intelligence": [{"team_name": "佛得角", "items": ["佛得角客场防守波动。"]}],
+                "squad_status": {"status": "阵容名单已获取，首发待确认"},
+                "index_reference": {"note": "Baidu/第三方指数仅作赛前分析参考；官方投注赔率仍以中国竞彩网为准。"},
+            }
+        return matches
+
+
 class WorldCupPredictionServiceTests(unittest.TestCase):
     def test_worldcup_prompt_template_renders_with_json_example(self) -> None:
         rendered = WORLDCUP_PROMPT_PATH.read_text(encoding="utf-8").format(
@@ -215,6 +235,48 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
         news = saved["input_summary"]["team_context"]["news"]
         self.assertEqual(news["status"], "unavailable")
         self.assertIn("news backend unavailable", news["error"])
+
+    def test_generate_injects_baidu_sports_context(self) -> None:
+        repository = _FakeWorldCupRepository()
+        baidu_service = _FakeBaiduSportsService()
+        fake_model = _FakeModel(
+            {
+                "recommendations": [
+                    {
+                        "match_id": "match-1",
+                        "play_type": "win_draw_win",
+                        "selection": "胜",
+                        "odds_value": "1.80",
+                        "confidence_level": "medium",
+                        "risk_level": "low",
+                        "budget_min": 10,
+                        "budget_max": 30,
+                        "reason": "参考百度体育赛前分析与官方赔率，赔率仅作展示参考。",
+                    }
+                ]
+            }
+        )
+        service = WorldCupPredictionService(
+            repository=repository,
+            model_repository=_FakeModelRepository(),
+            news_search_service=_FakeNewsSearchService(),
+            baidu_sports_service=baidu_service,
+        )
+
+        with patch("backend.app.services.worldcup_prediction_service.ensure_schema"), patch(
+            "backend.app.services.worldcup_prediction_service.load_model_registry",
+            return_value={"model-a": _FakeModelDefinition()},
+        ), patch(
+            "backend.app.services.worldcup_prediction_service.ModelFactory",
+            return_value=_FakeModelFactory(fake_model),
+        ):
+            service.generate_for_model(model_code="model-a", match_date="2026-06-16")
+
+        self.assertTrue(baidu_service.called)
+        self.assertIn("西班牙近期控球稳定", fake_model.prompt)
+        saved = repository.saved_recommendations[0]
+        self.assertEqual(saved["input_summary"]["team_context"]["baidu_sports"]["status"], "available")
+        self.assertIn("百度体育赛前分析", saved["model_sources"])
 
 
 if __name__ == "__main__":

@@ -6,7 +6,17 @@ import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
 import { useToast } from '../../shared/feedback/ToastProvider'
-import type { WorldCupConfidenceLevel, WorldCupMatch, WorldCupOddsSnapshot, WorldCupPlayType, WorldCupRecommendation, WorldCupRiskLevel } from '../../shared/types/api'
+import type {
+  WorldCupBaiduAnalysis,
+  WorldCupBaiduIntelligence,
+  WorldCupBaiduRecentRecord,
+  WorldCupConfidenceLevel,
+  WorldCupMatch,
+  WorldCupOddsSnapshot,
+  WorldCupPlayType,
+  WorldCupRecommendation,
+  WorldCupRiskLevel,
+} from '../../shared/types/api'
 import { WorldCupTabStrip } from './WorldCupTabStrip'
 
 const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string }> = [
@@ -16,13 +26,6 @@ const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string 
   { value: 'total_goals', label: '总进球数' },
   { value: 'correct_score', label: '比分' },
   { value: 'half_full_time', label: '半全场' },
-]
-
-const RISK_OPTIONS: Array<{ value: 'all' | WorldCupRiskLevel; label: string }> = [
-  { value: 'all', label: '全部风险' },
-  { value: 'low', label: '低风险' },
-  { value: 'medium', label: '中风险' },
-  { value: 'high', label: '高风险' },
 ]
 
 const STATUS_OPTIONS: Array<{ value: 'all' | 'scheduled' | 'live' | 'finished'; label: string }> = [
@@ -41,6 +44,7 @@ const CORRECT_SCORE_OTHER_ORDER: Record<string, number> = {
   平其它: 1,
   负其它: 2,
 }
+const BEIJING_TIME_ZONE = 'Asia/Shanghai'
 
 function formatPlayType(playType: WorldCupPlayType) {
   if (playType === 'win_draw_win') return '胜平负'
@@ -112,6 +116,47 @@ function formatCompactKickoff(value: string | number | null | undefined) {
 
 function formatOddsModalTitle(match: WorldCupMatch) {
   return [formatMatchNum(match.match_num_str), match.stage, formatCompactKickoff(match.kickoff_at)].filter(Boolean).join(' ')
+}
+
+function formatBeijingDateKey(value: string | number | Date = new Date()) {
+  const date = value instanceof Date ? value : new Date(typeof value === 'number' ? value * 1000 : value)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BEIJING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || ''
+  return `${pick('year')}-${pick('month')}-${pick('day')}`
+}
+
+function addDateKeyDays(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return date.toISOString().slice(0, 10)
+}
+
+function getMatchDateKey(match: WorldCupMatch) {
+  return formatDateTimeLocal(match.kickoff_at).slice(0, 10)
+}
+
+function buildDateRangePayload(dateKey: string) {
+  return {
+    date_start: `${dateKey} 00:00:00`,
+    date_end: `${dateKey} 23:59:59`,
+  }
+}
+
+function formatScheduleDateLabel(dateKey: string, todayKey: string) {
+  if (dateKey === todayKey) return '今天'
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const [todayYear, todayMonth, todayDay] = todayKey.split('-').map(Number)
+  const dayValue = Date.UTC(year, month - 1, day)
+  const todayValue = Date.UTC(todayYear, todayMonth - 1, todayDay)
+  const diffDays = Math.round((dayValue - todayValue) / 86_400_000)
+  if (diffDays === 1) return '明天'
+  if (diffDays === -1) return '昨天'
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 function formatGoalLine(value?: string | null) {
@@ -240,6 +285,25 @@ function isPassSaleStatus(value?: string | null) {
   const text = String(value || '').trim().toLowerCase()
   if (!text || ['0', 'false', 'closed', 'stop', 'stopped', '停售', '暂停销售'].includes(text)) return false
   return true
+}
+
+function getLatestWorldCupDataTime(matches: WorldCupMatch[], recommendations: WorldCupRecommendation[], detailRecommendation: WorldCupRecommendation | null) {
+  const timestamps = [
+    detailRecommendation?.updated_at,
+    detailRecommendation?.odds_fetched_at,
+    ...recommendations.flatMap((recommendation) => [
+      recommendation.updated_at,
+      recommendation.odds_fetched_at,
+      recommendation.match.odds_fetched_at,
+      ...(recommendation.match.odds_snapshots || []).flatMap((snapshot) => [snapshot.fetched_at, snapshot.source_updated_at]),
+    ]),
+    ...matches.flatMap((match) => [
+      match.odds_fetched_at,
+      ...(match.odds_snapshots || []).flatMap((snapshot) => [snapshot.fetched_at, snapshot.source_updated_at]),
+    ]),
+  ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0)
+
+  return timestamps.length ? Math.max(...timestamps) : null
 }
 
 function OddsPlaySection({ active, snapshot }: { active: boolean; snapshot: WorldCupOddsSnapshot }) {
@@ -390,21 +454,171 @@ function RecommendationOddsSummary({ recommendation }: { recommendation: WorldCu
   )
 }
 
+function getPredictionValue(analysis: WorldCupBaiduAnalysis | undefined, key: 'victory' | 'draw' | 'lost') {
+  const value = analysis?.pre_match_prediction?.percentage?.[key]
+  return typeof value === 'string' && value ? value : '-'
+}
+
+function getRecordTitle(record: WorldCupBaiduRecentRecord) {
+  if (record.scope === 'same_home_away') return `${record.team_name || '球队'} 同主客`
+  return record.title || `${record.team_name || '球队'} 近期战绩`
+}
+
+function BaiduRecordBlock({ record }: { record: WorldCupBaiduRecentRecord }) {
+  const matches = record.matches || []
+  return (
+    <section className="worldcup-baidu-record">
+      <div className="worldcup-baidu-record__top">
+        <div>
+          <h4>{getRecordTitle(record)}</h4>
+          <span>{record.result || '暂无战绩结论'}</span>
+        </div>
+        <div className="worldcup-baidu-record__metrics">
+          {(record.probability || []).slice(0, 3).map((item) => <span key={item}>{item}</span>)}
+        </div>
+      </div>
+      {matches.length ? (
+        <div className="worldcup-baidu-record__table">
+          {matches.slice(0, 4).map((item, index) => (
+            <div key={`${item.date}-${item.score}-${index}`} className="worldcup-baidu-record__row">
+              <span>{item.date || '-'}</span>
+              <strong>{item.score || item.match || '-'}</strong>
+              <em>{[item.handicap?.desc, item.total_goals?.desc].filter(Boolean).join(' / ') || '-'}</em>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function BaiduIntelligenceColumn({ items, title }: { items?: WorldCupBaiduIntelligence[]; title: string }) {
+  const rows = (items || []).filter((item) => (item.items || []).length > 0)
+  if (!rows.length) return null
+  return (
+    <section className="worldcup-baidu-intel">
+      <h4>{title}</h4>
+      <div className="worldcup-baidu-intel__grid">
+        {rows.map((row) => (
+          <div key={`${title}-${row.team_name}`} className="worldcup-baidu-intel__team">
+            <strong>{row.team_name || '球队'}</strong>
+            <ul>
+              {(row.items || []).slice(0, 3).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BaiduAnalysisPanel({
+  analysis,
+  error,
+  isLoading,
+  match,
+}: {
+  analysis?: WorldCupBaiduAnalysis
+  error?: string
+  isLoading: boolean
+  match: WorldCupMatch | null
+}) {
+  const available = analysis?.status === 'available'
+  const records = (analysis?.recent_records || []).slice(0, 4)
+  return (
+    <section className="worldcup-baidu-panel">
+      <div className="worldcup-panel__header">
+        <div>
+          <h2>赛前分析</h2>
+          <span>{match ? `${match.home_team} vs ${match.away_team}` : '请选择比赛'}</span>
+        </div>
+        <span className="worldcup-baidu-panel__source">Baidu 体育</span>
+      </div>
+      {isLoading ? (
+        <div className="worldcup-baidu-panel__empty">正在同步赛前分析...</div>
+      ) : !available ? (
+        <div className="worldcup-baidu-panel__empty">{error || analysis?.error || '暂无 Baidu 赛前分析'}</div>
+      ) : (
+        <>
+          <div className="worldcup-baidu-prediction">
+            <div>
+              <span>主胜</span>
+              <strong>{getPredictionValue(analysis, 'victory')}</strong>
+              <em>{match?.home_team || '主队'}</em>
+            </div>
+            <div>
+              <span>平局</span>
+              <strong>{getPredictionValue(analysis, 'draw')}</strong>
+              <em>{analysis?.pre_match_prediction?.sample_count ? `${analysis.pre_match_prediction.sample_count} 样本` : '样本待同步'}</em>
+            </div>
+            <div>
+              <span>客胜</span>
+              <strong>{getPredictionValue(analysis, 'lost')}</strong>
+              <em>{match?.away_team || '客队'}</em>
+            </div>
+          </div>
+          {analysis?.squad_status?.status ? (
+            <div className="worldcup-baidu-squad">
+              <span>{analysis.squad_status.status}</span>
+              {[analysis.squad_status.court, analysis.squad_status.referee]
+                .filter((item): item is string => Boolean(item))
+                .map((item) => <b key={item}>{item}</b>)}
+            </div>
+          ) : null}
+          {records.length ? (
+            <div className="worldcup-baidu-records">
+              {records.map((record, index) => <BaiduRecordBlock key={`${record.team_name}-${record.scope}-${index}`} record={record} />)}
+            </div>
+          ) : null}
+          <BaiduIntelligenceColumn title="有利情报" items={analysis?.positive_intelligence} />
+          <BaiduIntelligenceColumn title="不利情报" items={analysis?.negative_intelligence} />
+        </>
+      )}
+    </section>
+  )
+}
+
 export function WorldCupPage() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const todayDateKey = useMemo(() => formatBeijingDateKey(), [])
+  const defaultScheduleDateKey = useMemo(() => addDateKeyDays(todayDateKey, 1), [todayDateKey])
   const [ageConfirmed, setAgeConfirmed] = useState(() => localStorage.getItem('worldcup-age-confirmed') === '1')
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState(defaultScheduleDateKey)
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'live' | 'finished'>('all')
   const [playTypeFilter, setPlayTypeFilter] = useState<'all' | WorldCupPlayType>('all')
-  const [riskLevelFilter, setRiskLevelFilter] = useState<'all' | WorldCupRiskLevel>('all')
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
   const [oddsModalMatchId, setOddsModalMatchId] = useState<string | null>(null)
   const [detailRecommendationId, setDetailRecommendationId] = useState<string | null>(null)
   const [copiedRecommendationId, setCopiedRecommendationId] = useState<string | null>(null)
 
+  const scheduleCatalogQuery = useQuery({
+    queryKey: ['worldcup', 'matches', 'date-catalog'],
+    queryFn: () => apiClient.getWorldCupMatches({ status_filter: 'all' }),
+  })
+  const scheduleDateOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const match of scheduleCatalogQuery.data?.matches || []) {
+      const dateKey = getMatchDateKey(match)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue
+      counts.set(dateKey, (counts.get(dateKey) || 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([value, count]) => ({
+        value,
+        count,
+        label: formatScheduleDateLabel(value, todayDateKey),
+      }))
+  }, [scheduleCatalogQuery.data?.matches, todayDateKey])
+  const visibleScheduleDateOptions = useMemo(() => {
+    const upcoming = scheduleDateOptions.filter((option) => option.value >= todayDateKey)
+    return upcoming.length ? upcoming : scheduleDateOptions
+  }, [scheduleDateOptions, todayDateKey])
+  const selectedDateRange = useMemo(() => buildDateRangePayload(selectedScheduleDate), [selectedScheduleDate])
   const matchesQuery = useQuery({
-    queryKey: ['worldcup', 'matches', statusFilter],
-    queryFn: () => apiClient.getWorldCupMatches({ status_filter: statusFilter }),
+    queryKey: ['worldcup', 'matches', statusFilter, selectedScheduleDate],
+    queryFn: () => apiClient.getWorldCupMatches({ status_filter: statusFilter, ...selectedDateRange }),
   })
   const matchRows = useMemo(() => matchesQuery.data?.matches || [], [matchesQuery.data?.matches])
   const selectedMatchIdForQuery = selectedMatchId && matchRows.some((item) => item.match_id === selectedMatchId)
@@ -412,12 +626,11 @@ export function WorldCupPage() {
     : matchRows[0]?.match_id || null
 
   const recommendationsQuery = useQuery({
-    queryKey: ['worldcup', 'recommendations', selectedMatchIdForQuery, playTypeFilter, riskLevelFilter],
+    queryKey: ['worldcup', 'recommendations', selectedMatchIdForQuery, playTypeFilter],
     queryFn: () =>
       apiClient.getWorldCupRecommendations({
         match_id: selectedMatchIdForQuery || undefined,
         play_type_filter: playTypeFilter,
-        risk_level_filter: riskLevelFilter,
       }),
     enabled: matchesQuery.isSuccess,
   })
@@ -426,6 +639,12 @@ export function WorldCupPage() {
     queryKey: ['worldcup', 'recommendation-detail', detailRecommendationId],
     queryFn: () => apiClient.getWorldCupRecommendationDetail(detailRecommendationId || ''),
     enabled: Boolean(detailRecommendationId),
+  })
+  const baiduAnalysisQuery = useQuery({
+    queryKey: ['worldcup', 'baidu-analysis', selectedMatchIdForQuery],
+    queryFn: () => apiClient.getWorldCupBaiduAnalysis(selectedMatchIdForQuery || ''),
+    enabled: Boolean(selectedMatchIdForQuery) && matchesQuery.isSuccess,
+    retry: false,
   })
 
   const favoriteMutation = useMutation({
@@ -462,9 +681,9 @@ export function WorldCupPage() {
   const recommendations = recommendationsQuery.data?.recommendations || []
   const detailRecommendation = detailQuery.data?.recommendation || null
   const latestBudgetMax = recommendations.reduce((max, item) => Math.max(max, item.budget_max || 0), 0)
-  const overviewUpdatedAt = detailRecommendation?.updated_at || recommendations[0]?.updated_at || matchesQuery.data?.matches?.[0]?.odds_fetched_at || null
+  const overviewUpdatedAt = getLatestWorldCupDataTime(matchRows, recommendations, detailRecommendation)
 
-  const topMatches = useMemo(() => matchRows.slice(0, 5), [matchRows])
+  const scheduleMatches = useMemo(() => matchRows, [matchRows])
 
   const confirmAge = () => {
     localStorage.setItem('worldcup-age-confirmed', '1')
@@ -542,24 +761,44 @@ export function WorldCupPage() {
             </button>
           ))}
         </div>
-        <div className="worldcup-toolbar__filters">
-          {RISK_OPTIONS.map((option) => (
-            <button key={option.value} className={clsx('filter-chip', riskLevelFilter === option.value && 'is-active')} type="button" onClick={() => setRiskLevelFilter(option.value)}>
-              {option.label}
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="worldcup-grid">
         <div className="worldcup-column">
-          <div className="worldcup-panel__header">
-            <h2>近期比赛</h2>
+          <div className="worldcup-panel__header worldcup-schedule-header">
+            <div>
+              <h2>赛程赔率</h2>
+              <span>{selectedScheduleDate} · {matchesQuery.data?.total_count ?? 0} 场</span>
+            </div>
+            <label className="worldcup-date-input">
+              <span>比赛日期</span>
+              <input
+                type="date"
+                value={selectedScheduleDate}
+                onChange={(event) => setSelectedScheduleDate(event.target.value || defaultScheduleDateKey)}
+              />
+            </label>
+          </div>
+          <div className="worldcup-date-strip" aria-label="比赛日期">
+            {visibleScheduleDateOptions.length === 0 ? (
+              <span className="worldcup-date-strip__empty">暂无可选赛程日期</span>
+            ) : visibleScheduleDateOptions.map((option) => (
+              <button
+                key={option.value}
+                className={clsx('worldcup-date-chip', selectedScheduleDate === option.value && 'is-active')}
+                type="button"
+                onClick={() => setSelectedScheduleDate(option.value)}
+              >
+                <strong>{option.label}</strong>
+                <span>{option.value}</span>
+                <em>{option.count} 场</em>
+              </button>
+            ))}
           </div>
           <div className="worldcup-match-list">
-            {topMatches.length === 0 ? (
-              <div className="worldcup-empty">暂无真实赛程，请先在设置页维护列表抓取中国竞彩网世界杯赛程和赔率。</div>
-            ) : topMatches.map((match) => (
+            {scheduleMatches.length === 0 ? (
+              <div className="worldcup-empty">当天暂无赛程或赔率，请切换日期查看，或先在设置页维护列表抓取中国竞彩网世界杯赛程和赔率。</div>
+            ) : scheduleMatches.map((match) => (
               <article
                 key={match.match_id}
                 className={clsx('worldcup-match-card', selectedMatch?.match_id === match.match_id && 'is-active')}
@@ -577,6 +816,13 @@ export function WorldCupPage() {
         </div>
 
         <div className="worldcup-column worldcup-column--wide">
+          <BaiduAnalysisPanel
+            analysis={baiduAnalysisQuery.data?.analysis}
+            error={baiduAnalysisQuery.error instanceof Error ? baiduAnalysisQuery.error.message : undefined}
+            isLoading={baiduAnalysisQuery.isLoading}
+            match={selectedMatch}
+          />
+
           <div className="worldcup-panel__header">
             <h2>推荐方案</h2>
             <span>每场最多 3 条</span>

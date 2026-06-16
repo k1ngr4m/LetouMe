@@ -104,9 +104,324 @@
   align-items: center;
 }
 
+.worldcup-schedule-header {
+  gap: 0.8rem;
+}
+
+.worldcup-schedule-header > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.worldcup-schedule-header h2 {
+  margin: 0;
+}
+
+.worldcup-schedule-header span {
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.worldcup-date-input {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 10.5rem;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.worldcup-date-input input {
+  min-height: 2.35rem;
+  padding: 0 0.65rem;
+  border: 1px solid rgba(159, 195, 255, 0.2);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.worldcup-date-input input:focus {
+  outline: 2px solid rgba(92, 166, 255, 0.36);
+  outline-offset: 2px;
+}
+
+.worldcup-date-strip {
+  display: flex;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.2rem 0 0.05rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.worldcup-date-strip__empty {
+  color: var(--text-2);
+  font-size: 0.92rem;
+}
+
+.worldcup-date-chip {
+  flex: 0 0 auto;
+  min-width: 7.2rem;
+  display: grid;
+  gap: 0.14rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid rgba(159, 195, 255, 0.16);
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028)),
+    rgba(9, 16, 29, 0.5);
+  color: inherit;
+  text-align: left;
+}
+
+.worldcup-date-chip:hover {
+  border-color: rgba(159, 195, 255, 0.34);
+}
+
+.worldcup-date-chip.is-active {
+  border-color: rgba(255, 211, 106, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 211, 106, 0.14), rgba(255, 211, 106, 0.05)),
+    rgba(9, 16, 29, 0.7);
+  box-shadow: 0 0.6rem 1.8rem rgba(255, 211, 106, 0.1);
+}
+
+.worldcup-date-chip strong,
+.worldcup-date-chip span,
+.worldcup-date-chip em {
+  line-height: 1.2;
+}
+
+.worldcup-date-chip strong {
+  color: var(--text-1);
+  font-size: 0.98rem;
+}
+
+.worldcup-date-chip span,
+.worldcup-date-chip em {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
 .worldcup-match-card,
 .worldcup-card {
   padding: 0.95rem;
+}
+
+.worldcup-baidu-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(112, 188, 255, 0.22);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(54, 120, 214, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.worldcup-baidu-panel .worldcup-panel__header > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.worldcup-baidu-panel .worldcup-panel__header h2 {
+  margin: 0;
+}
+
+.worldcup-baidu-panel .worldcup-panel__header span {
+  color: var(--text-2);
+  font-size: 0.88rem;
+}
+
+.worldcup-baidu-panel__source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0 0.55rem;
+  border: 1px solid rgba(112, 188, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(64, 145, 255, 0.12);
+  color: #bcd8ff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.worldcup-baidu-panel__empty {
+  padding: 0.9rem;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 0.8rem;
+  color: var(--text-2);
+}
+
+.worldcup-baidu-prediction {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.worldcup-baidu-prediction div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.82rem;
+  background: rgba(8, 15, 27, 0.34);
+}
+
+.worldcup-baidu-prediction span,
+.worldcup-baidu-prediction em,
+.worldcup-baidu-squad,
+.worldcup-baidu-record__top span,
+.worldcup-baidu-record__row span,
+.worldcup-baidu-record__row em {
+  color: var(--text-2);
+}
+
+.worldcup-baidu-prediction span,
+.worldcup-baidu-prediction em {
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
+.worldcup-baidu-prediction strong {
+  color: var(--text-1);
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.worldcup-baidu-squad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(255, 211, 106, 0.18);
+  border-radius: 0.75rem;
+  background: rgba(255, 211, 106, 0.07);
+  font-size: 0.86rem;
+}
+
+.worldcup-baidu-squad span {
+  color: #ffd36a;
+  font-weight: 800;
+}
+
+.worldcup-baidu-squad b {
+  font-weight: 700;
+}
+
+.worldcup-baidu-records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.worldcup-baidu-record {
+  display: grid;
+  gap: 0.62rem;
+  min-width: 0;
+  padding: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.82rem;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.worldcup-baidu-record__top {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.worldcup-baidu-record__top h4,
+.worldcup-baidu-intel h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.worldcup-baidu-record__top span,
+.worldcup-baidu-record__row,
+.worldcup-baidu-intel li {
+  font-size: 0.84rem;
+}
+
+.worldcup-baidu-record__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.worldcup-baidu-record__metrics span {
+  display: inline-flex;
+  min-height: 1.55rem;
+  align-items: center;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(80, 161, 255, 0.12);
+  color: #cfe2ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.worldcup-baidu-record__table {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.worldcup-baidu-record__row {
+  display: grid;
+  grid-template-columns: 4.7rem minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+  min-height: 2rem;
+}
+
+.worldcup-baidu-record__row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worldcup-baidu-record__row em {
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.worldcup-baidu-intel {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.worldcup-baidu-intel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.worldcup-baidu-intel__team {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.82rem;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.worldcup-baidu-intel__team strong {
+  color: #ffd36a;
+}
+
+.worldcup-baidu-intel__team ul {
+  display: grid;
+  gap: 0.38rem;
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--text-1);
 }
 
 .worldcup-match-card {
@@ -786,6 +1101,11 @@ button.worldcup-match-card__odds-action {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .worldcup-baidu-records,
+  .worldcup-baidu-intel__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .worldcup-ticket__item,
   .worldcup-history-row {
     grid-template-columns: minmax(0, 1fr);
@@ -794,8 +1114,30 @@ button.worldcup-match-card__odds-action {
 }
 
 @media (max-width: 620px) {
+  .worldcup-schedule-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .worldcup-date-input {
+    min-width: 0;
+  }
+
   .worldcup-match-card__odds-preview {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .worldcup-baidu-prediction {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .worldcup-baidu-record__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .worldcup-baidu-record__row strong {
+    white-space: normal;
   }
 
   .worldcup-match-card__odds-tile {
