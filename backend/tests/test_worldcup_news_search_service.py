@@ -5,6 +5,31 @@ import unittest
 from backend.app.services.worldcup_news_search_service import WorldCupNewsSearchService
 
 
+class _FallbackNewsSearchService(WorldCupNewsSearchService):
+    def __init__(self) -> None:
+        super().__init__()
+        self.bing_queries: list[str] = []
+        self.gdelt_called = False
+
+    def _fetch_bing_news(self, query: str, *, max_results: int) -> list[dict[str, str]]:
+        self.bing_queries.append(query)
+        if query == "Spain Cape Verde team news":
+            return [
+                {
+                    "title": "Spain vs Cape Verde team news",
+                    "snippet": "Predicted lineup and injury update.",
+                    "source": "Fixture News",
+                    "published_at": "2026-06-15 10:00:00",
+                    "url": "https://example.com/spain-cape-verde",
+                }
+            ]
+        return []
+
+    def _fetch_gdelt_doc(self, query: str, *, max_results: int) -> list[dict[str, str]]:
+        self.gdelt_called = True
+        return []
+
+
 class WorldCupNewsSearchServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.service = WorldCupNewsSearchService()
@@ -65,6 +90,28 @@ class WorldCupNewsSearchServiceTests(unittest.TestCase):
         self.assertEqual(results[0]["source"], "news.example.com")
         self.assertEqual(results[0]["published_at"], "2026-06-15 09:15:00")
         self.assertEqual(results[0]["snippet"], "Cape Verde squad notes.")
+
+    def test_build_queries_adds_english_team_news_fallbacks_for_chinese_team_names(self) -> None:
+        queries = self.service._build_queries({"home_team": "西班牙", "away_team": "佛得角"})
+
+        self.assertEqual(queries[0], "西班牙 佛得角 世界杯 阵容 伤停 最新 team news")
+        self.assertIn("Spain Cape Verde team news", queries)
+        self.assertIn("Spain vs Cape Verde predicted lineups", queries)
+        self.assertEqual(len(queries), len(set(query.lower() for query in queries)))
+
+    def test_search_news_uses_english_fallback_before_gdelt_when_bing_finds_results(self) -> None:
+        service = _FallbackNewsSearchService()
+
+        result = service.search_news({"home_team": "西班牙", "away_team": "佛得角"})
+
+        self.assertEqual(result["status"], "available")
+        self.assertEqual(result["provider"], "Bing News RSS")
+        self.assertEqual(result["query"], "Spain Cape Verde team news")
+        self.assertFalse(service.gdelt_called)
+        self.assertIn("西班牙 佛得角 世界杯 阵容 伤停 最新 team news", service.bing_queries)
+        self.assertIn("Spain Cape Verde team news", service.bing_queries)
+        self.assertEqual(result["results"][0]["title"], "Spain vs Cape Verde team news")
+        self.assertIn("Spain vs Cape Verde injury news", result["attempted_queries"])
 
 
 if __name__ == "__main__":

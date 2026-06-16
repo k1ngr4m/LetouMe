@@ -64,6 +64,7 @@ import type {
   SiteMessageListResponse,
   SiteMessageUnreadCountResponse,
   SuccessResponse,
+  WorldCupBaiduAnalysisResponse,
   WorldCupFavoriteResponse,
   WorldCupHistoryResponse,
   WorldCupMatchListResponse,
@@ -516,6 +517,12 @@ export const apiClient = {
     return requestJson<WorldCupRecommendationDetailResponse>('/api/worldcup/recommendations/detail', {
       method: 'POST',
       body: JSON.stringify({ recommendation_id: recommendationId }),
+    })
+  },
+  getWorldCupBaiduAnalysis(matchId: string) {
+    return requestJson<WorldCupBaiduAnalysisResponse>('/api/worldcup/matches/baidu-analysis', {
+      method: 'POST',
+      body: JSON.stringify({ match_id: matchId }),
     })
   },
   favoriteWorldCupRecommendation(recommendationId: string, favorite = true) {

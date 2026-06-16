@@ -8,6 +8,7 @@ import requests
 
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.worldcup_repository import WorldCupRepository
+from backend.app.services.worldcup_baidu_sports_service import WorldCupBaiduSportsService, normalize_worldcup_team_name
 from backend.app.time_utils import now_ts
 
 
@@ -27,8 +28,13 @@ SPORTTERY_PLAY_TYPE_MAP = {
 
 
 class WorldCupFetchService:
-    def __init__(self, repository: WorldCupRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: WorldCupRepository | None = None,
+        baidu_sports_service: WorldCupBaiduSportsService | None = None,
+    ) -> None:
         self.repository = repository or WorldCupRepository()
+        self.baidu_sports_service = baidu_sports_service or WorldCupBaiduSportsService()
         self.logger = get_logger("services.worldcup_fetch")
 
     def fetch_and_save(self) -> dict[str, Any]:
@@ -39,20 +45,35 @@ class WorldCupFetchService:
         )
         matches = self._parse_matches(match_payload)
         odds_rows = self._parse_odds(calculator_payload)
+        baidu_matches: list[dict[str, Any]] = []
+        baidu_error: str | None = None
+        try:
+            baidu_matches = self.baidu_sports_service.fetch_schedule_matches()
+            matches = self._merge_baidu_matches(matches, baidu_matches)
+        except Exception as exc:
+            baidu_error = str(exc)
+            self.logger.warning(
+                "Baidu sports schedule enrichment failed; continuing with Sporttery data",
+                extra={"context": {"error": baidu_error[:240]}},
+            )
         match_ids = {item["match_id"] for item in matches}
         odds_rows = [row for row in odds_rows if row["match_id"] in match_ids]
         saved_matches = self.repository.upsert_matches(matches)
         saved_odds = self.repository.upsert_odds_snapshots(odds_rows)
         latest_match = max(matches, key=lambda item: item.get("kickoff_at") or "", default=None)
-        return {
+        summary = {
             "lottery_code": "worldcup",
             "fetched_count": len(matches) + len(odds_rows),
             "saved_count": saved_matches + saved_odds,
             "match_count": saved_matches,
             "odds_count": saved_odds,
-            "latest_period": latest_match.get("match_num_str") if latest_match else None,
+            "baidu_match_count": len(baidu_matches),
+            "latest_period": (latest_match.get("match_num_str") or latest_match.get("kickoff_at")) if latest_match else None,
             "duration_ms": 0,
         }
+        if baidu_error:
+            summary["baidu_error"] = baidu_error
+        return summary
 
     def _fetch_json(self, url: str, *, params: dict[str, str]) -> dict[str, Any]:
         response = requests.get(
@@ -140,6 +161,53 @@ class WorldCupFetchService:
                         "fetched_at": fetched_at,
                     }
                 )
+        return result
+
+    @classmethod
+    def _merge_baidu_matches(cls, sporttery_matches: list[dict[str, Any]], baidu_matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        merged = [dict(match) for match in sporttery_matches]
+        existing_by_signature = {cls._match_signature(match): match for match in merged}
+        for baidu_match in baidu_matches:
+            signature = cls._match_signature(baidu_match)
+            existing = existing_by_signature.get(signature)
+            if existing is None:
+                merged.append(dict(baidu_match))
+                existing_by_signature[signature] = merged[-1]
+                continue
+            existing["data_sources"] = cls._merge_data_sources(existing.get("data_sources"), baidu_match.get("data_sources"))
+            if not existing.get("score") and baidu_match.get("score"):
+                existing["score"] = baidu_match.get("score")
+            if baidu_match.get("match_status") in {"live", "finished"}:
+                existing["match_status"] = baidu_match.get("match_status")
+            if baidu_match.get("source_updated_at"):
+                existing["source_updated_at"] = max(str(existing.get("source_updated_at") or ""), str(baidu_match.get("source_updated_at") or "")) or None
+        return merged
+
+    @staticmethod
+    def _match_signature(match: dict[str, Any]) -> tuple[str, str, str]:
+        return (
+            str(match.get("kickoff_at") or "")[:16],
+            normalize_worldcup_team_name(match.get("home_team")),
+            normalize_worldcup_team_name(match.get("away_team")),
+        )
+
+    @staticmethod
+    def _merge_data_sources(left: Any, right: Any) -> dict[str, Any] | list[Any]:
+        if not isinstance(right, dict):
+            return left if left else ["sporttery"]
+        if not isinstance(left, dict):
+            sources = [str(item) for item in left] if isinstance(left, list) else []
+            left = {"sources": sources}
+        sources = []
+        for source in [*(left.get("sources") or []), *(right.get("sources") or [])]:
+            text = str(source or "").strip()
+            if text and text not in sources:
+                sources.append(text)
+        result = dict(left)
+        result["sources"] = sources
+        for key, value in right.items():
+            if key != "sources":
+                result[key] = value
         return result
 
     @staticmethod

@@ -9,6 +9,7 @@ from backend.app.db.connection import ensure_schema
 from backend.app.logging_utils import get_logger
 from backend.app.repositories.model_repository import ModelRepository
 from backend.app.repositories.worldcup_repository import WORLDCUP_COMPLIANCE_NOTICE, WorldCupRepository
+from backend.app.services.worldcup_baidu_sports_service import WorldCupBaiduSportsService
 from backend.app.services.worldcup_news_search_service import WorldCupNewsSearchService
 from backend.core.model_config import load_model_registry
 from backend.core.model_factory import ModelFactory
@@ -24,10 +25,12 @@ class WorldCupPredictionService:
         repository: WorldCupRepository | None = None,
         model_repository: ModelRepository | None = None,
         news_search_service: WorldCupNewsSearchService | None = None,
+        baidu_sports_service: WorldCupBaiduSportsService | None = None,
     ) -> None:
         self.repository = repository or WorldCupRepository()
         self.model_repository = model_repository or ModelRepository()
         self.news_search_service = news_search_service or WorldCupNewsSearchService()
+        self.baidu_sports_service = baidu_sports_service or WorldCupBaiduSportsService()
         self.logger = get_logger("services.worldcup_prediction")
 
     def generate_for_model(
@@ -63,6 +66,7 @@ class WorldCupPredictionService:
             if progress_callback:
                 progress_callback(summary)
             return summary
+        match_context = self._enrich_match_context_with_baidu_sports(match_context)
         match_context = self._enrich_match_context_with_news(match_context)
         prompt = WORLDCUP_PROMPT_PATH.read_text(encoding="utf-8").format(
             prediction_date=datetime.now().strftime("%Y-%m-%d"),
@@ -129,9 +133,10 @@ class WorldCupPredictionService:
                     "stage": row.get("stage") or row.get("league_name") or "世界杯",
                     "match_num_str": row.get("match_num_str"),
                     "remark": row.get("remark"),
+                    "data_sources": self._decode_json_object(row.get("data_sources_json")),
                     "official_odds_source": "中国竞彩网",
                     "team_context": {
-                        "status": "等待球队最新资讯搜索；官方赔率仅用于玩法校验、赔率展示和风险提示。",
+                        "status": "等待球队最新资讯与赛前分析补充；官方赔率仅用于玩法校验、赔率展示和风险提示。",
                     },
                     "odds": {},
                 },
@@ -144,6 +149,25 @@ class WorldCupPredictionService:
                 "fetched_at": str(row.get("odds_fetched_at") or ""),
             }
         return list(matches.values())
+
+    def _enrich_match_context_with_baidu_sports(self, match_context: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        try:
+            return self.baidu_sports_service.enrich_matches(match_context)
+        except Exception as exc:
+            self.logger.warning(
+                "WorldCup Baidu sports enrichment failed; continuing without Baidu context",
+                extra={"context": {"error": str(exc)[:240]}},
+            )
+            for match in match_context:
+                team_context = match.setdefault("team_context", {})
+                if isinstance(team_context, dict):
+                    team_context["baidu_sports"] = {
+                        "status": "unavailable",
+                        "provider": "baidu_tiyu",
+                        "fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                        "error": str(exc)[:300],
+                    }
+            return match_context
 
     def _enrich_match_context_with_news(self, match_context: list[dict[str, Any]]) -> list[dict[str, Any]]:
         try:
@@ -185,6 +209,8 @@ class WorldCupPredictionService:
                 model_sources = ["中国竞彩网赔率", "世界杯赛程"]
                 if self._match_has_news(context_by_match[match_id]):
                     model_sources.append("球队最新资讯")
+                if self._match_has_baidu_sports(context_by_match[match_id]):
+                    model_sources.append("百度体育赛前分析")
             result.append(
                 {
                     "recommendation_id": f"wc-ai-{model_code}-{match_id}-{play_type}",
@@ -236,6 +262,14 @@ class WorldCupPredictionService:
             return False
         news = team_context.get("news")
         return isinstance(news, dict) and str(news.get("status") or "") == "available" and bool(news.get("results"))
+
+    @staticmethod
+    def _match_has_baidu_sports(match: dict[str, Any]) -> bool:
+        team_context = match.get("team_context")
+        if not isinstance(team_context, dict):
+            return False
+        baidu_sports = team_context.get("baidu_sports")
+        return isinstance(baidu_sports, dict) and str(baidu_sports.get("status") or "") == "available"
 
     @staticmethod
     def _decode_json_object(value: Any) -> dict[str, Any]:

@@ -1374,6 +1374,10 @@ export function SettingsPage() {
             setMessage(`预测任务完成：成功 ${summary.processed_count}，跳过 ${summary.skipped_count}，失败 ${summary.failed_count}。`)
           }
           setMessageType('success')
+          if (task.lottery_code === 'worldcup') {
+            void queryClient.invalidateQueries({ queryKey: ['worldcup'] })
+            void queryClient.invalidateQueries({ queryKey: ['settings-worldcup-matches'] })
+          }
           void queryClient.invalidateQueries({ queryKey: ['settings-models'] })
           void queryClient.invalidateQueries({ queryKey: ['settings-maintenance-logs'] })
         } else if (task.status === 'failed') {

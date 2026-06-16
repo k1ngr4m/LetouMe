@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from backend.app.repositories.worldcup_repository import WORLDCUP_COMPLIANCE_NOTICE, WorldCupRepository
+from backend.app.services.worldcup_baidu_sports_service import WorldCupBaiduSportsService
 from backend.app.time_utils import ensure_timestamp
 
 
@@ -19,8 +20,13 @@ PLAY_TYPE_ORDER = tuple(PLAY_TYPE_LABELS.keys())
 
 
 class WorldCupService:
-    def __init__(self, repository: WorldCupRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: WorldCupRepository | None = None,
+        baidu_sports_service: WorldCupBaiduSportsService | None = None,
+    ) -> None:
         self.repository = repository or WorldCupRepository()
+        self.baidu_sports_service = baidu_sports_service or WorldCupBaiduSportsService()
 
     def list_matches(self, payload: dict[str, Any]) -> dict[str, Any]:
         date_start = payload.get("date_start")
@@ -56,6 +62,25 @@ class WorldCupService:
         if not row:
             raise KeyError(recommendation_id)
         return {"recommendation": self._serialize_recommendation(row)}
+
+    def get_baidu_analysis(self, match_id: str) -> dict[str, Any]:
+        row = self.repository.get_match(match_id)
+        if not row:
+            raise KeyError(match_id)
+        encoded_match_id = self._extract_baidu_encoded_match_id(row.get("data_sources_json"))
+        if not encoded_match_id:
+            encoded_match_id = self.baidu_sports_service.find_encoded_match_id(
+                home_team=str(row.get("home_team") or ""),
+                away_team=str(row.get("away_team") or ""),
+                kickoff_at=str(row.get("kickoff_at") or ""),
+            )
+        if not encoded_match_id:
+            raise ValueError("暂无 Baidu 赛前分析来源，请先更新世界杯数据")
+        return {
+            "match_id": str(row.get("match_id") or ""),
+            "match": self._serialize_match({**row, "recommendation_count": 0}),
+            "analysis": self.baidu_sports_service.fetch_match_context(encoded_match_id),
+        }
 
     def set_favorite(self, user_id: int, recommendation_id: str, favorite: bool) -> dict[str, Any]:
         row = self.repository.get_recommendation(recommendation_id, user_id=user_id)
@@ -475,6 +500,26 @@ class WorldCupService:
         if not isinstance(loaded, dict):
             return {}
         return {str(key): str(item) for key, item in loaded.items()}
+
+    @staticmethod
+    def _decode_json_dict(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if not value:
+            return {}
+        try:
+            loaded = json.loads(str(value))
+        except json.JSONDecodeError:
+            return {}
+        return loaded if isinstance(loaded, dict) else {}
+
+    @classmethod
+    def _extract_baidu_encoded_match_id(cls, value: Any) -> str:
+        data_sources = cls._decode_json_dict(value)
+        baidu_source = data_sources.get("baidu_tiyu")
+        if not isinstance(baidu_source, dict):
+            return ""
+        return str(baidu_source.get("encoded_match_id") or "").strip()
 
     @staticmethod
     def _limit_recommendations_per_match(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

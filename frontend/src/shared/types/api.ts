@@ -438,6 +438,63 @@ export type WorldCupMatchListResponse = {
   total_count: number
 }
 
+export type WorldCupBaiduRecordMatch = {
+  date?: string
+  match?: string
+  score?: string
+  handicap?: { value?: string; desc?: string } | null
+  total_goals?: { value?: string; desc?: string } | null
+}
+
+export type WorldCupBaiduRecentRecord = {
+  scope?: 'all' | 'same_home_away'
+  team_name?: string
+  title?: string
+  result?: string
+  probability?: string[]
+  matches?: WorldCupBaiduRecordMatch[]
+}
+
+export type WorldCupBaiduIntelligence = {
+  team_name?: string
+  items?: string[]
+}
+
+export type WorldCupBaiduAnalysis = {
+  status: 'available' | 'unavailable' | 'skipped' | string
+  provider?: string
+  fetched_at?: string
+  recent_records?: WorldCupBaiduRecentRecord[]
+  pre_match_prediction?: {
+    sample_count?: string
+    percentage?: Record<string, string | string[]>
+    teams?: Array<{ team?: string; winrate?: string; winner?: string }>
+    source_label?: string
+  }
+  positive_intelligence?: WorldCupBaiduIntelligence[]
+  negative_intelligence?: WorldCupBaiduIntelligence[]
+  squad_status?: {
+    status?: string
+    confirmed?: boolean
+    court?: string | null
+    referee?: string | null
+    updated_at?: string | null
+    home?: { name?: string; players?: Array<{ name?: string; position?: string; age?: string | null }> }
+    away?: { name?: string; players?: Array<{ name?: string; position?: string; age?: string | null }> }
+  }
+  index_reference?: {
+    note?: string
+    items?: Array<{ type?: string; samples?: Array<{ initial?: unknown; now?: unknown }> }>
+  }
+  error?: string
+}
+
+export type WorldCupBaiduAnalysisResponse = {
+  match_id: string
+  match: WorldCupMatch
+  analysis: WorldCupBaiduAnalysis
+}
+
 export type WorldCupRecommendationListResponse = {
   recommendations: WorldCupRecommendation[]
   total_count: number

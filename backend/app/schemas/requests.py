@@ -201,6 +201,10 @@ class WorldCupRecommendationDetailPayload(BaseModel):
     recommendation_id: str
 
 
+class WorldCupBaiduAnalysisPayload(BaseModel):
+    match_id: str
+
+
 class WorldCupFavoritePayload(BaseModel):
     recommendation_id: str
     favorite: bool = True

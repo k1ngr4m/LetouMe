@@ -233,6 +233,12 @@ class WorldCupRecommendationDetailResponse(BaseModel):
     recommendation: WorldCupRecommendationResponse
 
 
+class WorldCupBaiduAnalysisResponse(BaseModel):
+    match_id: str
+    match: WorldCupMatchResponse
+    analysis: dict[str, Any] = Field(default_factory=dict)
+
+
 class WorldCupFavoriteResponse(BaseModel):
     recommendation_id: str
     is_favorite: bool
