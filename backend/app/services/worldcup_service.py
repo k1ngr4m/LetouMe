@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 from backend.app.repositories.worldcup_repository import WORLDCUP_COMPLIANCE_NOTICE, WorldCupRepository
-from backend.app.services.worldcup_baidu_sports_service import WorldCupBaiduSportsService
+from backend.app.services.worldcup_baidu_sports_service import WorldCupBaiduSportsService, normalize_worldcup_team_name
 from backend.app.time_utils import ensure_timestamp
 
 
@@ -37,7 +37,7 @@ class WorldCupService:
             team_query=self._clean_text(payload.get("team_query")),
             status_filter=str(payload.get("status_filter") or "all"),
         )
-        matches = [self._serialize_match(row) for row in rows]
+        matches = [self._serialize_match(row) for row in self._dedupe_match_rows(rows)]
         return {"matches": matches, "total_count": len(matches)}
 
     def list_recommendations(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -271,6 +271,85 @@ class WorldCupService:
                 }
             )
         return list(grouped.values())
+
+    @classmethod
+    def _dedupe_match_rows(cls, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+        order: list[tuple[str, str, str]] = []
+        for row in rows:
+            signature = cls._match_signature(row)
+            if not all(signature):
+                signature = (str(row.get("match_id") or ""), "", "")
+            if signature not in grouped:
+                grouped[signature] = dict(row)
+                order.append(signature)
+                continue
+            grouped[signature] = cls._merge_duplicate_match_rows(grouped[signature], row)
+        return [grouped[signature] for signature in order]
+
+    @staticmethod
+    def _match_signature(row: dict[str, Any]) -> tuple[str, str, str]:
+        return (
+            str(row.get("kickoff_at") or "")[:16],
+            normalize_worldcup_team_name(row.get("home_team")),
+            normalize_worldcup_team_name(row.get("away_team")),
+        )
+
+    @classmethod
+    def _merge_duplicate_match_rows(cls, left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+        primary, secondary = (left, right) if cls._match_row_rank(left) >= cls._match_row_rank(right) else (right, left)
+        merged = dict(primary)
+        for key, value in secondary.items():
+            if key == "odds_snapshots":
+                continue
+            if key == "recommendation_count":
+                merged[key] = max(int(merged.get(key) or 0), int(value or 0))
+                continue
+            if key == "source_updated_at":
+                merged[key] = max(str(merged.get(key) or ""), str(value or "")) or None
+                continue
+            if key == "match_status" and value in {"live", "finished"}:
+                merged[key] = value
+                continue
+            if key == "score" and value:
+                merged[key] = value
+                continue
+            if not merged.get(key) and value:
+                merged[key] = value
+        merged["odds_snapshots"] = cls._merge_odds_snapshots(primary.get("odds_snapshots"), secondary.get("odds_snapshots"))
+        return merged
+
+    @classmethod
+    def _match_row_rank(cls, row: dict[str, Any]) -> tuple[int, int, int, int, int, str]:
+        status_rank = {"finished": 2, "live": 1}.get(str(row.get("match_status") or ""), 0)
+        return (
+            int(row.get("odds_count") or len(row.get("odds_snapshots") or []) or 0),
+            1 if row.get("sporttery_match_id") else 0,
+            1 if row.get("match_num_str") else 0,
+            int(row.get("recommendation_count") or 0),
+            status_rank,
+            str(row.get("source_updated_at") or ""),
+        )
+
+    @classmethod
+    def _merge_odds_snapshots(cls, left: Any, right: Any) -> list[dict[str, Any]]:
+        snapshots_by_type: dict[str, dict[str, Any]] = {}
+        for snapshot in [*(left or []), *(right or [])]:
+            if not isinstance(snapshot, dict):
+                continue
+            play_type = str(snapshot.get("play_type") or "")
+            if not play_type:
+                continue
+            existing = snapshots_by_type.get(play_type)
+            if existing is None or cls._odds_snapshot_rank(snapshot) >= cls._odds_snapshot_rank(existing):
+                snapshots_by_type[play_type] = snapshot
+        return list(snapshots_by_type.values())
+
+    @staticmethod
+    def _odds_snapshot_rank(snapshot: dict[str, Any]) -> tuple[int, str]:
+        odds = WorldCupService._decode_json_object(snapshot.get("odds_json"))
+        displayable_count = sum(1 for value in odds.values() if WorldCupService._is_displayable_odds_value(value))
+        return displayable_count, str(snapshot.get("odds_fetched_at") or snapshot.get("fetched_at") or "")
 
     def _settle_recommendation(self, row: dict[str, Any]) -> dict[str, Any]:
         score = self._parse_score(row.get("score"))

@@ -309,6 +309,8 @@ describe('WorldCupPage odds display', () => {
   })
 
   it('defaults the schedule odds view to tomorrow instead of today', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-16T12:00:00+08:00'))
     vi.mocked(apiClient.getWorldCupMatches).mockImplementation((payload) => {
       if (payload?.date_start) {
         return Promise.resolve({ matches: [tomorrowMatch], total_count: 1 })
