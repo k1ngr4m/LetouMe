@@ -37,6 +37,7 @@ class WorldCupService:
             team_query=self._clean_text(payload.get("team_query")),
             status_filter=str(payload.get("status_filter") or "all"),
         )
+        rows = [row for row in rows if self._is_sporttery_match_row(row)]
         matches = [self._serialize_match(row) for row in self._dedupe_match_rows(rows)]
         return {"matches": matches, "total_count": len(matches)}
 
@@ -286,6 +287,22 @@ class WorldCupService:
                 continue
             grouped[signature] = cls._merge_duplicate_match_rows(grouped[signature], row)
         return [grouped[signature] for signature in order]
+
+    @classmethod
+    def _is_sporttery_match_row(cls, row: dict[str, Any]) -> bool:
+        if row.get("sporttery_match_id") or row.get("match_num_str") or str(row.get("match_id") or "").startswith("sporttery-"):
+            return True
+        data_sources = row.get("data_sources_json")
+        if isinstance(data_sources, str):
+            try:
+                data_sources = json.loads(data_sources)
+            except json.JSONDecodeError:
+                data_sources = None
+        if isinstance(data_sources, list):
+            return "sporttery" in {str(item) for item in data_sources}
+        if isinstance(data_sources, dict):
+            return "sporttery" in {str(item) for item in data_sources.get("sources") or []}
+        return False
 
     @staticmethod
     def _match_signature(row: dict[str, Any]) -> tuple[str, str, str]:

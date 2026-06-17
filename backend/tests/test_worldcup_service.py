@@ -141,6 +141,54 @@ class WorldCupServiceTests(unittest.TestCase):
         self.assertEqual(result["matches"][0]["match_num_str"], "周二017")
         self.assertEqual(result["matches"][0]["latest_odds"]["胜"], "1.32")
 
+    def test_list_matches_hides_baidu_only_rows(self) -> None:
+        rows = [
+            {
+                "match_id": "sporttery-2040188",
+                "sporttery_match_id": "2040188",
+                "match_num_str": "周三021",
+                "home_team": "葡萄牙",
+                "away_team": "刚果(金)",
+                "kickoff_at": "2026-06-18 01:00:00",
+                "stage": "世界杯",
+                "match_status": "scheduled",
+                "score": None,
+                "sell_status": "Selling",
+                "recommendation_count": 0,
+                "odds_count": 1,
+                "odds_snapshots": [
+                    {
+                        "play_type": "win_draw_win",
+                        "odds_json": json.dumps({"胜": "1.13", "平": "5.86", "负": "13.50"}, ensure_ascii=False),
+                        "fetched_at": "2026-06-17 11:00:00",
+                    }
+                ],
+            },
+            {
+                "match_id": "baidu-portugal-congo",
+                "sporttery_match_id": "",
+                "match_num_str": "",
+                "home_team": "葡萄牙",
+                "away_team": "刚果民主共和国",
+                "kickoff_at": "2026-06-18 01:00:00",
+                "stage": "小组赛K组第1轮",
+                "match_status": "scheduled",
+                "score": None,
+                "sell_status": "",
+                "recommendation_count": 0,
+                "odds_count": 0,
+                "odds_snapshots": [],
+                "data_sources_json": json.dumps({"sources": ["baidu_tiyu"]}, ensure_ascii=False),
+            },
+        ]
+        service = WorldCupService(repository=_FakeMatchListRepository(rows))
+
+        result = service.list_matches({})
+
+        self.assertEqual(result["total_count"], 1)
+        self.assertEqual(result["matches"][0]["match_id"], "sporttery-2040188")
+        self.assertEqual(result["matches"][0]["away_team"], "刚果(金)")
+
 
 if __name__ == "__main__":
     unittest.main()
