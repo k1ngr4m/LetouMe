@@ -126,6 +126,59 @@ const scoreRecommendations: WorldCupRecommendation[] = [
   },
 ]
 
+const groupedPlayRecommendations: WorldCupRecommendation[] = [
+  ...scoreRecommendations,
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-total-goals-rec-1',
+    play_type: 'total_goals',
+    selection: '2',
+    odds_value: '3.25',
+    implied_probability: 0.308,
+    confidence_score: 62,
+    risk_level: 'medium',
+    reason: '测试总进球数 2。',
+    latest_odds: { '1': '4.50', '2': '3.25', '3': '3.70' },
+  },
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-total-goals-rec-2',
+    play_type: 'total_goals',
+    selection: '3',
+    odds_value: '3.70',
+    implied_probability: 0.27,
+    confidence_score: 57,
+    risk_level: 'medium',
+    reason: '测试总进球数 3。',
+    latest_odds: { '1': '4.50', '2': '3.25', '3': '3.70' },
+  },
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-half-full-rec-1',
+    play_type: 'half_full_time',
+    selection: '胜胜',
+    odds_value: '2.40',
+    implied_probability: 0.417,
+    confidence_score: 61,
+    risk_level: 'medium',
+    reason: '测试半全场胜胜。',
+    latest_odds: { 胜胜: '2.40', 胜平: '14.00', 平平: '6.50' },
+  },
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-half-full-rec-2',
+    play_type: 'half_full_time',
+    selection: '平平',
+    odds_value: '6.50',
+    implied_probability: 0.154,
+    confidence_score: 54,
+    confidence_level: 'low',
+    risk_level: 'high',
+    reason: '测试半全场平平。',
+    latest_odds: { 胜胜: '2.40', 胜平: '14.00', 平平: '6.50' },
+  },
+]
+
 const matchWithoutWinDrawWinOdds: WorldCupMatch = {
   ...match,
   latest_odds: {},
@@ -230,6 +283,7 @@ describe('WorldCupPage odds display', () => {
     const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
     expect(await screen.findByText('置信值')).toBeInTheDocument()
     expect(await screen.findByText('64%')).toBeInTheDocument()
+    expect(screen.queryByText('该玩法赔率快照')).not.toBeInTheDocument()
     expect(within(oddsButton).getAllByText('主胜').length).toBeGreaterThan(0)
     expect(within(oddsButton).getByText('1.80')).toBeInTheDocument()
     expect(within(oddsButton).getByText('3.20')).toBeInTheDocument()
@@ -270,10 +324,10 @@ describe('WorldCupPage odds display', () => {
     expect(screen.getByText('阵容名单已获取，首发待确认')).toBeInTheDocument()
   })
 
-  it('groups all correct score recommendations for a match in one card', async () => {
+  it('groups multi-pick recommendations for a match by play type', async () => {
     vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
-      recommendations: scoreRecommendations,
-      total_count: scoreRecommendations.length,
+      recommendations: groupedPlayRecommendations,
+      total_count: groupedPlayRecommendations.length,
       compliance_notice: recommendation.compliance_notice,
     })
 
@@ -288,6 +342,20 @@ describe('WorldCupPage odds display', () => {
     expect(within(scoreCard as HTMLElement).getByText('58%')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '比分 · 2:1' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '比分 · 1:0' })).not.toBeInTheDocument()
+
+    const totalGoalsHeading = await screen.findByRole('heading', { name: '总进球数 · 2 个推荐' })
+    const totalGoalsCard = totalGoalsHeading.closest('article')
+    expect(totalGoalsCard).not.toBeNull()
+    expect(within(totalGoalsCard as HTMLElement).getByText('2')).toBeInTheDocument()
+    expect(within(totalGoalsCard as HTMLElement).getByText('3')).toBeInTheDocument()
+    expect(within(totalGoalsCard as HTMLElement).getByText('62%')).toBeInTheDocument()
+
+    const halfFullHeading = await screen.findByRole('heading', { name: '半全场 · 2 个推荐' })
+    const halfFullCard = halfFullHeading.closest('article')
+    expect(halfFullCard).not.toBeNull()
+    expect(within(halfFullCard as HTMLElement).getByText('胜胜')).toBeInTheDocument()
+    expect(within(halfFullCard as HTMLElement).getByText('平平')).toBeInTheDocument()
+    expect(within(halfFullCard as HTMLElement).getByText('54%')).toBeInTheDocument()
   })
 
   it('shows a closed win-draw-win row when that play has no odds', async () => {

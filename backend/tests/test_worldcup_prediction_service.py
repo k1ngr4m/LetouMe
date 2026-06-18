@@ -143,7 +143,7 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
         self.assertIn("2026-06-15", rendered)
         self.assertIn("赔率不得影响 `selection`", rendered)
         self.assertIn("不得用赔率高低", rendered)
-        self.assertIn("比分玩法 `correct_score` 每场必须输出 2-3 条不同比分推荐", rendered)
+        self.assertIn("总进球数 `total_goals`、比分 `correct_score`、半全场 `half_full_time` 每场每个玩法必须输出 2-3 条不同推荐", rendered)
         self.assertIn('"confidence_score"', rendered)
 
     def test_generate_injects_news_context_and_preserves_news_evidence(self) -> None:
@@ -261,6 +261,59 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
             ],
         )
         self.assertEqual(recommendations[0]["confidence_score"], 64.0)
+
+    def test_normalize_preserves_multiple_total_goals_and_half_full_time_recommendations(self) -> None:
+        service = WorldCupPredictionService(
+            repository=_FakeWorldCupRepository(),
+            model_repository=_FakeModelRepository(),
+        )
+
+        rows = []
+        for play_type, selections in {
+            "total_goals": ["1", "2", "3", "4"],
+            "half_full_time": ["胜胜", "胜平", "平平", "平负"],
+        }.items():
+            for index, selection in enumerate(selections):
+                rows.append(
+                    {
+                        "match_id": "match-1",
+                        "play_type": play_type,
+                        "selection": selection,
+                        "odds_value": str(4 + index),
+                        "confidence_score": 60 - index,
+                        "confidence_level": "medium",
+                        "risk_level": "medium",
+                    }
+                )
+
+        recommendations = service._normalize_ai_recommendations(
+            {"recommendations": rows},
+            match_context=[
+                {
+                    "match_id": "match-1",
+                    "team_context": {},
+                    "odds": {
+                        "total_goals": {"odds": {"1": "4.00", "2": "5.00", "3": "6.00"}},
+                        "half_full_time": {"odds": {"胜胜": "4.00", "胜平": "5.00", "平平": "6.00"}},
+                    },
+                }
+            ],
+            model_code="model-a",
+            model_name="Fake Display Model",
+            overwrite=False,
+        )
+
+        self.assertEqual(
+            [item["recommendation_id"] for item in recommendations],
+            [
+                "wc-ai-model-a-match-1-total_goals-1",
+                "wc-ai-model-a-match-1-total_goals-2",
+                "wc-ai-model-a-match-1-total_goals-3",
+                "wc-ai-model-a-match-1-half_full_time-1",
+                "wc-ai-model-a-match-1-half_full_time-2",
+                "wc-ai-model-a-match-1-half_full_time-3",
+            ],
+        )
 
     def test_generate_continues_when_news_service_fails(self) -> None:
         repository = _FakeWorldCupRepository()

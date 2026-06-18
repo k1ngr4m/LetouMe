@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronDown, CircleHelp, Copy, Heart, ShieldAlert, Shuffle, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, CircleHelp, Copy, ShieldAlert, Shuffle, Sparkles } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
@@ -319,30 +319,23 @@ function getLatestWorldCupDataTime(matches: WorldCupMatch[], recommendations: Wo
   return timestamps.length ? Math.max(...timestamps) : null
 }
 
-type RecommendationDisplayItem =
-  | { kind: 'single'; key: string; recommendation: WorldCupRecommendation }
-  | { kind: 'correct_score_group'; key: string; recommendations: WorldCupRecommendation[] }
+type RecommendationDisplayItem = { key: string; recommendations: WorldCupRecommendation[] }
 
 function groupRecommendationDisplayItems(recommendations: WorldCupRecommendation[]): RecommendationDisplayItem[] {
-  const scoreGroups = new Map<string, Extract<RecommendationDisplayItem, { kind: 'correct_score_group' }>>()
+  const playGroups = new Map<string, RecommendationDisplayItem>()
   const items: RecommendationDisplayItem[] = []
   for (const recommendation of recommendations) {
-    if (recommendation.play_type !== 'correct_score') {
-      items.push({ kind: 'single', key: recommendation.recommendation_id, recommendation })
-      continue
-    }
-    const groupKey = `correct-score-${recommendation.match.match_id}`
-    const existing = scoreGroups.get(groupKey)
+    const groupKey = `${recommendation.play_type}-${recommendation.match.match_id}`
+    const existing = playGroups.get(groupKey)
     if (existing) {
       existing.recommendations.push(recommendation)
       continue
     }
-    const group: Extract<RecommendationDisplayItem, { kind: 'correct_score_group' }> = {
-      kind: 'correct_score_group',
+    const group: RecommendationDisplayItem = {
       key: groupKey,
       recommendations: [recommendation],
     }
-    scoreGroups.set(groupKey, group)
+    playGroups.set(groupKey, group)
     items.push(group)
   }
   return items
@@ -467,32 +460,6 @@ function WorldCupOddsModal({ activePlayType, match, onClose }: {
         </footer>
       </div>
     </section>
-  )
-}
-
-function RecommendationOddsSummary({ recommendation }: { recommendation: WorldCupRecommendation }) {
-  const matchSnapshot = recommendation.match.odds_snapshots?.find((snapshot) => snapshot.play_type === recommendation.play_type)
-  const snapshot: WorldCupOddsSnapshot = {
-    play_type: recommendation.play_type,
-    play_label: formatPlayType(recommendation.play_type),
-    odds: recommendation.latest_odds || {},
-    goal_line: matchSnapshot?.goal_line,
-  }
-  const entries = getOddsEntries(snapshot)
-  if (entries.length === 0) {
-    return null
-  }
-  return (
-    <div className="worldcup-card__odds-snapshot" aria-label={`${formatPlayType(recommendation.play_type)}赔率快照`}>
-      <span>该玩法赔率快照</span>
-      <div className="worldcup-odds-chip-list">
-        {entries.slice(0, 5).map(([label, value]) => (
-          <span key={label} className="worldcup-odds-chip">
-            {label} {value}
-          </span>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -689,17 +656,6 @@ export function WorldCupPage() {
     retry: false,
   })
 
-  const favoriteMutation = useMutation({
-    mutationFn: async ({ recommendationId, favorite }: { recommendationId: string; favorite: boolean }) =>
-      apiClient.favoriteWorldCupRecommendation(recommendationId, favorite),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['worldcup'] })
-    },
-    onError: (error) => {
-      showToast(error instanceof Error ? error.message : '操作失败', 'error')
-    },
-  })
-
   const simulationMutation = useMutation({
     mutationFn: async (recommendationId: string) => apiClient.createWorldCupSimulationFromRecommendation(recommendationId),
     onSuccess: async (data) => {
@@ -739,32 +695,14 @@ export function WorldCupPage() {
     setOddsModalMatchId(match.match_id)
   }
 
-  const copyChecklist = async (recommendation: WorldCupRecommendation) => {
-    const text = [
-      `${recommendation.match.home_team} vs ${recommendation.match.away_team}`,
-      `玩法：${formatPlayType(recommendation.play_type)}`,
-      `推荐：${recommendation.selection}`,
-      recommendation.odds_value ? `中国竞彩网赔率：${recommendation.odds_value}` : '',
-      `预算：${recommendation.budget_min}-${recommendation.budget_max} 元`,
-      recommendation.compliance_notice,
-      '请以线下实体店/官方公告为准。',
-    ].filter(Boolean).join('\n')
-    try {
-      await navigator.clipboard?.writeText(text)
-    } catch {
-      // Clipboard access can be unavailable outside secure browser contexts.
-    }
-    setCopiedRecommendationId(recommendation.recommendation_id)
-    showToast('已复制核对清单', 'success')
-  }
-
-  const copyScoreGroupChecklist = async (recommendations: WorldCupRecommendation[]) => {
+  const copyPlayGroupChecklist = async (recommendations: WorldCupRecommendation[]) => {
     const first = recommendations[0]
     if (!first) return
+    const playLabel = formatPlayType(first.play_type)
     const text = [
       `${first.match.home_team} vs ${first.match.away_team}`,
-      '玩法：比分',
-      '推荐比分：',
+      `玩法：${playLabel}`,
+      `推荐${playLabel}：`,
       ...recommendations.map((recommendation) => [
         `- ${recommendation.selection}`,
         `置信值 ${confidenceScoreLabel(recommendation)}`,
@@ -779,8 +717,8 @@ export function WorldCupPage() {
     } catch {
       // Clipboard access can be unavailable outside secure browser contexts.
     }
-    setCopiedRecommendationId(`score-group-${first.match.match_id}`)
-    showToast('已复制比分清单', 'success')
+    setCopiedRecommendationId(`play-group-${first.play_type}-${first.match.match_id}`)
+    showToast(`已复制${playLabel}清单`, 'success')
   }
 
   return (
@@ -893,34 +831,35 @@ export function WorldCupPage() {
             <div className="worldcup-empty">暂无真实 AI 推荐。请先抓取中国竞彩网赛程/赔率，再到设置页生成世界杯预测。</div>
           ) : (
             <div className="worldcup-card-list">
-              {recommendationDisplayItems.map((item) => item.kind === 'correct_score_group' ? (() => {
+              {recommendationDisplayItems.map((item) => {
                 const [firstRecommendation] = item.recommendations
+                const playLabel = formatPlayType(firstRecommendation.play_type)
                 const visibleRiskTags = Array.from(new Set(item.recommendations.flatMap((recommendation) => getVisibleRecommendationRiskTags(recommendation.risk_tags))))
                 return (
-                  <article key={item.key} className="worldcup-card worldcup-card--score-group">
+                  <article key={item.key} className="worldcup-card worldcup-card--play-group">
                     <div className="worldcup-card__header">
                       <div className="worldcup-card__title-block">
                         <span className="worldcup-card__eyebrow"><Sparkles size={13} aria-hidden="true" /> AI 推荐</span>
                         <p>{firstRecommendation.match.home_team} vs {firstRecommendation.match.away_team}</p>
-                        <h3>比分 · {item.recommendations.length} 个推荐</h3>
+                        <h3>{playLabel} · {item.recommendations.length} 个推荐</h3>
                       </div>
                     </div>
 
-                    <div className="worldcup-score-pick-list" aria-label={`${firstRecommendation.match.home_team} vs ${firstRecommendation.match.away_team} 比分推荐`}>
+                    <div className="worldcup-play-pick-list" aria-label={`${firstRecommendation.match.home_team} vs ${firstRecommendation.match.away_team} ${playLabel}推荐`}>
                       {item.recommendations.map((recommendation) => (
-                        <div key={recommendation.recommendation_id} className="worldcup-score-pick">
-                          <div className="worldcup-score-pick__main">
-                            <span>推荐比分</span>
+                        <div key={recommendation.recommendation_id} className="worldcup-play-pick">
+                          <div className="worldcup-play-pick__main">
+                            <span>推荐{playLabel}</span>
                             <strong>{recommendation.selection}</strong>
                             <em>{recommendation.reason}</em>
                           </div>
-                          <div className="worldcup-score-pick__stats">
+                          <div className="worldcup-play-pick__stats">
                             <span><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
                             <span><small>参考概率</small><strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong></span>
                             <span><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : '待确认'}</strong></span>
                             <span><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
                           </div>
-                          <div className="worldcup-score-pick__actions">
+                          <div className="worldcup-play-pick__actions">
                             <button className="ghost-button ghost-button--compact" type="button" onClick={() => setDetailRecommendationId(recommendation.recommendation_id)}>
                               详情
                             </button>
@@ -932,8 +871,6 @@ export function WorldCupPage() {
                       ))}
                     </div>
 
-                    <RecommendationOddsSummary recommendation={firstRecommendation} />
-
                     {visibleRiskTags.length > 0 ? (
                       <div className="worldcup-card__tags">
                         {visibleRiskTags.map((tag) => <span key={tag}>{tag}</span>)}
@@ -942,84 +879,14 @@ export function WorldCupPage() {
                     <p className="worldcup-card__notice">{firstRecommendation.compliance_notice}</p>
 
                     <div className="worldcup-card__actions">
-                      <button className="ghost-button ghost-button--compact" type="button" onClick={() => void copyScoreGroupChecklist(item.recommendations)}>
-                        <Copy size={14} aria-hidden="true" /> 复制比分清单
+                      <button className="ghost-button ghost-button--compact" type="button" onClick={() => void copyPlayGroupChecklist(item.recommendations)}>
+                        <Copy size={14} aria-hidden="true" /> 复制{playLabel}清单
                       </button>
-                      {copiedRecommendationId === `score-group-${firstRecommendation.match.match_id}` ? <span className="worldcup-card__copy-state"><Check size={14} aria-hidden="true" /> 已复制</span> : null}
+                      {copiedRecommendationId === `play-group-${firstRecommendation.play_type}-${firstRecommendation.match.match_id}` ? <span className="worldcup-card__copy-state"><Check size={14} aria-hidden="true" /> 已复制</span> : null}
                     </div>
                   </article>
                 )
-              })() : (
-                (() => {
-                  const recommendation = item.recommendation
-                  return (
-                <article key={recommendation.recommendation_id} className="worldcup-card">
-                  <div className="worldcup-card__header">
-                    <div className="worldcup-card__title-block">
-                      <span className="worldcup-card__eyebrow"><Sparkles size={13} aria-hidden="true" /> AI 推荐</span>
-                      <p>{recommendation.match.home_team} vs {recommendation.match.away_team}</p>
-                      <h3>{formatPlayType(recommendation.play_type)} · {recommendation.selection}</h3>
-                    </div>
-                    <button
-                      className={clsx('worldcup-icon-btn', recommendation.is_favorite && 'is-active')}
-                      type="button"
-                      onClick={() => favoriteMutation.mutate({ recommendationId: recommendation.recommendation_id, favorite: !recommendation.is_favorite })}
-                      aria-label="收藏推荐"
-                    >
-                      <Heart size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  <div className="worldcup-card__signal">
-                    <div className="worldcup-card__pick">
-                      <span>推荐选择</span>
-                      <strong>{recommendation.selection}</strong>
-                      <em>{formatPlayType(recommendation.play_type)}</em>
-                    </div>
-                    <div className="worldcup-card__edge">
-                      <span>参考概率</span>
-                      <strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong>
-                      <em>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</em>
-                    </div>
-                  </div>
-
-                  <div className="worldcup-card__meta">
-                    <span className="worldcup-card__metric worldcup-card__metric--confidence"><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
-                    <span className="worldcup-card__metric worldcup-card__metric--risk"><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
-                    <span className="worldcup-card__metric"><small>预算</small><strong>{recommendation.budget_min}-{recommendation.budget_max} 元</strong></span>
-                    <span className="worldcup-card__metric"><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</strong></span>
-                  </div>
-
-                  {recommendation.implied_probability ? (
-                    <p className="worldcup-card__odds">中国竞彩网隐含概率约 {(recommendation.implied_probability * 100).toFixed(1)}%</p>
-                  ) : null}
-
-                  <RecommendationOddsSummary recommendation={recommendation} />
-
-                  <p className="worldcup-card__reason">{recommendation.reason}</p>
-                  {getVisibleRecommendationRiskTags(recommendation.risk_tags).length > 0 ? (
-                    <div className="worldcup-card__tags">
-                      {getVisibleRecommendationRiskTags(recommendation.risk_tags).map((tag) => <span key={tag}>{tag}</span>)}
-                    </div>
-                  ) : null}
-                  <p className="worldcup-card__notice">{recommendation.compliance_notice}</p>
-
-                  <div className="worldcup-card__actions">
-                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => setDetailRecommendationId(recommendation.recommendation_id)}>
-                      查看详情
-                    </button>
-                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => void copyChecklist(recommendation)}>
-                      <Copy size={14} aria-hidden="true" /> 复制清单
-                    </button>
-                    <button className="ghost-button ghost-button--compact" type="button" onClick={() => simulationMutation.mutate(recommendation.recommendation_id)}>
-                      <Shuffle size={14} aria-hidden="true" /> 加入模拟
-                    </button>
-                    {copiedRecommendationId === recommendation.recommendation_id ? <span className="worldcup-card__copy-state"><Check size={14} aria-hidden="true" /> 已复制</span> : null}
-                  </div>
-                </article>
-                  )
-                })()
-              ))}
+              })}
             </div>
           )}
 

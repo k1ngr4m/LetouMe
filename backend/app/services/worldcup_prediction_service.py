@@ -17,6 +17,7 @@ from backend.core.model_factory import ModelFactory
 
 WORLDCUP_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "worldcup_prompt.md"
 WORLDCUP_PLAY_TYPES = {"win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"}
+WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES = {"total_goals", "correct_score", "half_full_time"}
 
 
 class WorldCupPredictionService:
@@ -206,7 +207,8 @@ class WorldCupPredictionService:
                 continue
             play_key = (match_id, play_type)
             play_count = play_counts.get(play_key, 0) + 1
-            if play_type == "correct_score" and play_count > 3:
+            max_play_count = 3 if play_type in WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES else 1
+            if play_count > max_play_count:
                 continue
             play_counts[play_key] = play_count
             odds_value = str(row.get("odds_value") or "").strip()
@@ -225,7 +227,7 @@ class WorldCupPredictionService:
                 if self._match_has_baidu_sports(context_by_match[match_id]):
                     model_sources.append("百度体育赛前分析")
             recommendation_id = f"wc-ai-{model_code}-{match_id}-{play_type}"
-            if play_type == "correct_score":
+            if play_type in WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES:
                 recommendation_id = f"{recommendation_id}-{play_count}"
             result.append(
                 {

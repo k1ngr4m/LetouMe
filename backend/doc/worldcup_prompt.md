@@ -22,8 +22,8 @@
 
 **第四阶段 · JSON 输出**
 - 只返回一个有效 JSON 对象，不要输出 Markdown、注释或解释文字。
-- 除比分外，每场比赛每个玩法最多输出 1 条推荐；比分玩法 `correct_score` 每场必须输出 2-3 条不同比分推荐。
-- 当输入中存在 `correct_score` 赔率时，不得跳过比分玩法；如果球队资讯不足，仍需给出 2-3 条低/中置信比分，并在 `risk_tags` 或 `data_gaps` 标注“资讯不足”“阵容待确认”等风险。
+- 胜平负和让球胜平负每场每个玩法最多输出 1 条推荐；总进球数 `total_goals`、比分 `correct_score`、半全场 `half_full_time` 每场每个玩法必须输出 2-3 条不同推荐。
+- 当输入中存在 `total_goals`、`correct_score` 或 `half_full_time` 赔率时，不得跳过对应玩法；如果球队资讯不足，仍需给出 2-3 条低/中置信推荐，并在 `risk_tags` 或 `data_gaps` 标注“资讯不足”“阵容待确认”等风险。
 - 推荐理由要简明，必须能看出主要依据来自赛程、让球规则和输入资讯；赔率只能作为官方展示值或销售状态风险出现。没有资讯时要明确使用“资讯不足/阵容待确认”等表达。
 
 ## 数据原则
@@ -84,9 +84,11 @@
 - `correct_score`：比分。
 - `half_full_time`：半全场。
 
-## 比分推荐要求
+## 多选项玩法推荐要求
 
 - 每场比赛必须输出 2-3 条 `play_type = "correct_score"` 的推荐，且 `selection` 必须是不同比分，例如 `"1:0"`、`"1:1"`、`"2:1"`；不要输出“胜其它/平其它/负其它”作为优先比分推荐，除非输入赔率中只有其它类选项可用。
 - 比分推荐的 `odds_value` 必须来自该场 `odds.correct_score.odds` 中对应比分的赔率；没有对应赔率时填空字符串，并在 `risk_tags` 标注“赔率缺失”。
+- 每场比赛必须输出 2-3 条 `play_type = "total_goals"` 的推荐，且 `selection` 必须是不同总进球数选项，例如 `"1"`、`"2"`、`"3"` 或 `"7+"`，`odds_value` 必须来自该场 `odds.total_goals.odds` 中对应选项。
+- 每场比赛必须输出 2-3 条 `play_type = "half_full_time"` 的推荐，且 `selection` 必须是不同半全场选项，例如 `"胜胜"`、`"胜平"`、`"平平"`，`odds_value` 必须来自该场 `odds.half_full_time.odds` 中对应选项。
 - 每条推荐都必须输出 `confidence_score`，取值为 0-100 的整数；它表示模型对该推荐的相对置信值，不是命中概率，也不得由赔率反推。
 - `confidence_level` 必须与 `confidence_score` 大致一致：0-54 为 `low`，55-74 为 `medium`，75-100 为 `high`。

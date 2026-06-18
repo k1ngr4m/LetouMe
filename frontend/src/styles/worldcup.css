@@ -34,7 +34,6 @@
 }
 
 .worldcup-hero__description,
-.worldcup-card__reason,
 .worldcup-card__notice,
 .worldcup-detail__card p {
   color: var(--text-2);
@@ -69,7 +68,6 @@
 }
 
 .worldcup-toolbar,
-.worldcup-card__meta,
 .worldcup-card__actions,
 .worldcup-card__tags,
 .worldcup-match-list,
@@ -544,8 +542,6 @@
 
 .worldcup-card__title-block p,
 .worldcup-card__title-block h3,
-.worldcup-card__odds,
-.worldcup-card__reason,
 .worldcup-card__notice {
   margin: 0;
 }
@@ -583,76 +579,16 @@
   color: #ffd36a;
 }
 
-.worldcup-card__signal {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(11rem, 0.9fr);
-  gap: 0.72rem;
-}
-
-.worldcup-card__pick,
-.worldcup-card__edge {
-  min-width: 0;
-  display: grid;
-  align-content: center;
-  gap: 0.18rem;
-  min-height: 6rem;
-  padding: 0.82rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.9rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.worldcup-card__pick {
-  background:
-    linear-gradient(135deg, rgba(255, 211, 106, 0.2), rgba(228, 108, 64, 0.1)),
-    rgba(255, 255, 255, 0.045);
-}
-
-.worldcup-card__edge {
-  background:
-    linear-gradient(135deg, rgba(92, 188, 255, 0.16), rgba(72, 204, 146, 0.08)),
-    rgba(255, 255, 255, 0.04);
-}
-
-.worldcup-card__pick span,
-.worldcup-card__edge span,
-.worldcup-card__pick em,
-.worldcup-card__edge em,
-.worldcup-card__metric small {
-  color: var(--worldcup-card-muted);
-  font-size: 0.78rem;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.worldcup-card__pick strong,
-.worldcup-card__edge strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--worldcup-card-text);
-  font-size: clamp(1.55rem, 3vw, 2.3rem);
-  line-height: 1;
-}
-
-.worldcup-card__pick strong {
-  color: #ffd36a;
-  text-shadow: 0 0.75rem 1.8rem rgba(255, 211, 106, 0.18);
-}
-
-.worldcup-card__edge strong {
-  color: #a8d8ff;
-}
-
-.worldcup-card--score-group {
+.worldcup-card--play-group {
   border-color: rgba(92, 188, 255, 0.24);
 }
 
-.worldcup-score-pick-list {
+.worldcup-play-pick-list {
   display: grid;
   gap: 0.68rem;
 }
 
-.worldcup-score-pick {
+.worldcup-play-pick {
   display: grid;
   grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1.4fr) auto;
   gap: 0.68rem;
@@ -666,47 +602,44 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
-.worldcup-score-pick__main,
-.worldcup-score-pick__stats span {
+.worldcup-play-pick__main,
+.worldcup-play-pick__stats span {
   min-width: 0;
 }
 
-.worldcup-score-pick__main {
+.worldcup-play-pick__main {
   display: grid;
   gap: 0.16rem;
 }
 
-.worldcup-score-pick__main span,
-.worldcup-score-pick__main em,
-.worldcup-score-pick__stats small {
+.worldcup-play-pick__main span,
+.worldcup-play-pick__main em,
+.worldcup-play-pick__stats small {
   color: var(--worldcup-card-muted);
   font-size: 0.78rem;
   font-style: normal;
   font-weight: 800;
 }
 
-.worldcup-score-pick__main strong {
+.worldcup-play-pick__main strong {
   color: #ffd36a;
   font-size: clamp(1.62rem, 3vw, 2.3rem);
   line-height: 1;
   text-shadow: 0 0.75rem 1.8rem rgba(255, 211, 106, 0.16);
 }
 
-.worldcup-score-pick__main em {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.worldcup-play-pick__main em {
   line-height: 1.45;
+  white-space: normal;
 }
 
-.worldcup-score-pick__stats {
+.worldcup-play-pick__stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.45rem;
 }
 
-.worldcup-score-pick__stats span {
+.worldcup-play-pick__stats span {
   display: grid;
   align-content: center;
   gap: 0.1rem;
@@ -717,7 +650,7 @@
   background: rgba(5, 10, 20, 0.22);
 }
 
-.worldcup-score-pick__stats strong {
+.worldcup-play-pick__stats strong {
   overflow: hidden;
   color: var(--worldcup-card-text);
   font-size: 0.92rem;
@@ -727,82 +660,25 @@
   white-space: nowrap;
 }
 
-.worldcup-score-pick__stats span:first-child {
+.worldcup-play-pick__stats span:first-child {
   border-color: rgba(72, 204, 146, 0.22);
   background: rgba(72, 204, 146, 0.08);
 }
 
-.worldcup-score-pick__stats span:first-child strong {
+.worldcup-play-pick__stats span:first-child strong {
   color: #9af1c8;
 }
 
-.worldcup-score-pick__actions {
+.worldcup-play-pick__actions {
   display: grid;
   align-content: center;
   gap: 0.42rem;
 }
 
-.worldcup-card__meta {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.worldcup-card__meta span,
 .worldcup-card__tags span,
 .worldcup-card__copy-state {
   font-size: 0.88rem;
   color: var(--worldcup-card-muted);
-}
-
-.worldcup-card__metric {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-  padding: 0.62rem 0.68rem;
-  border: 1px solid rgba(159, 195, 255, 0.12);
-  border-radius: 0.72rem;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.worldcup-card__metric strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--worldcup-card-text);
-  font-size: 0.96rem;
-  font-weight: 900;
-  line-height: 1.18;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.worldcup-card__metric--confidence {
-  border-color: rgba(72, 204, 146, 0.22);
-  background: rgba(72, 204, 146, 0.08);
-}
-
-.worldcup-card__metric--confidence strong {
-  color: #9af1c8;
-}
-
-.worldcup-card__metric--risk {
-  border-color: rgba(255, 211, 106, 0.22);
-  background: rgba(255, 211, 106, 0.08);
-}
-
-.worldcup-card__metric--risk strong {
-  color: #ffe09a;
-}
-
-.worldcup-card__odds {
-  color: #ffd36a;
-  font-size: 0.95rem;
-  font-weight: 850;
-}
-
-.worldcup-card__reason {
-  padding: 0.08rem 0.05rem;
-  font-size: 1rem;
-  font-weight: 650;
-  line-height: 1.68;
 }
 
 .worldcup-card__notice {
@@ -812,48 +688,6 @@
   background: rgba(255, 211, 106, 0.06);
   font-size: 0.9rem;
   line-height: 1.55;
-}
-
-.worldcup-card__odds-snapshot {
-  display: grid;
-  gap: 0.45rem;
-  padding: 0.72rem;
-  border: 1px solid rgba(159, 195, 255, 0.14);
-  border-radius: 0.85rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)),
-    rgba(5, 10, 20, 0.24);
-}
-
-.worldcup-card__odds-snapshot {
-  margin-top: 0;
-}
-
-.worldcup-card__odds-snapshot > span {
-  color: var(--text-2);
-  font-size: 0.86rem;
-}
-
-.worldcup-odds-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.worldcup-odds-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.7rem;
-  padding: 0 0.58rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
-    rgba(255, 255, 255, 0.04);
-  color: var(--worldcup-card-text);
-  font-size: 0.82rem;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .worldcup-match-card__odds-action {
@@ -1426,12 +1260,7 @@ button.worldcup-match-card__odds-action {
 }
 
 @media (max-width: 980px) {
-  .worldcup-card__signal,
-  .worldcup-card__meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .worldcup-score-pick {
+  .worldcup-play-pick {
     grid-template-columns: 1fr;
   }
 }
@@ -1450,34 +1279,20 @@ button.worldcup-match-card__odds-action {
     flex: 1 1 12rem;
   }
 
-  .worldcup-card__signal {
-    grid-template-columns: 1fr;
-  }
-
-  .worldcup-card__pick,
-  .worldcup-card__edge {
-    min-height: 5.3rem;
-  }
-
-  .worldcup-score-pick__stats {
+  .worldcup-play-pick__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .worldcup-score-pick__actions {
+  .worldcup-play-pick__actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .worldcup-score-pick__actions .ghost-button {
+  .worldcup-play-pick__actions .ghost-button {
     width: 100%;
   }
 
-  .worldcup-card__meta,
   .worldcup-card__tags {
     grid-template-columns: 1fr;
-  }
-
-  .worldcup-card__metric strong {
-    white-space: normal;
   }
 
   .worldcup-card__actions {
@@ -1539,7 +1354,6 @@ button.worldcup-match-card__odds-action {
     align-items: flex-start;
   }
 
-  .worldcup-card__meta,
   .worldcup-card__tags {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
