@@ -739,51 +739,53 @@ export function WorldCupPage() {
 
   return (
     <div className="worldcup-page">
-      <section className="worldcup-hero">
-        <div className="worldcup-hero__copy">
-          <p className="worldcup-hero__eyebrow">世界杯推荐</p>
-          <h1 className="worldcup-hero__title">世界杯体彩预测参考</h1>
-          <p className="worldcup-hero__description">展示赛程、推荐方向、预算控制与风险提示，只做研究参考和线下购彩辅助。</p>
-        </div>
-        <div className="worldcup-hero__stats" aria-label="推荐概览">
-          <div><span>比赛</span><strong>{matchesQuery.data?.total_count ?? 0}</strong></div>
-          <div><span>推荐</span><strong>{recommendationsQuery.data?.total_count ?? 0}</strong></div>
-          <div><span>更新时间</span><strong>{overviewUpdatedAt ? formatDateTimeLocal(overviewUpdatedAt) : '-'}</strong></div>
-          <div><span>预算上限</span><strong>{latestBudgetMax > 0 ? `${latestBudgetMax} 元` : '待生成'}</strong></div>
-        </div>
-      </section>
-
-      <SiteDisclaimer />
-
-      {!ageConfirmed ? (
-        <section className="worldcup-gate" role="dialog" aria-modal="true" aria-label="年龄确认">
-          <div className="worldcup-gate__card">
-            <ShieldAlert size={28} aria-hidden="true" />
-            <h2>请确认你已满 18 周岁</h2>
-            <p>本板块仅供参考研究，不构成购彩建议。</p>
-            <button className="primary-button" type="button" onClick={confirmAge}>
-              我已确认
-            </button>
+      <div className="worldcup-fixed-stack">
+        <section className="worldcup-hero">
+          <div className="worldcup-hero__copy">
+            <p className="worldcup-hero__eyebrow">世界杯推荐</p>
+            <h1 className="worldcup-hero__title">世界杯体彩预测参考</h1>
+            <p className="worldcup-hero__description">展示赛程、推荐方向、预算控制与风险提示，只做研究参考和线下购彩辅助。</p>
+          </div>
+          <div className="worldcup-hero__stats" aria-label="推荐概览">
+            <div><span>比赛</span><strong>{matchesQuery.data?.total_count ?? 0}</strong></div>
+            <div><span>推荐</span><strong>{recommendationsQuery.data?.total_count ?? 0}</strong></div>
+            <div><span>更新时间</span><strong>{overviewUpdatedAt ? formatDateTimeLocal(overviewUpdatedAt) : '-'}</strong></div>
+            <div><span>预算上限</span><strong>{latestBudgetMax > 0 ? `${latestBudgetMax} 元` : '待生成'}</strong></div>
           </div>
         </section>
-      ) : null}
 
-      <section className="worldcup-toolbar" aria-label="筛选条件">
-        <div className="worldcup-toolbar__filters">
-          {STATUS_OPTIONS.map((option) => (
-            <button key={option.value} className={clsx('filter-chip', statusFilter === option.value && 'is-active')} type="button" onClick={() => setStatusFilter(option.value)}>
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="worldcup-toolbar__filters">
-          {PLAY_TYPE_OPTIONS.map((option) => (
-            <button key={option.value} className={clsx('filter-chip', playTypeFilter === option.value && 'is-active')} type="button" onClick={() => setPlayTypeFilter(option.value)}>
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </section>
+        <SiteDisclaimer />
+
+        {!ageConfirmed ? (
+          <section className="worldcup-gate" role="dialog" aria-modal="true" aria-label="年龄确认">
+            <div className="worldcup-gate__card">
+              <ShieldAlert size={28} aria-hidden="true" />
+              <h2>请确认你已满 18 周岁</h2>
+              <p>本板块仅供参考研究，不构成购彩建议。</p>
+              <button className="primary-button" type="button" onClick={confirmAge}>
+                我已确认
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="worldcup-toolbar" aria-label="筛选条件">
+          <div className="worldcup-toolbar__filters">
+            {STATUS_OPTIONS.map((option) => (
+              <button key={option.value} className={clsx('filter-chip', statusFilter === option.value && 'is-active')} type="button" onClick={() => setStatusFilter(option.value)}>
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="worldcup-toolbar__filters">
+            {PLAY_TYPE_OPTIONS.map((option) => (
+              <button key={option.value} className={clsx('filter-chip', playTypeFilter === option.value && 'is-active')} type="button" onClick={() => setPlayTypeFilter(option.value)}>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <section className="worldcup-grid">
         <div className="worldcup-column">
@@ -843,75 +845,77 @@ export function WorldCupPage() {
             <span>每种玩法均展示</span>
           </div>
 
-          {recommendations.length === 0 ? (
-            <div className="worldcup-empty">暂无真实 AI 推荐。请先抓取中国竞彩网赛程/赔率，再到设置页生成世界杯预测。</div>
-          ) : (
-            <div className="worldcup-card-list">
-              {recommendationDisplayItems.map((item) => {
-                const [firstRecommendation] = item.recommendations
-                const playLabel = formatPlayType(firstRecommendation.play_type)
-                const visibleRiskTags = Array.from(new Set(item.recommendations.flatMap((recommendation) => getVisibleRecommendationRiskTags(recommendation.risk_tags))))
-                return (
-                  <article key={item.key} className="worldcup-card worldcup-card--play-group">
-                    <div className="worldcup-card__header">
-                      <div className="worldcup-card__title-block">
-                        <span className="worldcup-card__eyebrow"><Sparkles size={13} aria-hidden="true" /> AI 推荐</span>
-                        <p>{firstRecommendation.match.home_team} vs {firstRecommendation.match.away_team}</p>
-                        <h3>{playLabel} · {item.recommendations.length} 个推荐</h3>
-                      </div>
-                    </div>
-
-                    <div className="worldcup-play-pick-list" aria-label={`${firstRecommendation.match.home_team} vs ${firstRecommendation.match.away_team} ${playLabel}推荐`}>
-                      {item.recommendations.map((recommendation) => (
-                        <div key={recommendation.recommendation_id} className="worldcup-play-pick">
-                          <div className="worldcup-play-pick__main">
-                            <span>推荐{playLabel}</span>
-                            <strong>{recommendation.selection}</strong>
-                            <em>{recommendation.reason}</em>
-                          </div>
-                          <div className="worldcup-play-pick__stats">
-                            <span><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
-                            <span><small>参考概率</small><strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong></span>
-                            <span><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : '待确认'}</strong></span>
-                            <span><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
-                          </div>
-                          <div className="worldcup-play-pick__actions">
-                            <button className="ghost-button ghost-button--compact" type="button" onClick={() => setDetailRecommendationId(recommendation.recommendation_id)}>
-                              详情
-                            </button>
-                            <button className="ghost-button ghost-button--compact" type="button" onClick={() => simulationMutation.mutate(recommendation.recommendation_id)}>
-                              <Shuffle size={14} aria-hidden="true" /> 模拟
-                            </button>
-                          </div>
+          <div className="worldcup-recommendation-scroll">
+            {recommendations.length === 0 ? (
+              <div className="worldcup-empty">暂无真实 AI 推荐。请先抓取中国竞彩网赛程/赔率，再到设置页生成世界杯预测。</div>
+            ) : (
+              <div className="worldcup-card-list">
+                {recommendationDisplayItems.map((item) => {
+                  const [firstRecommendation] = item.recommendations
+                  const playLabel = formatPlayType(firstRecommendation.play_type)
+                  const visibleRiskTags = Array.from(new Set(item.recommendations.flatMap((recommendation) => getVisibleRecommendationRiskTags(recommendation.risk_tags))))
+                  return (
+                    <article key={item.key} className="worldcup-card worldcup-card--play-group">
+                      <div className="worldcup-card__header">
+                        <div className="worldcup-card__title-block">
+                          <span className="worldcup-card__eyebrow"><Sparkles size={13} aria-hidden="true" /> AI 推荐</span>
+                          <p>{firstRecommendation.match.home_team} vs {firstRecommendation.match.away_team}</p>
+                          <h3>{playLabel} · {item.recommendations.length} 个推荐</h3>
                         </div>
-                      ))}
-                    </div>
-
-                    {visibleRiskTags.length > 0 ? (
-                      <div className="worldcup-card__tags">
-                        {visibleRiskTags.map((tag) => <span key={tag}>{tag}</span>)}
                       </div>
-                    ) : null}
-                    <p className="worldcup-card__notice">{firstRecommendation.compliance_notice}</p>
 
-                    <div className="worldcup-card__actions">
-                      <button className="ghost-button ghost-button--compact" type="button" onClick={() => void copyPlayGroupChecklist(item.recommendations)}>
-                        <Copy size={14} aria-hidden="true" /> 复制{playLabel}清单
-                      </button>
-                      {copiedRecommendationId === `play-group-${firstRecommendation.play_type}-${firstRecommendation.match.match_id}` ? <span className="worldcup-card__copy-state"><Check size={14} aria-hidden="true" /> 已复制</span> : null}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
+                      <div className="worldcup-play-pick-list" aria-label={`${firstRecommendation.match.home_team} vs ${firstRecommendation.match.away_team} ${playLabel}推荐`}>
+                        {item.recommendations.map((recommendation) => (
+                          <div key={recommendation.recommendation_id} className="worldcup-play-pick">
+                            <div className="worldcup-play-pick__main">
+                              <span>推荐{playLabel}</span>
+                              <strong>{recommendation.selection}</strong>
+                              <em>{recommendation.reason}</em>
+                            </div>
+                            <div className="worldcup-play-pick__stats">
+                              <span><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
+                              <span><small>参考概率</small><strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong></span>
+                              <span><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : '待确认'}</strong></span>
+                              <span><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
+                            </div>
+                            <div className="worldcup-play-pick__actions">
+                              <button className="ghost-button ghost-button--compact" type="button" onClick={() => setDetailRecommendationId(recommendation.recommendation_id)}>
+                                详情
+                              </button>
+                              <button className="ghost-button ghost-button--compact" type="button" onClick={() => simulationMutation.mutate(recommendation.recommendation_id)}>
+                                <Shuffle size={14} aria-hidden="true" /> 模拟
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
 
-          <BaiduAnalysisPanel
-            analysis={baiduAnalysisQuery.data?.analysis}
-            error={baiduAnalysisQuery.error instanceof Error ? baiduAnalysisQuery.error.message : undefined}
-            isLoading={baiduAnalysisQuery.isLoading}
-            match={selectedMatch}
-          />
+                      {visibleRiskTags.length > 0 ? (
+                        <div className="worldcup-card__tags">
+                          {visibleRiskTags.map((tag) => <span key={tag}>{tag}</span>)}
+                        </div>
+                      ) : null}
+                      <p className="worldcup-card__notice">{firstRecommendation.compliance_notice}</p>
+
+                      <div className="worldcup-card__actions">
+                        <button className="ghost-button ghost-button--compact" type="button" onClick={() => void copyPlayGroupChecklist(item.recommendations)}>
+                          <Copy size={14} aria-hidden="true" /> 复制{playLabel}清单
+                        </button>
+                        {copiedRecommendationId === `play-group-${firstRecommendation.play_type}-${firstRecommendation.match.match_id}` ? <span className="worldcup-card__copy-state"><Check size={14} aria-hidden="true" /> 已复制</span> : null}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+
+            <BaiduAnalysisPanel
+              analysis={baiduAnalysisQuery.data?.analysis}
+              error={baiduAnalysisQuery.error instanceof Error ? baiduAnalysisQuery.error.message : undefined}
+              isLoading={baiduAnalysisQuery.isLoading}
+              match={selectedMatch}
+            />
+          </div>
         </div>
       </section>
 

@@ -372,7 +372,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed', isMyBetsRoute && 'crm-shell--my-bets')}>
+    <div className={clsx('app-shell crm-shell', isSidebarCollapsed && 'is-sidebar-collapsed', isMyBetsRoute && 'crm-shell--my-bets', isWorldCupRoute && 'crm-shell--worldcup')}>
       <aside className={clsx('crm-sidebar', isSidebarOpen && 'is-open')} aria-label="主导航">
         <div className="crm-sidebar__brand">
           <img className="crm-sidebar__brand-mark" src="/LetouMe_ico.png" alt="LetouMe 图标" />
@@ -823,7 +823,7 @@ export function AppShell({ children }: PropsWithChildren) {
           </nav>
         </header>
 
-        <main className={clsx('app-main crm-main', isMyBetsRoute && 'crm-main--my-bets')}>
+        <main className={clsx('app-main crm-main', isMyBetsRoute && 'crm-main--my-bets', isWorldCupRoute && 'crm-main--worldcup')}>
           {children}
         </main>
       </div>

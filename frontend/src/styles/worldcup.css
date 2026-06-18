@@ -1,6 +1,158 @@
 .worldcup-page {
+  --worldcup-hero-bg:
+    linear-gradient(160deg, rgba(20, 28, 44, 0.92), rgba(13, 18, 31, 0.94)),
+    radial-gradient(circle at top right, rgba(255, 215, 0, 0.15), transparent 35%);
+  --worldcup-soft-surface: rgba(255, 255, 255, 0.04);
+  --worldcup-field-bg: rgba(255, 255, 255, 0.06);
+  --worldcup-field-border: rgba(159, 195, 255, 0.2);
+  --worldcup-field-scheme: dark;
+  --worldcup-date-chip-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028)),
+    rgba(9, 16, 29, 0.5);
+  --worldcup-date-chip-active-bg:
+    linear-gradient(180deg, rgba(255, 211, 106, 0.14), rgba(255, 211, 106, 0.05)),
+    rgba(9, 16, 29, 0.7);
+  --worldcup-date-chip-shadow: 0 0.6rem 1.8rem rgba(255, 211, 106, 0.1);
+  --worldcup-baidu-panel-bg:
+    linear-gradient(180deg, rgba(54, 120, 214, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.035);
+  --worldcup-baidu-source-bg: rgba(64, 145, 255, 0.12);
+  --worldcup-baidu-source-text: #bcd8ff;
+  --worldcup-baidu-dashed-border: rgba(255, 255, 255, 0.14);
+  --worldcup-baidu-metric-bg: rgba(80, 161, 255, 0.12);
+  --worldcup-baidu-metric-text: #cfe2ff;
+  --worldcup-baidu-box-bg: rgba(255, 255, 255, 0.035);
+  --worldcup-baidu-prediction-bg: rgba(8, 15, 27, 0.34);
+  --worldcup-baidu-intel-bg: rgba(0, 0, 0, 0.14);
+  --worldcup-gold-text: #ffd36a;
+  --worldcup-card-text-themed: #f3efe8;
+  --worldcup-card-muted-themed: #b8c2d3;
+  --worldcup-card-bg:
+    linear-gradient(145deg, rgba(23, 35, 55, 0.92), rgba(10, 16, 29, 0.88) 58%, rgba(21, 36, 52, 0.9)),
+    radial-gradient(circle at 12% 0%, rgba(255, 211, 106, 0.16), transparent 32%),
+    radial-gradient(circle at 96% 14%, rgba(84, 170, 255, 0.16), transparent 28%);
+  --worldcup-card-glow-bg: rgba(255, 211, 106, 0.1);
+  --worldcup-card-chip-bg:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.035);
+  --worldcup-card-button-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.055)),
+    rgba(255, 255, 255, 0.04);
+  --worldcup-card-button-hover-bg:
+    linear-gradient(180deg, rgba(255, 211, 106, 0.16), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.05);
+  --worldcup-card-shadow:
+    0 1.4rem 3.2rem rgba(3, 8, 18, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --worldcup-card-hover-shadow:
+    0 1.7rem 3.6rem rgba(3, 8, 18, 0.3),
+    0 0 0 1px rgba(255, 211, 106, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --worldcup-pick-bg:
+    linear-gradient(135deg, rgba(92, 188, 255, 0.11), rgba(255, 211, 106, 0.06)),
+    rgba(255, 255, 255, 0.035);
+  --worldcup-pick-stat-bg: rgba(5, 10, 20, 0.22);
+  --worldcup-positive-text: #9af1c8;
+  --worldcup-ready-text: #bdf1ce;
+  --worldcup-goal-text: #73e7b4;
+  --worldcup-danger-text: #ffb2a7;
+  --worldcup-icon-bg: rgba(255, 255, 255, 0.04);
+  --worldcup-odds-preview-bg:
+    linear-gradient(180deg, rgba(12, 19, 32, 0.72), rgba(7, 12, 22, 0.74)),
+    rgba(255, 255, 255, 0.03);
+  --worldcup-odds-preview-hover-bg:
+    linear-gradient(180deg, rgba(17, 27, 45, 0.84), rgba(10, 16, 29, 0.82)),
+    rgba(255, 255, 255, 0.045);
+  --worldcup-odds-tile-bg: rgba(255, 255, 255, 0.055);
+  --worldcup-odds-side-bg: rgba(255, 255, 255, 0.075);
+  --worldcup-overlay-bg: rgba(8, 12, 18, 0.7);
+  --worldcup-ticket-bg: rgba(255, 255, 255, 0.04);
+  --worldcup-ticket-item-bg: rgba(0, 0, 0, 0.12);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.worldcup-fixed-stack {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+}
+
+:root[data-theme='light'] .worldcup-page {
+  --worldcup-hero-bg:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(242, 247, 253, 0.94)),
+    radial-gradient(circle at 8% 0%, rgba(250, 190, 92, 0.22), transparent 34%),
+    radial-gradient(circle at 90% 8%, rgba(77, 150, 219, 0.18), transparent 30%);
+  --worldcup-soft-surface: rgba(255, 255, 255, 0.76);
+  --worldcup-field-bg: rgba(248, 251, 255, 0.96);
+  --worldcup-field-border: rgba(121, 145, 180, 0.34);
+  --worldcup-field-scheme: light;
+  --worldcup-date-chip-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 245, 252, 0.92)),
+    rgba(255, 255, 255, 0.78);
+  --worldcup-date-chip-active-bg:
+    linear-gradient(180deg, rgba(255, 241, 203, 0.96), rgba(255, 250, 238, 0.94)),
+    rgba(255, 255, 255, 0.88);
+  --worldcup-date-chip-shadow: 0 0.7rem 1.9rem rgba(190, 139, 43, 0.13);
+  --worldcup-baidu-panel-bg:
+    linear-gradient(180deg, rgba(231, 241, 255, 0.96), rgba(255, 255, 255, 0.92)),
+    rgba(255, 255, 255, 0.82);
+  --worldcup-baidu-source-bg: rgba(43, 116, 206, 0.1);
+  --worldcup-baidu-source-text: #2f649d;
+  --worldcup-baidu-dashed-border: rgba(122, 146, 178, 0.32);
+  --worldcup-baidu-metric-bg: rgba(219, 235, 255, 0.86);
+  --worldcup-baidu-metric-text: #47698f;
+  --worldcup-baidu-box-bg: rgba(255, 255, 255, 0.72);
+  --worldcup-baidu-prediction-bg: rgba(247, 251, 255, 0.9);
+  --worldcup-baidu-intel-bg: rgba(249, 252, 255, 0.9);
+  --worldcup-gold-text: #9d6b12;
+  --worldcup-card-text-themed: #20304a;
+  --worldcup-card-muted-themed: #5e6e87;
+  --worldcup-card-bg:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(243, 248, 255, 0.94) 58%, rgba(255, 251, 240, 0.9)),
+    radial-gradient(circle at 12% 0%, rgba(232, 171, 55, 0.16), transparent 34%),
+    radial-gradient(circle at 96% 14%, rgba(63, 132, 212, 0.14), transparent 30%);
+  --worldcup-card-glow-bg: rgba(232, 171, 55, 0.1);
+  --worldcup-card-chip-bg:
+    linear-gradient(90deg, rgba(255, 251, 240, 0.92), rgba(235, 244, 255, 0.88)),
+    rgba(255, 255, 255, 0.74);
+  --worldcup-card-button-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(238, 245, 253, 0.9)),
+    rgba(255, 255, 255, 0.78);
+  --worldcup-card-button-hover-bg:
+    linear-gradient(180deg, rgba(255, 244, 212, 0.96), rgba(242, 248, 255, 0.92)),
+    rgba(255, 255, 255, 0.86);
+  --worldcup-card-shadow:
+    0 1.1rem 2.4rem rgba(91, 111, 143, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  --worldcup-card-hover-shadow:
+    0 1.35rem 2.9rem rgba(91, 111, 143, 0.2),
+    0 0 0 1px rgba(220, 167, 70, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --worldcup-pick-bg:
+    linear-gradient(135deg, rgba(229, 241, 255, 0.95), rgba(255, 249, 231, 0.9)),
+    rgba(255, 255, 255, 0.8);
+  --worldcup-pick-stat-bg: rgba(247, 250, 254, 0.9);
+  --worldcup-positive-text: #16794a;
+  --worldcup-ready-text: #28764a;
+  --worldcup-goal-text: #087d57;
+  --worldcup-danger-text: #c64f42;
+  --worldcup-icon-bg: rgba(255, 255, 255, 0.72);
+  --worldcup-odds-preview-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 253, 0.92)),
+    rgba(255, 255, 255, 0.75);
+  --worldcup-odds-preview-hover-bg:
+    linear-gradient(180deg, rgba(255, 252, 244, 0.98), rgba(235, 243, 253, 0.96)),
+    rgba(255, 255, 255, 0.86);
+  --worldcup-odds-tile-bg: rgba(248, 251, 255, 0.92);
+  --worldcup-odds-side-bg: rgba(236, 244, 253, 0.92);
+  --worldcup-overlay-bg: rgba(28, 40, 58, 0.38);
+  --worldcup-ticket-bg: rgba(255, 255, 255, 0.78);
+  --worldcup-ticket-item-bg: rgba(245, 249, 255, 0.82);
 }
 
 .worldcup-hero {
@@ -10,9 +162,7 @@
   padding: 1.4rem;
   border: 1px solid var(--border-1);
   border-radius: 1.2rem;
-  background:
-    linear-gradient(160deg, rgba(20, 28, 44, 0.92), rgba(13, 18, 31, 0.94)),
-    radial-gradient(circle at top right, rgba(255, 215, 0, 0.15), transparent 35%);
+  background: var(--worldcup-hero-bg);
 }
 
 .worldcup-hero--compact {
@@ -54,7 +204,7 @@
 .worldcup-empty {
   border: 1px solid var(--border-1);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--worldcup-soft-surface);
 }
 
 .worldcup-hero__stats div {
@@ -84,16 +234,22 @@
 
 .worldcup-grid {
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .worldcup-column {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.75rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .worldcup-column--wide {
   min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .worldcup-panel__header {
@@ -132,11 +288,11 @@
 .worldcup-date-input input {
   min-height: 2.35rem;
   padding: 0 0.65rem;
-  border: 1px solid rgba(159, 195, 255, 0.2);
+  border: 1px solid var(--worldcup-field-border);
   border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--worldcup-field-bg);
   color: var(--text-1);
-  color-scheme: dark;
+  color-scheme: var(--worldcup-field-scheme);
   font: inherit;
   font-size: 0.9rem;
 }
@@ -155,6 +311,43 @@
   scrollbar-width: thin;
 }
 
+.worldcup-match-list,
+.worldcup-recommendation-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(159, 195, 255, 0.42) rgba(255, 255, 255, 0.04);
+}
+
+.worldcup-match-list {
+  padding-right: 0.16rem;
+}
+
+.worldcup-recommendation-scroll {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  padding-right: 0.16rem;
+}
+
+.worldcup-match-list::-webkit-scrollbar,
+.worldcup-recommendation-scroll::-webkit-scrollbar {
+  width: 0.48rem;
+}
+
+.worldcup-match-list::-webkit-scrollbar-track,
+.worldcup-recommendation-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.worldcup-match-list::-webkit-scrollbar-thumb,
+.worldcup-recommendation-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(159, 195, 255, 0.42);
+}
+
 .worldcup-date-strip__empty {
   color: var(--text-2);
   font-size: 0.92rem;
@@ -168,9 +361,7 @@
   padding: 0.62rem 0.7rem;
   border: 1px solid rgba(159, 195, 255, 0.16);
   border-radius: 0.8rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028)),
-    rgba(9, 16, 29, 0.5);
+  background: var(--worldcup-date-chip-bg);
   color: inherit;
   text-align: left;
 }
@@ -181,10 +372,8 @@
 
 .worldcup-date-chip.is-active {
   border-color: rgba(255, 211, 106, 0.55);
-  background:
-    linear-gradient(180deg, rgba(255, 211, 106, 0.14), rgba(255, 211, 106, 0.05)),
-    rgba(9, 16, 29, 0.7);
-  box-shadow: 0 0.6rem 1.8rem rgba(255, 211, 106, 0.1);
+  background: var(--worldcup-date-chip-active-bg);
+  box-shadow: var(--worldcup-date-chip-shadow);
 }
 
 .worldcup-date-chip strong,
@@ -221,9 +410,7 @@
   padding: 0.95rem;
   border: 1px solid rgba(112, 188, 255, 0.22);
   border-radius: 1rem;
-  background:
-    linear-gradient(180deg, rgba(54, 120, 214, 0.12), rgba(255, 255, 255, 0.035)),
-    rgba(255, 255, 255, 0.035);
+  background: var(--worldcup-baidu-panel-bg);
 }
 
 .worldcup-baidu-panel .worldcup-panel__header > div {
@@ -247,8 +434,8 @@
   padding: 0 0.55rem;
   border: 1px solid rgba(112, 188, 255, 0.22);
   border-radius: 999px;
-  background: rgba(64, 145, 255, 0.12);
-  color: #bcd8ff;
+  background: var(--worldcup-baidu-source-bg);
+  color: var(--worldcup-baidu-source-text);
   font-size: 0.8rem;
   font-weight: 800;
   white-space: nowrap;
@@ -256,7 +443,7 @@
 
 .worldcup-baidu-panel__empty {
   padding: 0.9rem;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border: 1px dashed var(--worldcup-baidu-dashed-border);
   border-radius: 0.8rem;
   color: var(--text-2);
 }
@@ -272,9 +459,9 @@
   gap: 0.2rem;
   min-width: 0;
   padding: 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.82rem;
-  background: rgba(8, 15, 27, 0.34);
+  background: var(--worldcup-baidu-prediction-bg);
 }
 
 .worldcup-baidu-prediction span,
@@ -311,7 +498,7 @@
 }
 
 .worldcup-baidu-squad span {
-  color: #ffd36a;
+  color: var(--worldcup-gold-text);
   font-weight: 800;
 }
 
@@ -330,9 +517,9 @@
   gap: 0.62rem;
   min-width: 0;
   padding: 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.82rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--worldcup-baidu-box-bg);
 }
 
 .worldcup-baidu-record__top {
@@ -364,8 +551,8 @@
   align-items: center;
   padding: 0 0.45rem;
   border-radius: 999px;
-  background: rgba(80, 161, 255, 0.12);
-  color: #cfe2ff;
+  background: var(--worldcup-baidu-metric-bg);
+  color: var(--worldcup-baidu-metric-text);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -410,13 +597,13 @@
   display: grid;
   gap: 0.42rem;
   padding: 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.82rem;
-  background: rgba(0, 0, 0, 0.14);
+  background: var(--worldcup-baidu-intel-bg);
 }
 
 .worldcup-baidu-intel__team strong {
-  color: #ffd36a;
+  color: var(--worldcup-gold-text);
 }
 
 .worldcup-baidu-intel__team ul {
@@ -462,8 +649,8 @@
 }
 
 .worldcup-card {
-  --worldcup-card-text: #f3efe8;
-  --worldcup-card-muted: #b8c2d3;
+  --worldcup-card-text: var(--worldcup-card-text-themed);
+  --worldcup-card-muted: var(--worldcup-card-muted-themed);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -472,14 +659,9 @@
   padding: 1.08rem;
   border-color: rgba(159, 195, 255, 0.16);
   border-radius: 1rem;
-  background:
-    linear-gradient(145deg, rgba(23, 35, 55, 0.92), rgba(10, 16, 29, 0.88) 58%, rgba(21, 36, 52, 0.9)),
-    radial-gradient(circle at 12% 0%, rgba(255, 211, 106, 0.16), transparent 32%),
-    radial-gradient(circle at 96% 14%, rgba(84, 170, 255, 0.16), transparent 28%);
+  background: var(--worldcup-card-bg);
   color: var(--worldcup-card-text);
-  box-shadow:
-    0 1.4rem 3.2rem rgba(3, 8, 18, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  box-shadow: var(--worldcup-card-shadow);
 }
 
 .worldcup-card::before,
@@ -509,17 +691,14 @@
   top: -7rem;
   right: -3rem;
   border-radius: 999px;
-  background: rgba(255, 211, 106, 0.1);
+  background: var(--worldcup-card-glow-bg);
   filter: blur(1.2rem);
 }
 
 .worldcup-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 211, 106, 0.3);
-  box-shadow:
-    0 1.7rem 3.6rem rgba(3, 8, 18, 0.3),
-    0 0 0 1px rgba(255, 211, 106, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  box-shadow: var(--worldcup-card-hover-shadow);
 }
 
 .worldcup-card__header,
@@ -570,13 +749,13 @@
   background:
     linear-gradient(135deg, rgba(255, 211, 106, 0.18), rgba(92, 188, 255, 0.1)),
     rgba(255, 255, 255, 0.04);
-  color: #ffe09a;
+  color: var(--worldcup-gold-text);
   font-size: 0.72rem;
   font-weight: 900;
 }
 
 .worldcup-card__eyebrow svg {
-  color: #ffd36a;
+  color: var(--worldcup-gold-text);
 }
 
 .worldcup-card--play-group {
@@ -596,9 +775,7 @@
   padding: 0.76rem;
   border: 1px solid rgba(159, 195, 255, 0.16);
   border-radius: 0.86rem;
-  background:
-    linear-gradient(135deg, rgba(92, 188, 255, 0.11), rgba(255, 211, 106, 0.06)),
-    rgba(255, 255, 255, 0.035);
+  background: var(--worldcup-pick-bg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
@@ -622,7 +799,7 @@
 }
 
 .worldcup-play-pick__main strong {
-  color: #ffd36a;
+  color: var(--worldcup-gold-text);
   font-size: clamp(1.62rem, 3vw, 2.3rem);
   line-height: 1;
   text-shadow: 0 0.75rem 1.8rem rgba(255, 211, 106, 0.16);
@@ -645,9 +822,9 @@
   gap: 0.1rem;
   min-height: 3.6rem;
   padding: 0.5rem 0.56rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.68rem;
-  background: rgba(5, 10, 20, 0.22);
+  background: var(--worldcup-pick-stat-bg);
 }
 
 .worldcup-play-pick__stats strong {
@@ -666,7 +843,7 @@
 }
 
 .worldcup-play-pick__stats span:first-child strong {
-  color: #9af1c8;
+  color: var(--worldcup-positive-text);
 }
 
 .worldcup-play-pick__actions {
@@ -696,9 +873,9 @@
   min-height: 2.55rem;
   width: 100%;
   padding: 0 0.7rem;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border: 1px dashed var(--worldcup-baidu-dashed-border);
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--worldcup-soft-surface);
   color: var(--text-2);
   font-weight: 700;
 }
@@ -711,7 +888,7 @@ button.worldcup-match-card__odds-action {
   border-style: solid;
   border-color: rgba(92, 188, 132, 0.34);
   background: rgba(92, 188, 132, 0.1);
-  color: #bdf1ce;
+  color: var(--worldcup-ready-text);
 }
 
 .worldcup-match-card__odds-preview {
@@ -723,9 +900,7 @@ button.worldcup-match-card__odds-action {
   padding: 0.65rem;
   border: 1px solid rgba(159, 195, 255, 0.18);
   border-radius: 0.85rem;
-  background:
-    linear-gradient(180deg, rgba(12, 19, 32, 0.72), rgba(7, 12, 22, 0.74)),
-    rgba(255, 255, 255, 0.03);
+  background: var(--worldcup-odds-preview-bg);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -733,9 +908,7 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-match-card__odds-preview:hover {
   border-color: rgba(159, 195, 255, 0.36);
-  background:
-    linear-gradient(180deg, rgba(17, 27, 45, 0.84), rgba(10, 16, 29, 0.82)),
-    rgba(255, 255, 255, 0.045);
+  background: var(--worldcup-odds-preview-hover-bg);
 }
 
 .worldcup-match-card__odds-rows {
@@ -771,15 +944,15 @@ button.worldcup-match-card__odds-action {
   border: 1px solid rgba(72, 204, 146, 0.28);
   border-radius: 999px;
   background: rgba(72, 204, 146, 0.14);
-  color: #73e7b4;
+  color: var(--worldcup-goal-text);
   font-weight: 800;
   font-size: 0.88rem;
   white-space: nowrap;
 }
 
 .worldcup-match-card__goal-line.is-neutral {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-1);
+  background: var(--worldcup-field-bg);
   color: var(--text-2);
 }
 
@@ -798,9 +971,9 @@ button.worldcup-match-card__odds-action {
   min-width: 0;
   min-height: 2.55rem;
   padding: 0 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--worldcup-odds-tile-bg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   white-space: nowrap;
 }
@@ -826,9 +999,9 @@ button.worldcup-match-card__odds-action {
   justify-content: center;
   min-height: 2.55rem;
   padding: 0 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-1);
   border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--worldcup-odds-tile-bg);
   color: var(--text-2);
   font-size: 0.94rem;
   font-weight: 800;
@@ -842,9 +1015,9 @@ button.worldcup-match-card__odds-action {
   justify-content: center;
   min-height: 100%;
   padding: 0 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid var(--border-1);
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--worldcup-odds-side-bg);
   color: var(--text-1);
   font-size: 0.9rem;
   font-weight: 800;
@@ -858,7 +1031,7 @@ button.worldcup-match-card__odds-action {
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--worldcup-overlay-bg);
 }
 
 .worldcup-odds-modal__panel {
@@ -1134,9 +1307,7 @@ button.worldcup-match-card__odds-action {
   padding: 0.42rem 0.62rem;
   border: 1px solid rgba(159, 195, 255, 0.1);
   border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
-    rgba(255, 255, 255, 0.035);
+  background: var(--worldcup-card-chip-bg);
   font-weight: 800;
   text-align: center;
 }
@@ -1148,9 +1319,7 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-card__actions .ghost-button {
   border: 1px solid rgba(159, 195, 255, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.055)),
-    rgba(255, 255, 255, 0.04);
+  background: var(--worldcup-card-button-bg);
   color: var(--worldcup-card-text);
   font-weight: 850;
 }
@@ -1161,9 +1330,7 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-card__actions .ghost-button:hover {
   border-color: rgba(255, 211, 106, 0.28);
-  background:
-    linear-gradient(180deg, rgba(255, 211, 106, 0.16), rgba(255, 255, 255, 0.06)),
-    rgba(255, 255, 255, 0.05);
+  background: var(--worldcup-card-button-hover-bg);
 }
 
 .worldcup-icon-btn {
@@ -1174,7 +1341,7 @@ button.worldcup-match-card__odds-action {
   height: 2.2rem;
   border: 1px solid var(--border-1);
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--worldcup-icon-bg);
   color: var(--text-1);
   transition:
     transform var(--motion-fast) var(--motion-ease-standard),
@@ -1198,7 +1365,7 @@ button.worldcup-match-card__odds-action {
 .worldcup-detail {
   position: fixed;
   inset: 0;
-  background: rgba(8, 12, 18, 0.7);
+  background: var(--worldcup-overlay-bg);
   display: grid;
   place-items: center;
   z-index: 120;
@@ -1227,7 +1394,7 @@ button.worldcup-match-card__odds-action {
   padding: 1rem;
   border: 1px solid var(--border-1);
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--worldcup-ticket-bg);
 }
 
 .worldcup-ticket__items,
@@ -1245,7 +1412,7 @@ button.worldcup-match-card__odds-action {
   padding: 0.7rem;
   border: 1px solid var(--border-1);
   border-radius: 0.55rem;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--worldcup-ticket-item-bg);
 }
 
 .worldcup-history-row {
@@ -1321,20 +1488,20 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-status-pill.is-active,
 .worldcup-result-pill.is-hit {
-  color: #92f2b3;
+  color: var(--worldcup-positive-text);
   border-color: rgba(146, 242, 179, 0.45);
   background: rgba(146, 242, 179, 0.12);
 }
 
 .worldcup-status-pill.is-settled {
-  color: #9fc3ff;
+  color: var(--worldcup-baidu-source-text);
   border-color: rgba(159, 195, 255, 0.45);
   background: rgba(159, 195, 255, 0.12);
 }
 
 .worldcup-status-pill.is-archived,
 .worldcup-result-pill.is-miss {
-  color: #ffb2a7;
+  color: var(--worldcup-danger-text);
   border-color: rgba(255, 178, 167, 0.45);
   background: rgba(255, 178, 167, 0.1);
 }
@@ -1344,6 +1511,20 @@ button.worldcup-match-card__odds-action {
 }
 
 @media (max-width: 980px) {
+  .worldcup-page,
+  .worldcup-grid,
+  .worldcup-column,
+  .worldcup-match-list,
+  .worldcup-recommendation-scroll {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .worldcup-page {
+    grid-template-rows: auto;
+  }
+
   .worldcup-hero,
   .worldcup-grid {
     grid-template-columns: minmax(0, 1fr);

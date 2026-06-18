@@ -38,6 +38,15 @@ vi.mock('../features/home/HomeRulesPage', () => ({
 vi.mock('../features/messages/MessageCenterPage', () => ({
   MessageCenterPage: () => <div>Message Center Page Mock</div>,
 }))
+vi.mock('../features/worldcup/WorldCupPage', () => ({
+  WorldCupPage: () => <div>WorldCup Page Mock</div>,
+}))
+vi.mock('../features/worldcup/WorldCupSimulationPage', () => ({
+  WorldCupSimulationPage: () => <div>WorldCup Simulation Page Mock</div>,
+}))
+vi.mock('../features/worldcup/WorldCupHistoryPage', () => ({
+  WorldCupHistoryPage: () => <div>WorldCup History Page Mock</div>,
+}))
 
 vi.mock('../features/landing/LandingPage', () => ({
   LandingPage: () => <div>Landing Page Mock</div>,
@@ -171,6 +180,13 @@ describe('App routing', () => {
     expect(await screen.findByText('Home Page Mock')).toBeInTheDocument()
     expect(document.querySelector('.crm-shell')).toHaveClass('crm-shell--my-bets')
     expect(document.querySelector('.crm-main')).toHaveClass('crm-main--my-bets')
+  })
+
+  it('scopes fixed-height layout to the worldcup route', async () => {
+    renderApp(['/dashboard/worldcup'])
+    expect(await screen.findByText('WorldCup Page Mock')).toBeInTheDocument()
+    expect(document.querySelector('.crm-shell')).toHaveClass('crm-shell--worldcup')
+    expect(document.querySelector('.crm-main')).toHaveClass('crm-main--worldcup')
   })
 
   it('opens the context assistant drawer from the topbar', async () => {

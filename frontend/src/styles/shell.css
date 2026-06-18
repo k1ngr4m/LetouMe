@@ -1114,13 +1114,15 @@
   padding: 0.9rem 1.12rem 1.9rem;
 }
 
-.crm-shell--my-bets {
+.crm-shell--my-bets,
+.crm-shell--worldcup {
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
 
-.crm-shell--my-bets .crm-workspace {
+.crm-shell--my-bets .crm-workspace,
+.crm-shell--worldcup .crm-workspace {
   height: 100dvh;
   overflow: hidden;
 }
@@ -1137,6 +1139,14 @@
   min-height: 0;
 }
 
+.crm-main--worldcup {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  padding-bottom: 0.9rem;
+}
+
 @media (min-width: 861px) {
   .crm-main--my-bets:has(.my-bets-page--form) {
     overflow-y: auto;
@@ -1145,6 +1155,21 @@
 
   .crm-main--my-bets:has(.my-bets-page--form) > .my-bets-page {
     min-height: auto;
+  }
+}
+
+@media (max-width: 980px) {
+  .crm-shell--worldcup,
+  .crm-shell--worldcup .crm-workspace {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .crm-main--worldcup {
+    overflow: visible;
+    display: grid;
+    padding-bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
