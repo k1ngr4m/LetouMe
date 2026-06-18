@@ -822,13 +822,6 @@ export function WorldCupPage() {
         </div>
 
         <div className="worldcup-column worldcup-column--wide">
-          <BaiduAnalysisPanel
-            analysis={baiduAnalysisQuery.data?.analysis}
-            error={baiduAnalysisQuery.error instanceof Error ? baiduAnalysisQuery.error.message : undefined}
-            isLoading={baiduAnalysisQuery.isLoading}
-            match={selectedMatch}
-          />
-
           <div className="worldcup-panel__header">
             <h2>推荐方案</h2>
             <span>每种玩法均展示</span>
@@ -906,6 +899,13 @@ export function WorldCupPage() {
               ))}
             </div>
           )}
+
+          <BaiduAnalysisPanel
+            analysis={baiduAnalysisQuery.data?.analysis}
+            error={baiduAnalysisQuery.error instanceof Error ? baiduAnalysisQuery.error.message : undefined}
+            isLoading={baiduAnalysisQuery.isLoading}
+            match={selectedMatch}
+          />
         </div>
       </section>
 

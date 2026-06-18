@@ -228,7 +228,9 @@ describe('WorldCupPage odds display', () => {
   it('shows baidu pre-match analysis for the selected match', async () => {
     renderPage()
 
-    expect(await screen.findByText('赛前分析')).toBeInTheDocument()
+    const recommendationHeading = await screen.findByRole('heading', { name: '推荐方案' })
+    const analysisHeading = await screen.findByRole('heading', { name: '赛前分析' })
+    expect(recommendationHeading.compareDocumentPosition(analysisHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByText('Baidu 体育')).toBeInTheDocument()
     expect(await screen.findByText('68%')).toBeInTheDocument()
     expect(screen.getByText('71955 样本')).toBeInTheDocument()
