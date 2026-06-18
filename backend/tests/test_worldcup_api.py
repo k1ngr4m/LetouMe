@@ -243,7 +243,7 @@ class WorldCupApiTests(unittest.TestCase):
                 sum(1 for item in payload["recommendations"] if item["match"]["match_id"] == match["match_id"])
                 for match in matches
             ),
-            3,
+            5,
         )
 
     def test_detail_favorite_and_simulation_draft(self) -> None:

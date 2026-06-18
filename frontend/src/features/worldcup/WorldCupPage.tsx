@@ -35,6 +35,8 @@ const STATUS_OPTIONS: Array<{ value: 'all' | 'scheduled' | 'live' | 'finished'; 
   { value: 'finished', label: '已结束' },
 ]
 
+const HIDDEN_RECOMMENDATION_RISK_TAGS = new Set(['资讯不足', '阵容待确认'])
+
 const PLAY_TYPE_ORDER = PLAY_TYPE_OPTIONS.filter((option): option is { value: WorldCupPlayType; label: string } => option.value !== 'all')
 const WIN_DRAW_WIN_ORDER = ['胜', '平', '负']
 const TOTAL_GOALS_ORDER = ['0', '1', '2', '3', '4', '5', '6', '7+']
@@ -64,6 +66,10 @@ function riskLabel(level: WorldCupRiskLevel) {
   if (level === 'low') return '低风险'
   if (level === 'high') return '高风险'
   return '中风险'
+}
+
+function getVisibleRecommendationRiskTags(tags: string[]) {
+  return tags.filter((tag) => !HIDDEN_RECOMMENDATION_RISK_TAGS.has(tag))
 }
 
 function getOddsEntries(snapshot: Pick<WorldCupOddsSnapshot, 'odds'>) {
@@ -825,7 +831,7 @@ export function WorldCupPage() {
 
           <div className="worldcup-panel__header">
             <h2>推荐方案</h2>
-            <span>每场最多 3 条</span>
+            <span>每种玩法均展示</span>
           </div>
 
           {recommendations.length === 0 ? (
@@ -877,9 +883,11 @@ export function WorldCupPage() {
                   <RecommendationOddsSummary recommendation={recommendation} />
 
                   <p className="worldcup-card__reason">{recommendation.reason}</p>
-                  <div className="worldcup-card__tags">
-                    {recommendation.risk_tags.map((tag) => <span key={tag}>{tag}</span>)}
-                  </div>
+                  {getVisibleRecommendationRiskTags(recommendation.risk_tags).length > 0 ? (
+                    <div className="worldcup-card__tags">
+                      {getVisibleRecommendationRiskTags(recommendation.risk_tags).map((tag) => <span key={tag}>{tag}</span>)}
+                    </div>
+                  ) : null}
                   <p className="worldcup-card__notice">{recommendation.compliance_notice}</p>
 
                   <div className="worldcup-card__actions">

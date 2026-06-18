@@ -624,7 +624,7 @@ class WorldCupService:
         for row in rows:
             match_id = str(row.get("match_id") or "")
             current = counts.get(match_id, 0)
-            if current >= 3:
+            if current >= len(PLAY_TYPE_ORDER):
                 continue
             counts[match_id] = current + 1
             limited.append(row)
