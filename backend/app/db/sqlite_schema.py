@@ -243,6 +243,7 @@ SQLITE_SCHEMA_STATEMENTS = [
             selection TEXT NOT NULL,
             odds_value TEXT NULL,
             implied_probability REAL NULL,
+            confidence_score REAL NULL,
             confidence_level TEXT NOT NULL DEFAULT 'medium',
             risk_level TEXT NOT NULL DEFAULT 'medium',
             budget_min INTEGER NOT NULL DEFAULT 0,

@@ -203,6 +203,7 @@ class WorldCupRecommendationResponse(BaseModel):
     selection: str
     odds_value: str | None = None
     implied_probability: float | None = None
+    confidence_score: float | None = None
     confidence_level: str = "medium"
     risk_level: str = "medium"
     budget_min: int = 0

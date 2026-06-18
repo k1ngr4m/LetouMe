@@ -195,7 +195,8 @@ class WorldCupPredictionService:
             raise ValueError("模型返回的世界杯预测结构无效")
         context_by_match = {str(item.get("match_id") or ""): item for item in match_context}
         result: list[dict[str, Any]] = []
-        for index, row in enumerate(rows):
+        play_counts: dict[tuple[str, str], int] = {}
+        for row in rows:
             if not isinstance(row, dict):
                 continue
             match_id = str(row.get("match_id") or "").strip()
@@ -203,7 +204,19 @@ class WorldCupPredictionService:
             selection = str(row.get("selection") or "").strip()
             if match_id not in context_by_match or play_type not in WORLDCUP_PLAY_TYPES or not selection:
                 continue
+            play_key = (match_id, play_type)
+            play_count = play_counts.get(play_key, 0) + 1
+            if play_type == "correct_score" and play_count > 3:
+                continue
+            play_counts[play_key] = play_count
             odds_value = str(row.get("odds_value") or "").strip()
+            confidence_level = self._normalize_level(row.get("confidence_level"), default="medium")
+            confidence_score = self._bounded_float(
+                row.get("confidence_score"),
+                minimum=0,
+                maximum=100,
+                default=self._default_confidence_score(confidence_level),
+            )
             model_sources = self._normalize_string_list(row.get("model_sources"))
             if not model_sources:
                 model_sources = ["中国竞彩网赔率", "世界杯赛程"]
@@ -211,15 +224,19 @@ class WorldCupPredictionService:
                     model_sources.append("球队最新资讯")
                 if self._match_has_baidu_sports(context_by_match[match_id]):
                     model_sources.append("百度体育赛前分析")
+            recommendation_id = f"wc-ai-{model_code}-{match_id}-{play_type}"
+            if play_type == "correct_score":
+                recommendation_id = f"{recommendation_id}-{play_count}"
             result.append(
                 {
-                    "recommendation_id": f"wc-ai-{model_code}-{match_id}-{play_type}",
+                    "recommendation_id": recommendation_id,
                     "match_id": match_id,
                     "play_type": play_type,
                     "selection": selection[:128],
                     "odds_value": odds_value,
                     "implied_probability": self._implied_probability(odds_value),
-                    "confidence_level": self._normalize_level(row.get("confidence_level"), default="medium"),
+                    "confidence_score": confidence_score,
+                    "confidence_level": confidence_level,
                     "risk_level": self._normalize_level(row.get("risk_level"), default="medium"),
                     "budget_min": self._bounded_int(row.get("budget_min"), minimum=0, maximum=200, default=0),
                     "budget_max": self._bounded_int(row.get("budget_max"), minimum=0, maximum=300, default=30),
@@ -295,6 +312,22 @@ class WorldCupPredictionService:
         except (TypeError, ValueError):
             return default
         return max(minimum, min(maximum, parsed))
+
+    @staticmethod
+    def _bounded_float(value: Any, *, minimum: float, maximum: float, default: float) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return default
+        return round(max(minimum, min(maximum, parsed)), 2)
+
+    @staticmethod
+    def _default_confidence_score(confidence_level: str) -> float:
+        if confidence_level == "high":
+            return 80.0
+        if confidence_level == "low":
+            return 45.0
+        return 65.0
 
     @staticmethod
     def _normalize_string_list(value: Any) -> list[str]:

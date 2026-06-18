@@ -96,12 +96,13 @@ class WorldCupApiTests(unittest.TestCase):
                 cursor.execute(
                     """
                     INSERT INTO worldcup_recommendation (
-                        recommendation_id,
-                        match_id,
-                        play_type,
-                        selection,
-                        odds_value,
-                        confidence_level,
+                            recommendation_id,
+                            match_id,
+                            play_type,
+                            selection,
+                            odds_value,
+                            confidence_score,
+                            confidence_level,
                         risk_level,
                         budget_min,
                         budget_max,
@@ -110,15 +111,16 @@ class WorldCupApiTests(unittest.TestCase):
                         risk_tags_json,
                         status,
                         compliance_notice
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        "test-worldcup-rec-1",
-                        "test-worldcup-match",
-                        "win_draw_win",
-                        "胜",
-                        "1.80",
-                        "medium",
+                            "test-worldcup-rec-1",
+                            "test-worldcup-match",
+                            "win_draw_win",
+                            "胜",
+                            "1.80",
+                            63,
+                            "medium",
                         "low",
                         10,
                         30,
@@ -238,6 +240,7 @@ class WorldCupApiTests(unittest.TestCase):
         self.assertIn("不保证", payload["compliance_notice"])
         win_recommendation = next(item for item in payload["recommendations"] if item["recommendation_id"] == "test-worldcup-rec-1")
         self.assertEqual(win_recommendation["latest_odds"]["胜"], "1.80")
+        self.assertEqual(win_recommendation["confidence_score"], 63.0)
         self.assertLessEqual(
             max(
                 sum(1 for item in payload["recommendations"] if item["match"]["match_id"] == match["match_id"])

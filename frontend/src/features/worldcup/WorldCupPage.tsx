@@ -62,6 +62,13 @@ function confidenceLabel(level: WorldCupConfidenceLevel) {
   return '中信心'
 }
 
+function confidenceScoreLabel(recommendation: WorldCupRecommendation) {
+  if (typeof recommendation.confidence_score === 'number') {
+    return `${Math.round(recommendation.confidence_score)}%`
+  }
+  return confidenceLabel(recommendation.confidence_level)
+}
+
 function riskLabel(level: WorldCupRiskLevel) {
   if (level === 'low') return '低风险'
   if (level === 'high') return '高风险'
@@ -863,7 +870,7 @@ export function WorldCupPage() {
                   </div>
 
                   <div className="worldcup-card__meta">
-                    <span className="worldcup-card__metric worldcup-card__metric--confidence"><small>信心</small><strong>{confidenceLabel(recommendation.confidence_level)}</strong></span>
+                    <span className="worldcup-card__metric worldcup-card__metric--confidence"><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
                     <span className="worldcup-card__metric worldcup-card__metric--risk"><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
                     <span className="worldcup-card__metric"><small>预算</small><strong>{recommendation.budget_min}-{recommendation.budget_max} 元</strong></span>
                     <span className="worldcup-card__metric"><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</strong></span>

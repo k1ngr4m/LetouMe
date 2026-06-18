@@ -469,6 +469,7 @@ def _ensure_compat_columns(cursor: MySQLCursorAdapter | SQLiteCursorAdapter, db_
     worldcup_recommendation_columns = {
         "odds_value": "VARCHAR(32)" if db_driver == "mysql" else text_type,
         "implied_probability": double_type,
+        "confidence_score": double_type,
         "input_summary_json": json_type,
         "ai_payload_json": json_type,
         "model_code": "VARCHAR(128)" if db_driver == "mysql" else text_type,

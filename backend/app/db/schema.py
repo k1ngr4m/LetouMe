@@ -268,6 +268,7 @@ SCHEMA_STATEMENTS = [
         selection VARCHAR(128) NOT NULL,
         odds_value VARCHAR(32) NULL,
         implied_probability DOUBLE NULL,
+        confidence_score DOUBLE NULL,
         confidence_level VARCHAR(16) NOT NULL DEFAULT 'medium',
         risk_level VARCHAR(16) NOT NULL DEFAULT 'medium',
         budget_min INT NOT NULL DEFAULT 0,

@@ -147,6 +147,7 @@ class WorldCupRepository:
                             selection,
                             odds_value,
                             implied_probability,
+                            confidence_score,
                             confidence_level,
                             risk_level,
                             budget_min,
@@ -160,11 +161,12 @@ class WorldCupRepository:
                             risk_tags_json,
                             status,
                             compliance_notice
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
                             selection = VALUES(selection),
                             odds_value = VALUES(odds_value),
                             implied_probability = VALUES(implied_probability),
+                            confidence_score = VALUES(confidence_score),
                             confidence_level = VALUES(confidence_level),
                             risk_level = VALUES(risk_level),
                             budget_min = VALUES(budget_min),
@@ -187,6 +189,7 @@ class WorldCupRepository:
                             recommendation["selection"],
                             recommendation.get("odds_value"),
                             recommendation.get("implied_probability"),
+                            recommendation.get("confidence_score"),
                             recommendation.get("confidence_level") or "medium",
                             recommendation.get("risk_level") or "medium",
                             int(recommendation.get("budget_min") or 0),

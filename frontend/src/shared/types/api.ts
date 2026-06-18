@@ -418,6 +418,7 @@ export type WorldCupRecommendation = {
   selection: string
   odds_value?: string | null
   implied_probability?: number | null
+  confidence_score?: number | null
   confidence_level: WorldCupConfidenceLevel
   risk_level: WorldCupRiskLevel
   budget_min: number

@@ -50,8 +50,7 @@ class WorldCupService:
             play_type_filter=str(payload.get("play_type_filter") or "all"),
             risk_level_filter=str(payload.get("risk_level_filter") or "all"),
         )
-        limited_rows = self._limit_recommendations_per_match(rows)
-        recommendations = [self._serialize_recommendation(row) for row in limited_rows]
+        recommendations = [self._serialize_recommendation(row) for row in rows]
         return {
             "recommendations": recommendations,
             "total_count": len(recommendations),
@@ -223,6 +222,7 @@ class WorldCupService:
             "selection": str(row.get("selection") or ""),
             "odds_value": str(row.get("odds_value") or "") or None,
             "implied_probability": float(row["implied_probability"]) if row.get("implied_probability") is not None else None,
+            "confidence_score": float(row["confidence_score"]) if row.get("confidence_score") is not None else None,
             "confidence_level": str(row.get("confidence_level") or "medium"),
             "risk_level": str(row.get("risk_level") or "medium"),
             "budget_min": int(row.get("budget_min") or 0),
@@ -616,19 +616,6 @@ class WorldCupService:
         if not isinstance(baidu_source, dict):
             return ""
         return str(baidu_source.get("encoded_match_id") or "").strip()
-
-    @staticmethod
-    def _limit_recommendations_per_match(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        counts: dict[str, int] = {}
-        limited: list[dict[str, Any]] = []
-        for row in rows:
-            match_id = str(row.get("match_id") or "")
-            current = counts.get(match_id, 0)
-            if current >= len(PLAY_TYPE_ORDER):
-                continue
-            counts[match_id] = current + 1
-            limited.append(row)
-        return limited
 
     @staticmethod
     def _clean_text(value: Any) -> str | None:

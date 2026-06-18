@@ -143,6 +143,8 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
         self.assertIn("2026-06-15", rendered)
         self.assertIn("赔率不得影响 `selection`", rendered)
         self.assertIn("不得用赔率高低", rendered)
+        self.assertIn("比分玩法 `correct_score` 每场必须输出 2-3 条不同比分推荐", rendered)
+        self.assertIn('"confidence_score"', rendered)
 
     def test_generate_injects_news_context_and_preserves_news_evidence(self) -> None:
         repository = _FakeWorldCupRepository()
@@ -195,6 +197,70 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
         self.assertEqual(saved["input_summary"]["team_context"]["news"]["status"], "available")
         self.assertEqual(saved["ai_payload"]["news_evidence"][0]["source"], "Fixture News")
         self.assertIn("球队最新资讯", saved["model_sources"])
+
+    def test_normalize_preserves_multiple_correct_score_recommendations(self) -> None:
+        service = WorldCupPredictionService(
+            repository=_FakeWorldCupRepository(),
+            model_repository=_FakeModelRepository(),
+        )
+
+        recommendations = service._normalize_ai_recommendations(
+            {
+                "recommendations": [
+                    {
+                        "match_id": "match-1",
+                        "play_type": "correct_score",
+                        "selection": "1:0",
+                        "odds_value": "6.00",
+                        "confidence_score": 64,
+                        "confidence_level": "medium",
+                        "risk_level": "medium",
+                    },
+                    {
+                        "match_id": "match-1",
+                        "play_type": "correct_score",
+                        "selection": "1:1",
+                        "odds_value": "7.50",
+                        "confidence_score": 58,
+                        "confidence_level": "medium",
+                        "risk_level": "medium",
+                    },
+                    {
+                        "match_id": "match-1",
+                        "play_type": "correct_score",
+                        "selection": "2:1",
+                        "odds_value": "8.00",
+                        "confidence_score": 52,
+                        "confidence_level": "low",
+                        "risk_level": "high",
+                    },
+                    {
+                        "match_id": "match-1",
+                        "play_type": "correct_score",
+                        "selection": "2:0",
+                        "odds_value": "9.00",
+                        "confidence_score": 45,
+                        "confidence_level": "low",
+                        "risk_level": "high",
+                    },
+                ]
+            },
+            match_context=[{"match_id": "match-1", "team_context": {}, "odds": {"correct_score": {"odds": {"1:0": "6.00"}}}}],
+            model_code="model-a",
+            model_name="Fake Display Model",
+            overwrite=False,
+        )
+
+        self.assertEqual([item["selection"] for item in recommendations], ["1:0", "1:1", "2:1"])
+        self.assertEqual(
+            [item["recommendation_id"] for item in recommendations],
+            [
+                "wc-ai-model-a-match-1-correct_score-1",
+                "wc-ai-model-a-match-1-correct_score-2",
+                "wc-ai-model-a-match-1-correct_score-3",
+            ],
+        )
+        self.assertEqual(recommendations[0]["confidence_score"], 64.0)
 
     def test_generate_continues_when_news_service_fails(self) -> None:
         repository = _FakeWorldCupRepository()

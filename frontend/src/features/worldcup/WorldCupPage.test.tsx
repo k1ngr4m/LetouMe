@@ -83,6 +83,7 @@ const recommendation: WorldCupRecommendation = {
   selection: '胜',
   odds_value: '1.80',
   implied_probability: 0.556,
+  confidence_score: 64,
   confidence_level: 'medium',
   risk_level: 'low',
   budget_min: 10,
@@ -200,6 +201,8 @@ describe('WorldCupPage odds display', () => {
     renderPage()
 
     const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    expect(await screen.findByText('置信值')).toBeInTheDocument()
+    expect(await screen.findByText('64%')).toBeInTheDocument()
     expect(within(oddsButton).getAllByText('主胜').length).toBeGreaterThan(0)
     expect(within(oddsButton).getByText('1.80')).toBeInTheDocument()
     expect(within(oddsButton).getByText('3.20')).toBeInTheDocument()
