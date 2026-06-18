@@ -27,6 +27,8 @@ const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string 
   { value: 'correct_score', label: '比分' },
   { value: 'half_full_time', label: '半全场' },
 ]
+const CONFIDENCE_HELP_TEXT = '置信值：模型综合球队状态、赛程、风险等信息后，对本次推荐方向的把握程度。'
+const PROBABILITY_HELP_TEXT = '参考概率：该选项结果发生可能性的估计，来自推荐数据中的概率字段，仅作参考。'
 
 const STATUS_OPTIONS: Array<{ value: 'all' | 'scheduled' | 'live' | 'finished'; label: string }> = [
   { value: 'all', label: '全部状态' },
@@ -80,6 +82,20 @@ function riskLabel(level: WorldCupRiskLevel) {
   if (level === 'low') return '低风险'
   if (level === 'high') return '高风险'
   return '中风险'
+}
+
+function StatHelp({ label, text }: { label: string; text: string }) {
+  return (
+    <button
+      type="button"
+      className="worldcup-stat-help"
+      aria-label={`${label}说明：${text}`}
+      data-tooltip={text}
+      title={text}
+    >
+      ?
+    </button>
+  )
 }
 
 function getVisibleRecommendationRiskTags(tags: string[]) {
@@ -837,8 +853,8 @@ export function WorldCupPage() {
                               <em>{recommendation.reason}</em>
                             </div>
                             <div className="worldcup-play-pick__stats">
-                              <span><small>置信值</small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
-                              <span><small>参考概率</small><strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong></span>
+                              <span><small>置信值 <StatHelp label="置信值" text={CONFIDENCE_HELP_TEXT} /></small><strong>{confidenceScoreLabel(recommendation)}</strong></span>
+                              <span><small>参考概率 <StatHelp label="参考概率" text={PROBABILITY_HELP_TEXT} /></small><strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong></span>
                               <span><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : '待确认'}</strong></span>
                               <span><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
                             </div>

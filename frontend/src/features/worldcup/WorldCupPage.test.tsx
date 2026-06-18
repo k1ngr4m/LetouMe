@@ -295,6 +295,8 @@ describe('WorldCupPage odds display', () => {
 
     const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
     expect(await screen.findByText('置信值')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /置信值说明/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /参考概率说明/ })).toBeInTheDocument()
     expect(await screen.findByText('64%')).toBeInTheDocument()
     expect(screen.queryByText('该玩法赔率快照')).not.toBeInTheDocument()
     expect(within(oddsButton).getAllByText('主胜').length).toBeGreaterThan(0)
@@ -431,7 +433,7 @@ describe('WorldCupPage odds display', () => {
     expect(within(dialog).getByText('总进球数')).toBeInTheDocument()
   })
 
-  it('shows the latest odds update time when odds are newer than recommendations', async () => {
+  it('does not show the overview hero metrics on the prediction page', async () => {
     const newerOddsMatch: WorldCupMatch = {
       ...match,
       odds_fetched_at: 1781578800,
@@ -449,7 +451,9 @@ describe('WorldCupPage odds display', () => {
 
     renderPage()
 
-    expect(await screen.findByText('2026-06-16 11:00')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '赛程赔率' })).toBeInTheDocument()
+    expect(screen.queryByText('世界杯体彩预测参考')).not.toBeInTheDocument()
+    expect(screen.queryByText('更新时间')).not.toBeInTheDocument()
   })
 
   it('defaults the schedule odds view to tomorrow instead of today', async () => {
