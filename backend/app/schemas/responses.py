@@ -201,6 +201,8 @@ class WorldCupRecommendationResponse(BaseModel):
     match: WorldCupMatchResponse
     play_type: str
     selection: str
+    model_code: str | None = None
+    model_name: str | None = None
     odds_value: str | None = None
     implied_probability: float | None = None
     confidence_score: float | None = None

@@ -210,8 +210,8 @@ class WorldCupService:
                 "match_status": row.get("match_status"),
                 "score": row.get("score"),
                 "sell_status": row.get("sell_status"),
-                        "odds_count": row.get("odds_count"),
-                        "odds_fetched_at": row.get("odds_fetched_at"),
+                "odds_count": row.get("odds_count"),
+                "odds_fetched_at": row.get("odds_fetched_at"),
                 "recommendation_count": 0,
             }
         )
@@ -220,6 +220,8 @@ class WorldCupService:
             "match": match,
             "play_type": str(row.get("play_type") or ""),
             "selection": str(row.get("selection") or ""),
+            "model_code": str(row.get("model_code") or "") or None,
+            "model_name": str(row.get("model_name") or "") or None,
             "odds_value": str(row.get("odds_value") or "") or None,
             "implied_probability": float(row["implied_probability"]) if row.get("implied_probability") is not None else None,
             "confidence_score": float(row["confidence_score"]) if row.get("confidence_score") is not None else None,

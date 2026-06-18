@@ -324,6 +324,7 @@ function isPassSaleStatus(value?: string | null) {
 }
 
 type RecommendationDisplayItem = { key: string; recommendations: WorldCupRecommendation[] }
+type RecommendationModelOption = { value: string; label: string; count: number }
 
 function getRecommendationPlayTypeSortIndex(playType: WorldCupPlayType) {
   const index = RECOMMENDATION_PLAY_TYPE_ORDER.indexOf(playType)
@@ -352,6 +353,38 @@ function groupRecommendationDisplayItems(recommendations: WorldCupRecommendation
     const [rightRecommendation] = right.recommendations
     return getRecommendationPlayTypeSortIndex(leftRecommendation.play_type) - getRecommendationPlayTypeSortIndex(rightRecommendation.play_type)
   })
+}
+
+function getRecommendationModelKey(recommendation: WorldCupRecommendation) {
+  const modelCode = String(recommendation.model_code || '').trim()
+  if (modelCode) return modelCode
+  const modelName = String(recommendation.model_name || '').trim()
+  return modelName ? `model-name:${modelName}` : 'unknown-model'
+}
+
+function getRecommendationModelLabel(recommendation: WorldCupRecommendation) {
+  const modelName = String(recommendation.model_name || '').trim()
+  if (modelName) return modelName
+  const modelCode = String(recommendation.model_code || '').trim()
+  return modelCode || '未标记模型'
+}
+
+function buildRecommendationModelOptions(recommendations: WorldCupRecommendation[]): RecommendationModelOption[] {
+  const options = new Map<string, RecommendationModelOption>()
+  for (const recommendation of recommendations) {
+    const value = getRecommendationModelKey(recommendation)
+    const existing = options.get(value)
+    if (existing) {
+      existing.count += 1
+      continue
+    }
+    options.set(value, {
+      value,
+      label: getRecommendationModelLabel(recommendation),
+      count: 1,
+    })
+  }
+  return Array.from(options.values()).sort((left, right) => left.label.localeCompare(right.label, 'zh-Hans-CN'))
 }
 
 function OddsPlaySection({ active, snapshot }: { active: boolean; snapshot: WorldCupOddsSnapshot }) {
@@ -609,6 +642,7 @@ export function WorldCupPage() {
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(defaultScheduleDateKey)
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'live' | 'finished'>('all')
   const [playTypeFilter, setPlayTypeFilter] = useState<'all' | WorldCupPlayType>('all')
+  const [modelFilter, setModelFilter] = useState('all')
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
   const [oddsModalMatchId, setOddsModalMatchId] = useState<string | null>(null)
   const [detailRecommendationId, setDetailRecommendationId] = useState<string | null>(null)
@@ -690,7 +724,18 @@ export function WorldCupPage() {
     [matchRows, oddsModalMatchId],
   )
   const recommendations = useMemo(() => recommendationsQuery.data?.recommendations || [], [recommendationsQuery.data?.recommendations])
-  const recommendationDisplayItems = useMemo(() => groupRecommendationDisplayItems(recommendations), [recommendations])
+  const modelFilterOptions = useMemo(() => buildRecommendationModelOptions(recommendations), [recommendations])
+  const effectiveModelFilter = useMemo(() => (
+    modelFilter === 'all' || modelFilterOptions.some((option) => option.value === modelFilter)
+      ? modelFilter
+      : 'all'
+  ), [modelFilter, modelFilterOptions])
+  const visibleRecommendations = useMemo(() => (
+    effectiveModelFilter === 'all'
+      ? recommendations
+      : recommendations.filter((recommendation) => getRecommendationModelKey(recommendation) === effectiveModelFilter)
+  ), [effectiveModelFilter, recommendations])
+  const recommendationDisplayItems = useMemo(() => groupRecommendationDisplayItems(visibleRecommendations), [visibleRecommendations])
   const detailRecommendation = detailQuery.data?.recommendation || null
   const scheduleMatches = useMemo(() => matchRows, [matchRows])
 
@@ -715,6 +760,7 @@ export function WorldCupPage() {
       `推荐${playLabel}：`,
       ...recommendations.map((recommendation) => [
         `- ${recommendation.selection}`,
+        `模型 ${getRecommendationModelLabel(recommendation)}`,
         `置信值 ${confidenceScoreLabel(recommendation)}`,
         recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : '',
         `预算 ${recommendation.budget_min}-${recommendation.budget_max} 元`,
@@ -821,12 +867,35 @@ export function WorldCupPage() {
 
         <div className="worldcup-column worldcup-column--wide">
           <div className="worldcup-panel__header">
-            <h2>推荐方案</h2>
-            <span>每种玩法均展示</span>
+            <div>
+              <h2>推荐方案</h2>
+              <span>{effectiveModelFilter === 'all' ? '全部模型' : modelFilterOptions.find((option) => option.value === effectiveModelFilter)?.label || '全部模型'} · {visibleRecommendations.length} 条</span>
+            </div>
           </div>
+          {modelFilterOptions.length > 1 ? (
+            <div className="worldcup-model-filter" aria-label="AI 模型筛选">
+              <button
+                className={clsx('filter-chip', effectiveModelFilter === 'all' && 'is-active')}
+                type="button"
+                onClick={() => setModelFilter('all')}
+              >
+                全部模型
+              </button>
+              {modelFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={clsx('filter-chip', effectiveModelFilter === option.value && 'is-active')}
+                  type="button"
+                  onClick={() => setModelFilter(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="worldcup-recommendation-scroll">
-            {recommendations.length === 0 ? (
+            {visibleRecommendations.length === 0 ? (
               <div className="worldcup-empty">暂无真实 AI 推荐。请先抓取中国竞彩网赛程/赔率，再到设置页生成世界杯预测。</div>
             ) : (
               <div className="worldcup-card-list">
@@ -849,6 +918,7 @@ export function WorldCupPage() {
                           <div key={recommendation.recommendation_id} className="worldcup-play-pick">
                             <div className="worldcup-play-pick__main">
                               <span>推荐{playLabel}</span>
+                              <b className="worldcup-model-badge">{getRecommendationModelLabel(recommendation)}</b>
                               <strong>{recommendation.selection}</strong>
                               <em>{recommendation.reason}</em>
                             </div>
@@ -907,6 +977,7 @@ export function WorldCupPage() {
               <button className="worldcup-icon-btn" type="button" onClick={() => setDetailRecommendationId(null)}>×</button>
             </div>
             <p>{detailRecommendation.match.home_team} vs {detailRecommendation.match.away_team}</p>
+            <p>模型：{getRecommendationModelLabel(detailRecommendation)}</p>
             <p>{detailRecommendation.reason}</p>
             <p>模型来源：{detailRecommendation.model_sources.join(' / ')}</p>
             <p>{detailRecommendation.compliance_notice}</p>

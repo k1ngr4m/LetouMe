@@ -81,6 +81,8 @@ const recommendation: WorldCupRecommendation = {
   match,
   play_type: 'win_draw_win',
   selection: '胜',
+  model_code: 'worldcup-model-a',
+  model_name: '世界杯模型 A',
   odds_value: '1.80',
   implied_probability: 0.556,
   confidence_score: 64,
@@ -189,6 +191,20 @@ const groupedPlayRecommendations: WorldCupRecommendation[] = [
     risk_level: 'high',
     reason: '测试半全场平平。',
     latest_odds: { 胜胜: '2.40', 胜平: '14.00', 平平: '6.50' },
+  },
+]
+
+const multiModelRecommendations: WorldCupRecommendation[] = [
+  recommendation,
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-rec-model-b',
+    model_code: 'worldcup-model-b',
+    model_name: '世界杯模型 B',
+    selection: '平',
+    odds_value: '3.20',
+    confidence_score: 52,
+    reason: '模型 B 认为平局风险收益更均衡。',
   },
 ]
 
@@ -382,6 +398,38 @@ describe('WorldCupPage odds display', () => {
     expect(within(halfFullCard as HTMLElement).getByText('胜胜')).toBeInTheDocument()
     expect(within(halfFullCard as HTMLElement).getByText('平平')).toBeInTheDocument()
     expect(within(halfFullCard as HTMLElement).getByText('54%')).toBeInTheDocument()
+  })
+
+  it('filters recommendations by AI model and keeps model names visible', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
+      recommendations: multiModelRecommendations,
+      total_count: multiModelRecommendations.length,
+      compliance_notice: recommendation.compliance_notice,
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: '全部模型' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '世界杯模型 A' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '世界杯模型 B' })).toBeInTheDocument()
+    expect(screen.getAllByText('世界杯模型 A').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('世界杯模型 B').length).toBeGreaterThan(1)
+    expect(screen.getByText('测试推荐理由。')).toBeInTheDocument()
+    expect(screen.getByText('模型 B 认为平局风险收益更均衡。')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '世界杯模型 B' }))
+
+    expect(screen.queryByText('测试推荐理由。')).not.toBeInTheDocument()
+    expect(screen.getByText('模型 B 认为平局风险收益更均衡。')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '复制胜平负清单' }))
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('模型 世界杯模型 B'))
   })
 
   it('shows a closed win-draw-win row when that play has no odds', async () => {

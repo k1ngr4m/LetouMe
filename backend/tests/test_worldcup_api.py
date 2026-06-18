@@ -96,35 +96,39 @@ class WorldCupApiTests(unittest.TestCase):
                 cursor.execute(
                     """
                     INSERT INTO worldcup_recommendation (
-                            recommendation_id,
-                            match_id,
-                            play_type,
-                            selection,
-                            odds_value,
-                            confidence_score,
-                            confidence_level,
+                        recommendation_id,
+                        match_id,
+                        play_type,
+                        selection,
+                        odds_value,
+                        confidence_score,
+                        confidence_level,
                         risk_level,
                         budget_min,
                         budget_max,
                         reason,
+                        model_code,
+                        model_name,
                         model_sources_json,
                         risk_tags_json,
                         status,
                         compliance_notice
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                            "test-worldcup-rec-1",
-                            "test-worldcup-match",
-                            "win_draw_win",
-                            "胜",
-                            "1.80",
-                            63,
-                            "medium",
+                        "test-worldcup-rec-1",
+                        "test-worldcup-match",
+                        "win_draw_win",
+                        "胜",
+                        "1.80",
+                        63,
+                        "medium",
                         "low",
                         10,
                         30,
                         "测试夹具：主队状态更稳。",
+                        "worldcup-model-a",
+                        "世界杯模型 A",
                         '["fixture"]',
                         '["fixture"]',
                         "published",
@@ -239,6 +243,8 @@ class WorldCupApiTests(unittest.TestCase):
         self.assertGreaterEqual(len(payload["recommendations"]), 1)
         self.assertIn("不保证", payload["compliance_notice"])
         win_recommendation = next(item for item in payload["recommendations"] if item["recommendation_id"] == "test-worldcup-rec-1")
+        self.assertEqual(win_recommendation["model_code"], "worldcup-model-a")
+        self.assertEqual(win_recommendation["model_name"], "世界杯模型 A")
         self.assertEqual(win_recommendation["latest_odds"]["胜"], "1.80")
         self.assertEqual(win_recommendation["confidence_score"], 63.0)
         self.assertLessEqual(
@@ -256,6 +262,8 @@ class WorldCupApiTests(unittest.TestCase):
         detail_response = self.client.post("/api/worldcup/recommendations/detail", json={"recommendation_id": recommendation_id})
         self.assertEqual(detail_response.status_code, 200)
         self.assertEqual(detail_response.json()["recommendation"]["recommendation_id"], recommendation_id)
+        self.assertIn("model_code", detail_response.json()["recommendation"])
+        self.assertIn("model_name", detail_response.json()["recommendation"])
 
         favorite_response = self.client.post(
             "/api/worldcup/recommendations/favorite",

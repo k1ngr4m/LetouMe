@@ -416,6 +416,8 @@ export type WorldCupRecommendation = {
   match: WorldCupMatch
   play_type: WorldCupPlayType
   selection: string
+  model_code?: string | null
+  model_name?: string | null
   odds_value?: string | null
   implied_probability?: number | null
   confidence_score?: number | null

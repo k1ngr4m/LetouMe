@@ -119,6 +119,28 @@ class WorldCupRepositoryTests(unittest.TestCase):
             ),
         )
 
+    def test_replace_recommendations_scopes_deletion_by_model_code(self) -> None:
+        cursor = _Cursor()
+        recommendations = [
+            {
+                "recommendation_id": "wc-ai-model-a-match-1-win_draw_win",
+                "match_id": "match-1",
+                "play_type": "win_draw_win",
+                "selection": "胜",
+                "model_code": "model-a",
+                "reason": "new pick",
+                "compliance_notice": "notice",
+            }
+        ]
+
+        with patch("backend.app.repositories.worldcup_repository.get_connection", return_value=_ConnectionContext(cursor)):
+            saved_count = WorldCupRepository().replace_recommendations(recommendations)
+
+        self.assertEqual(saved_count, 1)
+        self.assertIn("AND model_code = ?", cursor.queries[0])
+        self.assertEqual(cursor.params[0], ("match-1", "win_draw_win", "model-a", "wc-ai-model-a-match-1-win_draw_win"))
+        self.assertNotIn("model-b", cursor.params[0])
+
 
 if __name__ == "__main__":
     unittest.main()

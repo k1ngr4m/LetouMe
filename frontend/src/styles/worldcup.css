@@ -234,6 +234,13 @@
   gap: 0.5rem;
 }
 
+.worldcup-model-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .worldcup-grid {
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   align-items: stretch;
@@ -251,13 +258,27 @@
 
 .worldcup-column--wide {
   min-width: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .worldcup-panel__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.worldcup-panel__header > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.worldcup-panel__header h2 {
+  margin: 0;
+}
+
+.worldcup-panel__header span {
+  color: var(--text-2);
+  font-size: 0.88rem;
 }
 
 .worldcup-schedule-header {
@@ -798,6 +819,19 @@
   font-size: 0.78rem;
   font-style: normal;
   font-weight: 800;
+}
+
+.worldcup-model-badge {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.18rem 0.44rem;
+  border: 1px solid rgba(112, 188, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(112, 188, 255, 0.1);
+  color: var(--worldcup-baidu-source-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .worldcup-play-pick__stats small {
