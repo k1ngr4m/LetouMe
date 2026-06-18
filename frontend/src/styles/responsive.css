@@ -1189,12 +1189,19 @@
   }
 
   .home-model-list-table__groups {
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.35rem;
   }
 
   .home-model-list-table__groups .prediction-group-card {
     flex-basis: 100%;
     min-width: 0;
+  }
+
+  .home-model-list-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
   }
 
   .home-model-list-table__title,
@@ -1205,6 +1212,10 @@
   .home-model-list-table-shell,
   .score-view-table-shell {
     overflow-x: auto;
+  }
+
+  .home-model-list-table-shell {
+    overflow-x: visible;
   }
 
   .home-model-list-table th,
@@ -1220,11 +1231,33 @@
     font-size: 0.68rem;
   }
 
+  .home-model-list-table th:first-child,
+  .home-model-list-table td:first-child,
   .home-model-list-table__col--status,
   .home-model-list-table__col--actions,
   .score-view-table__col--status,
   .score-view-table__col--actions {
     display: none;
+  }
+
+  .home-model-list-table__mobile-model {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    margin-bottom: 0.42rem;
+    padding: 0 0.08rem;
+  }
+
+  .home-model-list-table__mobile-model .home-model-list-table__model-link {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .home-model-list-table__mobile-model > span {
+    color: var(--text-2);
+    font-size: 0.68rem;
   }
 
   .score-view-table th:first-child,

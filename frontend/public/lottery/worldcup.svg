@@ -1,24 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="世界杯">
   <defs>
-    <radialGradient id="bg" cx="34%" cy="24%" r="72%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="58%" stop-color="#f4f7fb"/>
-      <stop offset="100%" stop-color="#d7e0ee"/>
+    <radialGradient id="wc-glow" cx="35%" cy="24%" r="76%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="48%" stop-color="#f7c84b"/>
+      <stop offset="100%" stop-color="#b86123"/>
     </radialGradient>
-    <linearGradient id="rim" x1="12" x2="52" y1="8" y2="58">
-      <stop offset="0%" stop-color="#49d37f"/>
-      <stop offset="52%" stop-color="#2e8cff"/>
-      <stop offset="100%" stop-color="#ffb13d"/>
+    <linearGradient id="wc-field" x1="16" x2="48" y1="11" y2="51">
+      <stop offset="0%" stop-color="#19c47a"/>
+      <stop offset="54%" stop-color="#0f8b66"/>
+      <stop offset="100%" stop-color="#063c45"/>
     </linearGradient>
+    <linearGradient id="wc-trophy" x1="24" x2="40" y1="37" y2="56">
+      <stop offset="0%" stop-color="#fff3a5"/>
+      <stop offset="48%" stop-color="#f5b93f"/>
+      <stop offset="100%" stop-color="#be6327"/>
+    </linearGradient>
+    <filter id="wc-shadow" x="-25%" y="-20%" width="150%" height="155%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.4" flood-color="#061726" flood-opacity=".42"/>
+    </filter>
   </defs>
-  <circle cx="32" cy="32" r="29" fill="#10233a"/>
-  <circle cx="32" cy="32" r="25" fill="url(#rim)"/>
-  <circle cx="32" cy="32" r="21" fill="url(#bg)"/>
-  <path d="m32 16 8 6-3 10H27l-3-10 8-6Z" fill="#172337"/>
-  <path d="m20 24 7-2 3 10-7 6-8-5 5-9Z" fill="#172337"/>
-  <path d="m44 24-7-2-3 10 7 6 8-5-5-9Z" fill="#172337"/>
-  <path d="m23 38 7-6h4l7 6-3 10H26l-3-10Z" fill="#172337"/>
-  <path d="m16 35 7 3 3 10-7-2a21 21 0 0 1-3-11Z" fill="#172337"/>
-  <path d="m48 35-7 3-3 10 7-2a21 21 0 0 0 3-11Z" fill="#172337"/>
-  <path d="M24 22 18 13M40 22l6-9M19 46l-8 3M45 46l8 3" stroke="#f4f7fb" stroke-width="2.4" stroke-linecap="round" opacity=".78"/>
+
+  <circle cx="32" cy="32" r="30" fill="#092033"/>
+  <circle cx="32" cy="32" r="27" fill="url(#wc-glow)"/>
+  <circle cx="32" cy="30" r="22" fill="url(#wc-field)"/>
+  <path d="M11 33a21 21 0 0 0 42 0" fill="none" stroke="#ffe68a" stroke-width="2.6" stroke-linecap="round" opacity=".8"/>
+
+  <g filter="url(#wc-shadow)">
+    <path d="M23 37h18l-3 10H26l-3-10Z" fill="url(#wc-trophy)"/>
+    <path d="M27 47h10l2 5H25l2-5Z" fill="#f0a83a"/>
+    <path d="M22 53h20" fill="none" stroke="#ffe08a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M19 35c-5-2-8-7-8-13h8c0 5 2 9 6 11" fill="none" stroke="#ffd66b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M45 35c5-2 8-7 8-13h-8c0 5-2 9-6 11" fill="none" stroke="#ffd66b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g filter="url(#wc-shadow)">
+    <circle cx="32" cy="25" r="15" fill="#f9fbff"/>
+    <circle cx="32" cy="25" r="14" fill="none" stroke="#d5dfeb" stroke-width="1.4"/>
+    <path d="m32 15 6 4-2.3 6.8h-7.4L26 19l6-4Z" fill="#132235"/>
+    <path d="m21.4 23 6.9 2.8 2.3 7-5.7 4.1A14.8 14.8 0 0 1 18 27l3.4-4Z" fill="#132235"/>
+    <path d="m42.6 23-6.9 2.8-2.3 7 5.7 4.1A14.8 14.8 0 0 0 46 27l-3.4-4Z" fill="#132235"/>
+    <path d="M28.3 25.8h7.4m-5.1 7 1.4 4.8m1.4-4.8-1.4 4.8M26 19l-4.6 4m16.6-4 4.6 4" fill="none" stroke="#d5dfeb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

@@ -426,10 +426,10 @@ export function AppShell({ children }: PropsWithChildren) {
                     {LOTTERY_OPTIONS.map((item) => (
                       <button
                         key={item.code}
-                        className={clsx('crm-lottery-picker__option', selectedLottery === item.code && 'is-active')}
+                        className={clsx('crm-lottery-picker__option', !isWorldCupRoute && selectedLottery === item.code && 'is-active')}
                         type="button"
                         role="menuitemradio"
-                        aria-checked={selectedLottery === item.code}
+                        aria-checked={!isWorldCupRoute && selectedLottery === item.code}
                         title={item.label}
                         onClick={() => handleLotterySelect(item.code)}
                       >
@@ -544,10 +544,10 @@ export function AppShell({ children }: PropsWithChildren) {
                       {LOTTERY_OPTIONS.map((item) => (
                         <button
                           key={item.code}
-                          className={clsx('crm-lottery-picker__option', selectedLottery === item.code && 'is-active')}
+                          className={clsx('crm-lottery-picker__option', !isWorldCupRoute && selectedLottery === item.code && 'is-active')}
                           type="button"
                           role="menuitemradio"
-                          aria-checked={selectedLottery === item.code}
+                          aria-checked={!isWorldCupRoute && selectedLottery === item.code}
                           title={item.label}
                           onClick={() => handleLotterySelect(item.code)}
                         >

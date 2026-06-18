@@ -4075,6 +4075,19 @@ function ModelListTable({
                     onDetail(model.model_id)
                   }}
                 >
+                  <div className="home-model-list-table__mobile-model">
+                    <button
+                      className="home-model-list-table__model-link"
+                      onClick={() => onDetail(model.model_id)}
+                      aria-label={`查看详情：${model.model_name}`}
+                      title="查看详情"
+                      type="button"
+                    >
+                      {model.model_name}
+                    </button>
+                    <span>{model.model_provider}</span>
+                    <ModelScoreInlineCompact score={resolveModelScore(modelScores, model)} />
+                  </div>
                   <div className="home-model-list-table__groups">
                     {model.predictions.map((group) => (
                       <PredictionGroupCard key={group.group_id} group={group} actualResult={actualResult} compact showBetCostSummary />
