@@ -16,7 +16,7 @@ from backend.app.repositories.model_repository import ModelRepository
 from backend.app.repositories.prediction_repository import PredictionRepository
 from backend.app.services.lottery_service import LotteryService
 from backend.app.services.prediction_service import PredictionService
-from backend.core.model_config import ModelDefinition, load_model_registry
+from backend.core.model_config import ModelDefinition, get_model_registry_cache_revision, load_model_registry
 from backend.core.model_factory import ModelFactory
 
 
@@ -79,7 +79,7 @@ class PredictionGenerationService:
         self.prediction_repository = prediction_repository or PredictionRepository()
         self.model_repository = model_repository or ModelRepository()
         self.logger = get_logger("services.prediction_generation")
-        self._model_registry_cache: tuple[float, Any] | None = None
+        self._model_registry_cache: tuple[float, int, Any] | None = None
         self._model_registry_lock = Lock()
         self._provider_failure_state: dict[str, tuple[int, float]] = {}
         self._provider_failure_lock = Lock()
@@ -917,13 +917,14 @@ class PredictionGenerationService:
 
     def _load_model_registry_cached(self) -> Any:
         now = monotonic()
+        revision = get_model_registry_cache_revision()
         with self._model_registry_lock:
             cached = self._model_registry_cache
-            if cached and cached[0] > now:
-                return cached[1]
+            if cached and cached[0] > now and cached[1] == revision:
+                return cached[2]
         registry = load_model_registry()
         with self._model_registry_lock:
-            self._model_registry_cache = (now + MODEL_REGISTRY_CACHE_TTL_SECONDS, registry)
+            self._model_registry_cache = (now + MODEL_REGISTRY_CACHE_TTL_SECONDS, revision, registry)
         return registry
 
     @staticmethod

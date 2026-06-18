@@ -27,6 +27,20 @@ class PredictionGenerationServiceTests(unittest.TestCase):
         self.assertIs(first, second)
         self.assertEqual(load_registry.call_count, 1)
 
+    def test_load_model_registry_cached_refreshes_after_registry_revision_changes(self) -> None:
+        service = PredictionGenerationService()
+        registries = [Mock(name="registry-1"), Mock(name="registry-2")]
+        with (
+            patch("backend.app.services.prediction_generation_service.get_model_registry_cache_revision", side_effect=[1, 2]),
+            patch("backend.app.services.prediction_generation_service.load_model_registry", side_effect=registries) as load_registry,
+        ):
+            first = service._load_model_registry_cached()
+            second = service._load_model_registry_cached()
+
+        self.assertIs(first, registries[0])
+        self.assertIs(second, registries[1])
+        self.assertEqual(load_registry.call_count, 2)
+
     def test_provider_failure_circuit_blocks_during_cooldown(self) -> None:
         service = PredictionGenerationService()
         service._record_provider_failure("aimixhub")

@@ -35,6 +35,7 @@ _bootstrap_signature: tuple[Any, ...] | None = None
 _bootstrap_lock = Lock()
 _registry_cache_lock = Lock()
 _registry_cache_entry: tuple[float, tuple[Any, ...], "ModelRegistry"] | None = None
+_registry_cache_revision = 0
 MODEL_REGISTRY_CACHE_TTL_SECONDS = 60
 
 
@@ -266,9 +267,15 @@ def _provider_name(provider_code: str) -> str:
 
 
 def invalidate_model_registry_cache() -> None:
-    global _registry_cache_entry
+    global _registry_cache_entry, _registry_cache_revision
     with _registry_cache_lock:
         _registry_cache_entry = None
+        _registry_cache_revision += 1
+
+
+def get_model_registry_cache_revision() -> int:
+    with _registry_cache_lock:
+        return _registry_cache_revision
 
 
 def load_model_registry(_config_path: str | None = None, *, use_cache: bool = True) -> ModelRegistry:
