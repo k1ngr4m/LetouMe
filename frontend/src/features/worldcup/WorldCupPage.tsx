@@ -307,25 +307,6 @@ function isPassSaleStatus(value?: string | null) {
   return true
 }
 
-function getLatestWorldCupDataTime(matches: WorldCupMatch[], recommendations: WorldCupRecommendation[], detailRecommendation: WorldCupRecommendation | null) {
-  const timestamps = [
-    detailRecommendation?.updated_at,
-    detailRecommendation?.odds_fetched_at,
-    ...recommendations.flatMap((recommendation) => [
-      recommendation.updated_at,
-      recommendation.odds_fetched_at,
-      recommendation.match.odds_fetched_at,
-      ...(recommendation.match.odds_snapshots || []).flatMap((snapshot) => [snapshot.fetched_at, snapshot.source_updated_at]),
-    ]),
-    ...matches.flatMap((match) => [
-      match.odds_fetched_at,
-      ...(match.odds_snapshots || []).flatMap((snapshot) => [snapshot.fetched_at, snapshot.source_updated_at]),
-    ]),
-  ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0)
-
-  return timestamps.length ? Math.max(...timestamps) : null
-}
-
 type RecommendationDisplayItem = { key: string; recommendations: WorldCupRecommendation[] }
 
 function getRecommendationPlayTypeSortIndex(playType: WorldCupPlayType) {
@@ -695,9 +676,6 @@ export function WorldCupPage() {
   const recommendations = useMemo(() => recommendationsQuery.data?.recommendations || [], [recommendationsQuery.data?.recommendations])
   const recommendationDisplayItems = useMemo(() => groupRecommendationDisplayItems(recommendations), [recommendations])
   const detailRecommendation = detailQuery.data?.recommendation || null
-  const latestBudgetMax = recommendations.reduce((max, item) => Math.max(max, item.budget_max || 0), 0)
-  const overviewUpdatedAt = getLatestWorldCupDataTime(matchRows, recommendations, detailRecommendation)
-
   const scheduleMatches = useMemo(() => matchRows, [matchRows])
 
   const confirmAge = () => {
@@ -740,20 +718,6 @@ export function WorldCupPage() {
   return (
     <div className="worldcup-page">
       <div className="worldcup-fixed-stack">
-        <section className="worldcup-hero">
-          <div className="worldcup-hero__copy">
-            <p className="worldcup-hero__eyebrow">世界杯推荐</p>
-            <h1 className="worldcup-hero__title">世界杯体彩预测参考</h1>
-            <p className="worldcup-hero__description">展示赛程、推荐方向、预算控制与风险提示，只做研究参考和线下购彩辅助。</p>
-          </div>
-          <div className="worldcup-hero__stats" aria-label="推荐概览">
-            <div><span>比赛</span><strong>{matchesQuery.data?.total_count ?? 0}</strong></div>
-            <div><span>推荐</span><strong>{recommendationsQuery.data?.total_count ?? 0}</strong></div>
-            <div><span>更新时间</span><strong>{overviewUpdatedAt ? formatDateTimeLocal(overviewUpdatedAt) : '-'}</strong></div>
-            <div><span>预算上限</span><strong>{latestBudgetMax > 0 ? `${latestBudgetMax} 元` : '待生成'}</strong></div>
-          </div>
-        </section>
-
         <SiteDisclaimer />
 
         {!ageConfirmed ? (
