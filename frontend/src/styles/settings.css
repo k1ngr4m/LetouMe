@@ -1739,6 +1739,79 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+.generation-worldcup-match-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.generation-worldcup-match-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.generation-worldcup-match-picker__header > span {
+  color: var(--text-2);
+  font-weight: 700;
+}
+
+.generation-worldcup-match-picker__header .ghost-button {
+  min-height: 2.05rem;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.generation-worldcup-match-picker__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.generation-worldcup-match-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 4.25rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.generation-worldcup-match-option input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #8bffca;
+}
+
+.generation-worldcup-match-option span {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.generation-worldcup-match-option strong,
+.generation-worldcup-match-option small {
+  overflow-wrap: anywhere;
+}
+
+.generation-worldcup-match-option strong {
+  color: var(--text-0);
+}
+
+.generation-worldcup-match-option small,
+.generation-worldcup-match-picker__empty {
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+.generation-worldcup-match-picker__empty {
+  margin: 0;
+}
+
 .generation-modal__hint,
 .generation-modal__warning {
   margin: 0;
@@ -1747,6 +1820,14 @@
 .generation-modal__actions {
   justify-content: flex-end;
   margin-top: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .generation-modal__grid,
+  .generation-modal__history-grid,
+  .generation-worldcup-match-picker__list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-grid-react {

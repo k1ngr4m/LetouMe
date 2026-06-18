@@ -38,6 +38,13 @@ const STATUS_OPTIONS: Array<{ value: 'all' | 'scheduled' | 'live' | 'finished'; 
 const HIDDEN_RECOMMENDATION_RISK_TAGS = new Set(['资讯不足', '阵容待确认'])
 
 const PLAY_TYPE_ORDER = PLAY_TYPE_OPTIONS.filter((option): option is { value: WorldCupPlayType; label: string } => option.value !== 'all')
+const RECOMMENDATION_PLAY_TYPE_ORDER: WorldCupPlayType[] = [
+  'win_draw_win',
+  'handicap_win_draw_win',
+  'correct_score',
+  'total_goals',
+  'half_full_time',
+]
 const WIN_DRAW_WIN_ORDER = ['胜', '平', '负']
 const TOTAL_GOALS_ORDER = ['0', '1', '2', '3', '4', '5', '6', '7+']
 const HALF_FULL_TIME_ORDER = ['胜胜', '胜平', '胜负', '平胜', '平平', '平负', '负胜', '负平', '负负']
@@ -321,6 +328,11 @@ function getLatestWorldCupDataTime(matches: WorldCupMatch[], recommendations: Wo
 
 type RecommendationDisplayItem = { key: string; recommendations: WorldCupRecommendation[] }
 
+function getRecommendationPlayTypeSortIndex(playType: WorldCupPlayType) {
+  const index = RECOMMENDATION_PLAY_TYPE_ORDER.indexOf(playType)
+  return index < 0 ? RECOMMENDATION_PLAY_TYPE_ORDER.length : index
+}
+
 function groupRecommendationDisplayItems(recommendations: WorldCupRecommendation[]): RecommendationDisplayItem[] {
   const playGroups = new Map<string, RecommendationDisplayItem>()
   const items: RecommendationDisplayItem[] = []
@@ -338,7 +350,11 @@ function groupRecommendationDisplayItems(recommendations: WorldCupRecommendation
     playGroups.set(groupKey, group)
     items.push(group)
   }
-  return items
+  return items.sort((left, right) => {
+    const [leftRecommendation] = left.recommendations
+    const [rightRecommendation] = right.recommendations
+    return getRecommendationPlayTypeSortIndex(leftRecommendation.play_type) - getRecommendationPlayTypeSortIndex(rightRecommendation.play_type)
+  })
 }
 
 function OddsPlaySection({ active, snapshot }: { active: boolean; snapshot: WorldCupOddsSnapshot }) {
@@ -676,7 +692,7 @@ export function WorldCupPage() {
     () => matchRows.find((item) => item.match_id === oddsModalMatchId) || null,
     [matchRows, oddsModalMatchId],
   )
-  const recommendations = recommendationsQuery.data?.recommendations || []
+  const recommendations = useMemo(() => recommendationsQuery.data?.recommendations || [], [recommendationsQuery.data?.recommendations])
   const recommendationDisplayItems = useMemo(() => groupRecommendationDisplayItems(recommendations), [recommendations])
   const detailRecommendation = detailQuery.data?.recommendation || null
   const latestBudgetMax = recommendations.reduce((max, item) => Math.max(max, item.budget_max || 0), 0)

@@ -52,9 +52,11 @@ class _FakeWorldCupRepository:
     def __init__(self) -> None:
         self.saved_recommendations: list[dict] = []
         self.last_match_date: str | None = None
+        self.last_match_ids: list[str] | None = None
 
-    def list_recent_matches_with_odds(self, *, limit: int, match_date: str | None = None) -> list[dict]:
+    def list_recent_matches_with_odds(self, *, limit: int, match_date: str | None = None, match_ids: list[str] | None = None) -> list[dict]:
         self.last_match_date = match_date
+        self.last_match_ids = match_ids
         return [
             {
                 "match_id": "match-1",
@@ -75,6 +77,10 @@ class _FakeWorldCupRepository:
         ]
 
     def upsert_recommendations(self, recommendations: list[dict]) -> int:
+        self.saved_recommendations = recommendations
+        return len(recommendations)
+
+    def replace_recommendations(self, recommendations: list[dict]) -> int:
         self.saved_recommendations = recommendations
         return len(recommendations)
 
@@ -186,11 +192,13 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
             "backend.app.services.worldcup_prediction_service.ModelFactory",
             return_value=_FakeModelFactory(fake_model),
         ):
-            summary = service.generate_for_model(model_code="model-a", match_date="2026-06-16")
+            summary = service.generate_for_model(model_code="model-a", match_date="2026-06-16", match_ids=["match-1"])
 
         self.assertTrue(news_service.called)
         self.assertEqual(repository.last_match_date, "2026-06-16")
+        self.assertEqual(repository.last_match_ids, ["match-1"])
         self.assertEqual(summary["match_date"], "2026-06-16")
+        self.assertEqual(summary["match_ids"], ["match-1"])
         self.assertEqual(summary["processed_count"], 1)
         self.assertIn("Spain injury update before Cape Verde match", fake_model.prompt)
         saved = repository.saved_recommendations[0]
@@ -313,6 +321,44 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
                 "wc-ai-model-a-match-1-half_full_time-2",
                 "wc-ai-model-a-match-1-half_full_time-3",
             ],
+        )
+
+    def test_generate_replaces_previous_worldcup_recommendation_scope(self) -> None:
+        repository = _FakeWorldCupRepository()
+        fake_model = _FakeModel(
+            {
+                "recommendations": [
+                    {
+                        "match_id": "match-1",
+                        "play_type": "win_draw_win",
+                        "selection": "胜",
+                        "odds_value": "1.80",
+                        "confidence_level": "medium",
+                        "risk_level": "low",
+                        "budget_min": 10,
+                        "budget_max": 30,
+                    }
+                ]
+            }
+        )
+        service = WorldCupPredictionService(
+            repository=repository,
+            model_repository=_FakeModelRepository(),
+            news_search_service=_FakeNewsSearchService(),
+        )
+
+        with patch("backend.app.services.worldcup_prediction_service.ensure_schema"), patch(
+            "backend.app.services.worldcup_prediction_service.load_model_registry",
+            return_value={"model-a": _FakeModelDefinition()},
+        ), patch(
+            "backend.app.services.worldcup_prediction_service.ModelFactory",
+            return_value=_FakeModelFactory(fake_model),
+        ):
+            service.generate_for_model(model_code="model-a")
+
+        self.assertEqual(
+            [item["recommendation_id"] for item in repository.saved_recommendations],
+            ["wc-ai-model-a-match-1-win_draw_win"],
         )
 
     def test_generate_continues_when_news_service_fails(self) -> None:

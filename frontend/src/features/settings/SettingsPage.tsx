@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -38,6 +38,7 @@ import type {
   SettingsProviderPayload,
   LotteryCode,
   ModelLotteryCode,
+  WorldCupMatch,
 } from '../../shared/types/api'
 import {
   buildMonthLabel,
@@ -176,6 +177,23 @@ function normalizeCustomHeaderRecord(value: unknown): Record<string, string> {
       .filter(([key, headerValue]) => key.trim() && typeof headerValue === 'string')
       .map(([key, headerValue]) => [key.trim(), headerValue as string]),
   )
+}
+
+function formatDateKeyFromLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getTomorrowDateKey(): string {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return formatDateKeyFromLocalDate(tomorrow)
+}
+
+function getWorldCupMatchDateKey(match: WorldCupMatch): string {
+  return formatDateTimeLocal(match.kickoff_at).slice(0, 10)
 }
 
 function customHeadersToDrafts(headers: Record<string, string>): CustomBodyParamDraft[] {
@@ -339,6 +357,7 @@ const EMPTY_GENERATION_FORM = {
   predictionPlayMode: 'direct' as ModelPredictionPlayMode,
   worldCupPlayMode: 'all' as WorldCupPredictionPlayMode,
   worldCupMatchDate: '',
+  worldCupMatchIds: [] as string[],
   historyRangeMode: 'custom' as GenerationHistoryRangeMode,
   recentPeriodCount: '5' as GenerationRecentPeriodCount,
   promptHistoryPeriodCount: '50' as GenerationPromptHistoryPeriodCount,
@@ -1128,6 +1147,7 @@ export function SettingsPage() {
   const [generationSourceModelCodes, setGenerationSourceModelCodes] = useState<string[]>([])
   const [generationFilterNotice, setGenerationFilterNotice] = useState<string | null>(null)
   const [generationTask, setGenerationTask] = useState<PredictionGenerationTask | null>(null)
+  const lastWorldCupMatchDateRef = useRef<string>('')
   const [selectedModelCodes, setSelectedModelCodes] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>(EMPTY_BULK_EDIT_FORM)
@@ -1248,7 +1268,7 @@ export function SettingsPage() {
     const counts = new Map<string, number>()
     for (const match of worldCupMatchesQuery.data?.matches ?? []) {
       if (match.status === 'finished') continue
-      const dateKey = formatDateTimeLocal(match.kickoff_at).slice(0, 10)
+      const dateKey = getWorldCupMatchDateKey(match)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue
       counts.set(dateKey, (counts.get(dateKey) || 0) + 1)
     }
@@ -1256,6 +1276,12 @@ export function SettingsPage() {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([value, count]) => ({ value, label: `${value}（${count}场）` }))
   }, [worldCupMatchesQuery.data?.matches])
+  const selectedWorldCupMatches = useMemo(() => {
+    if (!generationForm.worldCupMatchDate) return []
+    return (worldCupMatchesQuery.data?.matches ?? [])
+      .filter((match) => match.status !== 'finished' && getWorldCupMatchDateKey(match) === generationForm.worldCupMatchDate)
+      .sort((left, right) => left.kickoff_at - right.kickoff_at)
+  }, [generationForm.worldCupMatchDate, worldCupMatchesQuery.data?.matches])
 
   const availableTabs = useMemo(() => {
     const tabs: Array<{ id: SettingsTab; label: string }> = [
@@ -1297,11 +1323,31 @@ export function SettingsPage() {
     if (!generationModalOpen || generationForm.lotteryCode !== 'worldcup') return
     const isCurrentDateAvailable = worldCupDateOptions.some((option) => option.value === generationForm.worldCupMatchDate)
     if (isCurrentDateAvailable) return
+    const preferredDate = worldCupDateOptions.find((option) => option.value === getTomorrowDateKey())?.value || worldCupDateOptions[0]?.value || ''
     setGenerationForm((previous) => ({
       ...previous,
-      worldCupMatchDate: worldCupDateOptions[0]?.value || '',
+      worldCupMatchDate: preferredDate,
+      worldCupMatchIds: [],
     }))
   }, [generationForm.lotteryCode, generationForm.worldCupMatchDate, generationModalOpen, worldCupDateOptions])
+
+  useEffect(() => {
+    if (!generationModalOpen || generationForm.lotteryCode !== 'worldcup') return
+    const visibleMatchIds = selectedWorldCupMatches.map((match) => match.match_id)
+    const isDateChanged = lastWorldCupMatchDateRef.current !== generationForm.worldCupMatchDate
+    lastWorldCupMatchDateRef.current = generationForm.worldCupMatchDate
+    setGenerationForm((previous) => {
+      if (previous.lotteryCode !== 'worldcup') return previous
+      if (!visibleMatchIds.length) {
+        return previous.worldCupMatchIds.length ? { ...previous, worldCupMatchIds: [] } : previous
+      }
+      const selectedVisibleIds = previous.worldCupMatchIds.filter((matchId) => visibleMatchIds.includes(matchId))
+      if (!isDateChanged && selectedVisibleIds.length === previous.worldCupMatchIds.length) {
+        return previous
+      }
+      return isDateChanged ? { ...previous, worldCupMatchIds: visibleMatchIds } : { ...previous, worldCupMatchIds: selectedVisibleIds }
+    })
+  }, [generationForm.lotteryCode, generationForm.worldCupMatchDate, generationModalOpen, selectedWorldCupMatches])
 
   useEffect(() => {
     if (!providerSourceMenuOpen) return undefined
@@ -1950,6 +1996,7 @@ export function SettingsPage() {
           play_type: generationForm.worldCupPlayMode,
           overwrite: generationForm.overwrite,
           match_date: generationForm.worldCupMatchDate,
+          match_ids: generationForm.worldCupMatchIds,
         })
       }
       const parallelism = Number(generationForm.parallelism.trim())
@@ -2539,6 +2586,7 @@ export function SettingsPage() {
     const nextLottery = DEFAULT_SETTINGS_LOTTERY
     const nextModelCodes = sourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationTask(null)
+    lastWorldCupMatchDateRef.current = ''
     setGenerationSourceModelCodes(sourceModelCodes)
     setGenerationFilterNotice(sourceModelCodes.length > nextModelCodes.length ? `已移除 ${sourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null)
     setGenerationForm({
@@ -2549,6 +2597,7 @@ export function SettingsPage() {
       predictionPlayMode: 'direct',
       worldCupPlayMode: 'all',
       worldCupMatchDate: '',
+      worldCupMatchIds: [],
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2571,6 +2620,7 @@ export function SettingsPage() {
     const nextLottery = DEFAULT_SETTINGS_LOTTERY
     const nextModelCodes = sourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationTask(null)
+    lastWorldCupMatchDateRef.current = ''
     setGenerationSourceModelCodes(sourceModelCodes)
     const notices = [
       skippedInactiveCount > 0 ? `已自动跳过 ${skippedInactiveCount} 个停用模型。` : '',
@@ -2585,6 +2635,7 @@ export function SettingsPage() {
       predictionPlayMode: 'direct',
       worldCupPlayMode: 'all',
       worldCupMatchDate: '',
+      worldCupMatchIds: [],
       historyRangeMode: 'custom',
       recentPeriodCount: '5',
       promptHistoryPeriodCount: '50',
@@ -2798,6 +2849,37 @@ export function SettingsPage() {
     })
   }
 
+  function getWorldCupMatchIdsForDate(dateKey: string): string[] {
+    return (worldCupMatchesQuery.data?.matches ?? [])
+      .filter((match) => match.status !== 'finished' && getWorldCupMatchDateKey(match) === dateKey)
+      .sort((left, right) => left.kickoff_at - right.kickoff_at)
+      .map((match) => match.match_id)
+  }
+
+  function handleWorldCupMatchDateChange(nextDate: string) {
+    setGenerationForm((previous) => ({
+      ...previous,
+      worldCupMatchDate: nextDate,
+      worldCupMatchIds: getWorldCupMatchIdsForDate(nextDate),
+    }))
+  }
+
+  function toggleWorldCupMatch(matchId: string, checked: boolean) {
+    setGenerationForm((previous) => {
+      if (checked) {
+        return previous.worldCupMatchIds.includes(matchId) ? previous : { ...previous, worldCupMatchIds: [...previous.worldCupMatchIds, matchId] }
+      }
+      return { ...previous, worldCupMatchIds: previous.worldCupMatchIds.filter((item) => item !== matchId) }
+    })
+  }
+
+  function setAllWorldCupMatchesForSelectedDate(checked: boolean) {
+    setGenerationForm((previous) => ({
+      ...previous,
+      worldCupMatchIds: checked ? selectedWorldCupMatches.map((match) => match.match_id) : [],
+    }))
+  }
+
   function submitGenerationForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!generationForm.modelCodes.length) {
@@ -2817,6 +2899,11 @@ export function SettingsPage() {
     }
     if (generationForm.lotteryCode === 'worldcup' && !generationForm.worldCupMatchDate) {
       setMessage('请选择世界杯比赛日期；如无可选日期，请先抓取赛程/赔率。')
+      setMessageType('error')
+      return
+    }
+    if (generationForm.lotteryCode === 'worldcup' && generationForm.worldCupMatchIds.length === 0) {
+      setMessage('请选择至少一场世界杯比赛')
       setMessageType('error')
       return
     }
@@ -2844,6 +2931,9 @@ export function SettingsPage() {
   }
 
   function handleGenerationLotteryChange(nextLottery: GenerationLotteryCode) {
+    if (nextLottery === 'worldcup') {
+      lastWorldCupMatchDateRef.current = ''
+    }
     const nextModelCodes = generationSourceModelCodes.filter((code) => (modelLotteryCodeMap[code] || [DEFAULT_SETTINGS_LOTTERY]).includes(nextLottery))
     setGenerationFilterNotice(
       generationSourceModelCodes.length > nextModelCodes.length ? `已移除 ${generationSourceModelCodes.length - nextModelCodes.length} 个不支持${getLotteryLabel(nextLottery)}的模型。` : null,
@@ -2855,6 +2945,7 @@ export function SettingsPage() {
       predictionPlayMode: normalizePredictionPlayModeForLottery(nextLottery, previous.predictionPlayMode),
       mode: nextLottery === 'worldcup' ? 'current' : previous.mode,
       worldCupMatchDate: nextLottery === 'worldcup' ? previous.worldCupMatchDate : '',
+      worldCupMatchIds: nextLottery === 'worldcup' ? previous.worldCupMatchIds : [],
     }))
   }
 
@@ -5295,7 +5386,7 @@ export function SettingsPage() {
                       <span>比赛日期</span>
                       <select
                         value={generationForm.worldCupMatchDate}
-                        onChange={(event) => setGenerationForm((previous) => ({ ...previous, worldCupMatchDate: event.target.value }))}
+                        onChange={(event) => handleWorldCupMatchDateChange(event.target.value)}
                         disabled={worldCupMatchesQuery.isLoading || worldCupDateOptions.length === 0}
                       >
                         <option value="" disabled>{worldCupMatchesQuery.isLoading ? '加载比赛日期中' : worldCupDateOptions.length ? '请选择比赛日期' : '暂无可生成比赛日期'}</option>
@@ -5316,6 +5407,45 @@ export function SettingsPage() {
                       </select>
                     </label>
                   )}
+                  {generationForm.lotteryCode === 'worldcup' ? (
+                    <div className="generation-worldcup-match-picker">
+                      <div className="generation-worldcup-match-picker__header">
+                        <span>比赛</span>
+                        {selectedWorldCupMatches.length ? (
+                          <button
+                            className="ghost-button ghost-button--small"
+                            type="button"
+                            onClick={() => setAllWorldCupMatchesForSelectedDate(generationForm.worldCupMatchIds.length !== selectedWorldCupMatches.length)}
+                          >
+                            {generationForm.worldCupMatchIds.length === selectedWorldCupMatches.length ? '取消全选' : '全选'}
+                          </button>
+                        ) : null}
+                      </div>
+                      {selectedWorldCupMatches.length ? (
+                        <div className="generation-worldcup-match-picker__list">
+                          {selectedWorldCupMatches.map((match) => {
+                            const matchLabel = `${match.home_team} vs ${match.away_team}`
+                            return (
+                              <label className="generation-worldcup-match-option" key={match.match_id}>
+                                <input
+                                  type="checkbox"
+                                  aria-label={matchLabel}
+                                  checked={generationForm.worldCupMatchIds.includes(match.match_id)}
+                                  onChange={(event) => toggleWorldCupMatch(match.match_id, event.target.checked)}
+                                />
+                                <span>
+                                  <strong>{matchLabel}</strong>
+                                  <small>{match.match_num_str ? `${match.match_num_str} · ` : ''}{formatDateTimeLocal(match.kickoff_at)}</small>
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="generation-worldcup-match-picker__empty">当前比赛日暂无可生成比赛</p>
+                      )}
+                    </div>
+                  ) : null}
                   {generationForm.lotteryCode === 'worldcup' ? (
                     <label className="field">
                       <span>世界杯预测玩法</span>
@@ -5559,7 +5689,11 @@ export function SettingsPage() {
                 <button
                   className="primary-button"
                   type="submit"
-                  disabled={generatePredictionMutation.isPending || generationForm.modelCodes.length === 0 || (generationForm.lotteryCode === 'worldcup' && !generationForm.worldCupMatchDate)}
+                  disabled={
+                    generatePredictionMutation.isPending ||
+                    generationForm.modelCodes.length === 0 ||
+                    (generationForm.lotteryCode === 'worldcup' && (!generationForm.worldCupMatchDate || generationForm.worldCupMatchIds.length === 0))
+                  }
                 >
                   创建任务
                 </button>

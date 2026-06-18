@@ -339,6 +339,7 @@ class WorldCupApiTests(unittest.TestCase):
                     "mode": "current",
                     "model_code": "worldcup-model",
                     "match_date": "2026-06-16",
+                    "match_ids": ["test-worldcup-match"],
                     "processed_count": 0,
                     "skipped_count": 0,
                     "failed_count": 0,
@@ -354,6 +355,7 @@ class WorldCupApiTests(unittest.TestCase):
                     "play_type": "all",
                     "overwrite": False,
                     "match_date": "2026-06-16",
+                    "match_ids": ["test-worldcup-match"],
                 },
             )
 
@@ -364,6 +366,7 @@ class WorldCupApiTests(unittest.TestCase):
             play_type="all",
             overwrite=False,
             match_date="2026-06-16",
+            match_ids=["test-worldcup-match"],
         )
 
     def test_prediction_task_detail_reads_worldcup_prediction_task(self) -> None:

@@ -41,6 +41,7 @@ class WorldCupPredictionService:
         play_type: str = "all",
         overwrite: bool = False,
         match_date: str | None = None,
+        match_ids: list[str] | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         ensure_schema()
@@ -48,13 +49,15 @@ class WorldCupPredictionService:
         model_def = load_model_registry().get(model_code)
         if not model_def.supports_lottery("worldcup"):
             raise ValueError("该模型未配置世界杯")
-        rows = self.repository.list_recent_matches_with_odds(limit=200, match_date=match_date)
+        selected_match_ids = list(match_ids or [])
+        rows = self.repository.list_recent_matches_with_odds(limit=200, match_date=match_date, match_ids=selected_match_ids)
         match_context = self._build_match_context(rows, play_type=play_type)
         summary = {
             "lottery_code": "worldcup",
             "mode": "current",
             "model_code": model_code,
             "match_date": match_date,
+            "match_ids": selected_match_ids,
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
@@ -87,7 +90,7 @@ class WorldCupPredictionService:
                 model_name=str(model_record.get("display_name") or model_def.name),
                 overwrite=overwrite,
             )
-            saved_count = self.repository.upsert_recommendations(recommendations)
+            saved_count = self.repository.replace_recommendations(recommendations)
             summary["processed_count"] = saved_count
             summary["completed_count"] = saved_count
             if not saved_count:

@@ -134,78 +134,115 @@ class WorldCupRepository:
     def upsert_recommendations(self, recommendations: list[dict[str, Any]]) -> int:
         if not recommendations:
             return 0
-        saved_count = 0
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                for recommendation in recommendations:
+                return self._upsert_recommendations(cursor, recommendations)
+
+    def replace_recommendations(self, recommendations: list[dict[str, Any]]) -> int:
+        if not recommendations:
+            return 0
+        scopes: dict[tuple[str | None, str, str], set[str]] = {}
+        for recommendation in recommendations:
+            match_id = str(recommendation.get("match_id") or "")
+            play_type = str(recommendation.get("play_type") or "")
+            recommendation_id = str(recommendation.get("recommendation_id") or "")
+            if not match_id or not play_type or not recommendation_id:
+                continue
+            model_code = recommendation.get("model_code")
+            scopes.setdefault((str(model_code) if model_code is not None else None, match_id, play_type), set()).add(recommendation_id)
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                for (model_code, match_id, play_type), current_ids in scopes.items():
+                    placeholders = ", ".join("?" for _ in current_ids)
+                    params: list[Any] = [match_id, play_type]
+                    model_condition = "model_code IS NULL" if model_code is None else "model_code = ?"
+                    if model_code is not None:
+                        params.append(model_code)
+                    params.extend(sorted(current_ids))
                     cursor.execute(
-                        """
-                        INSERT INTO worldcup_recommendation (
-                            recommendation_id,
-                            match_id,
-                            play_type,
-                            selection,
-                            odds_value,
-                            implied_probability,
-                            confidence_score,
-                            confidence_level,
-                            risk_level,
-                            budget_min,
-                            budget_max,
-                            reason,
-                            input_summary_json,
-                            ai_payload_json,
-                            model_code,
-                            model_name,
-                            model_sources_json,
-                            risk_tags_json,
-                            status,
-                            compliance_notice
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE
-                            selection = VALUES(selection),
-                            odds_value = VALUES(odds_value),
-                            implied_probability = VALUES(implied_probability),
-                            confidence_score = VALUES(confidence_score),
-                            confidence_level = VALUES(confidence_level),
-                            risk_level = VALUES(risk_level),
-                            budget_min = VALUES(budget_min),
-                            budget_max = VALUES(budget_max),
-                            reason = VALUES(reason),
-                            input_summary_json = VALUES(input_summary_json),
-                            ai_payload_json = VALUES(ai_payload_json),
-                            model_code = VALUES(model_code),
-                            model_name = VALUES(model_name),
-                            model_sources_json = VALUES(model_sources_json),
-                            risk_tags_json = VALUES(risk_tags_json),
-                            status = VALUES(status),
-                            compliance_notice = VALUES(compliance_notice),
-                            updated_at = CURRENT_TIMESTAMP
+                        f"""
+                        DELETE FROM worldcup_recommendation
+                        WHERE match_id = ?
+                            AND play_type = ?
+                            AND {model_condition}
+                            AND recommendation_id NOT IN ({placeholders})
                         """,
-                        (
-                            recommendation["recommendation_id"],
-                            recommendation["match_id"],
-                            recommendation["play_type"],
-                            recommendation["selection"],
-                            recommendation.get("odds_value"),
-                            recommendation.get("implied_probability"),
-                            recommendation.get("confidence_score"),
-                            recommendation.get("confidence_level") or "medium",
-                            recommendation.get("risk_level") or "medium",
-                            int(recommendation.get("budget_min") or 0),
-                            int(recommendation.get("budget_max") or 0),
-                            recommendation.get("reason") or "",
-                            json.dumps(recommendation.get("input_summary") or {}, ensure_ascii=False, sort_keys=True),
-                            json.dumps(recommendation.get("ai_payload") or {}, ensure_ascii=False, sort_keys=True),
-                            recommendation.get("model_code"),
-                            recommendation.get("model_name"),
-                            json.dumps(recommendation.get("model_sources") or [], ensure_ascii=False),
-                            json.dumps(recommendation.get("risk_tags") or [], ensure_ascii=False),
-                            recommendation.get("status") or "published",
-                            recommendation.get("compliance_notice") or WORLDCUP_COMPLIANCE_NOTICE,
-                        ),
+                        tuple(params),
                     )
-                    saved_count += 1
+                return self._upsert_recommendations(cursor, recommendations)
+
+    def _upsert_recommendations(self, cursor: Any, recommendations: list[dict[str, Any]]) -> int:
+        saved_count = 0
+        for recommendation in recommendations:
+            cursor.execute(
+                """
+                INSERT INTO worldcup_recommendation (
+                    recommendation_id,
+                    match_id,
+                    play_type,
+                    selection,
+                    odds_value,
+                    implied_probability,
+                    confidence_score,
+                    confidence_level,
+                    risk_level,
+                    budget_min,
+                    budget_max,
+                    reason,
+                    input_summary_json,
+                    ai_payload_json,
+                    model_code,
+                    model_name,
+                    model_sources_json,
+                    risk_tags_json,
+                    status,
+                    compliance_notice
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    selection = VALUES(selection),
+                    odds_value = VALUES(odds_value),
+                    implied_probability = VALUES(implied_probability),
+                    confidence_score = VALUES(confidence_score),
+                    confidence_level = VALUES(confidence_level),
+                    risk_level = VALUES(risk_level),
+                    budget_min = VALUES(budget_min),
+                    budget_max = VALUES(budget_max),
+                    reason = VALUES(reason),
+                    input_summary_json = VALUES(input_summary_json),
+                    ai_payload_json = VALUES(ai_payload_json),
+                    model_code = VALUES(model_code),
+                    model_name = VALUES(model_name),
+                    model_sources_json = VALUES(model_sources_json),
+                    risk_tags_json = VALUES(risk_tags_json),
+                    status = VALUES(status),
+                    compliance_notice = VALUES(compliance_notice),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    recommendation["recommendation_id"],
+                    recommendation["match_id"],
+                    recommendation["play_type"],
+                    recommendation["selection"],
+                    recommendation.get("odds_value"),
+                    recommendation.get("implied_probability"),
+                    recommendation.get("confidence_score"),
+                    recommendation.get("confidence_level") or "medium",
+                    recommendation.get("risk_level") or "medium",
+                    int(recommendation.get("budget_min") or 0),
+                    int(recommendation.get("budget_max") or 0),
+                    recommendation.get("reason") or "",
+                    json.dumps(recommendation.get("input_summary") or {}, ensure_ascii=False, sort_keys=True),
+                    json.dumps(recommendation.get("ai_payload") or {}, ensure_ascii=False, sort_keys=True),
+                    recommendation.get("model_code"),
+                    recommendation.get("model_name"),
+                    json.dumps(recommendation.get("model_sources") or [], ensure_ascii=False),
+                    json.dumps(recommendation.get("risk_tags") or [], ensure_ascii=False),
+                    recommendation.get("status") or "published",
+                    recommendation.get("compliance_notice") or WORLDCUP_COMPLIANCE_NOTICE,
+                ),
+            )
+            saved_count += 1
         return saved_count
 
     def list_matches(
@@ -404,7 +441,7 @@ class WorldCupRepository:
                 )
                 return cursor.fetchall()
 
-    def list_recent_matches_with_odds(self, *, limit: int = 12, match_date: str | None = None) -> list[dict[str, Any]]:
+    def list_recent_matches_with_odds(self, *, limit: int = 12, match_date: str | None = None, match_ids: list[str] | None = None) -> list[dict[str, Any]]:
         conditions = ["m.match_status != 'finished'"]
         params: list[Any] = []
         if match_date:
@@ -418,6 +455,10 @@ class WorldCupRepository:
                 start_at.strftime("%Y-%m-%d %H:%M:%S"),
                 end_at.strftime("%Y-%m-%d %H:%M:%S"),
             ])
+        selected_match_ids = [str(match_id).strip() for match_id in match_ids or [] if str(match_id).strip()]
+        if selected_match_ids:
+            conditions.append(f"m.match_id IN ({', '.join(['?'] * len(selected_match_ids))})")
+            params.extend(selected_match_ids)
         params.append(max(1, int(limit)))
         with get_connection() as connection:
             with connection.cursor() as cursor:

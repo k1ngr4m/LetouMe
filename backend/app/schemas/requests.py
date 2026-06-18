@@ -267,6 +267,7 @@ class WorldCupPredictionGeneratePayload(BaseModel):
     play_type: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
     overwrite: bool = False
     match_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    match_ids: list[str] = Field(default_factory=list)
 
     @field_validator("match_date")
     @classmethod
@@ -278,6 +279,19 @@ class WorldCupPredictionGeneratePayload(BaseModel):
         except ValueError as exc:
             raise ValueError("比赛日期格式必须为 YYYY-MM-DD") from exc
         return value
+
+    @field_validator("match_ids")
+    @classmethod
+    def validate_match_ids(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            match_id = str(item).strip()
+            if not match_id or match_id in seen:
+                continue
+            cleaned.append(match_id)
+            seen.add(match_id)
+        return cleaned
 
 
 class MyBetRecordListPayload(BaseModel):

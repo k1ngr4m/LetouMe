@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from './SettingsPage'
 import { MotionProvider } from '../../shared/theme/MotionProvider'
 import { ToastProvider } from '../../shared/feedback/ToastProvider'
@@ -123,6 +123,10 @@ describe('SettingsPage model management view switch', () => {
     apiClientMock.listScheduleTasks.mockResolvedValue({ tasks: [] })
     apiClientMock.listScheduleRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
     apiClientMock.listMaintenanceRunLogs.mockResolvedValue({ logs: [], total_count: 0 })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders provider-first model management and switches managed providers', async () => {
@@ -970,6 +974,8 @@ describe('SettingsPage model management view switch', () => {
   })
 
   it('uses match date instead of generation mode for worldcup prediction tasks', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00+08:00'))
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [
         {
@@ -1053,6 +1059,7 @@ describe('SettingsPage model management view switch', () => {
         mode: 'current',
         model_code: 'worldcup-deepseek',
         match_date: '2026-06-17',
+        match_ids: ['worldcup-match-3'],
         processed_count: 0,
         skipped_count: 0,
         failed_count: 0,
@@ -1072,8 +1079,12 @@ describe('SettingsPage model management view switch', () => {
     expect(screen.queryByLabelText('Prompt历史期数')).not.toBeInTheDocument()
     expect(await screen.findByRole('option', { name: '2026-06-16（2场）' })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: '2026-06-18（1场）' })).not.toBeInTheDocument()
+    expect(matchDateSelect).toHaveValue('2026-06-16')
+    expect(await screen.findByLabelText('西班牙 vs 佛得角')).toBeChecked()
+    expect(screen.getByLabelText('葡萄牙 vs 摩洛哥')).toBeChecked()
 
     await userEvent.selectOptions(matchDateSelect, '2026-06-17')
+    expect(await screen.findByLabelText('法国 vs 日本')).toBeChecked()
     await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
 
     await waitFor(() =>
@@ -1082,6 +1093,7 @@ describe('SettingsPage model management view switch', () => {
         play_type: 'all',
         overwrite: false,
         match_date: '2026-06-17',
+        match_ids: ['worldcup-match-3'],
       }),
     )
   })

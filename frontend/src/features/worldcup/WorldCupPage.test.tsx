@@ -127,7 +127,6 @@ const scoreRecommendations: WorldCupRecommendation[] = [
 ]
 
 const groupedPlayRecommendations: WorldCupRecommendation[] = [
-  ...scoreRecommendations,
   {
     ...recommendation,
     recommendation_id: 'worldcup-total-goals-rec-1',
@@ -140,18 +139,7 @@ const groupedPlayRecommendations: WorldCupRecommendation[] = [
     reason: '测试总进球数 2。',
     latest_odds: { '1': '4.50', '2': '3.25', '3': '3.70' },
   },
-  {
-    ...recommendation,
-    recommendation_id: 'worldcup-total-goals-rec-2',
-    play_type: 'total_goals',
-    selection: '3',
-    odds_value: '3.70',
-    implied_probability: 0.27,
-    confidence_score: 57,
-    risk_level: 'medium',
-    reason: '测试总进球数 3。',
-    latest_odds: { '1': '4.50', '2': '3.25', '3': '3.70' },
-  },
+  ...scoreRecommendations,
   {
     ...recommendation,
     recommendation_id: 'worldcup-half-full-rec-1',
@@ -163,6 +151,31 @@ const groupedPlayRecommendations: WorldCupRecommendation[] = [
     risk_level: 'medium',
     reason: '测试半全场胜胜。',
     latest_odds: { 胜胜: '2.40', 胜平: '14.00', 平平: '6.50' },
+  },
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-handicap-rec-1',
+    play_type: 'handicap_win_draw_win',
+    selection: '胜',
+    odds_value: '1.54',
+    implied_probability: 0.649,
+    confidence_score: 63,
+    risk_level: 'medium',
+    reason: '测试让球胜平负胜。',
+    latest_odds: { 胜: '1.54', 平: '4.55', 负: '3.85' },
+  },
+  recommendation,
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-total-goals-rec-2',
+    play_type: 'total_goals',
+    selection: '3',
+    odds_value: '3.70',
+    implied_probability: 0.27,
+    confidence_score: 57,
+    risk_level: 'medium',
+    reason: '测试总进球数 3。',
+    latest_odds: { '1': '4.50', '2': '3.25', '3': '3.70' },
   },
   {
     ...recommendation,
@@ -332,6 +345,17 @@ describe('WorldCupPage odds display', () => {
     })
 
     renderPage()
+
+    const orderedPlayHeadings = await Promise.all([
+      screen.findByRole('heading', { name: '胜平负 · 1 个推荐' }),
+      screen.findByRole('heading', { name: '让球胜平负 · 1 个推荐' }),
+      screen.findByRole('heading', { name: '比分 · 2 个推荐' }),
+      screen.findByRole('heading', { name: '总进球数 · 2 个推荐' }),
+      screen.findByRole('heading', { name: '半全场 · 2 个推荐' }),
+    ])
+    for (let index = 0; index < orderedPlayHeadings.length - 1; index += 1) {
+      expect(orderedPlayHeadings[index].compareDocumentPosition(orderedPlayHeadings[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
 
     const heading = await screen.findByRole('heading', { name: '比分 · 2 个推荐' })
     const scoreCard = heading.closest('article')
