@@ -99,6 +99,33 @@ const recommendation: WorldCupRecommendation = {
   created_at: 1781492400,
 }
 
+const scoreRecommendations: WorldCupRecommendation[] = [
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-score-rec-1',
+    play_type: 'correct_score',
+    selection: '2:1',
+    odds_value: '6.25',
+    implied_probability: 0.16,
+    confidence_score: 60,
+    risk_level: 'medium',
+    reason: '测试比分推荐 2:1。',
+    latest_odds: { '2:1': '6.25', '1:0': '6.50' },
+  },
+  {
+    ...recommendation,
+    recommendation_id: 'worldcup-score-rec-2',
+    play_type: 'correct_score',
+    selection: '1:0',
+    odds_value: '6.50',
+    implied_probability: 0.154,
+    confidence_score: 58,
+    risk_level: 'medium',
+    reason: '测试比分推荐 1:0。',
+    latest_odds: { '2:1': '6.25', '1:0': '6.50' },
+  },
+]
+
 const matchWithoutWinDrawWinOdds: WorldCupMatch = {
   ...match,
   latest_odds: {},
@@ -241,6 +268,26 @@ describe('WorldCupPage odds display', () => {
     expect(screen.getByText('胜率 83%')).toBeInTheDocument()
     expect(screen.getByText('西班牙6场比赛5胜1平，状态出色。')).toBeInTheDocument()
     expect(screen.getByText('阵容名单已获取，首发待确认')).toBeInTheDocument()
+  })
+
+  it('groups all correct score recommendations for a match in one card', async () => {
+    vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValueOnce({
+      recommendations: scoreRecommendations,
+      total_count: scoreRecommendations.length,
+      compliance_notice: recommendation.compliance_notice,
+    })
+
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { name: '比分 · 2 个推荐' })
+    const scoreCard = heading.closest('article')
+    expect(scoreCard).not.toBeNull()
+    expect(within(scoreCard as HTMLElement).getByText('2:1')).toBeInTheDocument()
+    expect(within(scoreCard as HTMLElement).getByText('1:0')).toBeInTheDocument()
+    expect(within(scoreCard as HTMLElement).getByText('60%')).toBeInTheDocument()
+    expect(within(scoreCard as HTMLElement).getByText('58%')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '比分 · 2:1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '比分 · 1:0' })).not.toBeInTheDocument()
   })
 
   it('shows a closed win-draw-win row when that play has no odds', async () => {
