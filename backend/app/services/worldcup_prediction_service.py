@@ -105,6 +105,73 @@ class WorldCupPredictionService:
                 progress_callback(summary)
             raise
 
+    def generate_for_models(
+        self,
+        *,
+        model_codes: list[str],
+        play_type: str = "all",
+        overwrite: bool = False,
+        match_date: str | None = None,
+        match_ids: list[str] | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
+        unique_codes = list(dict.fromkeys(normalized_codes))
+        if not unique_codes:
+            raise ValueError("请选择至少一个模型")
+        selected_match_ids = list(match_ids or [])
+        summary: dict[str, Any] = {
+            "lottery_code": "worldcup",
+            "mode": "current",
+            "model_code": "__bulk__",
+            "selected_count": len(unique_codes),
+            "match_date": match_date,
+            "match_ids": selected_match_ids,
+            "play_type": play_type,
+            "processed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "failed_periods": [],
+            "completed_count": 0,
+            "processed_models": [],
+            "skipped_models": [],
+            "failed_models": [],
+            "failed_details": [],
+        }
+        if progress_callback:
+            progress_callback(dict(summary))
+
+        for model_code in unique_codes:
+            try:
+                result = self.generate_for_model(
+                    model_code=model_code,
+                    play_type=play_type,
+                    overwrite=overwrite,
+                    match_date=match_date,
+                    match_ids=selected_match_ids,
+                )
+                processed_count = int(result.get("processed_count") or 0)
+                skipped_count = int(result.get("skipped_count") or 0)
+                failed_count = int(result.get("failed_count") or 0)
+                summary["processed_count"] += processed_count
+                summary["skipped_count"] += skipped_count
+                summary["failed_count"] += failed_count
+                summary["completed_count"] += int(result.get("completed_count") or processed_count)
+                if processed_count > 0:
+                    summary["processed_models"].append(model_code)
+                elif skipped_count > 0:
+                    summary["skipped_models"].append(model_code)
+                if failed_count > 0:
+                    summary["failed_models"].append(model_code)
+                    summary["failed_details"].extend(result.get("failed_details") or [])
+            except Exception as exc:
+                summary["failed_count"] += 1
+                summary["failed_models"].append(model_code)
+                summary["failed_details"].append({"model_code": model_code, "error": str(exc)})
+            if progress_callback:
+                progress_callback(dict(summary))
+        return summary
+
     def _validate_model(self, model_code: str) -> dict[str, Any]:
         model = self.model_repository.get_model(model_code)
         if not model:

@@ -2012,7 +2012,8 @@ export function SettingsPage() {
     mutationFn: () => {
       if (generationForm.lotteryCode === 'worldcup') {
         return apiClient.generateSettingsWorldCupPredictions({
-          model_code: generationForm.modelCodes[0] || '',
+          model_code: generationForm.modelCodes.length > 1 ? '__bulk__' : generationForm.modelCodes[0] || '',
+          model_codes: generationForm.modelCodes,
           play_type: generationForm.worldCupPlayMode,
           overwrite: generationForm.overwrite,
           match_date: generationForm.worldCupMatchDate,
@@ -2907,11 +2908,6 @@ export function SettingsPage() {
     event.preventDefault()
     if (!generationForm.modelCodes.length) {
       setMessage('当前彩种暂无可用模型，请切换彩种后重试。')
-      setMessageType('error')
-      return
-    }
-    if (generationForm.lotteryCode === 'worldcup' && generationForm.modelCodes.length > 1) {
-      setMessage('世界杯预测当前请单模型生成')
       setMessageType('error')
       return
     }

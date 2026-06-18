@@ -263,7 +263,8 @@ class WorldCupHistoryPayload(BaseModel):
 
 
 class WorldCupPredictionGeneratePayload(BaseModel):
-    model_code: str
+    model_code: str = ""
+    model_codes: list[str] = Field(default_factory=list)
     play_type: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
     overwrite: bool = False
     match_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")

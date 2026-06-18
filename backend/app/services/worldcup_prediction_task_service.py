@@ -23,23 +23,29 @@ class WorldCupPredictionTaskService:
         self,
         *,
         model_code: str,
+        model_codes: list[str] | None = None,
         play_type: str = "all",
         overwrite: bool = False,
         match_date: str | None = None,
         match_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         selected_match_ids = list(match_ids or [])
+        selected_model_codes = list(dict.fromkeys(str(code).strip() for code in (model_codes or [model_code]) if str(code).strip()))
+        if not selected_model_codes:
+            raise ValueError("请选择至少一个模型")
+        task_model_code = selected_model_codes[0] if len(selected_model_codes) == 1 else "__bulk__"
         task = self.runner.create_task(
             initial_task={
                 "lottery_code": "worldcup",
                 "mode": "current",
-                "model_code": model_code,
+                "model_code": task_model_code,
                 "match_date": match_date,
                 "match_ids": selected_match_ids,
                 "progress_summary": {
                     "lottery_code": "worldcup",
                     "mode": "current",
-                    "model_code": model_code,
+                    "model_code": task_model_code,
+                    "selected_count": len(selected_model_codes),
                     "match_date": match_date,
                     "match_ids": selected_match_ids,
                     "processed_count": 0,
@@ -51,13 +57,24 @@ class WorldCupPredictionTaskService:
                 },
                 "error_message": None,
             },
-            worker=lambda progress_callback: self.prediction_service.generate_for_model(
-                model_code=model_code,
-                play_type=play_type,
-                overwrite=overwrite,
-                match_date=match_date,
-                match_ids=selected_match_ids,
-                progress_callback=progress_callback,
+            worker=lambda progress_callback: (
+                self.prediction_service.generate_for_model(
+                    model_code=selected_model_codes[0],
+                    play_type=play_type,
+                    overwrite=overwrite,
+                    match_date=match_date,
+                    match_ids=selected_match_ids,
+                    progress_callback=progress_callback,
+                )
+                if len(selected_model_codes) == 1
+                else self.prediction_service.generate_for_models(
+                    model_codes=selected_model_codes,
+                    play_type=play_type,
+                    overwrite=overwrite,
+                    match_date=match_date,
+                    match_ids=selected_match_ids,
+                    progress_callback=progress_callback,
+                )
             ),
             on_update=self._handle_task_update,
         )
@@ -68,7 +85,7 @@ class WorldCupPredictionTaskService:
             trigger_type="manual",
             task_type="worldcup_prediction_generate",
             mode="current",
-            model_code=model_code,
+            model_code=task_model_code,
             status=str(task["status"]),
             created_at=task.get("created_at"),
         )

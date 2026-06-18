@@ -1090,12 +1090,117 @@ describe('SettingsPage model management view switch', () => {
     await waitFor(() =>
       expect(apiClientMock.generateSettingsWorldCupPredictions).toHaveBeenCalledWith({
         model_code: 'worldcup-deepseek',
+        model_codes: ['worldcup-deepseek'],
         play_type: 'all',
         overwrite: false,
         match_date: '2026-06-17',
         match_ids: ['worldcup-match-3'],
       }),
     )
+  })
+
+  it('submits batch worldcup prediction task for selected models', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-18T12:00:00+08:00'))
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'worldcup-qwen',
+          display_name: 'qwen3.5-plus',
+          provider: 'deepseek',
+          api_model_name: 'qwen',
+          version: '1',
+          tags: ['worldcup'],
+          base_url: 'https://example.test',
+          api_key: '',
+          app_code: 'worldcup',
+          lottery_codes: ['worldcup'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+        {
+          model_code: 'worldcup-deepseek',
+          display_name: 'DeepSeek V4 Flash',
+          provider: 'deepseek',
+          api_model_name: 'deepseek-chat',
+          version: '1',
+          tags: ['worldcup'],
+          base_url: 'https://api.deepseek.com',
+          api_key: '',
+          app_code: 'worldcup',
+          lottery_codes: ['worldcup'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({ providers: [DEEPSEEK_PROVIDER_FIXTURE] })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.getWorldCupMatches.mockResolvedValue({
+      matches: [
+        {
+          match_id: 'worldcup-match-1',
+          home_team: '捷克',
+          away_team: '南非',
+          kickoff_at: Date.UTC(2026, 5, 18, 16, 0, 0) / 1000,
+          stage: '世界杯',
+          status: 'scheduled',
+          latest_odds: {},
+          recommendation_count: 0,
+        },
+      ],
+      total_count: 1,
+    })
+    apiClientMock.generateSettingsWorldCupPredictions.mockResolvedValue({
+      task_id: 'worldcup-bulk-task-1',
+      lottery_code: 'worldcup',
+      status: 'queued',
+      mode: 'current',
+      model_code: '__bulk__',
+      created_at: Date.UTC(2026, 5, 18) / 1000,
+      started_at: null,
+      finished_at: null,
+      progress_summary: {
+        mode: 'current',
+        model_code: '__bulk__',
+        selected_count: 2,
+        match_date: '2026-06-19',
+        match_ids: ['worldcup-match-1'],
+        processed_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        failed_periods: [],
+      },
+      error_message: null,
+    })
+
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: '模型管理' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '全选模型' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量生成预测' }))
+    await userEvent.selectOptions(screen.getByLabelText('生成彩种'), 'worldcup')
+    await screen.findByLabelText('捷克 vs 南非')
+    await userEvent.click(screen.getByRole('button', { name: '创建任务' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.generateSettingsWorldCupPredictions).toHaveBeenCalledWith({
+        model_code: '__bulk__',
+        model_codes: ['worldcup-qwen', 'worldcup-deepseek'],
+        play_type: 'all',
+        overwrite: false,
+        match_date: '2026-06-19',
+        match_ids: ['worldcup-match-1'],
+      }),
+    )
+    expect(apiClientMock.bulkGenerateSettingsModelPredictions).not.toHaveBeenCalled()
   })
 
   it('submits history generate task with recent-period preset and disables manual range inputs', async () => {

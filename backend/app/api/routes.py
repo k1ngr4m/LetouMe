@@ -494,6 +494,7 @@ def generate_settings_worldcup_predictions(payload: WorldCupPredictionGeneratePa
     try:
         return worldcup_prediction_task_service.create_task(
             model_code=payload.model_code,
+            model_codes=payload.model_codes,
             play_type=payload.play_type,
             overwrite=payload.overwrite,
             match_date=payload.match_date,
