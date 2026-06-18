@@ -785,6 +785,74 @@
   border-color: rgba(92, 188, 255, 0.24);
 }
 
+.worldcup-play-result-list {
+  display: grid;
+  gap: 0.82rem;
+}
+
+.worldcup-play-result-group {
+  display: grid;
+  gap: 0.68rem;
+  min-width: 0;
+  padding: 0.74rem;
+  border: 1px solid rgba(159, 195, 255, 0.14);
+  border-radius: 0.9rem;
+  background:
+    linear-gradient(135deg, rgba(92, 188, 255, 0.08), rgba(72, 204, 146, 0.045)),
+    rgba(255, 255, 255, 0.025);
+}
+
+.worldcup-play-result-group__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.worldcup-play-result-group__header > div {
+  display: grid;
+  gap: 0.14rem;
+  min-width: 0;
+}
+
+.worldcup-play-result-group__header > div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.worldcup-play-result-group__header span {
+  overflow: hidden;
+  color: var(--worldcup-card-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worldcup-play-result-group__header strong {
+  overflow-wrap: anywhere;
+  color: var(--worldcup-gold-text);
+  font-size: clamp(1.22rem, 2vw, 1.62rem);
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.worldcup-play-result-group__header b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8rem;
+  padding: 0 0.62rem;
+  border: 1px solid rgba(72, 204, 146, 0.24);
+  border-radius: 999px;
+  background: rgba(72, 204, 146, 0.1);
+  color: var(--worldcup-positive-text);
+  font-size: 0.9rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
 .worldcup-play-pick-list {
   display: grid;
   gap: 0.68rem;
@@ -1135,13 +1203,13 @@ button.worldcup-match-card__odds-action {
   z-index: 150;
   display: grid;
   place-items: center;
-  padding: 1.25rem;
+  padding: 0.9rem;
   background: var(--worldcup-overlay-bg);
 }
 
 .worldcup-odds-modal__panel {
-  width: min(94vw, 48rem);
-  max-height: min(92vh, 58rem);
+  width: min(93vw, 45rem);
+  max-height: min(94vh, 56rem);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -1152,21 +1220,21 @@ button.worldcup-match-card__odds-action {
 }
 
 .worldcup-odds-modal__topline {
-  padding: 0.9rem 1rem 0.7rem;
+  padding: 0.62rem 1rem 0.5rem;
   text-align: center;
   color: #666;
-  font-size: 1.05rem;
+  font-size: 0.96rem;
   font-weight: 700;
 }
 
 .worldcup-odds-modal__match-hero {
   position: relative;
-  min-height: 4.65rem;
+  min-height: 3.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.8rem;
-  padding: 0.8rem 1rem;
+  gap: 0.62rem;
+  padding: 0.58rem 0.9rem;
   overflow: hidden;
   color: #fff;
   background:
@@ -1204,35 +1272,35 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-odds-modal__match-hero span {
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.96rem;
+  font-size: 0.84rem;
 }
 
 .worldcup-odds-modal__match-hero strong {
-  font-size: clamp(1.25rem, 4vw, 1.85rem);
+  font-size: clamp(1.14rem, 3.3vw, 1.55rem);
   line-height: 1.1;
   letter-spacing: 0;
 }
 
 .worldcup-odds-modal__match-hero b {
-  font-size: 1.28rem;
+  font-size: 1.08rem;
   text-transform: uppercase;
 }
 
 .worldcup-odds-modal__body {
   display: grid;
-  gap: 1.1rem;
+  gap: 0.78rem;
   overflow-y: auto;
-  padding: 1.25rem 1.55rem 1rem;
+  padding: 0.86rem 1.25rem 0.72rem;
 }
 
 .worldcup-odds-modal__section {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.52rem;
 }
 
 .worldcup-odds-modal__section.is-priority {
-  padding: 0.75rem;
-  margin: -0.75rem;
+  padding: 0.52rem;
+  margin: -0.52rem;
   border-radius: 0.8rem;
   background: rgba(55, 142, 255, 0.08);
 }
@@ -1247,17 +1315,17 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-odds-modal__section-header {
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .worldcup-odds-modal__section-title {
-  gap: 0.35rem;
+  gap: 0.28rem;
   min-width: 0;
 }
 
 .worldcup-odds-modal__section-title > span {
-  width: 0.22rem;
-  height: 1.25rem;
+  width: 0.18rem;
+  height: 1.05rem;
   border-radius: 999px;
   background: #55b976;
 }
@@ -1278,7 +1346,7 @@ button.worldcup-match-card__odds-action {
 .worldcup-odds-modal__section-title h3 {
   margin: 0;
   color: #222;
-  font-size: 1.35rem;
+  font-size: 1.12rem;
   line-height: 1.2;
 }
 
@@ -1287,19 +1355,20 @@ button.worldcup-match-card__odds-action {
 }
 
 .worldcup-odds-modal__badges {
-  gap: 0.35rem;
+  gap: 0.28rem;
 }
 
 .worldcup-odds-modal__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.8rem;
-  padding: 0 0.45rem;
+  min-height: 1.45rem;
+  padding: 0 0.38rem;
   border-radius: 999px;
   background: #b7b7b7;
   color: #fff;
   font-weight: 800;
+  font-size: 0.86rem;
   line-height: 1;
 }
 
@@ -1309,11 +1378,11 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-odds-modal__section-body {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.55rem;
 }
 
 .worldcup-odds-modal__section-body.has-goal-line {
-  gap: 0.8rem;
+  gap: 0.55rem;
 }
 
 .worldcup-odds-modal__goal-line {
@@ -1321,12 +1390,12 @@ button.worldcup-match-card__odds-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3rem;
-  min-height: 3rem;
-  border-radius: 1rem;
+  min-width: 2.38rem;
+  min-height: 2.38rem;
+  border-radius: 0.72rem;
   background: linear-gradient(180deg, #e7f8ee, #d7f1e2);
   color: #06ae75;
-  font-size: 1.35rem;
+  font-size: 1.08rem;
   font-weight: 700;
   box-shadow: 0 0.2rem 0.8rem rgba(16, 149, 92, 0.15);
 }
@@ -1334,7 +1403,7 @@ button.worldcup-match-card__odds-action {
 .worldcup-odds-modal__tiles {
   width: 100%;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.46rem;
 }
 
 .worldcup-odds-modal__tiles--three {
@@ -1351,16 +1420,26 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-odds-modal__tile {
   min-width: 0;
-  min-height: 4.45rem;
+  min-height: 3.45rem;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 0.15rem;
-  padding: 0.55rem 0.4rem;
+  gap: 0.08rem;
+  padding: 0.38rem 0.32rem;
   border: 1px solid #e7e7e7;
   border-radius: 0.52rem;
   background: linear-gradient(180deg, #fff, #f6f6f6);
   box-shadow: inset 0 -0.2rem 0.8rem rgba(0, 0, 0, 0.025);
+}
+
+.worldcup-odds-modal__tile.is-predicted {
+  border-color: rgba(72, 204, 146, 0.36);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(237, 250, 244, 0.98)),
+    #fff;
+  box-shadow:
+    inset 0 -0.2rem 0.8rem rgba(0, 0, 0, 0.02),
+    0 0.24rem 0.75rem rgba(16, 149, 92, 0.06);
 }
 
 .worldcup-odds-modal__tile.is-wide {
@@ -1368,7 +1447,8 @@ button.worldcup-match-card__odds-action {
 }
 
 .worldcup-odds-modal__tile span,
-.worldcup-odds-modal__tile strong {
+.worldcup-odds-modal__tile strong,
+.worldcup-odds-modal__model-tags {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -1378,29 +1458,53 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-odds-modal__tile span {
   color: #444;
-  font-size: 1.12rem;
+  font-size: 0.96rem;
   font-weight: 700;
 }
 
 .worldcup-odds-modal__tile strong {
   color: #666;
-  font-size: 1.08rem;
+  font-size: 0.96rem;
+}
+
+.worldcup-odds-modal__model-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.12rem;
+  margin-top: 0.08rem;
+  font-style: normal;
+}
+
+.worldcup-odds-modal__model-tags b {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.08rem 0.26rem;
+  border: 1px solid rgba(72, 204, 146, 0.28);
+  border-radius: 999px;
+  background: rgba(72, 204, 146, 0.12);
+  color: #08754d;
+  font-size: 0.56rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .worldcup-odds-modal__footer {
-  padding: 0.8rem 1rem;
+  padding: 0.52rem 0.9rem;
   border-top: 1px solid #e8e8e8;
   background: rgba(255, 255, 255, 0.96);
 }
 
 .worldcup-odds-modal__footer button {
   width: 100%;
-  min-height: 2.8rem;
+  min-height: 2.22rem;
   border: 0;
   border-radius: 0.75rem;
   background: #fff;
   color: #222;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 800;
 }
 
@@ -1551,6 +1655,20 @@ button.worldcup-match-card__odds-action {
     flex: 1 1 12rem;
   }
 
+  .worldcup-play-result-group {
+    padding: 0.62rem;
+  }
+
+  .worldcup-play-result-group__header {
+    grid-template-columns: 1fr;
+    gap: 0.48rem;
+  }
+
+  .worldcup-play-result-group__header > div:last-child {
+    justify-items: start;
+    text-align: left;
+  }
+
   .worldcup-play-pick__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1695,7 +1813,7 @@ button.worldcup-match-card__odds-action {
   }
 
   .worldcup-odds-modal {
-    padding: 0.55rem;
+    padding: 0.42rem;
   }
 
   .worldcup-odds-modal__panel {
@@ -1705,16 +1823,16 @@ button.worldcup-match-card__odds-action {
   }
 
   .worldcup-odds-modal__topline {
-    font-size: 0.95rem;
+    font-size: 0.86rem;
   }
 
   .worldcup-odds-modal__match-hero {
     flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.32rem;
   }
 
   .worldcup-odds-modal__body {
-    padding: 1rem 0.85rem 0.85rem;
+    padding: 0.72rem 0.62rem 0.62rem;
   }
 
   .worldcup-odds-modal__section-header {
@@ -1735,6 +1853,6 @@ button.worldcup-match-card__odds-action {
   }
 
   .worldcup-odds-modal__tile {
-    min-height: 4.2rem;
+    min-height: 3.25rem;
   }
 }
