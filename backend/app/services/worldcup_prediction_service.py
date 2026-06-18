@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -18,6 +20,8 @@ from backend.core.model_factory import ModelFactory
 WORLDCUP_PROMPT_PATH = Path(__file__).resolve().parents[2] / "doc" / "worldcup_prompt.md"
 WORLDCUP_PLAY_TYPES = {"win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"}
 WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES = {"total_goals", "correct_score", "half_full_time"}
+WORLDCUP_RECOMMENDATION_ID_MAX_LENGTH = 64
+WORLDCUP_RECOMMENDATION_ID_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class WorldCupPredictionService:
@@ -296,9 +300,12 @@ class WorldCupPredictionService:
                     model_sources.append("球队最新资讯")
                 if self._match_has_baidu_sports(context_by_match[match_id]):
                     model_sources.append("百度体育赛前分析")
-            recommendation_id = f"wc-ai-{model_code}-{match_id}-{play_type}"
-            if play_type in WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES:
-                recommendation_id = f"{recommendation_id}-{play_count}"
+            recommendation_id = self._build_recommendation_id(
+                model_code=model_code,
+                match_id=match_id,
+                play_type=play_type,
+                play_count=play_count if play_type in WORLDCUP_MULTI_RECOMMENDATION_PLAY_TYPES else None,
+            )
             result.append(
                 {
                     "recommendation_id": recommendation_id,
@@ -324,6 +331,22 @@ class WorldCupPredictionService:
                 }
             )
         return result
+
+    @staticmethod
+    def _build_recommendation_id(*, model_code: str, match_id: str, play_type: str, play_count: int | None = None) -> str:
+        parts = ["wc-ai", model_code, match_id, play_type]
+        if play_count is not None:
+            parts.append(str(play_count))
+        raw_id = "-".join(str(part).strip() for part in parts)
+        if len(raw_id) <= WORLDCUP_RECOMMENDATION_ID_MAX_LENGTH and WORLDCUP_RECOMMENDATION_ID_SAFE_PATTERN.fullmatch(raw_id):
+            return raw_id
+
+        digest = hashlib.sha1(raw_id.encode("utf-8")).hexdigest()[:16]
+        slug = re.sub(r"[^A-Za-z0-9_-]+", "-", raw_id).strip("-") or "wc-ai"
+        suffix = f"-{digest}"
+        prefix_length = WORLDCUP_RECOMMENDATION_ID_MAX_LENGTH - len(suffix)
+        prefix = slug[:prefix_length].rstrip("-") or "wc-ai"
+        return f"{prefix}{suffix}"
 
     @staticmethod
     def _attach_unavailable_news(match: dict[str, Any], *, error: str) -> None:

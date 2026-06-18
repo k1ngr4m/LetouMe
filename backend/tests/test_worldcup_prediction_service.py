@@ -323,6 +323,43 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
             ],
         )
 
+    def test_normalize_caps_long_recommendation_ids_for_database_columns(self) -> None:
+        service = WorldCupPredictionService(
+            repository=_FakeWorldCupRepository(),
+            model_repository=_FakeModelRepository(),
+        )
+        long_model_code = "ZhipuAI/GLM-5-" + ("very-long-model-code-" * 6)
+
+        recommendations = service._normalize_ai_recommendations(
+            {
+                "recommendations": [
+                    {
+                        "match_id": "match-1",
+                        "play_type": "total_goals",
+                        "selection": "3",
+                        "odds_value": "6.00",
+                    },
+                    {
+                        "match_id": "match-1",
+                        "play_type": "total_goals",
+                        "selection": "4",
+                        "odds_value": "7.00",
+                    },
+                ]
+            },
+            match_context=[{"match_id": "match-1", "team_context": {}, "odds": {"total_goals": {"odds": {"3": "6.00", "4": "7.00"}}}}],
+            model_code=long_model_code,
+            model_name="Fake Display Model",
+            overwrite=False,
+        )
+
+        recommendation_ids = [item["recommendation_id"] for item in recommendations]
+        self.assertEqual(len(recommendation_ids), 2)
+        self.assertEqual(len(set(recommendation_ids)), 2)
+        for recommendation_id in recommendation_ids:
+            self.assertLessEqual(len(recommendation_id), 64)
+            self.assertRegex(recommendation_id, r"^[A-Za-z0-9_-]+$")
+
     def test_generate_replaces_previous_worldcup_recommendation_scope(self) -> None:
         repository = _FakeWorldCupRepository()
         fake_model = _FakeModel(
