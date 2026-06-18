@@ -1692,6 +1692,26 @@ export function SettingsPage() {
   const modelCustomBodyParamKeys = Object.keys(modelCustomBodyParams)
   const providerCustomHeaders = useMemo(() => normalizeCustomHeaderRecord(providerDraft.custom_headers), [providerDraft.custom_headers])
   const providerCustomHeaderKeys = Object.keys(providerCustomHeaders)
+  function getEffectiveModelConnectionConfig() {
+    const providerCode = modelForm.provider.trim()
+    const provider = providerMap[providerCode]
+    const providerExtraOptions = provider?.extra_options || {}
+    const modelExtraOptions = mergeCustomBodyParams(modelForm.extra_options, modelCustomBodyParams)
+    return {
+      provider: providerCode,
+      api_format: provider?.api_format || modelForm.api_format,
+      base_url: String(provider?.base_url || modelForm.base_url || '').trim(),
+      api_key: String(provider?.api_key || modelForm.api_key || '').trim(),
+      extra_options: {
+        ...providerExtraOptions,
+        ...modelExtraOptions,
+        custom_body_params: {
+          ...getCustomBodyParams(providerExtraOptions),
+          ...getCustomBodyParams(modelExtraOptions),
+        },
+      },
+    }
+  }
   const users = usersQuery.data?.users ?? EMPTY_USERS
   const roles = rolesQuery.data?.roles ?? EMPTY_ROLES
   const permissions = permissionsQuery.data?.permissions ?? EMPTY_PERMISSIONS
@@ -2807,6 +2827,7 @@ export function SettingsPage() {
   function submitModelForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const modelCode = modelForm.model_code?.trim()
+    const connectionConfig = getEffectiveModelConnectionConfig()
     const autoModelCode = `${modelForm.provider}-${modelForm.api_model_name || modelForm.provider_model_name || ''}`
       .toLowerCase()
       .replace(/[^a-z0-9-_.]+/g, '-')
@@ -2818,25 +2839,27 @@ export function SettingsPage() {
       display_name: modelForm.display_name.trim(),
       provider: modelForm.provider.trim(),
       provider_model_name: modelForm.provider_model_name?.trim(),
+      api_format: connectionConfig.api_format,
       api_model_name: modelForm.api_model_name.trim(),
-      base_url: modelForm.base_url.trim(),
-      api_key: modelForm.api_key.trim(),
+      base_url: connectionConfig.base_url,
+      api_key: connectionConfig.api_key,
       app_code: modelForm.app_code.trim(),
       temperature: null,
-      extra_options: mergeCustomBodyParams(modelForm.extra_options, modelCustomBodyParams),
+      extra_options: connectionConfig.extra_options,
     })
   }
 
   function testModelConnectivity() {
+    const connectionConfig = getEffectiveModelConnectionConfig()
     setModelConnectivityResult(null)
     testModelConnectivityMutation.mutate({
-      provider: modelForm.provider.trim(),
-      api_format: modelForm.api_format,
+      provider: connectionConfig.provider,
+      api_format: connectionConfig.api_format,
       api_model_name: modelForm.api_model_name.trim(),
-      base_url: modelForm.base_url.trim(),
-      api_key: modelForm.api_key.trim(),
+      base_url: connectionConfig.base_url,
+      api_key: connectionConfig.api_key,
       app_code: modelForm.app_code.trim(),
-      extra_options: mergeCustomBodyParams(modelForm.extra_options, modelCustomBodyParams),
+      extra_options: connectionConfig.extra_options,
     })
   }
 

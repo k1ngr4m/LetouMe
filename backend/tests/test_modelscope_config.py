@@ -64,13 +64,13 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
                     "provider_code": "openai_compatible",
                     "api_format": "openai_compatible",
                     "provider_id": 7,
-                    "provider_base_url": "https://example.com/v1",
-                    "provider_api_key": "",
+                    "provider_base_url": "https://provider.example.com/v1",
+                    "provider_api_key": "saved-provider-key",
                     "api_model_name": "phase5-api-model",
                     "provider_model_name": "phase5-provider-model",
                     "version": "1",
-                    "base_url": "",
-                    "api_key": "",
+                    "base_url": "https://stale.example.com/v1",
+                    "api_key": "stale-model-key",
                     "app_code": "",
                     "temperature": 0.6,
                     "is_active": 1,
@@ -93,6 +93,8 @@ class ModelScopeConfigUnitTests(unittest.TestCase):
         definition = registry.get("phase5-model")
         self.assertEqual(definition.provider, "openai_compatible")
         self.assertEqual(definition.api_model, "phase5-api-model")
+        self.assertEqual(definition.api_key(), "saved-provider-key")
+        self.assertEqual(definition.base_url(), "https://provider.example.com/v1")
         self.assertEqual(
             definition.extra,
             {"timeout": 30, "headers": {"x-app": "demo"}, "custom_body_params": {"temperature": 0.6}},

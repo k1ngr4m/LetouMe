@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import requests
 
@@ -34,6 +34,47 @@ class ModelServiceOpenAIClientTests(unittest.TestCase):
                 base_url="https://api.deepseek.com",
                 api_key="",
             )
+
+    def test_connectivity_test_prefers_provider_credentials_over_payload(self) -> None:
+        service = ModelService()
+        fake_model = MagicMock()
+        fake_model.health_check.return_value = (True, "ok")
+        with (
+            patch.object(
+                service.repository,
+                "get_provider",
+                return_value={
+                    "code": "aihubmix",
+                    "api_format": "openai_compatible",
+                    "api_key": "saved-provider-key",
+                    "base_url": "https://provider.example/v1",
+                    "extra_options": {
+                        "custom_headers": {"X-App": "letoume"},
+                        "custom_body_params": {"top_p": 0.8},
+                    },
+                },
+            ),
+            patch("backend.app.services.model_service.ModelFactory.create", return_value=fake_model) as create_model,
+        ):
+            result = service.test_model_connectivity(
+                {
+                    "provider": "aihubmix",
+                    "api_format": "anthropic",
+                    "api_model_name": "qwen3.5-plus",
+                    "base_url": "https://stale.example/v1",
+                    "api_key": "stale-model-key",
+                    "app_code": "APP-123",
+                    "extra_options": {"custom_body_params": {"temperature": 0.9}},
+                }
+            )
+
+        self.assertTrue(result["ok"])
+        definition = create_model.call_args.args[0]
+        self.assertEqual(definition.api_key(), "saved-provider-key")
+        self.assertEqual(definition.base_url(), "https://provider.example/v1")
+        self.assertEqual(definition.api_format, "openai_compatible")
+        self.assertEqual(definition.extra["custom_headers"], {"X-App": "letoume"})
+        self.assertEqual(definition.extra["custom_body_params"], {"top_p": 0.8, "temperature": 0.9})
 
     def test_create_provider_allows_underscored_provider_codes(self) -> None:
         service = ModelService()

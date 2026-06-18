@@ -1491,6 +1491,84 @@ describe('SettingsPage model management view switch', () => {
     )
   })
 
+  it('uses saved provider credentials instead of stale model credentials in connectivity test', async () => {
+    apiClientMock.getSettingsModels.mockResolvedValue({
+      models: [
+        {
+          model_code: 'aihubmix-stale',
+          display_name: 'Stale Model',
+          provider: 'aihubmix',
+          api_model_name: 'qwen3.5-plus',
+          version: '1',
+          tags: [],
+          base_url: 'https://stale.example/v1',
+          api_key: 'stale-model-key',
+          app_code: 'dlt',
+          lottery_codes: ['dlt'],
+          temperature: null,
+          is_active: true,
+          is_deleted: false,
+          updated_at: '2026-03-16 12:00:00',
+        },
+      ],
+    })
+    apiClientMock.getSettingsProviders.mockResolvedValue({
+      providers: [
+        {
+          code: 'aihubmix',
+          name: 'AIHubMix',
+          is_system_preset: true,
+          api_format: 'openai_compatible',
+          base_url: 'https://aihubmix.com/v1',
+          api_key: 'saved-provider-key',
+          extra_options: { custom_headers: { 'X-App': 'letoume' } },
+        },
+      ],
+    })
+    apiClientMock.getSettingsModel.mockResolvedValue({
+      model_code: 'aihubmix-stale',
+      display_name: 'Stale Model',
+      provider: 'aihubmix',
+      api_model_name: 'qwen3.5-plus',
+      provider_model_name: 'qwen3.5-plus',
+      base_url: 'https://stale.example/v1',
+      api_key: 'stale-model-key',
+      app_code: 'dlt',
+      lottery_codes: ['dlt'],
+      temperature: null,
+      extra_options: { custom_body_params: { temperature: 0.3 } },
+      is_active: true,
+      is_deleted: false,
+      updated_at: '2026-03-16 12:00:00',
+    })
+    apiClientMock.listUsers.mockResolvedValue({ users: [] })
+    apiClientMock.listRoles.mockResolvedValue({ roles: [] })
+    apiClientMock.listPermissions.mockResolvedValue({ permissions: [] })
+    apiClientMock.getSettingsPredictionRecords.mockResolvedValue({ records: [] })
+    apiClientMock.testSettingsModelConnectivity.mockResolvedValue({ ok: true, message: 'ok', duration_ms: 120 })
+
+    renderPage('/settings/models')
+
+    await selectManagedProvider(/AIHubMix/)
+    await userEvent.click(await screen.findByRole('button', { name: '编辑模型 Stale Model' }))
+    await userEvent.click(await screen.findByRole('button', { name: '测试连通性' }))
+
+    await waitFor(() =>
+      expect(apiClientMock.testSettingsModelConnectivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'aihubmix',
+          api_format: 'openai_compatible',
+          base_url: 'https://aihubmix.com/v1',
+          api_key: 'saved-provider-key',
+          extra_options: expect.objectContaining({
+            custom_headers: { 'X-App': 'letoume' },
+            custom_body_params: expect.objectContaining({ temperature: 0.3 }),
+          }),
+        }),
+      ),
+    )
+  })
+
   it('auto-removes incompatible models after generation lottery changes in bulk modal', async () => {
     apiClientMock.getSettingsModels.mockResolvedValue({
       models: [

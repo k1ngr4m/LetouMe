@@ -93,12 +93,25 @@ class ModelService:
         api_model_name = str(payload.get("api_model_name") or "").strip()
         api_format = str(payload.get("api_format") or "").strip().lower() or None
         extra_options = self._normalize_model_extra_options(payload.get("extra_options"), payload.get("temperature"))
-        temperature = self._normalize_temperature(extra_options.get("custom_body_params", {}).get("temperature"))
         if not provider:
             raise ValueError("Provider cannot be empty")
         if not api_model_name:
             raise ValueError("API model name cannot be empty")
 
+        provider_config = self.repository.get_provider(provider) or {}
+        provider_extra_options = provider_config.get("extra_options")
+        if isinstance(provider_extra_options, dict):
+            provider_body_params = provider_extra_options.get("custom_body_params")
+            model_body_params = extra_options.get("custom_body_params")
+            extra_options = {
+                **provider_extra_options,
+                **extra_options,
+                "custom_body_params": {
+                    **(provider_body_params if isinstance(provider_body_params, dict) else {}),
+                    **(model_body_params if isinstance(model_body_params, dict) else {}),
+                },
+            }
+        temperature = self._normalize_temperature(extra_options.get("custom_body_params", {}).get("temperature"))
         started_at = perf_counter()
         model_definition = ModelDefinition(
             id=f"connectivity-test-{provider}-{api_model_name}",
@@ -106,9 +119,9 @@ class ModelService:
             provider=provider,
             model_id=api_model_name,
             api_model=api_model_name,
-            api_format=api_format,
-            api_key_value=str(payload.get("api_key") or "").strip(),
-            base_url_value=str(payload.get("base_url") or "").strip(),
+            api_format=str(provider_config.get("api_format") or "").strip().lower() or api_format,
+            api_key_value=str(provider_config.get("api_key") or payload.get("api_key") or "").strip(),
+            base_url_value=str(provider_config.get("base_url") or payload.get("base_url") or "").strip(),
             app_code_value=str(payload.get("app_code") or "").strip(),
             temperature=temperature,
             extra=extra_options,
