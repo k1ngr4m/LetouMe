@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronDown, CircleHelp, Copy, Heart, ShieldAlert, Shuffle } from 'lucide-react'
+import { Check, ChevronDown, CircleHelp, Copy, Heart, ShieldAlert, Shuffle, Sparkles } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
@@ -835,7 +835,8 @@ export function WorldCupPage() {
               {recommendations.map((recommendation) => (
                 <article key={recommendation.recommendation_id} className="worldcup-card">
                   <div className="worldcup-card__header">
-                    <div>
+                    <div className="worldcup-card__title-block">
+                      <span className="worldcup-card__eyebrow"><Sparkles size={13} aria-hidden="true" /> AI 推荐</span>
                       <p>{recommendation.match.home_team} vs {recommendation.match.away_team}</p>
                       <h3>{formatPlayType(recommendation.play_type)} · {recommendation.selection}</h3>
                     </div>
@@ -849,11 +850,24 @@ export function WorldCupPage() {
                     </button>
                   </div>
 
+                  <div className="worldcup-card__signal">
+                    <div className="worldcup-card__pick">
+                      <span>推荐选择</span>
+                      <strong>{recommendation.selection}</strong>
+                      <em>{formatPlayType(recommendation.play_type)}</em>
+                    </div>
+                    <div className="worldcup-card__edge">
+                      <span>参考概率</span>
+                      <strong>{recommendation.implied_probability ? `${(recommendation.implied_probability * 100).toFixed(1)}%` : '待确认'}</strong>
+                      <em>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</em>
+                    </div>
+                  </div>
+
                   <div className="worldcup-card__meta">
-                    <span>{confidenceLabel(recommendation.confidence_level)}</span>
-                    <span>{riskLabel(recommendation.risk_level)}</span>
-                    <span>{recommendation.budget_min}-{recommendation.budget_max} 元</span>
-                    <span>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</span>
+                    <span className="worldcup-card__metric worldcup-card__metric--confidence"><small>信心</small><strong>{confidenceLabel(recommendation.confidence_level)}</strong></span>
+                    <span className="worldcup-card__metric worldcup-card__metric--risk"><small>风险</small><strong>{riskLabel(recommendation.risk_level)}</strong></span>
+                    <span className="worldcup-card__metric"><small>预算</small><strong>{recommendation.budget_min}-{recommendation.budget_max} 元</strong></span>
+                    <span className="worldcup-card__metric"><small>盘口</small><strong>{recommendation.odds_value ? `赔率 ${recommendation.odds_value}` : formatDateTimeLocal(recommendation.updated_at)}</strong></span>
                   </div>
 
                   {recommendation.implied_probability ? (
