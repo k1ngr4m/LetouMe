@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { History, ShieldAlert } from 'lucide-react'
+import { CalendarDays, History, ShieldAlert } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import type { WorldCupPlayType } from '../../shared/types/api'
+import type { WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
 import { WorldCupTabStrip } from './WorldCupTabStrip'
 
 const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string }> = [
@@ -27,36 +27,68 @@ function resultLabel(hit?: boolean | null) {
   return '待判定'
 }
 
+function getHistoryRecordStats(record: WorldCupHistoryRecord) {
+  const total = record.recommendations.length
+  const settled = record.recommendations.filter((item) => item.result_status === 'settled').length
+  const hit = record.recommendations.filter((item) => item.hit === true).length
+  const miss = record.recommendations.filter((item) => item.hit === false).length
+  const pending = Math.max(total - settled, 0)
+
+  return { total, settled, hit, miss, pending }
+}
+
+function formatMatchScore(score?: string | null, status?: string) {
+  if (score) return score
+  if (status === 'finished') return '待同步'
+  return '待开奖'
+}
+
+function formatScoreLabel(score?: string | null, status?: string) {
+  if (score) return '完场比分'
+  if (status === 'finished') return '赛果'
+  return '状态'
+}
+
 export function WorldCupHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'finished' | 'pending'>('all')
   const [playTypeFilter, setPlayTypeFilter] = useState<'all' | WorldCupPlayType>('all')
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState('')
+  const historyDateRange = selectedHistoryDate
+    ? {
+        date_start: `${selectedHistoryDate} 00:00:00`,
+        date_end: `${selectedHistoryDate} 23:59:59`,
+      }
+    : {}
   const historyQuery = useQuery({
-    queryKey: ['worldcup', 'history', statusFilter, playTypeFilter],
-    queryFn: () => apiClient.getWorldCupHistory({ status_filter: statusFilter, play_type_filter: playTypeFilter }),
+    queryKey: ['worldcup', 'history', statusFilter, playTypeFilter, selectedHistoryDate],
+    queryFn: () => apiClient.getWorldCupHistory({ status_filter: statusFilter, play_type_filter: playTypeFilter, ...historyDateRange }),
   })
 
   const records = historyQuery.data?.records || []
-  const settledCount = records.reduce((sum, record) => sum + record.recommendations.filter((item) => item.result_status === 'settled').length, 0)
-  const hitCount = records.reduce((sum, record) => sum + record.recommendations.filter((item) => item.hit === true).length, 0)
 
   return (
-    <div className="worldcup-page">
-      <section className="worldcup-hero worldcup-hero--compact">
-        <div className="worldcup-hero__copy">
-          <p className="worldcup-hero__eyebrow">开奖回溯</p>
-          <h1 className="worldcup-hero__title">世界杯赛果复盘</h1>
-          <p className="worldcup-hero__description">按已同步赛果回看 AI 推荐表现；比分或字段缺失时保持待判定。</p>
-        </div>
-        <div className="worldcup-hero__stats" aria-label="回溯概览">
-          <div><span>比赛</span><strong>{records.length}</strong></div>
-          <div><span>已判定</span><strong>{settledCount}</strong></div>
-          <div><span>命中</span><strong>{hitCount}</strong></div>
-        </div>
-      </section>
-
+    <div className="worldcup-page worldcup-page--history">
       <SiteDisclaimer />
 
       <section className="worldcup-toolbar" aria-label="回溯筛选">
+        <div className="worldcup-toolbar__filters worldcup-toolbar__filters--date">
+          <label className="worldcup-date-input">
+            <span>比赛日期</span>
+            <input
+              aria-label="比赛日期"
+              type="date"
+              value={selectedHistoryDate}
+              onChange={(event) => setSelectedHistoryDate(event.target.value)}
+            />
+          </label>
+          <button
+            className={clsx('filter-chip', !selectedHistoryDate && 'is-active')}
+            type="button"
+            onClick={() => setSelectedHistoryDate('')}
+          >
+            全部日期
+          </button>
+        </div>
         <div className="worldcup-toolbar__filters">
           {[
             { value: 'all', label: '全部' },
@@ -83,30 +115,55 @@ export function WorldCupHistoryPage() {
         <div className="worldcup-empty">暂无回溯记录，等待赛程、推荐或赛果同步。</div>
       ) : (
         <section className="worldcup-history-list">
-          {records.map((record) => (
-            <article key={record.match.match_id} className="worldcup-history-card">
-              <div className="worldcup-card__header">
-                <div>
-                  <p>{formatDateTimeLocal(record.match.kickoff_at)} · {record.match.stage}</p>
-                  <h2>{record.match.home_team} vs {record.match.away_team}</h2>
-                </div>
-                <span className="worldcup-score">{record.match.score || '待开奖'}</span>
-              </div>
-              <div className="worldcup-history-card__rows">
-                {record.recommendations.map((item) => (
-                  <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
-                    <div>
-                      <strong>{formatPlayType(item.recommendation.play_type as WorldCupPlayType)} · {item.recommendation.selection}</strong>
-                      <p>{item.actual_result || item.settlement_note}</p>
+          {records.map((record) => {
+            const stats = getHistoryRecordStats(record)
+            const scoreText = formatMatchScore(record.match.score, record.match.status)
+
+            return (
+              <article key={record.match.match_id} className="worldcup-history-card">
+                <div className="worldcup-history-card__top">
+                  <div className="worldcup-history-match">
+                    <div className="worldcup-history-match__meta">
+                      <span>{record.match.match_num_str || '世界杯'}</span>
+                      <span><CalendarDays size={14} aria-hidden="true" /> {formatDateTimeLocal(record.match.kickoff_at)}</span>
+                      <span>{record.match.stage}</span>
                     </div>
-                    <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
-                      {resultLabel(item.hit)}
-                    </span>
+                    <h2>{record.match.home_team} vs {record.match.away_team}</h2>
                   </div>
-                ))}
-              </div>
-            </article>
-          ))}
+                  <div className={clsx('worldcup-history-score', record.match.score && 'has-score')}>
+                    <span>{formatScoreLabel(record.match.score, record.match.status)}</span>
+                    <strong>{scoreText}</strong>
+                  </div>
+                </div>
+
+                <div className="worldcup-history-summary" aria-label={`${record.match.home_team} vs ${record.match.away_team} 推荐概览`}>
+                  <span><b>{stats.total}</b> 推荐</span>
+                  <span><b>{stats.settled}</b> 已判定</span>
+                  <span className="is-hit"><b>{stats.hit}</b> 命中</span>
+                  <span className="is-miss"><b>{stats.miss}</b> 未中</span>
+                  <span><b>{stats.pending}</b> 待判定</span>
+                </div>
+
+                <div className="worldcup-history-card__rows">
+                  {record.recommendations.map((item) => (
+                    <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
+                      <div className="worldcup-history-row__pick">
+                        <span>{formatPlayType(item.recommendation.play_type as WorldCupPlayType)}</span>
+                        <strong>{item.recommendation.selection}</strong>
+                      </div>
+                      <div className="worldcup-history-row__result">
+                        <span>实际结果</span>
+                        <p>{item.actual_result || item.settlement_note}</p>
+                      </div>
+                      <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
+                        {resultLabel(item.hit)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )
+          })}
         </section>
       )}
 
