@@ -75,6 +75,7 @@ class WorldCupFetchServiceTests(unittest.TestCase):
                 "kickoff_at": "2026-06-16 00:00:00",
                 "match_status": "scheduled",
                 "score": None,
+                "half_time_score": None,
                 "data_sources": ["sporttery"],
                 "source_updated_at": "2026-06-15 11:00:00",
             }
@@ -87,6 +88,7 @@ class WorldCupFetchServiceTests(unittest.TestCase):
                 "kickoff_at": "2026-06-16 00:00:00",
                 "match_status": "scheduled",
                 "score": None,
+                "half_time_score": None,
                 "data_sources": {"sources": ["baidu_tiyu"], "baidu_tiyu": {"encoded_match_id": "encoded-a"}},
                 "source_updated_at": "2026-06-16 11:00:00",
             },
@@ -97,6 +99,7 @@ class WorldCupFetchServiceTests(unittest.TestCase):
                 "kickoff_at": "2026-06-17 03:00:00",
                 "match_status": "scheduled",
                 "score": None,
+                "half_time_score": None,
                 "data_sources": {"sources": ["baidu_tiyu"], "baidu_tiyu": {"encoded_match_id": "encoded-b"}},
                 "source_updated_at": "2026-06-16 11:00:00",
             },
@@ -109,6 +112,36 @@ class WorldCupFetchServiceTests(unittest.TestCase):
         self.assertEqual(merged[0]["data_sources"]["sources"], ["sporttery", "baidu_tiyu"])
         self.assertEqual(merged[0]["data_sources"]["baidu_tiyu"]["encoded_match_id"], "encoded-a")
         self.assertEqual(merged[1]["match_id"], "baidu-b")
+
+    def test_attach_baidu_half_time_scores_uses_encoded_match_id_for_started_matches(self) -> None:
+        class _FakeBaiduService:
+            def __init__(self) -> None:
+                self.encoded_match_ids: list[str] = []
+
+            def fetch_half_time_score(self, encoded_match_id: str) -> str:
+                self.encoded_match_ids.append(encoded_match_id)
+                return "3:0"
+
+        baidu_service = _FakeBaiduService()
+        service = WorldCupFetchService(baidu_sports_service=baidu_service)  # type: ignore[arg-type]
+        matches = [
+            {
+                "match_id": "baidu-a",
+                "match_status": "finished",
+                "data_sources": {"baidu_tiyu": {"encoded_match_id": "encoded-a"}},
+            },
+            {
+                "match_id": "baidu-b",
+                "match_status": "scheduled",
+                "data_sources": {"baidu_tiyu": {"encoded_match_id": "encoded-b"}},
+            },
+        ]
+
+        result = service._attach_baidu_half_time_scores(matches)
+
+        self.assertEqual(result[0]["half_time_score"], "3:0")
+        self.assertNotIn("half_time_score", result[1])
+        self.assertEqual(baidu_service.encoded_match_ids, ["encoded-a"])
 
 
 if __name__ == "__main__":

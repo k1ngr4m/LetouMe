@@ -277,6 +277,150 @@ class WorldCupServiceTests(unittest.TestCase):
         self.assertEqual(total_goals_models["model-b"]["hit_count"], 1)
         self.assertEqual(total_goals_models["model-b"]["accuracy"], 1.0)
 
+    def test_list_history_exposes_prediction_and_match_accuracy(self) -> None:
+        rows = [
+            _history_row(
+                recommendation_id="rec-goals-model-a-1",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="1",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="0:2",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-model-a-2",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="2",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="0:2",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-model-a-3",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="3",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="0:2",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-model-b-1",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="3",
+                model_code="model-b",
+                model_name="模型B",
+                match_status="finished",
+                score="0:2",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-model-b-2",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="4",
+                model_code="model-b",
+                model_name="模型B",
+                match_status="finished",
+                score="0:2",
+            ),
+        ]
+        service = WorldCupService(repository=_FakeHistoryRepository(rows))
+
+        result = service.list_history(1, {})
+
+        self.assertEqual(result["summary"]["total_count"], 5)
+        self.assertEqual(result["summary"]["hit_count"], 1)
+        self.assertAlmostEqual(result["summary"]["accuracy"], 0.2)
+        self.assertEqual(result["summary"]["prediction_stats"]["settled_count"], 5)
+        self.assertEqual(result["summary"]["prediction_stats"]["hit_count"], 1)
+        self.assertAlmostEqual(result["summary"]["prediction_stats"]["accuracy"], 0.2)
+        self.assertEqual(result["summary"]["match_stats"]["settled_count"], 2)
+        self.assertEqual(result["summary"]["match_stats"]["hit_count"], 1)
+        self.assertEqual(result["summary"]["match_stats"]["miss_count"], 1)
+        self.assertAlmostEqual(result["summary"]["match_stats"]["accuracy"], 0.5)
+
+        total_goals_group = result["play_type_groups"][0]
+        self.assertEqual(total_goals_group["play_type"], "total_goals")
+        self.assertEqual(total_goals_group["prediction_stats"]["settled_count"], 5)
+        self.assertEqual(total_goals_group["prediction_stats"]["hit_count"], 1)
+        self.assertAlmostEqual(total_goals_group["prediction_stats"]["accuracy"], 0.2)
+        self.assertEqual(total_goals_group["match_stats"]["settled_count"], 2)
+        self.assertEqual(total_goals_group["match_stats"]["hit_count"], 1)
+        self.assertAlmostEqual(total_goals_group["match_stats"]["accuracy"], 0.5)
+
+        models = {model["model_code"]: model for model in total_goals_group["models"]}
+        self.assertEqual(models["model-a"]["prediction_stats"]["settled_count"], 3)
+        self.assertEqual(models["model-a"]["prediction_stats"]["hit_count"], 1)
+        self.assertAlmostEqual(models["model-a"]["prediction_stats"]["accuracy"], 0.3333)
+        self.assertEqual(models["model-a"]["match_stats"]["settled_count"], 1)
+        self.assertEqual(models["model-a"]["match_stats"]["hit_count"], 1)
+        self.assertAlmostEqual(models["model-a"]["match_stats"]["accuracy"], 1.0)
+        self.assertEqual(models["model-b"]["prediction_stats"]["settled_count"], 2)
+        self.assertEqual(models["model-b"]["prediction_stats"]["hit_count"], 0)
+        self.assertAlmostEqual(models["model-b"]["prediction_stats"]["accuracy"], 0.0)
+        self.assertEqual(models["model-b"]["match_stats"]["settled_count"], 1)
+        self.assertEqual(models["model-b"]["match_stats"]["miss_count"], 1)
+        self.assertAlmostEqual(models["model-b"]["match_stats"]["accuracy"], 0.0)
+
+    def test_list_history_settles_half_full_time_with_half_time_score(self) -> None:
+        rows = [
+            _history_row(
+                recommendation_id="rec-half-hit",
+                match_id="match-1",
+                play_type="half_full_time",
+                selection="胜胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="4:0",
+                half_time_score="3:0",
+            ),
+            _history_row(
+                recommendation_id="rec-half-miss",
+                match_id="match-1",
+                play_type="half_full_time",
+                selection="平胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="4:0",
+                half_time_score="3:0",
+            ),
+            _history_row(
+                recommendation_id="rec-half-unknown",
+                match_id="match-2",
+                play_type="half_full_time",
+                selection="胜胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="4:0",
+            ),
+        ]
+        service = WorldCupService(repository=_FakeHistoryRepository(rows))
+
+        result = service.list_history(1, {})
+
+        self.assertEqual(result["summary"]["total_count"], 3)
+        self.assertEqual(result["summary"]["settled_count"], 2)
+        self.assertEqual(result["summary"]["hit_count"], 1)
+        self.assertEqual(result["summary"]["miss_count"], 1)
+        self.assertEqual(result["summary"]["unknown_count"], 1)
+        settled_items = [
+            item
+            for record in result["records"]
+            for item in record["recommendations"]
+            if item["result_status"] == "settled"
+        ]
+        self.assertEqual([item["actual_result"] for item in settled_items], ["胜胜", "胜胜"])
+        self.assertEqual([item["hit"] for item in settled_items], [True, False])
+
 
 def _history_row(
     *,
@@ -288,6 +432,7 @@ def _history_row(
     model_name: str,
     match_status: str,
     score: str | None,
+    half_time_score: str | None = None,
 ) -> dict:
     return {
         "recommendation_id": recommendation_id,
@@ -300,6 +445,7 @@ def _history_row(
         "stage": "世界杯",
         "match_status": match_status,
         "score": score,
+        "half_time_score": half_time_score,
         "sell_status": "Selling",
         "play_type": play_type,
         "selection": selection,

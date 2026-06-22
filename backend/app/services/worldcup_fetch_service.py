@@ -49,6 +49,7 @@ class WorldCupFetchService:
         baidu_error: str | None = None
         try:
             baidu_matches = self.baidu_sports_service.fetch_schedule_matches()
+            baidu_matches = self._attach_baidu_half_time_scores(baidu_matches)
             matches = self._merge_baidu_matches(matches, baidu_matches)
         except Exception as exc:
             baidu_error = str(exc)
@@ -118,6 +119,7 @@ class WorldCupFetchService:
                 "sell_status": str(match.get("sellStatus") or match.get("matchStatus") or ""),
                 "match_status": self._normalize_match_status(match.get("matchStatus") or match.get("sellStatus")),
                 "score": None,
+                "half_time_score": None,
                 "remark": str(match.get("remark") or ""),
                 "data_sources": ["sporttery"],
                 "source_updated_at": source_updated_at,
@@ -177,11 +179,41 @@ class WorldCupFetchService:
             existing["data_sources"] = cls._merge_data_sources(existing.get("data_sources"), baidu_match.get("data_sources"))
             if not existing.get("score") and baidu_match.get("score"):
                 existing["score"] = baidu_match.get("score")
+            if not existing.get("half_time_score") and baidu_match.get("half_time_score"):
+                existing["half_time_score"] = baidu_match.get("half_time_score")
             if baidu_match.get("match_status") in {"live", "finished"}:
                 existing["match_status"] = baidu_match.get("match_status")
             if baidu_match.get("source_updated_at"):
                 existing["source_updated_at"] = max(str(existing.get("source_updated_at") or ""), str(baidu_match.get("source_updated_at") or "")) or None
         return merged
+
+    def _attach_baidu_half_time_scores(self, matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for match in matches:
+            if str(match.get("match_status") or "") not in {"live", "finished"}:
+                continue
+            encoded_match_id = self._extract_baidu_encoded_match_id(match.get("data_sources"))
+            if not encoded_match_id:
+                continue
+            try:
+                half_time_score = self.baidu_sports_service.fetch_half_time_score(encoded_match_id)
+            except Exception as exc:
+                self.logger.warning(
+                    "Baidu sports half-time score unavailable; continuing without half-full-time settlement",
+                    extra={"context": {"match_id": match.get("match_id"), "error": str(exc)[:240]}},
+                )
+                continue
+            if half_time_score:
+                match["half_time_score"] = half_time_score
+        return matches
+
+    @staticmethod
+    def _extract_baidu_encoded_match_id(data_sources: Any) -> str:
+        if not isinstance(data_sources, dict):
+            return ""
+        baidu_source = data_sources.get("baidu_tiyu")
+        if not isinstance(baidu_source, dict):
+            return ""
+        return str(baidu_source.get("encoded_match_id") or "").strip()
 
     @staticmethod
     def _match_signature(match: dict[str, Any]) -> tuple[str, str, str]:

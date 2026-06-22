@@ -14,6 +14,7 @@ from backend.app.time_utils import beijing_now, format_beijing_datetime
 
 BAIDU_SCHEDULE_URL = "https://tiyu.baidu.com/al/api/match/schedules"
 BAIDU_DETAIL_URL = "https://tiyu.baidu.com/al/live/detail"
+BAIDU_INCIDENTS_URL = "https://tiyu.baidu.com/al/api/liveDetail/liveTextBroadcastAndIncident"
 BAIDU_ODDS_NOTE = "Baidu/第三方指数仅作赛前分析参考；官方投注赔率仍以中国竞彩网为准。"
 
 
@@ -101,6 +102,17 @@ class WorldCupBaiduSportsService:
         lineup = self._fetch_detail_tab(encoded_match_id, "阵容")
         index = self._fetch_detail_tab(encoded_match_id, "指数")
         return self.parse_match_context(analysis_payload=analysis, lineup_payload=lineup, index_payload=index)
+
+    def fetch_half_time_score(self, encoded_match_id: str) -> str | None:
+        payload = self._fetch_json(
+            BAIDU_INCIDENTS_URL,
+            params={
+                "matchKey": encoded_match_id,
+                "ofType": "incidents",
+            },
+            referer=f"https://tiyu.baidu.com/al/live/detail?matchId={encoded_match_id}&tab=%E8%B5%9B%E5%86%B5",
+        )
+        return self.parse_half_time_score(payload)
 
     def find_encoded_match_id(self, *, home_team: str, away_team: str, kickoff_at: str) -> str:
         date_key = str(kickoff_at or "")[:10]
@@ -240,6 +252,78 @@ class WorldCupBaiduSportsService:
         if left_score in {"", "-"} or right_score in {"", "-"}:
             return None
         return f"{left_score}:{right_score}"
+
+    @classmethod
+    def parse_half_time_score(cls, payload: dict[str, Any]) -> str | None:
+        incidents = cls._incident_rows(payload)
+        if not incidents:
+            return None
+        home_score = 0
+        away_score = 0
+        for incident in incidents:
+            if not cls._is_first_half_incident(incident):
+                continue
+            if not cls._is_scoring_incident(incident):
+                continue
+            score_side = cls._incident_score_side(incident)
+            if score_side == "left":
+                home_score += 1
+            elif score_side == "right":
+                away_score += 1
+            else:
+                return None
+        return f"{home_score}:{away_score}"
+
+    @staticmethod
+    def _incident_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        data = payload.get("data") if isinstance(payload, dict) else {}
+        graphic_incidents = data.get("graphic_incidents") if isinstance(data, dict) else {}
+        incidents = graphic_incidents.get("incidents") if isinstance(graphic_incidents, dict) else None
+        if not isinstance(incidents, list):
+            return []
+        return [incident for incident in incidents if isinstance(incident, dict)]
+
+    @classmethod
+    def _is_first_half_incident(cls, incident: dict[str, Any]) -> bool:
+        minute = cls._incident_minute(incident)
+        if minute is None:
+            return False
+        return minute <= 45
+
+    @staticmethod
+    def _incident_minute(incident: dict[str, Any]) -> int | None:
+        passed_time = str(incident.get("passedTime") or "").strip()
+        match = re.search(r"(\d+)(?:\s*\+\s*\d+)?", passed_time)
+        if match:
+            return int(match.group(1))
+        sort_time = incident.get("sortTime")
+        try:
+            seconds = int(sort_time)
+        except (TypeError, ValueError):
+            return None
+        if seconds <= 0:
+            return None
+        return seconds // 60
+
+    @staticmethod
+    def _is_scoring_incident(incident: dict[str, Any]) -> bool:
+        goal_type = str(incident.get("goaltype") or "").strip()
+        incident_type = str(incident.get("type") or "").strip()
+        text = str(incident.get("text") or "").strip()
+        combined = f"{incident_type} {goal_type} {text}"
+        if any(keyword in combined for keyword in ("无效", "取消", "未进", "射失", "扑出")):
+            return False
+        return goal_type in {"进球", "点球", "乌龙球"} or incident_type in {"进球", "点球", "乌龙球"}
+
+    @staticmethod
+    def _incident_score_side(incident: dict[str, Any]) -> str | None:
+        left = incident.get("left")
+        right = incident.get("right")
+        has_left = isinstance(left, dict)
+        has_right = isinstance(right, dict)
+        if has_left == has_right:
+            return None
+        return "left" if has_left else "right"
 
     @staticmethod
     def _parse_recent_records(value: Any) -> list[dict[str, Any]]:

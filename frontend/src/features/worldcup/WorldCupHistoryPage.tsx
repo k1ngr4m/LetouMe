@@ -5,8 +5,10 @@ import { CalendarDays, History, ShieldAlert } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import type { WorldCupHistoryPlayTypeGroup, WorldCupHistoryRecommendation, WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
+import type { WorldCupHistoryMetricStats, WorldCupHistoryPlayTypeGroup, WorldCupHistoryRecommendation, WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
 import { WorldCupTabStrip } from './WorldCupTabStrip'
+
+type HistoryMetricMode = 'match' | 'prediction'
 
 const HISTORY_PLAY_TYPE_ORDER: WorldCupPlayType[] = [
   'win_draw_win',
@@ -23,6 +25,11 @@ const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string 
   { value: 'total_goals', label: '总进球数' },
   { value: 'correct_score', label: '比分' },
   { value: 'half_full_time', label: '半全场' },
+]
+
+const METRIC_MODE_OPTIONS: Array<{ value: HistoryMetricMode; label: string }> = [
+  { value: 'match', label: '按场次' },
+  { value: 'prediction', label: '按预测次数' },
 ]
 
 function formatPlayType(playType: WorldCupPlayType) {
@@ -47,6 +54,30 @@ function formatAccuracy(value?: number | null) {
 function getAccuracyWidth(value?: number | null) {
   if (value == null) return '0%'
   return `${Math.max(0, Math.min(100, Number(value) * 100))}%`
+}
+
+function formatMetricMode(mode: HistoryMetricMode) {
+  return mode === 'match' ? '场次' : '预测次数'
+}
+
+function formatMetricTotalUnit(mode: HistoryMetricMode) {
+  return mode === 'match' ? '场次' : '推荐'
+}
+
+function formatOverallMetricLabel(mode: HistoryMetricMode) {
+  return mode === 'match' ? '整体场次命中率' : '整体预测命中率'
+}
+
+function getOtherMetricMode(mode: HistoryMetricMode): HistoryMetricMode {
+  return mode === 'match' ? 'prediction' : 'match'
+}
+
+function getHistoryMetricStats<T extends WorldCupHistoryMetricStats & { prediction_stats?: WorldCupHistoryMetricStats; match_stats?: WorldCupHistoryMetricStats }>(item: T, mode: HistoryMetricMode) {
+  return (mode === 'match' ? item.match_stats : item.prediction_stats) || item
+}
+
+function formatMetricHitLine(mode: HistoryMetricMode, stats: WorldCupHistoryMetricStats) {
+  return `${formatMetricMode(mode)} ${stats.hit_count}/${stats.settled_count} 命中`
 }
 
 function getHistoryRecordStats(record: WorldCupHistoryRecord) {
@@ -89,6 +120,7 @@ function formatScoreLabel(score?: string | null, status?: string) {
 export function WorldCupHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'finished' | 'pending'>('all')
   const [playTypeFilter, setPlayTypeFilter] = useState<'all' | WorldCupPlayType>('all')
+  const [metricMode, setMetricMode] = useState<HistoryMetricMode>('match')
   const [selectedHistoryDate, setSelectedHistoryDate] = useState('')
   const historyDateRange = selectedHistoryDate
     ? {
@@ -104,6 +136,8 @@ export function WorldCupHistoryPage() {
   const records = historyQuery.data?.records || []
   const summary = historyQuery.data?.summary
   const playTypeGroups = historyQuery.data?.play_type_groups || []
+  const summaryStats = summary ? getHistoryMetricStats(summary, metricMode) : null
+  const summarySecondaryStats = summary ? getHistoryMetricStats(summary, getOtherMetricMode(metricMode)) : null
 
   return (
     <div className="worldcup-page worldcup-page--history">
@@ -155,27 +189,40 @@ export function WorldCupHistoryPage() {
               <p>玩法表现</p>
               <h2>按玩法统计模型正确率</h2>
             </div>
+            <div className="worldcup-history-metric-toggle" role="group" aria-label="统计口径">
+              {METRIC_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  className={clsx(metricMode === option.value && 'is-active')}
+                  type="button"
+                  onClick={() => setMetricMode(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
             {summary ? (
-              <div className="worldcup-history-performance__score">
-                <span>整体正确率</span>
-                <strong>{formatAccuracy(summary.accuracy)}</strong>
-                <small>{summary.hit_count}/{summary.settled_count} 已判定命中</small>
+              <div className="worldcup-history-performance__score" aria-label="整体命中率">
+                <span>{formatOverallMetricLabel(metricMode)}</span>
+                <strong>{formatAccuracy(summaryStats?.accuracy)}</strong>
+                {summaryStats ? <small>{formatMetricHitLine(metricMode, summaryStats)}</small> : null}
+                {summarySecondaryStats ? <small className="worldcup-history-performance__score-alt">{formatMetricHitLine(getOtherMetricMode(metricMode), summarySecondaryStats)}</small> : null}
               </div>
             ) : null}
           </div>
 
           <div className="worldcup-history-performance__overview" aria-label="回溯统计总览">
-            <span><b>{summary?.total_count || 0}</b> 推荐</span>
-            <span><b>{summary?.settled_count || 0}</b> 已判定</span>
-            <span className="is-hit"><b>{summary?.hit_count || 0}</b> 命中</span>
-            <span className="is-miss"><b>{summary?.miss_count || 0}</b> 未中</span>
-            <span><b>{summary?.pending_count || 0}</b> 待开奖</span>
-            <span><b>{summary?.unknown_count || 0}</b> 无法判定</span>
+            <span><b>{summaryStats?.total_count || 0}</b> {formatMetricTotalUnit(metricMode)}</span>
+            <span><b>{summaryStats?.settled_count || 0}</b> 已判定</span>
+            <span className="is-hit"><b>{summaryStats?.hit_count || 0}</b> 命中</span>
+            <span className="is-miss"><b>{summaryStats?.miss_count || 0}</b> 未中</span>
+            <span><b>{summaryStats?.pending_count || 0}</b> 待开奖</span>
+            <span><b>{summaryStats?.unknown_count || 0}</b> 无法判定</span>
           </div>
 
           <div className="worldcup-history-play-grid">
             {playTypeGroups.map((group) => (
-              <PlayTypePerformanceCard key={group.play_type} group={group} />
+              <PlayTypePerformanceCard key={group.play_type} group={group} metricMode={metricMode} />
             ))}
           </div>
         </section>
@@ -270,38 +317,51 @@ export function WorldCupHistoryPage() {
   )
 }
 
-function PlayTypePerformanceCard({ group }: { group: WorldCupHistoryPlayTypeGroup }) {
+function PlayTypePerformanceCard({ group, metricMode }: { group: WorldCupHistoryPlayTypeGroup; metricMode: HistoryMetricMode }) {
+  const activeStats = getHistoryMetricStats(group, metricMode)
+  const secondaryMode = getOtherMetricMode(metricMode)
+  const secondaryStats = getHistoryMetricStats(group, secondaryMode)
+
   return (
     <article className="worldcup-history-play-card">
       <div className="worldcup-history-play-card__top">
         <div>
           <span>{formatPlayType(group.play_type)}</span>
-          <strong>{formatAccuracy(group.accuracy)}</strong>
+          <strong>{formatAccuracy(activeStats.accuracy)}</strong>
         </div>
-        <small>{group.hit_count}/{group.settled_count} 已判定命中</small>
+        <small>{formatMetricHitLine(metricMode, activeStats)}</small>
       </div>
 
       <div className="worldcup-history-play-card__stats">
-        <span>{group.total_count} 推荐</span>
-        <span>{group.pending_count} 待开奖</span>
-        <span>{group.unknown_count} 无法判定</span>
+        <span>{activeStats.total_count} {formatMetricTotalUnit(metricMode)}</span>
+        <span>{activeStats.pending_count} 待开奖</span>
+        <span>{activeStats.unknown_count} 无法判定</span>
+        <span>{formatMetricHitLine(secondaryMode, secondaryStats)}</span>
       </div>
 
       <div className="worldcup-history-model-rank">
-        {group.models.map((model) => (
-          <div key={`${model.play_type}-${model.model_code}`} className="worldcup-history-model-rank__row">
-            <div className="worldcup-history-model-rank__main">
-              <strong>{model.model_name}</strong>
-            </div>
-            <div className="worldcup-history-model-rank__meter" aria-label={`${model.model_name} ${formatPlayType(model.play_type)} 正确率 ${formatAccuracy(model.accuracy)}`}>
-              <div className="worldcup-history-model-rank__track">
-                <div className="worldcup-history-model-rank__bar" style={{ width: getAccuracyWidth(model.accuracy) }} />
+        {group.models.map((model) => {
+          const modelActiveStats = getHistoryMetricStats(model, metricMode)
+          const modelSecondaryStats = getHistoryMetricStats(model, secondaryMode)
+
+          return (
+            <div key={`${model.play_type}-${model.model_code}`} className="worldcup-history-model-rank__row">
+              <div className="worldcup-history-model-rank__main">
+                <strong>{model.model_name}</strong>
               </div>
-              <span>{formatAccuracy(model.accuracy)}</span>
+              <div className="worldcup-history-model-rank__meter" aria-label={`${model.model_name} ${formatPlayType(model.play_type)} ${formatMetricMode(metricMode)}正确率 ${formatAccuracy(modelActiveStats.accuracy)}`}>
+                <div className="worldcup-history-model-rank__track">
+                  <div className="worldcup-history-model-rank__bar" style={{ width: getAccuracyWidth(modelActiveStats.accuracy) }} />
+                </div>
+                <span>{formatAccuracy(modelActiveStats.accuracy)}</span>
+              </div>
+              <div className="worldcup-history-model-rank__counts">
+                <small>{formatMetricHitLine(metricMode, modelActiveStats)}</small>
+                <small>{formatMetricHitLine(secondaryMode, modelSecondaryStats)}</small>
+              </div>
             </div>
-            <small>{model.hit_count}/{model.settled_count} 命中</small>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </article>
   )

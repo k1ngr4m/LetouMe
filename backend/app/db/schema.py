@@ -230,6 +230,7 @@ SCHEMA_STATEMENTS = [
         sell_status VARCHAR(32) NULL,
         match_status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
         score VARCHAR(32) NULL,
+        half_time_score VARCHAR(32) NULL,
         remark TEXT NULL,
         data_sources_json JSON NULL,
         source_updated_at DATETIME NULL,

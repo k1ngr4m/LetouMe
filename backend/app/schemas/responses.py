@@ -306,7 +306,7 @@ class WorldCupHistoryMatchResponse(BaseModel):
     recommendations: list[WorldCupHistoryRecommendationResponse] = Field(default_factory=list)
 
 
-class WorldCupHistorySummaryResponse(BaseModel):
+class WorldCupHistoryMetricStatsResponse(BaseModel):
     total_count: int = 0
     settled_count: int = 0
     hit_count: int = 0
@@ -314,6 +314,11 @@ class WorldCupHistorySummaryResponse(BaseModel):
     pending_count: int = 0
     unknown_count: int = 0
     accuracy: float | None = None
+
+
+class WorldCupHistorySummaryResponse(WorldCupHistoryMetricStatsResponse):
+    prediction_stats: WorldCupHistoryMetricStatsResponse = Field(default_factory=WorldCupHistoryMetricStatsResponse)
+    match_stats: WorldCupHistoryMetricStatsResponse = Field(default_factory=WorldCupHistoryMetricStatsResponse)
 
 
 class WorldCupHistoryModelPlayStatResponse(WorldCupHistorySummaryResponse):

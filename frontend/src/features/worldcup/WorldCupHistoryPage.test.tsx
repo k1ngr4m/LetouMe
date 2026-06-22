@@ -241,8 +241,10 @@ describe('WorldCupHistoryPage', () => {
     const performance = await screen.findByLabelText('玩法表现')
 
     expect(within(performance).getByText('按玩法统计模型正确率')).toBeInTheDocument()
-    expect(within(performance).getByText('整体正确率')).toBeInTheDocument()
+    expect(within(performance).getByText('整体场次命中率')).toBeInTheDocument()
     expect(within(performance).getByText('50.0%')).toBeInTheDocument()
+    expect(within(performance).getByRole('button', { name: '按场次' })).toHaveClass('is-active')
+    expect(within(performance).getByRole('button', { name: '按预测次数' })).toBeInTheDocument()
     expect(within(performance).getAllByText('胜平负').length).toBeGreaterThan(0)
     expect(within(performance).getAllByText('100.0%').length).toBeGreaterThan(0)
     expect(within(performance).getAllByText('0.0%').length).toBeGreaterThan(0)
@@ -250,6 +252,122 @@ describe('WorldCupHistoryPage', () => {
     expect(within(performance).queryByText('worldcup-model-a')).not.toBeInTheDocument()
     expect(within(performance).getAllByText('暂无已判定')).toHaveLength(2)
     expect(within(performance).getAllByText('1 待开奖').length).toBeGreaterThan(0)
+  })
+
+  it('defaults to match metrics and switches to prediction-count metrics', async () => {
+    vi.mocked(apiClient.getWorldCupHistory).mockResolvedValueOnce({
+      ...historyResponse,
+      summary: {
+        total_count: 3,
+        settled_count: 3,
+        hit_count: 1,
+        miss_count: 2,
+        pending_count: 0,
+        unknown_count: 0,
+        accuracy: 0.3333,
+        prediction_stats: {
+          total_count: 3,
+          settled_count: 3,
+          hit_count: 1,
+          miss_count: 2,
+          pending_count: 0,
+          unknown_count: 0,
+          accuracy: 0.3333,
+        },
+        match_stats: {
+          total_count: 1,
+          settled_count: 1,
+          hit_count: 1,
+          miss_count: 0,
+          pending_count: 0,
+          unknown_count: 0,
+          accuracy: 1,
+        },
+      },
+      play_type_groups: [
+        {
+          play_type: 'total_goals',
+          play_type_label: '总进球数',
+          total_count: 3,
+          settled_count: 3,
+          hit_count: 1,
+          miss_count: 2,
+          pending_count: 0,
+          unknown_count: 0,
+          accuracy: 0.3333,
+          prediction_stats: {
+            total_count: 3,
+            settled_count: 3,
+            hit_count: 1,
+            miss_count: 2,
+            pending_count: 0,
+            unknown_count: 0,
+            accuracy: 0.3333,
+          },
+          match_stats: {
+            total_count: 1,
+            settled_count: 1,
+            hit_count: 1,
+            miss_count: 0,
+            pending_count: 0,
+            unknown_count: 0,
+            accuracy: 1,
+          },
+          models: [
+            {
+              model_code: 'worldcup-model-a',
+              model_name: '瑞士模型',
+              play_type: 'total_goals',
+              total_count: 3,
+              settled_count: 3,
+              hit_count: 1,
+              miss_count: 2,
+              pending_count: 0,
+              unknown_count: 0,
+              accuracy: 0.3333,
+              prediction_stats: {
+                total_count: 3,
+                settled_count: 3,
+                hit_count: 1,
+                miss_count: 2,
+                pending_count: 0,
+                unknown_count: 0,
+                accuracy: 0.3333,
+              },
+              match_stats: {
+                total_count: 1,
+                settled_count: 1,
+                hit_count: 1,
+                miss_count: 0,
+                pending_count: 0,
+                unknown_count: 0,
+                accuracy: 1,
+              },
+            },
+          ],
+        },
+      ],
+    })
+    renderPage()
+
+    const performance = await screen.findByLabelText('玩法表现')
+    const score = within(performance).getByLabelText('整体命中率')
+
+    expect(within(performance).getByRole('button', { name: '按场次' })).toHaveClass('is-active')
+    expect(within(score).getByText('整体场次命中率')).toBeInTheDocument()
+    expect(within(score).getByText('100.0%')).toBeInTheDocument()
+    expect(within(score).getByText('场次 1/1 命中')).toBeInTheDocument()
+    expect(within(score).getByText('预测次数 1/3 命中')).toBeInTheDocument()
+    expect(within(performance).getByLabelText('瑞士模型 总进球数 场次正确率 100.0%')).toBeInTheDocument()
+
+    await userEvent.click(within(performance).getByRole('button', { name: '按预测次数' }))
+
+    expect(within(performance).getByRole('button', { name: '按预测次数' })).toHaveClass('is-active')
+    expect(within(score).getByText('整体预测命中率')).toBeInTheDocument()
+    expect(within(score).getByText('33.3%')).toBeInTheDocument()
+    expect(within(score).getByText('预测次数 1/3 命中')).toBeInTheDocument()
+    expect(within(score).getByText('场次 1/1 命中')).toBeInTheDocument()
+    expect(within(performance).getByLabelText('瑞士模型 总进球数 预测次数正确率 33.3%')).toBeInTheDocument()
   })
 
   it('filters history by a selected match date', async () => {

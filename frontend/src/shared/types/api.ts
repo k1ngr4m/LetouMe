@@ -572,7 +572,7 @@ export type WorldCupHistoryRecord = {
   recommendations: WorldCupHistoryRecommendation[]
 }
 
-export type WorldCupHistorySummary = {
+export type WorldCupHistoryMetricStats = {
   total_count: number
   settled_count: number
   hit_count: number
@@ -580,6 +580,11 @@ export type WorldCupHistorySummary = {
   pending_count: number
   unknown_count: number
   accuracy: number | null
+}
+
+export type WorldCupHistorySummary = WorldCupHistoryMetricStats & {
+  prediction_stats?: WorldCupHistoryMetricStats
+  match_stats?: WorldCupHistoryMetricStats
 }
 
 export type WorldCupHistoryModelPlayStat = WorldCupHistorySummary & {

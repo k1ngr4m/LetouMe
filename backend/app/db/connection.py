@@ -461,6 +461,7 @@ def _ensure_compat_columns(cursor: MySQLCursorAdapter | SQLiteCursorAdapter, db_
         "league_name": "VARCHAR(128)" if db_driver == "mysql" else text_type,
         "business_date": "VARCHAR(32)" if db_driver == "mysql" else text_type,
         "sell_status": "VARCHAR(32)" if db_driver == "mysql" else text_type,
+        "half_time_score": "VARCHAR(32)" if db_driver == "mysql" else text_type,
         "remark": text_type,
         "data_sources_json": json_type,
         "source_updated_at": datetime_type,

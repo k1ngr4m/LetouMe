@@ -1835,11 +1835,13 @@ button.worldcup-match-card__odds-action {
   align-items: end;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .worldcup-history-performance__header > div:first-child {
   display: grid;
   gap: 0.18rem;
+  min-width: min(100%, 13rem);
 }
 
 .worldcup-history-performance__header p,
@@ -1858,11 +1860,44 @@ button.worldcup-match-card__odds-action {
   font-size: 1.08rem;
 }
 
+.worldcup-history-metric-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  min-height: 2rem;
+  padding: 0.18rem;
+  border: 1px solid rgba(159, 195, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.worldcup-history-metric-toggle button {
+  min-height: 1.62rem;
+  padding: 0 0.68rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--worldcup-card-muted-themed);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.worldcup-history-metric-toggle button.is-active {
+  background: linear-gradient(90deg, rgba(42, 157, 143, 0.92), rgba(255, 211, 106, 0.82));
+  color: #071927;
+  box-shadow: 0 0.5rem 1rem rgba(42, 157, 143, 0.14);
+}
+
 .worldcup-history-performance__score {
   display: grid;
   justify-items: end;
   gap: 0.16rem;
   min-width: 9rem;
+  margin-left: auto;
 }
 
 .worldcup-history-performance__score strong {
@@ -1875,6 +1910,10 @@ button.worldcup-match-card__odds-action {
 .worldcup-history-performance__score small {
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.worldcup-history-performance__score-alt {
+  opacity: 0.72;
 }
 
 .worldcup-history-performance__overview {
@@ -2036,9 +2075,19 @@ button.worldcup-match-card__odds-action {
   min-width: 0;
 }
 
-.worldcup-history-model-rank__row > small {
+.worldcup-history-model-rank__counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.18rem 0.5rem;
   justify-self: end;
   line-height: 1.1;
+  min-width: 0;
+  text-align: right;
+}
+
+.worldcup-history-model-rank__counts small + small {
+  opacity: 0.72;
 }
 
 .worldcup-history-model-rank__meter span {
@@ -2351,6 +2400,7 @@ button.worldcup-match-card__odds-action {
 
   .worldcup-history-performance__score {
     justify-items: start;
+    margin-left: 0;
   }
 
   .worldcup-history-score {
@@ -2371,8 +2421,10 @@ button.worldcup-match-card__odds-action {
     width: 100%;
   }
 
-  .worldcup-history-model-rank__row > small {
+  .worldcup-history-model-rank__counts {
     justify-self: start;
+    justify-content: flex-start;
+    text-align: left;
   }
 
   .worldcup-ticket__item {

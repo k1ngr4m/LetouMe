@@ -206,15 +206,16 @@ class WorldCupService:
         }
 
     def _build_history_accuracy_payload(self, stat_rows: list[dict[str, Any]]) -> dict[str, Any]:
-        summary_bucket = self._empty_history_stat_bucket()
-        play_buckets: dict[str, dict[str, Any]] = {}
-        model_buckets: dict[tuple[str, str], dict[str, Any]] = {}
+        summary_prediction_bucket = self._empty_history_stat_bucket()
+        play_prediction_buckets: dict[str, dict[str, Any]] = {}
+        model_prediction_buckets: dict[tuple[str, str], dict[str, Any]] = {}
+        match_groups: dict[tuple[str, str, str], dict[str, Any]] = {}
 
         for item in stat_rows:
             row = item["row"]
             recommendation = item["recommendation"]
             settlement = item["settlement"]
-            self._add_history_stat(summary_bucket, settlement)
+            self._add_history_stat(summary_prediction_bucket, settlement)
             play_type = str(recommendation.get("play_type") or row.get("play_type") or "")
             if not play_type:
                 continue
@@ -223,10 +224,49 @@ class WorldCupService:
             if model_code == "__unknown__":
                 model_name = "未标记模型"
 
-            play_bucket = play_buckets.setdefault(play_type, {"play_type": play_type, **self._empty_history_stat_bucket()})
+            play_bucket = play_prediction_buckets.setdefault(play_type, {"play_type": play_type, **self._empty_history_stat_bucket()})
             self._add_history_stat(play_bucket, settlement)
             model_key = (play_type, model_code)
-            model_bucket = model_buckets.setdefault(
+            model_bucket = model_prediction_buckets.setdefault(
+                model_key,
+                {
+                    "model_code": model_code,
+                    "model_name": model_name,
+                    "play_type": play_type,
+                    **self._empty_history_stat_bucket(),
+                },
+            )
+            model_bucket["model_name"] = model_name
+            self._add_history_stat(model_bucket, settlement)
+
+            match_id = str(row.get("match_id") or recommendation.get("match", {}).get("match_id") or "")
+            match_key = (play_type, model_code, match_id)
+            match_group = match_groups.setdefault(
+                match_key,
+                {
+                    "play_type": play_type,
+                    "model_code": model_code,
+                    "model_name": model_name,
+                    "settlements": [],
+                },
+            )
+            match_group["model_name"] = model_name
+            match_group["settlements"].append(settlement)
+
+        summary_match_bucket = self._empty_history_stat_bucket()
+        play_match_buckets: dict[str, dict[str, Any]] = {}
+        model_match_buckets: dict[tuple[str, str], dict[str, Any]] = {}
+        for match_group in match_groups.values():
+            play_type = str(match_group.get("play_type") or "")
+            model_code = str(match_group.get("model_code") or "__unknown__")
+            model_name = str(match_group.get("model_name") or model_code)
+            settlement = self._combine_history_match_settlement(match_group.get("settlements") or [])
+            self._add_history_stat(summary_match_bucket, settlement)
+
+            play_bucket = play_match_buckets.setdefault(play_type, {"play_type": play_type, **self._empty_history_stat_bucket()})
+            self._add_history_stat(play_bucket, settlement)
+            model_key = (play_type, model_code)
+            model_bucket = model_match_buckets.setdefault(
                 model_key,
                 {
                     "model_code": model_code,
@@ -239,32 +279,32 @@ class WorldCupService:
             self._add_history_stat(model_bucket, settlement)
 
         play_type_groups = []
-        for play_type in sorted(play_buckets, key=self._history_play_type_sort_key):
+        for play_type in sorted(play_prediction_buckets, key=self._history_play_type_sort_key):
             models = [
-                self._finalize_history_stat_bucket(bucket)
-                for (bucket_play_type, _), bucket in model_buckets.items()
+                self._finalize_history_metric_buckets(bucket, model_match_buckets.get((bucket_play_type, model_code)))
+                for (bucket_play_type, model_code), bucket in model_prediction_buckets.items()
                 if bucket_play_type == play_type
             ]
             models.sort(
                 key=lambda item: (
-                    item["accuracy"] is not None,
-                    float(item["accuracy"] or 0),
-                    int(item["settled_count"] or 0),
-                    int(item["hit_count"] or 0),
+                    item["match_stats"]["accuracy"] is not None,
+                    float(item["match_stats"]["accuracy"] or 0),
+                    int(item["match_stats"]["settled_count"] or 0),
+                    int(item["match_stats"]["hit_count"] or 0),
                     str(item["model_name"] or ""),
                 ),
                 reverse=True,
             )
             play_type_groups.append(
                 {
-                    **self._finalize_history_stat_bucket(play_buckets[play_type]),
+                    **self._finalize_history_metric_buckets(play_prediction_buckets[play_type], play_match_buckets.get(play_type)),
                     "play_type_label": PLAY_TYPE_LABELS.get(play_type, play_type),
                     "models": models,
                 }
             )
 
         return {
-            "summary": self._finalize_history_stat_bucket(summary_bucket),
+            "summary": self._finalize_history_metric_buckets(summary_prediction_bucket, summary_match_bucket),
             "play_type_groups": play_type_groups,
         }
 
@@ -302,6 +342,26 @@ class WorldCupService:
             **bucket,
             "accuracy": round(hit_count / settled_count, 4) if settled_count else None,
         }
+
+    @classmethod
+    def _finalize_history_metric_buckets(cls, prediction_bucket: dict[str, Any], match_bucket: dict[str, Any] | None = None) -> dict[str, Any]:
+        prediction_stats = cls._finalize_history_stat_bucket(prediction_bucket)
+        match_stats = cls._finalize_history_stat_bucket(match_bucket or cls._empty_history_stat_bucket())
+        return {
+            **prediction_stats,
+            "prediction_stats": prediction_stats,
+            "match_stats": match_stats,
+        }
+
+    @staticmethod
+    def _combine_history_match_settlement(settlements: list[dict[str, Any]]) -> dict[str, Any]:
+        if any(settlement.get("result_status") == "settled" and settlement.get("hit") is True for settlement in settlements):
+            return {"result_status": "settled", "hit": True}
+        if any(settlement.get("result_status") == "settled" and settlement.get("hit") is False for settlement in settlements):
+            return {"result_status": "settled", "hit": False}
+        if settlements and all(settlement.get("result_status") == "pending" for settlement in settlements):
+            return {"result_status": "pending", "hit": None}
+        return {"result_status": "unknown", "hit": None}
 
     @staticmethod
     def _history_play_type_sort_key(play_type: str) -> tuple[int, str]:
@@ -446,6 +506,9 @@ class WorldCupService:
             if key == "score" and value:
                 merged[key] = value
                 continue
+            if key == "half_time_score" and value:
+                merged[key] = value
+                continue
             if not merged.get(key) and value:
                 merged[key] = value
         merged["odds_snapshots"] = cls._merge_odds_snapshots(primary.get("odds_snapshots"), secondary.get("odds_snapshots"))
@@ -528,7 +591,12 @@ class WorldCupService:
             actual = f"{home_score}:{away_score}"
             return actual, actual in normalized_selection or f"{home_score}-{away_score}" in normalized_selection
         if play_type == "half_full_time":
-            return "半全场结果未知", None
+            half_time_score = self._parse_score(row.get("half_time_score"))
+            if half_time_score is None:
+                return "半全场结果未知", None
+            half_home_score, half_away_score = half_time_score
+            actual = f"{self._wdw_label(half_home_score - half_away_score)}{self._wdw_label(home_score - away_score)}"
+            return actual, self._selection_matches_half_full_time(normalized_selection, actual)
         return "赛果未知", None
 
     @staticmethod
@@ -579,6 +647,13 @@ class WorldCupService:
         if numbers:
             return total_goals in numbers
         return None
+
+    @staticmethod
+    def _selection_matches_half_full_time(selection: str, actual: str) -> bool | None:
+        compact_selection = re.sub(r"[\s:：/／,，、;；|｜-]+", "", selection)
+        if not any(label in compact_selection for label in ("胜", "平", "负")):
+            return None
+        return actual in compact_selection
 
     @staticmethod
     def _serialize_match(row: dict[str, Any]) -> dict[str, Any]:

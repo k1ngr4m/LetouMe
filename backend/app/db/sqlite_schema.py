@@ -210,6 +210,7 @@ SQLITE_SCHEMA_STATEMENTS = [
             sell_status TEXT NULL,
             match_status TEXT NOT NULL DEFAULT 'scheduled',
             score TEXT NULL,
+            half_time_score TEXT NULL,
             remark TEXT NULL,
             data_sources_json TEXT NULL,
             source_updated_at TEXT NULL,

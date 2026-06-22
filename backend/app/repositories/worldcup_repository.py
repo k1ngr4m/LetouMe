@@ -38,10 +38,11 @@ class WorldCupRepository:
                             sell_status,
                             match_status,
                             score,
+                            half_time_score,
                             remark,
                             data_sources_json,
                             source_updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
                             sporttery_match_id = VALUES(sporttery_match_id),
                             match_num = VALUES(match_num),
@@ -57,6 +58,7 @@ class WorldCupRepository:
                             sell_status = VALUES(sell_status),
                             match_status = VALUES(match_status),
                             score = VALUES(score),
+                            half_time_score = COALESCE(VALUES(half_time_score), half_time_score),
                             remark = VALUES(remark),
                             data_sources_json = VALUES(data_sources_json),
                             source_updated_at = VALUES(source_updated_at)
@@ -77,6 +79,7 @@ class WorldCupRepository:
                             match.get("sell_status"),
                             match.get("match_status") or "scheduled",
                             match.get("score"),
+                            match.get("half_time_score"),
                             match.get("remark"),
                             json.dumps(match.get("data_sources") or ["sporttery"], ensure_ascii=False),
                             match.get("source_updated_at"),
@@ -289,6 +292,7 @@ class WorldCupRepository:
                         m.sell_status,
                         m.match_status,
                         m.score,
+                        m.half_time_score,
                         m.remark,
                         m.data_sources_json,
                         m.source_updated_at,
@@ -314,6 +318,7 @@ class WorldCupRepository:
                         m.sell_status,
                         m.match_status,
                         m.score,
+                        m.half_time_score,
                         m.remark,
                         m.data_sources_json,
                         m.source_updated_at
@@ -412,6 +417,7 @@ class WorldCupRepository:
                         m.sell_status,
                         m.match_status,
                         m.score,
+                        m.half_time_score,
                         m.remark,
                         m.source_updated_at,
                         odds.odds_json AS latest_odds_json,
@@ -757,6 +763,7 @@ class WorldCupRepository:
                         m.sell_status,
                         m.match_status,
                         m.score,
+                        m.half_time_score,
                         m.remark,
                         m.source_updated_at,
                         odds.odds_json AS latest_odds_json,

@@ -165,6 +165,42 @@ class WorldCupBaiduSportsServiceTests(unittest.TestCase):
         self.assertEqual(context["squad_status"]["home"]["players"][0]["name"], "阿里·贾西姆")
         self.assertEqual(context["index_reference"]["note"], BAIDU_ODDS_NOTE)
 
+    def test_parse_half_time_score_from_scoring_incidents(self) -> None:
+        payload = {
+            "code": "0",
+            "data": {
+                "graphic_incidents": {
+                    "incidents": [
+                        {"goaltype": "结束", "passedTime": "90'", "text": "结束 4-0"},
+                        {"goaltype": "乌龙球", "passedTime": "49'", "left": {"direction": "left", "teamName": "西班牙"}},
+                        {"goaltype": "进球", "passedTime": "24'", "left": {"direction": "left", "teamName": "西班牙"}},
+                        {"goaltype": "进球", "passedTime": "21'", "left": {"direction": "left", "teamName": "西班牙"}},
+                        {"goaltype": "进球", "passedTime": "10'", "left": {"direction": "left", "teamName": "西班牙"}},
+                    ]
+                }
+            },
+        }
+
+        self.assertEqual(WorldCupBaiduSportsService.parse_half_time_score(payload), "3:0")
+
+    def test_parse_half_time_score_counts_first_half_stoppage_time_only(self) -> None:
+        payload = {
+            "data": {
+                "graphic_incidents": {
+                    "incidents": [
+                        {"goaltype": "进球", "passedTime": "45+2'", "right": {"direction": "right", "teamName": "沙特阿拉伯"}},
+                        {"goaltype": "进球", "passedTime": "49'", "left": {"direction": "left", "teamName": "西班牙"}},
+                    ]
+                }
+            }
+        }
+
+        self.assertEqual(WorldCupBaiduSportsService.parse_half_time_score(payload), "0:1")
+
+    def test_parse_half_time_score_returns_none_without_incidents(self) -> None:
+        self.assertIsNone(WorldCupBaiduSportsService.parse_half_time_score({"data": {"graphic_incidents": {"incidents": []}}}))
+        self.assertIsNone(WorldCupBaiduSportsService.parse_half_time_score({"data": {}}))
+
     def test_find_encoded_match_id_matches_schedule_by_date_and_teams(self) -> None:
         service = WorldCupBaiduSportsService()
         service.fetch_schedule_matches = lambda start_date=None: [  # type: ignore[method-assign]
