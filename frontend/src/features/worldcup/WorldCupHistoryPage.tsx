@@ -5,8 +5,16 @@ import { CalendarDays, History, ShieldAlert } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import type { WorldCupHistoryPlayTypeGroup, WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
+import type { WorldCupHistoryPlayTypeGroup, WorldCupHistoryRecommendation, WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
 import { WorldCupTabStrip } from './WorldCupTabStrip'
+
+const HISTORY_PLAY_TYPE_ORDER: WorldCupPlayType[] = [
+  'win_draw_win',
+  'handicap_win_draw_win',
+  'total_goals',
+  'correct_score',
+  'half_full_time',
+]
 
 const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string }> = [
   { value: 'all', label: '全部玩法' },
@@ -45,6 +53,21 @@ function getHistoryRecordStats(record: WorldCupHistoryRecord) {
   const pending = Math.max(total - settled, 0)
 
   return { total, settled, hit, miss, pending }
+}
+
+function getHistoryRecommendationGroups(recommendations: WorldCupHistoryRecommendation[]) {
+  const itemsByPlayType = recommendations.reduce((groups, item) => {
+    const playType = item.recommendation.play_type as WorldCupPlayType
+    const items = groups.get(playType) || []
+    items.push(item)
+    groups.set(playType, items)
+    return groups
+  }, new Map<WorldCupPlayType, WorldCupHistoryRecommendation[]>())
+
+  return HISTORY_PLAY_TYPE_ORDER.map((playType) => ({
+    playType,
+    items: itemsByPlayType.get(playType) || [],
+  })).filter((group) => group.items.length > 0)
 }
 
 function formatMatchScore(score?: string | null, status?: string) {
@@ -163,6 +186,7 @@ export function WorldCupHistoryPage() {
           {records.map((record) => {
             const stats = getHistoryRecordStats(record)
             const scoreText = formatMatchScore(record.match.score, record.match.status)
+            const recommendationGroups = getHistoryRecommendationGroups(record.recommendations)
 
             return (
               <article key={record.match.match_id} className="worldcup-history-card">
@@ -189,21 +213,30 @@ export function WorldCupHistoryPage() {
                   <span><b>{stats.pending}</b> 待判定</span>
                 </div>
 
-                <div className="worldcup-history-card__rows">
-                  {record.recommendations.map((item) => (
-                    <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
-                      <div className="worldcup-history-row__pick">
-                        <span>{formatPlayType(item.recommendation.play_type as WorldCupPlayType)}</span>
-                        <strong>{item.recommendation.selection}</strong>
+                <div className="worldcup-history-card__groups">
+                  {recommendationGroups.map((group) => (
+                    <section key={group.playType} className="worldcup-history-play-section" aria-label={`${formatPlayType(group.playType)}推荐分组`}>
+                      <div className="worldcup-history-play-section__header">
+                        <h3>{formatPlayType(group.playType)} · {group.items.length} 推荐</h3>
                       </div>
-                      <div className="worldcup-history-row__result">
-                        <span>实际结果</span>
-                        <p>{item.actual_result || item.settlement_note}</p>
+                      <div className="worldcup-history-card__rows">
+                        {group.items.map((item) => (
+                          <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
+                            <div className="worldcup-history-row__pick">
+                              <span>{formatPlayType(item.recommendation.play_type as WorldCupPlayType)}</span>
+                              <strong>{item.recommendation.selection}</strong>
+                            </div>
+                            <div className="worldcup-history-row__result">
+                              <span>实际结果</span>
+                              <p>{item.actual_result || item.settlement_note}</p>
+                            </div>
+                            <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
+                              {resultLabel(item.hit)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
-                        {resultLabel(item.hit)}
-                      </span>
-                    </div>
+                    </section>
                   ))}
                 </div>
               </article>
@@ -251,7 +284,6 @@ function PlayTypePerformanceCard({ group }: { group: WorldCupHistoryPlayTypeGrou
           <div key={`${model.play_type}-${model.model_code}`} className="worldcup-history-model-rank__row">
             <div className="worldcup-history-model-rank__main">
               <strong>{model.model_name}</strong>
-              <span>{model.model_code}</span>
             </div>
             <div className="worldcup-history-model-rank__meter" aria-label={`${model.model_name} ${formatPlayType(model.play_type)} 正确率 ${formatAccuracy(model.accuracy)}`}>
               <div className="worldcup-history-model-rank__track">

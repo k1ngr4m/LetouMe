@@ -2017,8 +2017,7 @@ button.worldcup-match-card__odds-action {
   min-width: 0;
 }
 
-.worldcup-history-model-rank__main strong,
-.worldcup-history-model-rank__main span {
+.worldcup-history-model-rank__main strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2067,6 +2066,35 @@ button.worldcup-match-card__odds-action {
 .worldcup-history-card__rows {
   display: grid;
   gap: 0.55rem;
+}
+
+.worldcup-history-card__groups {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.worldcup-history-play-section {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.worldcup-history-play-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0 0.08rem;
+}
+
+.worldcup-history-play-section__header h3 {
+  margin: 0;
+  color: var(--worldcup-card-text-themed);
+  font-size: 0.95rem;
+  font-weight: 950;
+  line-height: 1.2;
 }
 
 .worldcup-history-card__rows {
