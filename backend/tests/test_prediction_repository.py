@@ -20,6 +20,60 @@ class PredictionRepositoryTests(unittest.TestCase):
         self.assertEqual(repository._serialize_prediction_date("2026-03-26"), "2026-03-26")
         self.assertEqual(repository._serialize_prediction_date(None), "")
 
+    def test_upsert_model_from_payload_accepts_worldcup_with_lottery_codes(self) -> None:
+        repository = PredictionRepository()
+
+        class _FakeCursor:
+            def __init__(self) -> None:
+                self.executed: list[tuple[str, tuple | None]] = []
+                self.last_query = ""
+
+            def execute(self, query: str, params: tuple | None = None) -> None:
+                self.last_query = " ".join(query.split())
+                self.executed.append((self.last_query, params))
+
+            def fetchone(self):
+                if "SELECT id, provider_name FROM model_provider" in self.last_query:
+                    return {"id": 7, "provider_name": "DeepSeek"}
+                if "SELECT id FROM provider_model_config" in self.last_query:
+                    return {"id": 8}
+                if "SELECT id FROM ai_model WHERE model_code" in self.last_query:
+                    return {"id": 9}
+                return None
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+        class _FakeConnection:
+            def __init__(self) -> None:
+                self.cursor_instance = _FakeCursor()
+
+            def cursor(self) -> _FakeCursor:
+                return self.cursor_instance
+
+        connection = _FakeConnection()
+        repository._upsert_model_from_payload(
+            connection,
+            {
+                "model_id": "deepseek-v4-flash",
+                "model_name": "DeepSeek V4 Flash",
+                "model_provider": "deepseek",
+                "model_api_model": "deepseek-v4-flash",
+                "lottery_codes": ["dlt", "worldcup"],
+            },
+            None,
+        )
+
+        lottery_insert_params = [
+            params
+            for query, params in connection.cursor_instance.executed
+            if "INSERT INTO ai_model_lottery" in query
+        ]
+        self.assertEqual(lottery_insert_params, [(9, "dlt"), (9, "worldcup")])
+
     def test_upsert_history_record_retries_retryable_lock_timeout(self) -> None:
         repository = PredictionRepository(log_repository=Mock())
         payload = {

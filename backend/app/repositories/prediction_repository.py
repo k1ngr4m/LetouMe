@@ -1054,10 +1054,17 @@ class PredictionRepository:
                     VALUES (?, ?)
                     ON DUPLICATE KEY UPDATE lottery_code = VALUES(lottery_code)
                     """,
-                    (model_db_id, normalize_lottery_code(str(lottery_code))),
+                    (model_db_id, self._normalize_model_lottery_code(lottery_code)),
                 )
             invalidate_model_registry_cache()
             return model_db_id
+
+    @staticmethod
+    def _normalize_model_lottery_code(value: Any) -> str:
+        raw_code = str(value or "").strip().lower()
+        if raw_code == "worldcup":
+            return "worldcup"
+        return normalize_lottery_code(raw_code)
 
     def _upsert_model_definition(self, connection, definition: ModelDefinition) -> None:
         self._upsert_model_from_payload(
