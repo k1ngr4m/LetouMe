@@ -8,16 +8,21 @@ import type { WorldCupMatch, WorldCupRecommendation } from '../../shared/types/a
 import { apiClient } from '../../shared/api/client'
 import { WorldCupPage } from './WorldCupPage'
 
-const { apiClientMock } = vi.hoisted(() => ({
+const { apiClientMock, toJpegMock } = vi.hoisted(() => ({
   apiClientMock: {
     getWorldCupMatches: vi.fn(),
     getWorldCupBaiduAnalysis: vi.fn(),
     getWorldCupRecommendations: vi.fn(),
   },
+  toJpegMock: vi.fn(),
 }))
 
 vi.mock('../../shared/api/client', () => ({
   apiClient: apiClientMock,
+}))
+
+vi.mock('html-to-image', () => ({
+  toJpeg: toJpegMock,
 }))
 
 const match: WorldCupMatch = {
@@ -252,6 +257,8 @@ function renderPage() {
 describe('WorldCupPage odds display', () => {
   beforeEach(() => {
     localStorage.setItem('worldcup-age-confirmed', '1')
+    toJpegMock.mockReset()
+    toJpegMock.mockResolvedValue('data:image/jpeg;base64,mock-image')
     vi.mocked(apiClient.getWorldCupMatches).mockResolvedValue({ matches: [match], total_count: 1 })
     vi.mocked(apiClient.getWorldCupRecommendations).mockResolvedValue({
       recommendations: [recommendation],
@@ -342,6 +349,56 @@ describe('WorldCupPage odds display', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
     expect(screen.queryByRole('dialog', { name: '世界杯赔率' })).not.toBeInTheDocument()
+  })
+
+  it('exports the full odds modal as jpg', async () => {
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderPage()
+
+    const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    await userEvent.click(oddsButton)
+
+    const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
+    await userEvent.click(within(dialog).getByRole('button', { name: '导出 JPG' }))
+
+    await waitFor(() => expect(toJpegMock).toHaveBeenCalledTimes(1))
+    expect(toJpegMock).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+        pixelRatio: 2,
+        quality: 0.95,
+      }),
+    )
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    const anchor = anchorClickSpy.mock.contexts[0] as HTMLAnchorElement
+    expect(anchor.href).toBe('data:image/jpeg;base64,mock-image')
+    expect(anchor.download).toBe('worldcup_odds_周一013_西班牙_vs_佛得角.jpg')
+    expect(screen.getByRole('status')).toHaveTextContent('导出成功，已开始下载。')
+
+    anchorClickSpy.mockRestore()
+  })
+
+  it('restores the jpg export button when odds export fails', async () => {
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    toJpegMock.mockRejectedValueOnce(new Error('boom'))
+    renderPage()
+
+    const oddsButton = await screen.findByRole('button', { name: '西班牙 vs 佛得角 查看全部赔率' })
+    await userEvent.click(oddsButton)
+
+    const dialog = screen.getByRole('dialog', { name: '世界杯赔率' })
+    await userEvent.click(within(dialog).getByRole('button', { name: '导出 JPG' }))
+
+    await waitFor(() => expect(toJpegMock).toHaveBeenCalledTimes(1))
+    expect(anchorClickSpy).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('导出失败，请稍后重试。'))
+    expect(within(dialog).getByRole('button', { name: '导出 JPG' })).toBeEnabled()
+
+    anchorClickSpy.mockRestore()
+    consoleErrorSpy.mockRestore()
   })
 
   it('shows baidu pre-match analysis for the selected match', async () => {

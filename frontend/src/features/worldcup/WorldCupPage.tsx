@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronDown, CircleHelp, Copy, ShieldAlert, Shuffle, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, CircleHelp, Copy, Download, ShieldAlert, Shuffle, Sparkles } from 'lucide-react'
+import { toJpeg } from 'html-to-image'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
@@ -38,6 +39,36 @@ const STATUS_OPTIONS: Array<{ value: 'all' | 'scheduled' | 'live' | 'finished'; 
 ]
 
 const HIDDEN_RECOMMENDATION_RISK_TAGS = new Set(['资讯不足', '阵容待确认'])
+const ODDS_EXPORT_JPEG_QUALITY = 0.95
+
+function sanitizeDownloadFileName(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+}
+
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame !== 'function') {
+      window.setTimeout(resolve, 0)
+      return
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  })
+}
+
+function triggerDownload(downloadUrl: string, fileName: string) {
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download = fileName
+  link.click()
+}
+
+function buildWorldCupOddsExportFileName(match: WorldCupMatch) {
+  const matchLabel = match.match_num_str || match.match_id || 'match'
+  return `${sanitizeDownloadFileName(`worldcup_odds_${matchLabel}_${match.home_team}_vs_${match.away_team}`)}.jpg`
+}
 
 const PLAY_TYPE_ORDER = PLAY_TYPE_OPTIONS.filter((option): option is { value: WorldCupPlayType; label: string } => option.value !== 'all')
 const RECOMMENDATION_PLAY_TYPE_ORDER: WorldCupPlayType[] = [
@@ -569,12 +600,50 @@ function WorldCupOddsModal({ activePlayType, match, recommendations, onClose }: 
   recommendations: WorldCupRecommendation[]
   onClose: () => void
 }) {
+  const { showToast } = useToast()
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const [isExportingJpg, setIsExportingJpg] = useState(false)
   const snapshots = sortOddsSnapshots(match.odds_snapshots || [], activePlayType).filter((snapshot) => getOddsEntries(snapshot).length > 0)
   if (snapshots.length === 0) return null
 
+  async function handleExportJpg() {
+    if (isExportingJpg || !panelRef.current) return
+    setIsExportingJpg(true)
+    try {
+      await waitForNextPaint()
+      const exportHost = document.createElement('div')
+      exportHost.className = 'worldcup-odds-modal__export-host'
+      exportHost.setAttribute('aria-hidden', 'true')
+
+      const exportPanel = panelRef.current.cloneNode(true) as HTMLElement
+      exportPanel.classList.add('worldcup-odds-modal__panel--exporting')
+      exportPanel.querySelector('.worldcup-odds-modal__footer')?.remove()
+      exportHost.appendChild(exportPanel)
+      document.body.appendChild(exportHost)
+
+      try {
+        const dataUrl = await toJpeg(exportPanel, {
+          pixelRatio: 2,
+          cacheBust: true,
+          backgroundColor: '#ffffff',
+          quality: ODDS_EXPORT_JPEG_QUALITY,
+        })
+        triggerDownload(dataUrl, buildWorldCupOddsExportFileName(match))
+        showToast('导出成功，已开始下载。', 'success')
+      } finally {
+        exportHost.remove()
+      }
+    } catch (error) {
+      console.error('导出世界杯赔率 JPG 失败', error)
+      showToast('导出失败，请稍后重试。', 'error')
+    } finally {
+      setIsExportingJpg(false)
+    }
+  }
+
   return (
     <section className="worldcup-odds-modal" role="dialog" aria-modal="true" aria-label="世界杯赔率" onClick={onClose}>
-      <div className="worldcup-odds-modal__panel" onClick={(event) => event.stopPropagation()}>
+      <div ref={panelRef} className="worldcup-odds-modal__panel" onClick={(event) => event.stopPropagation()}>
         <header className="worldcup-odds-modal__topline">{formatOddsModalTitle(match)}</header>
         <div className="worldcup-odds-modal__match-hero">
           <span>[主]</span>
@@ -595,7 +664,16 @@ function WorldCupOddsModal({ activePlayType, match, recommendations, onClose }: 
           ))}
         </div>
         <footer className="worldcup-odds-modal__footer">
-          <button type="button" onClick={onClose}>关闭</button>
+          <button
+            className="worldcup-odds-modal__export-button"
+            type="button"
+            onClick={() => void handleExportJpg()}
+            disabled={isExportingJpg}
+          >
+            <Download size={15} aria-hidden="true" />
+            {isExportingJpg ? '导出中...' : '导出 JPG'}
+          </button>
+          <button className="worldcup-odds-modal__close-button" type="button" onClick={onClose}>关闭</button>
         </footer>
       </div>
     </section>
