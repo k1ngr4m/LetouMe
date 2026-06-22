@@ -1995,9 +1995,10 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-history-model-rank__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.8fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(10.5rem, 0.72fr);
   align-items: center;
-  gap: 0.62rem;
+  column-gap: 0.72rem;
+  row-gap: 0.18rem;
   min-width: 0;
   padding: 0.62rem;
   border: 1px solid rgba(159, 195, 255, 0.12);
@@ -2011,6 +2012,7 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-history-model-rank__main {
   display: grid;
+  grid-row: 1 / span 2;
   gap: 0.12rem;
   min-width: 0;
 }
@@ -2029,10 +2031,15 @@ button.worldcup-match-card__odds-action {
 
 .worldcup-history-model-rank__meter {
   display: grid;
-  grid-template-columns: minmax(3.8rem, 1fr) 4.2rem;
+  grid-template-columns: minmax(4.8rem, 1fr) max-content;
   align-items: center;
   gap: 0.42rem;
   min-width: 0;
+}
+
+.worldcup-history-model-rank__row > small {
+  justify-self: end;
+  line-height: 1.1;
 }
 
 .worldcup-history-model-rank__meter span {
@@ -2276,8 +2283,16 @@ button.worldcup-match-card__odds-action {
     align-items: start;
   }
 
+  .worldcup-history-model-rank__main {
+    grid-row: auto;
+  }
+
   .worldcup-history-model-rank__meter {
     width: 100%;
+  }
+
+  .worldcup-history-model-rank__row > small {
+    justify-self: start;
   }
 
   .worldcup-ticket__item,
