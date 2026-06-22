@@ -218,12 +218,12 @@ describe('WorldCupHistoryPage', () => {
     expect(within(matchCard).getAllByText('命中')).toHaveLength(2)
     expect(within(matchCard).getAllByText('未中')).toHaveLength(2)
     expect(within(matchCard).getAllByText('待判定')).toHaveLength(2)
-    expect(within(matchCard).getByText('胜平负')).toBeInTheDocument()
     expect(within(matchCard).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
       '胜平负 · 1 推荐',
       '总进球数 · 1 推荐',
       '比分 · 1 推荐',
     ])
+    expect(within(matchCard).getAllByText('模型 · 瑞士模型')).toHaveLength(3)
     expect(within(within(matchCard).getByLabelText('总进球数推荐分组')).getByText('2')).toBeInTheDocument()
     expect(within(matchCard).getByText('实际赛果为 5球')).toBeInTheDocument()
     expect(within(matchCard).getByText('等待赛果同步')).toBeInTheDocument()

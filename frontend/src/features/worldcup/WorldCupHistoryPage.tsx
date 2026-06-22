@@ -35,6 +35,10 @@ function resultLabel(hit?: boolean | null) {
   return '待判定'
 }
 
+function formatRecommendationModel(modelName?: string | null, modelCode?: string | null) {
+  return modelName?.trim() || modelCode?.trim() || '未知模型'
+}
+
 function formatAccuracy(value?: number | null) {
   if (value == null) return '暂无已判定'
   return `${(Number(value) * 100).toFixed(1)}%`
@@ -220,21 +224,25 @@ export function WorldCupHistoryPage() {
                         <h3>{formatPlayType(group.playType)} · {group.items.length} 推荐</h3>
                       </div>
                       <div className="worldcup-history-card__rows">
-                        {group.items.map((item) => (
-                          <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
-                            <div className="worldcup-history-row__pick">
-                              <span>{formatPlayType(item.recommendation.play_type as WorldCupPlayType)}</span>
-                              <strong>{item.recommendation.selection}</strong>
+                        {group.items.map((item) => {
+                          const modelLabel = formatRecommendationModel(item.recommendation.model_name, item.recommendation.model_code)
+
+                          return (
+                            <div key={item.recommendation.recommendation_id} className="worldcup-history-row">
+                              <div className="worldcup-history-row__pick">
+                                <span className="worldcup-history-row__model" title={modelLabel}>模型 · {modelLabel}</span>
+                                <strong>{item.recommendation.selection}</strong>
+                              </div>
+                              <div className="worldcup-history-row__result">
+                                <span>实际结果</span>
+                                <p>{item.actual_result || item.settlement_note}</p>
+                              </div>
+                              <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
+                                {resultLabel(item.hit)}
+                              </span>
                             </div>
-                            <div className="worldcup-history-row__result">
-                              <span>实际结果</span>
-                              <p>{item.actual_result || item.settlement_note}</p>
-                            </div>
-                            <span className={clsx('worldcup-result-pill', item.hit === true && 'is-hit', item.hit === false && 'is-miss')}>
-                              {resultLabel(item.hit)}
-                            </span>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </section>
                   ))}
