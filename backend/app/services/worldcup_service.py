@@ -183,19 +183,132 @@ class WorldCupService:
             play_type_filter=str(payload.get("play_type_filter") or "all"),
         )
         grouped: dict[str, dict[str, Any]] = {}
+        stat_rows: list[dict[str, Any]] = []
         for row in rows:
             match_id = str(row.get("match_id") or "")
             if match_id not in grouped:
                 grouped[match_id] = {"match": self._serialize_match({**row, "recommendation_count": 0}), "recommendations": []}
             settlement = self._settle_recommendation(row)
+            recommendation = self._serialize_recommendation(row)
             grouped[match_id]["recommendations"].append(
                 {
-                    "recommendation": self._serialize_recommendation(row),
+                    "recommendation": recommendation,
                     **settlement,
                 }
             )
+            stat_rows.append({"row": row, "recommendation": recommendation, "settlement": settlement})
         records = list(grouped.values())
-        return {"records": records, "total_count": len(records), "compliance_notice": WORLDCUP_COMPLIANCE_NOTICE}
+        return {
+            "records": records,
+            "total_count": len(records),
+            **self._build_history_accuracy_payload(stat_rows),
+            "compliance_notice": WORLDCUP_COMPLIANCE_NOTICE,
+        }
+
+    def _build_history_accuracy_payload(self, stat_rows: list[dict[str, Any]]) -> dict[str, Any]:
+        summary_bucket = self._empty_history_stat_bucket()
+        play_buckets: dict[str, dict[str, Any]] = {}
+        model_buckets: dict[tuple[str, str], dict[str, Any]] = {}
+
+        for item in stat_rows:
+            row = item["row"]
+            recommendation = item["recommendation"]
+            settlement = item["settlement"]
+            self._add_history_stat(summary_bucket, settlement)
+            play_type = str(recommendation.get("play_type") or row.get("play_type") or "")
+            if not play_type:
+                continue
+            model_code = str(recommendation.get("model_code") or row.get("model_code") or "__unknown__")
+            model_name = str(recommendation.get("model_name") or row.get("model_name") or model_code)
+            if model_code == "__unknown__":
+                model_name = "未标记模型"
+
+            play_bucket = play_buckets.setdefault(play_type, {"play_type": play_type, **self._empty_history_stat_bucket()})
+            self._add_history_stat(play_bucket, settlement)
+            model_key = (play_type, model_code)
+            model_bucket = model_buckets.setdefault(
+                model_key,
+                {
+                    "model_code": model_code,
+                    "model_name": model_name,
+                    "play_type": play_type,
+                    **self._empty_history_stat_bucket(),
+                },
+            )
+            model_bucket["model_name"] = model_name
+            self._add_history_stat(model_bucket, settlement)
+
+        play_type_groups = []
+        for play_type in sorted(play_buckets, key=self._history_play_type_sort_key):
+            models = [
+                self._finalize_history_stat_bucket(bucket)
+                for (bucket_play_type, _), bucket in model_buckets.items()
+                if bucket_play_type == play_type
+            ]
+            models.sort(
+                key=lambda item: (
+                    item["accuracy"] is not None,
+                    float(item["accuracy"] or 0),
+                    int(item["settled_count"] or 0),
+                    int(item["hit_count"] or 0),
+                    str(item["model_name"] or ""),
+                ),
+                reverse=True,
+            )
+            play_type_groups.append(
+                {
+                    **self._finalize_history_stat_bucket(play_buckets[play_type]),
+                    "play_type_label": PLAY_TYPE_LABELS.get(play_type, play_type),
+                    "models": models,
+                }
+            )
+
+        return {
+            "summary": self._finalize_history_stat_bucket(summary_bucket),
+            "play_type_groups": play_type_groups,
+        }
+
+    @staticmethod
+    def _empty_history_stat_bucket() -> dict[str, int]:
+        return {
+            "total_count": 0,
+            "settled_count": 0,
+            "hit_count": 0,
+            "miss_count": 0,
+            "pending_count": 0,
+            "unknown_count": 0,
+        }
+
+    @staticmethod
+    def _add_history_stat(bucket: dict[str, Any], settlement: dict[str, Any]) -> None:
+        bucket["total_count"] = int(bucket.get("total_count") or 0) + 1
+        result_status = str(settlement.get("result_status") or "unknown")
+        if result_status == "settled":
+            bucket["settled_count"] = int(bucket.get("settled_count") or 0) + 1
+            if settlement.get("hit") is True:
+                bucket["hit_count"] = int(bucket.get("hit_count") or 0) + 1
+            elif settlement.get("hit") is False:
+                bucket["miss_count"] = int(bucket.get("miss_count") or 0) + 1
+        elif result_status == "pending":
+            bucket["pending_count"] = int(bucket.get("pending_count") or 0) + 1
+        else:
+            bucket["unknown_count"] = int(bucket.get("unknown_count") or 0) + 1
+
+    @staticmethod
+    def _finalize_history_stat_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
+        settled_count = int(bucket.get("settled_count") or 0)
+        hit_count = int(bucket.get("hit_count") or 0)
+        return {
+            **bucket,
+            "accuracy": round(hit_count / settled_count, 4) if settled_count else None,
+        }
+
+    @staticmethod
+    def _history_play_type_sort_key(play_type: str) -> tuple[int, str]:
+        try:
+            return PLAY_TYPE_ORDER.index(play_type), play_type
+        except ValueError:
+            return len(PLAY_TYPE_ORDER), play_type
 
     def _serialize_recommendation(self, row: dict[str, Any]) -> dict[str, Any]:
         match = self._serialize_match(

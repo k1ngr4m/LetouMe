@@ -306,9 +306,33 @@ class WorldCupHistoryMatchResponse(BaseModel):
     recommendations: list[WorldCupHistoryRecommendationResponse] = Field(default_factory=list)
 
 
+class WorldCupHistorySummaryResponse(BaseModel):
+    total_count: int = 0
+    settled_count: int = 0
+    hit_count: int = 0
+    miss_count: int = 0
+    pending_count: int = 0
+    unknown_count: int = 0
+    accuracy: float | None = None
+
+
+class WorldCupHistoryModelPlayStatResponse(WorldCupHistorySummaryResponse):
+    model_code: str
+    model_name: str
+    play_type: str
+
+
+class WorldCupHistoryPlayTypeGroupResponse(WorldCupHistorySummaryResponse):
+    play_type: str
+    play_type_label: str
+    models: list[WorldCupHistoryModelPlayStatResponse] = Field(default_factory=list)
+
+
 class WorldCupHistoryResponse(BaseModel):
     records: list[WorldCupHistoryMatchResponse] = Field(default_factory=list)
     total_count: int = 0
+    summary: WorldCupHistorySummaryResponse = Field(default_factory=WorldCupHistorySummaryResponse)
+    play_type_groups: list[WorldCupHistoryPlayTypeGroupResponse] = Field(default_factory=list)
     compliance_notice: str
 
 

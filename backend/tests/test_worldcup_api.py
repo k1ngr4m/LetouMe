@@ -314,6 +314,8 @@ class WorldCupApiTests(unittest.TestCase):
         pending_records = pending_response.json()["records"]
         self.assertGreaterEqual(len(pending_records), 1)
         self.assertEqual(pending_records[0]["recommendations"][0]["result_status"], "pending")
+        self.assertEqual(pending_response.json()["summary"]["settled_count"], 0)
+        self.assertIsNone(pending_response.json()["summary"]["accuracy"])
 
         with db_connection.get_connection() as connection:
             with connection.cursor() as cursor:
@@ -329,6 +331,15 @@ class WorldCupApiTests(unittest.TestCase):
             for item in record["recommendations"]
         }
         self.assertTrue(result_statuses.intersection({"settled", "unknown"}))
+        payload = settled_response.json()
+        self.assertEqual(payload["summary"]["total_count"], 2)
+        self.assertEqual(payload["summary"]["settled_count"], 2)
+        self.assertEqual(payload["summary"]["hit_count"], 2)
+        self.assertEqual(payload["summary"]["accuracy"], 1.0)
+        play_groups = {group["play_type"]: group for group in payload["play_type_groups"]}
+        self.assertIn("win_draw_win", play_groups)
+        self.assertIn("total_goals", play_groups)
+        self.assertEqual(play_groups["win_draw_win"]["models"][0]["model_code"], "worldcup-model-a")
 
     def test_worldcup_prediction_generate_accepts_match_date(self) -> None:
         self.client.post("/api/auth/login", json={"identifier": "admin", "password": "admin123456"})
@@ -371,6 +382,7 @@ class WorldCupApiTests(unittest.TestCase):
         self.assertEqual(response.json()["progress_summary"]["match_date"], "2026-06-16")
         create_task.assert_called_once_with(
             model_code="worldcup-model",
+            model_codes=[],
             play_type="all",
             overwrite=False,
             match_date="2026-06-16",

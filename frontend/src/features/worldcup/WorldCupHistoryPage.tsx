@@ -5,7 +5,7 @@ import { CalendarDays, History, ShieldAlert } from 'lucide-react'
 import { apiClient } from '../../shared/api/client'
 import { SiteDisclaimer } from '../../shared/components/SiteDisclaimer'
 import { formatDateTimeLocal } from '../../shared/lib/format'
-import type { WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
+import type { WorldCupHistoryPlayTypeGroup, WorldCupHistoryRecord, WorldCupPlayType } from '../../shared/types/api'
 import { WorldCupTabStrip } from './WorldCupTabStrip'
 
 const PLAY_TYPE_OPTIONS: Array<{ value: 'all' | WorldCupPlayType; label: string }> = [
@@ -25,6 +25,16 @@ function resultLabel(hit?: boolean | null) {
   if (hit === true) return '命中'
   if (hit === false) return '未中'
   return '待判定'
+}
+
+function formatAccuracy(value?: number | null) {
+  if (value == null) return '暂无已判定'
+  return `${(Number(value) * 100).toFixed(1)}%`
+}
+
+function getAccuracyWidth(value?: number | null) {
+  if (value == null) return '0%'
+  return `${Math.max(0, Math.min(100, Number(value) * 100))}%`
 }
 
 function getHistoryRecordStats(record: WorldCupHistoryRecord) {
@@ -65,6 +75,8 @@ export function WorldCupHistoryPage() {
   })
 
   const records = historyQuery.data?.records || []
+  const summary = historyQuery.data?.summary
+  const playTypeGroups = historyQuery.data?.play_type_groups || []
 
   return (
     <div className="worldcup-page worldcup-page--history">
@@ -108,6 +120,39 @@ export function WorldCupHistoryPage() {
           ))}
         </div>
       </section>
+
+      {historyQuery.data && playTypeGroups.length ? (
+        <section className="worldcup-history-performance" aria-label="玩法表现">
+          <div className="worldcup-history-performance__header">
+            <div>
+              <p>玩法表现</p>
+              <h2>按玩法统计模型正确率</h2>
+            </div>
+            {summary ? (
+              <div className="worldcup-history-performance__score">
+                <span>整体正确率</span>
+                <strong>{formatAccuracy(summary.accuracy)}</strong>
+                <small>{summary.hit_count}/{summary.settled_count} 已判定命中</small>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="worldcup-history-performance__overview" aria-label="回溯统计总览">
+            <span><b>{summary?.total_count || 0}</b> 推荐</span>
+            <span><b>{summary?.settled_count || 0}</b> 已判定</span>
+            <span className="is-hit"><b>{summary?.hit_count || 0}</b> 命中</span>
+            <span className="is-miss"><b>{summary?.miss_count || 0}</b> 未中</span>
+            <span><b>{summary?.pending_count || 0}</b> 待开奖</span>
+            <span><b>{summary?.unknown_count || 0}</b> 无法判定</span>
+          </div>
+
+          <div className="worldcup-history-play-grid">
+            {playTypeGroups.map((group) => (
+              <PlayTypePerformanceCard key={group.play_type} group={group} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {historyQuery.isLoading ? (
         <div className="worldcup-empty">正在加载回溯记录...</div>
@@ -181,5 +226,43 @@ export function WorldCupHistoryPage() {
       </section>
       <WorldCupTabStrip activeTab="history" />
     </div>
+  )
+}
+
+function PlayTypePerformanceCard({ group }: { group: WorldCupHistoryPlayTypeGroup }) {
+  return (
+    <article className="worldcup-history-play-card">
+      <div className="worldcup-history-play-card__top">
+        <div>
+          <span>{formatPlayType(group.play_type)}</span>
+          <strong>{formatAccuracy(group.accuracy)}</strong>
+        </div>
+        <small>{group.hit_count}/{group.settled_count} 已判定命中</small>
+      </div>
+
+      <div className="worldcup-history-play-card__stats">
+        <span>{group.total_count} 推荐</span>
+        <span>{group.pending_count} 待开奖</span>
+        <span>{group.unknown_count} 无法判定</span>
+      </div>
+
+      <div className="worldcup-history-model-rank">
+        {group.models.map((model) => (
+          <div key={`${model.play_type}-${model.model_code}`} className="worldcup-history-model-rank__row">
+            <div className="worldcup-history-model-rank__main">
+              <strong>{model.model_name}</strong>
+              <span>{model.model_code}</span>
+            </div>
+            <div className="worldcup-history-model-rank__meter" aria-label={`${model.model_name} ${formatPlayType(model.play_type)} 正确率 ${formatAccuracy(model.accuracy)}`}>
+              <div className="worldcup-history-model-rank__track">
+                <div className="worldcup-history-model-rank__bar" style={{ width: getAccuracyWidth(model.accuracy) }} />
+              </div>
+              <span>{formatAccuracy(model.accuracy)}</span>
+            </div>
+            <small>{model.hit_count}/{model.settled_count} 命中</small>
+          </div>
+        ))}
+      </div>
+    </article>
   )
 }

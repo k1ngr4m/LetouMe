@@ -22,6 +22,14 @@ class _FakeMatchListRepository:
         return self.rows
 
 
+class _FakeHistoryRepository:
+    def __init__(self, rows: list[dict]) -> None:
+        self.rows = rows
+
+    def list_history_rows(self, **_: object) -> list[dict]:
+        return self.rows
+
+
 class _FakeBaiduSportsService:
     def __init__(self) -> None:
         self.encoded_match_id: str | None = None
@@ -188,6 +196,128 @@ class WorldCupServiceTests(unittest.TestCase):
         self.assertEqual(result["total_count"], 1)
         self.assertEqual(result["matches"][0]["match_id"], "sporttery-2040188")
         self.assertEqual(result["matches"][0]["away_team"], "刚果(金)")
+
+    def test_list_history_groups_accuracy_by_play_type_and_model(self) -> None:
+        rows = [
+            _history_row(
+                recommendation_id="rec-wdw-hit",
+                match_id="match-1",
+                play_type="win_draw_win",
+                selection="胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="1:0",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-miss",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="2",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="1:0",
+            ),
+            _history_row(
+                recommendation_id="rec-goals-hit",
+                match_id="match-1",
+                play_type="total_goals",
+                selection="1",
+                model_code="model-b",
+                model_name="模型B",
+                match_status="finished",
+                score="1:0",
+            ),
+            _history_row(
+                recommendation_id="rec-wdw-pending",
+                match_id="match-2",
+                play_type="win_draw_win",
+                selection="胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="scheduled",
+                score=None,
+            ),
+            _history_row(
+                recommendation_id="rec-half-unknown",
+                match_id="match-3",
+                play_type="half_full_time",
+                selection="胜胜",
+                model_code="model-a",
+                model_name="模型A",
+                match_status="finished",
+                score="2:1",
+            ),
+        ]
+        service = WorldCupService(repository=_FakeHistoryRepository(rows))
+
+        result = service.list_history(1, {})
+
+        self.assertEqual(result["summary"]["total_count"], 5)
+        self.assertEqual(result["summary"]["settled_count"], 3)
+        self.assertEqual(result["summary"]["hit_count"], 2)
+        self.assertEqual(result["summary"]["miss_count"], 1)
+        self.assertEqual(result["summary"]["pending_count"], 1)
+        self.assertEqual(result["summary"]["unknown_count"], 1)
+        self.assertAlmostEqual(result["summary"]["accuracy"], 0.6667)
+
+        groups = {group["play_type"]: group for group in result["play_type_groups"]}
+        self.assertEqual(groups["win_draw_win"]["settled_count"], 1)
+        self.assertEqual(groups["win_draw_win"]["pending_count"], 1)
+        self.assertEqual(groups["win_draw_win"]["accuracy"], 1.0)
+        self.assertEqual(groups["total_goals"]["hit_count"], 1)
+        self.assertEqual(groups["total_goals"]["miss_count"], 1)
+        self.assertEqual(groups["total_goals"]["accuracy"], 0.5)
+        self.assertIsNone(groups["half_full_time"]["accuracy"])
+
+        total_goals_models = {model["model_code"]: model for model in groups["total_goals"]["models"]}
+        self.assertEqual(total_goals_models["model-a"]["miss_count"], 1)
+        self.assertEqual(total_goals_models["model-a"]["accuracy"], 0.0)
+        self.assertEqual(total_goals_models["model-b"]["hit_count"], 1)
+        self.assertEqual(total_goals_models["model-b"]["accuracy"], 1.0)
+
+
+def _history_row(
+    *,
+    recommendation_id: str,
+    match_id: str,
+    play_type: str,
+    selection: str,
+    model_code: str,
+    model_name: str,
+    match_status: str,
+    score: str | None,
+) -> dict:
+    return {
+        "recommendation_id": recommendation_id,
+        "match_id": match_id,
+        "sporttery_match_id": match_id,
+        "match_num_str": "周一013",
+        "home_team": "西班牙",
+        "away_team": "佛得角",
+        "kickoff_at": "2026-06-16 00:00:00",
+        "stage": "世界杯",
+        "match_status": match_status,
+        "score": score,
+        "sell_status": "Selling",
+        "play_type": play_type,
+        "selection": selection,
+        "model_code": model_code,
+        "model_name": model_name,
+        "confidence_level": "medium",
+        "risk_level": "low",
+        "budget_min": 10,
+        "budget_max": 20,
+        "reason": "测试推荐。",
+        "model_sources_json": "[]",
+        "risk_tags_json": "[]",
+        "status": "published",
+        "compliance_notice": "预测仅供参考研究，不保证命中。",
+        "updated_at": "2026-06-15 12:00:00",
+        "created_at": "2026-06-15 12:00:00",
+        "is_favorite": 0,
+    }
 
 
 if __name__ == "__main__":

@@ -38,6 +38,8 @@ const baseRecommendation = {
   match,
   play_type: 'win_draw_win' as const,
   selection: '胜',
+  model_code: 'worldcup-model-a',
+  model_name: '瑞士模型',
   confidence_level: 'medium' as const,
   risk_level: 'low' as const,
   budget_min: 10,
@@ -92,6 +94,92 @@ const historyResponse: WorldCupHistoryResponse = {
     },
   ],
   total_count: 1,
+  summary: {
+    total_count: 3,
+    settled_count: 2,
+    hit_count: 1,
+    miss_count: 1,
+    pending_count: 1,
+    unknown_count: 0,
+    accuracy: 0.5,
+  },
+  play_type_groups: [
+    {
+      play_type: 'win_draw_win',
+      play_type_label: '胜平负',
+      total_count: 1,
+      settled_count: 1,
+      hit_count: 1,
+      miss_count: 0,
+      pending_count: 0,
+      unknown_count: 0,
+      accuracy: 1,
+      models: [
+        {
+          model_code: 'worldcup-model-a',
+          model_name: '瑞士模型',
+          play_type: 'win_draw_win',
+          total_count: 1,
+          settled_count: 1,
+          hit_count: 1,
+          miss_count: 0,
+          pending_count: 0,
+          unknown_count: 0,
+          accuracy: 1,
+        },
+      ],
+    },
+    {
+      play_type: 'total_goals',
+      play_type_label: '总进球数',
+      total_count: 1,
+      settled_count: 1,
+      hit_count: 0,
+      miss_count: 1,
+      pending_count: 0,
+      unknown_count: 0,
+      accuracy: 0,
+      models: [
+        {
+          model_code: 'worldcup-model-a',
+          model_name: '瑞士模型',
+          play_type: 'total_goals',
+          total_count: 1,
+          settled_count: 1,
+          hit_count: 0,
+          miss_count: 1,
+          pending_count: 0,
+          unknown_count: 0,
+          accuracy: 0,
+        },
+      ],
+    },
+    {
+      play_type: 'correct_score',
+      play_type_label: '比分',
+      total_count: 1,
+      settled_count: 0,
+      hit_count: 0,
+      miss_count: 0,
+      pending_count: 1,
+      unknown_count: 0,
+      accuracy: null,
+      models: [
+        {
+          model_code: 'worldcup-model-a',
+          model_name: '瑞士模型',
+          play_type: 'correct_score',
+          total_count: 1,
+          settled_count: 0,
+          hit_count: 0,
+          miss_count: 0,
+          pending_count: 1,
+          unknown_count: 0,
+          accuracy: null,
+        },
+      ],
+    },
+  ],
   compliance_notice: '预测仅供参考研究，不保证命中。',
 }
 
@@ -141,6 +229,22 @@ describe('WorldCupHistoryPage', () => {
     })
   })
 
+  it('renders play-type performance groups with model accuracy', async () => {
+    renderPage()
+
+    const performance = await screen.findByLabelText('玩法表现')
+
+    expect(within(performance).getByText('按玩法统计模型正确率')).toBeInTheDocument()
+    expect(within(performance).getByText('整体正确率')).toBeInTheDocument()
+    expect(within(performance).getByText('50.0%')).toBeInTheDocument()
+    expect(within(performance).getAllByText('胜平负').length).toBeGreaterThan(0)
+    expect(within(performance).getAllByText('100.0%').length).toBeGreaterThan(0)
+    expect(within(performance).getAllByText('0.0%').length).toBeGreaterThan(0)
+    expect(within(performance).getAllByText('瑞士模型')).toHaveLength(3)
+    expect(within(performance).getAllByText('暂无已判定')).toHaveLength(2)
+    expect(within(performance).getAllByText('1 待开奖').length).toBeGreaterThan(0)
+  })
+
   it('filters history by a selected match date', async () => {
     renderPage()
 
@@ -161,6 +265,16 @@ describe('WorldCupHistoryPage', () => {
     vi.mocked(apiClient.getWorldCupHistory).mockResolvedValueOnce({
       records: [],
       total_count: 0,
+      summary: {
+        total_count: 0,
+        settled_count: 0,
+        hit_count: 0,
+        miss_count: 0,
+        pending_count: 0,
+        unknown_count: 0,
+        accuracy: null,
+      },
+      play_type_groups: [],
       compliance_notice: '预测仅供参考研究，不保证命中。',
     })
 

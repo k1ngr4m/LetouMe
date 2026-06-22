@@ -572,9 +572,33 @@ export type WorldCupHistoryRecord = {
   recommendations: WorldCupHistoryRecommendation[]
 }
 
+export type WorldCupHistorySummary = {
+  total_count: number
+  settled_count: number
+  hit_count: number
+  miss_count: number
+  pending_count: number
+  unknown_count: number
+  accuracy: number | null
+}
+
+export type WorldCupHistoryModelPlayStat = WorldCupHistorySummary & {
+  model_code: string
+  model_name: string
+  play_type: WorldCupPlayType
+}
+
+export type WorldCupHistoryPlayTypeGroup = WorldCupHistorySummary & {
+  play_type: WorldCupPlayType
+  play_type_label: string
+  models: WorldCupHistoryModelPlayStat[]
+}
+
 export type WorldCupHistoryResponse = {
   records: WorldCupHistoryRecord[]
   total_count: number
+  summary: WorldCupHistorySummary
+  play_type_groups: WorldCupHistoryPlayTypeGroup[]
   compliance_notice: string
 }
 
