@@ -1867,6 +1867,7 @@ export function SettingsPage() {
       (generationTask?.progress_summary.failed_details ?? []).map((item) => ({
         ...item,
         model_name: item.model_name || modelNameMap[item.model_code] || item.model_code,
+        reason: item.reason || item.error || '未知错误',
       })),
     [generationTask?.progress_summary.failed_details, modelNameMap],
   )
@@ -2010,17 +2011,18 @@ export function SettingsPage() {
 
   const generatePredictionMutation = useMutation({
     mutationFn: () => {
+      const parallelism = Number(generationForm.parallelism.trim())
       if (generationForm.lotteryCode === 'worldcup') {
         return apiClient.generateSettingsWorldCupPredictions({
           model_code: generationForm.modelCodes.length > 1 ? '__bulk__' : generationForm.modelCodes[0] || '',
           model_codes: generationForm.modelCodes,
           play_type: generationForm.worldCupPlayMode,
           overwrite: generationForm.overwrite,
+          parallelism,
           match_date: generationForm.worldCupMatchDate,
           match_ids: generationForm.worldCupMatchIds,
         })
       }
-      const parallelism = Number(generationForm.parallelism.trim())
       const historyRangePayload =
         generationForm.mode === 'history'
           ? generationForm.historyRangeMode === 'recent'

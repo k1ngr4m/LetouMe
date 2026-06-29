@@ -398,6 +398,47 @@ class WorldCupPredictionServiceTests(unittest.TestCase):
             ["wc-ai-model-a-match-1-win_draw_win"],
         )
 
+    def test_generate_for_models_counts_models_and_recommendations_separately(self) -> None:
+        repository = _FakeWorldCupRepository()
+        fake_model = _FakeModel(
+            {
+                "recommendations": [
+                    {
+                        "match_id": "match-1",
+                        "play_type": "win_draw_win",
+                        "selection": "胜",
+                    }
+                ]
+            }
+        )
+        service = WorldCupPredictionService(
+            repository=repository,
+            model_repository=_FakeModelRepository(),
+            news_search_service=_FakeNewsSearchService(),
+            baidu_sports_service=_FakeBaiduSportsService(),
+        )
+
+        with patch("backend.app.services.worldcup_prediction_service.ensure_schema"), patch(
+            "backend.app.services.worldcup_prediction_service.load_model_registry",
+            return_value={"model-a": _FakeModelDefinition(), "model-b": _FakeModelDefinition()},
+        ), patch(
+            "backend.app.services.worldcup_prediction_service.ModelFactory",
+            return_value=_FakeModelFactory(fake_model),
+        ):
+            summary = service.generate_for_models(
+                model_codes=["model-a", "model-b"],
+                match_date="2026-06-16",
+                match_ids=["match-1"],
+                parallelism=1,
+            )
+
+        self.assertEqual(summary["selected_count"], 2)
+        self.assertEqual(summary["completed_count"], 2)
+        self.assertEqual(summary["processed_count"], 2)
+        self.assertEqual(summary["saved_count"], 2)
+        self.assertEqual(summary["recommendation_count"], 2)
+        self.assertEqual(summary["processed_models"], ["model-a", "model-b"])
+
     def test_generate_continues_when_news_service_fails(self) -> None:
         repository = _FakeWorldCupRepository()
         fake_model = _FakeModel(

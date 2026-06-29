@@ -267,6 +267,7 @@ class WorldCupPredictionGeneratePayload(BaseModel):
     model_codes: list[str] = Field(default_factory=list)
     play_type: Literal["all", "win_draw_win", "handicap_win_draw_win", "total_goals", "correct_score", "half_full_time"] = "all"
     overwrite: bool = False
+    parallelism: int = Field(default=1, ge=1, le=8)
     match_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     match_ids: list[str] = Field(default_factory=list)
 

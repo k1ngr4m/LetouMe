@@ -387,6 +387,7 @@ class WorldCupApiTests(unittest.TestCase):
             overwrite=False,
             match_date="2026-06-16",
             match_ids=["test-worldcup-match"],
+            parallelism=1,
         )
 
     def test_prediction_task_detail_reads_worldcup_prediction_task(self) -> None:

@@ -499,6 +499,7 @@ def generate_settings_worldcup_predictions(payload: WorldCupPredictionGeneratePa
             overwrite=payload.overwrite,
             match_date=payload.match_date,
             match_ids=payload.match_ids,
+            parallelism=payload.parallelism,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="模型不存在") from exc

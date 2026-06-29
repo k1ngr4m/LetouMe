@@ -583,6 +583,7 @@ export const apiClient = {
     model_codes?: string[]
     play_type?: 'all' | 'win_draw_win' | 'handicap_win_draw_win' | 'total_goals' | 'correct_score' | 'half_full_time'
     overwrite?: boolean
+    parallelism?: number
     match_date?: string
     match_ids?: string[]
   }) {

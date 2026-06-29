@@ -1143,7 +1143,8 @@ export type BulkModelActionResult = {
 export type PredictionGenerationFailureDetail = {
   model_code: string
   model_name?: string
-  reason: string
+  reason?: string
+  error?: string
 }
 
 export type PredictionGenerationTask = {
@@ -1166,6 +1167,8 @@ export type PredictionGenerationTask = {
     processed_count: number
     skipped_count: number
     failed_count: number
+    saved_count?: number
+    recommendation_count?: number
     failed_periods: string[]
     processed_models?: string[]
     skipped_models?: string[]

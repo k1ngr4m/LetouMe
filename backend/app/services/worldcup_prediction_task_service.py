@@ -28,12 +28,14 @@ class WorldCupPredictionTaskService:
         overwrite: bool = False,
         match_date: str | None = None,
         match_ids: list[str] | None = None,
+        parallelism: int | None = None,
     ) -> dict[str, Any]:
         selected_match_ids = list(match_ids or [])
         selected_model_codes = list(dict.fromkeys(str(code).strip() for code in (model_codes or [model_code]) if str(code).strip()))
         if not selected_model_codes:
             raise ValueError("请选择至少一个模型")
         task_model_code = selected_model_codes[0] if len(selected_model_codes) == 1 else "__bulk__"
+        requested_parallelism = max(1, int(parallelism or 1))
         task = self.runner.create_task(
             initial_task={
                 "lottery_code": "worldcup",
@@ -48,11 +50,14 @@ class WorldCupPredictionTaskService:
                     "selected_count": len(selected_model_codes),
                     "match_date": match_date,
                     "match_ids": selected_match_ids,
+                    "parallelism": requested_parallelism if len(selected_model_codes) > 1 else 1,
                     "processed_count": 0,
                     "skipped_count": 0,
                     "failed_count": 0,
                     "failed_periods": [],
                     "completed_count": 0,
+                    "saved_count": 0,
+                    "recommendation_count": 0,
                     "failed_details": [],
                 },
                 "error_message": None,
@@ -73,6 +78,7 @@ class WorldCupPredictionTaskService:
                     overwrite=overwrite,
                     match_date=match_date,
                     match_ids=selected_match_ids,
+                    parallelism=requested_parallelism,
                     progress_callback=progress_callback,
                 )
             ),
@@ -107,7 +113,7 @@ class WorldCupPredictionTaskService:
             "started_at": state.get("started_at"),
             "finished_at": state.get("finished_at"),
             "fetched_count": 0,
-            "saved_count": 0,
+            "saved_count": int(summary.get("saved_count") or summary.get("recommendation_count") or 0),
             "processed_count": int(summary.get("processed_count") or 0),
             "skipped_count": int(summary.get("skipped_count") or 0),
             "failed_count": int(summary.get("failed_count") or 0),

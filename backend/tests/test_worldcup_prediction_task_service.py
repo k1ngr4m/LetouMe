@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from time import sleep
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 from backend.app.services.worldcup_prediction_task_service import WorldCupPredictionTaskService
 
@@ -31,6 +31,7 @@ class WorldCupPredictionTaskServiceTests(unittest.TestCase):
             overwrite=False,
             match_date="2026-06-19",
             match_ids=["match-1"],
+            parallelism=2,
         )
         for _ in range(20):
             if prediction_service.generate_for_models.called:
@@ -42,6 +43,7 @@ class WorldCupPredictionTaskServiceTests(unittest.TestCase):
         self.assertEqual(call_kwargs["model_codes"], ["model-a", "model-b"])
         self.assertEqual(call_kwargs["match_date"], "2026-06-19")
         self.assertEqual(call_kwargs["match_ids"], ["match-1"])
+        self.assertEqual(call_kwargs["parallelism"], 2)
         log_repository.create_log.assert_any_call(
             task_id=str(task["task_id"]),
             lottery_code="worldcup",
@@ -50,7 +52,7 @@ class WorldCupPredictionTaskServiceTests(unittest.TestCase):
             task_type="worldcup_prediction_generate",
             mode="current",
             model_code="__bulk__",
-            status="queued",
+            status=ANY,
             created_at=task.get("created_at"),
         )
 

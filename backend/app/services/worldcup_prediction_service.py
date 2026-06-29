@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from backend.app.db.connection import ensure_schema
@@ -67,10 +69,13 @@ class WorldCupPredictionService:
             "failed_count": 0,
             "failed_periods": [],
             "completed_count": 0,
+            "saved_count": 0,
+            "recommendation_count": 0,
             "failed_details": [],
         }
         if not match_context:
             summary["skipped_count"] = 1
+            summary["completed_count"] = 1
             if progress_callback:
                 progress_callback(summary)
             return summary
@@ -95,16 +100,27 @@ class WorldCupPredictionService:
                 overwrite=overwrite,
             )
             saved_count = self.repository.replace_recommendations(recommendations)
-            summary["processed_count"] = saved_count
-            summary["completed_count"] = saved_count
+            summary["saved_count"] = saved_count
+            summary["recommendation_count"] = saved_count
             if not saved_count:
                 summary["skipped_count"] = 1
+                summary["completed_count"] = 1
+            else:
+                summary["processed_count"] = 1
+                summary["completed_count"] = 1
             if progress_callback:
                 progress_callback(summary)
             return summary
         except Exception as exc:
             summary["failed_count"] = 1
-            summary["failed_details"] = [{"model_code": model_code, "error": str(exc)}]
+            summary["completed_count"] = 1
+            summary["failed_details"] = [
+                self._build_failed_detail(
+                    model_code=model_code,
+                    model_name=str(model_record.get("display_name") or model_def.name),
+                    reason=str(exc),
+                )
+            ]
             if progress_callback:
                 progress_callback(summary)
             raise
@@ -117,6 +133,7 @@ class WorldCupPredictionService:
         overwrite: bool = False,
         match_date: str | None = None,
         match_ids: list[str] | None = None,
+        parallelism: int | None = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         normalized_codes = [str(code).strip() for code in model_codes if str(code).strip()]
@@ -124,19 +141,23 @@ class WorldCupPredictionService:
         if not unique_codes:
             raise ValueError("请选择至少一个模型")
         selected_match_ids = list(match_ids or [])
+        max_workers = self._normalize_parallelism(parallelism, selected_count=len(unique_codes))
         summary: dict[str, Any] = {
             "lottery_code": "worldcup",
             "mode": "current",
             "model_code": "__bulk__",
             "selected_count": len(unique_codes),
+            "completed_count": 0,
             "match_date": match_date,
             "match_ids": selected_match_ids,
             "play_type": play_type,
+            "parallelism": max_workers,
             "processed_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
             "failed_periods": [],
-            "completed_count": 0,
+            "saved_count": 0,
+            "recommendation_count": 0,
             "processed_models": [],
             "skipped_models": [],
             "failed_models": [],
@@ -145,7 +166,9 @@ class WorldCupPredictionService:
         if progress_callback:
             progress_callback(dict(summary))
 
-        for model_code in unique_codes:
+        outcomes_lock = Lock()
+
+        def run_single_model(model_code: str) -> tuple[str, dict[str, Any]]:
             try:
                 result = self.generate_for_model(
                     model_code=model_code,
@@ -154,27 +177,67 @@ class WorldCupPredictionService:
                     match_date=match_date,
                     match_ids=selected_match_ids,
                 )
+                return model_code, result
+            except Exception as exc:
+                return model_code, {
+                    "processed_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 1,
+                    "completed_count": 1,
+                    "saved_count": 0,
+                    "recommendation_count": 0,
+                    "failed_details": [self._build_failed_detail(model_code=model_code, reason=str(exc))],
+                }
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(run_single_model, model_code): model_code for model_code in unique_codes}
+            for future in as_completed(futures):
+                model_code, result = future.result()
                 processed_count = int(result.get("processed_count") or 0)
                 skipped_count = int(result.get("skipped_count") or 0)
                 failed_count = int(result.get("failed_count") or 0)
-                summary["processed_count"] += processed_count
-                summary["skipped_count"] += skipped_count
-                summary["failed_count"] += failed_count
-                summary["completed_count"] += int(result.get("completed_count") or processed_count)
-                if processed_count > 0:
-                    summary["processed_models"].append(model_code)
-                elif skipped_count > 0:
-                    summary["skipped_models"].append(model_code)
-                if failed_count > 0:
-                    summary["failed_models"].append(model_code)
-                    summary["failed_details"].extend(result.get("failed_details") or [])
-            except Exception as exc:
-                summary["failed_count"] += 1
-                summary["failed_models"].append(model_code)
-                summary["failed_details"].append({"model_code": model_code, "error": str(exc)})
-            if progress_callback:
-                progress_callback(dict(summary))
+                saved_count = int(result.get("saved_count") or result.get("recommendation_count") or 0)
+                completed_count = int(result.get("completed_count") or 1)
+                with outcomes_lock:
+                    summary["processed_count"] += processed_count
+                    summary["skipped_count"] += skipped_count
+                    summary["failed_count"] += failed_count
+                    summary["completed_count"] += completed_count
+                    summary["saved_count"] += saved_count
+                    summary["recommendation_count"] += saved_count
+                    if processed_count > 0:
+                        summary["processed_models"].append(model_code)
+                    elif skipped_count > 0:
+                        summary["skipped_models"].append(model_code)
+                    if failed_count > 0:
+                        summary["failed_models"].append(model_code)
+                        summary["failed_details"].extend(result.get("failed_details") or [])
+                    snapshot = dict(summary)
+                if progress_callback:
+                    progress_callback(snapshot)
         return summary
+
+    @staticmethod
+    def _normalize_parallelism(value: int | None, *, selected_count: int) -> int:
+        try:
+            requested = int(value or 1)
+        except (TypeError, ValueError):
+            requested = 1
+        requested = max(1, requested)
+        selected = max(1, int(selected_count or 1))
+        return min(requested, selected, 8)
+
+    @staticmethod
+    def _build_failed_detail(*, model_code: str, reason: str, model_name: str | None = None) -> dict[str, str]:
+        normalized_reason = str(reason or "未知错误")
+        detail = {
+            "model_code": str(model_code),
+            "reason": normalized_reason,
+            "error": normalized_reason,
+        }
+        if model_name:
+            detail["model_name"] = str(model_name)
+        return detail
 
     def _validate_model(self, model_code: str) -> dict[str, Any]:
         model = self.model_repository.get_model(model_code)
